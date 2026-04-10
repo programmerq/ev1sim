@@ -1,0 +1,38 @@
+{
+  "vehicle_model": "sedan",
+  "terrain": {
+    "type": "rigid_plane",
+    "surface": "asphalt",
+    "length_m": 400.0,
+    "width_m": 400.0,
+    "friction": 0.9
+  },
+  "simulation": {
+    "step_size_s": 0.002,
+    "render_fps": 60,
+    "realtime": true
+  },
+  "spawn": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.5,
+    "yaw_deg": 0.0
+  },
+  "camera": {
+    "default_mode": "chase",
+    "chase_distance": 6.0,
+    "chase_height": 2.0
+  },
+  "input": {
+    "steer_rate": 1.8,
+    "steer_return_rate": 2.5,
+    "throttle_rise_rate": 1.5,
+    "brake_rise_rate": 2.0
+  },
+  "telemetry": {
+    "log_rate_hz": 10.0,
+    "log_to_file": false,
+    "log_file": "telemetry.csv",
+    "show_hud": true
+  }
+}
