@@ -40,6 +40,15 @@ FetchContent_Declare(json
 )
 FetchContent_MakeAvailable(json)
 
+# ── macOS Objective-C++ support ─────────────────────────────────────────────
+if(APPLE)
+    enable_language(OBJCXX)
+    set(CMAKE_OBJCXX_STANDARD 17)
+    set(MACOS_PLATFORM_SRC src/MacOSPlatform.mm)
+else()
+    set(MACOS_PLATFORM_SRC)
+endif()
+
 # ── Main executable ─────────────────────────────────────────────────────────
 add_executable(ev1sim
     src/main.cpp
@@ -50,6 +59,8 @@ add_executable(ev1sim
     src/CameraManager.cpp
     src/Config.cpp
     src/Telemetry.cpp
+    src/HornAudio.cpp
+    ${MACOS_PLATFORM_SRC}
 )
 
 target_include_directories(ev1sim PRIVATE src)
@@ -57,6 +68,15 @@ target_link_libraries(ev1sim PRIVATE
     ${CHRONO_LIBRARIES}
     nlohmann_json::nlohmann_json
 )
+
+# Link macOS frameworks for platform fixes and audio.
+if(APPLE)
+    target_link_libraries(ev1sim PRIVATE
+        "-framework Cocoa"
+        "-framework OpenGL"
+        "-framework AudioToolbox"
+    )
+endif()
 
 # Pass Chrono's data directory so vehicle JSON definitions are found at runtime.
 target_compile_definitions(ev1sim PRIVATE

@@ -1,4 +1,5 @@
 #include "SimApp.h"
+#include "MacOSPlatform.h"
 
 #include <algorithm>
 #include <cmath>
@@ -27,10 +28,13 @@ SimApp::SimApp(const Config& config) : m_config(config) {
         m_config.telemetry.log_file,
         m_config.telemetry.show_hud);
 
-    // 4. Visualization (creates window).
+    // 4. Horn audio.
+    m_horn = std::make_unique<HornAudio>();
+
+    // 5. Visualization (creates window).
     SetupVisualization();
 
-    // 5. Camera manager — needs the Irrlicht camera node from vis.
+    // 6. Camera manager — needs the Irrlicht camera node from vis.
     auto* cam_node = m_vis->GetActiveCamera();
     m_camera = std::make_unique<CameraManager>(
         cam_node, m_config.camera.chase_distance, m_config.camera.chase_height);
@@ -40,7 +44,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
     m_vis->AddUserEventReceiver(m_camera.get());
 
     std::cout << "[SimApp] Ready.  Controls: WASD=drive  Space=park brake  "
-                 "R=reset  C=camera  Esc=quit\n";
+                 "R=reset  C=camera  B=horn  O=hi  L=lo  Esc=quit\n";
 }
 
 SimApp::~SimApp() = default;
@@ -62,6 +66,12 @@ void SimApp::SetupVisualization() {
     m_vis->Initialize();
     m_vis->AddTypicalLights();
     m_vis->AttachVehicle(&m_world->GetVehicle());
+
+    // macOS platform fixes (no-ops on other platforms).
+    macos_activate_app();
+    macos_setup_menu_bar();
+    macos_fix_retina_viewport();
+    macos_enable_fullscreen();
 
     // Register keyboard handler.
     m_vis->AddUserEventReceiver(m_keyboard.get());
@@ -109,6 +119,9 @@ void SimApp::Run() {
                              m_camera->GetModeName(),
                              m_config.terrain.surface);
         m_vis->EndScene();
+
+        // --- Horn audio ---
+        m_horn->SetTones(cmd.horn_low, cmd.horn_high);
 
         // --- Telemetry logging ---
         m_telemetry->Record(m_world->GetState(), render_dt);
