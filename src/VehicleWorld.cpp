@@ -28,8 +28,9 @@ VehicleWorld::VehicleWorld(const Config& config) {
     m_spawn_pos = ChVector3d(config.spawn.x, config.spawn.y, config.spawn.z);
     m_spawn_rot = QuatFromAngleZ(yaw_rad);
 
-    // Set Chrono data path so vehicle JSON definitions are found.
+    // Set Chrono data paths so vehicle JSON definitions and meshes are found.
     SetChronoDataPath(CHRONO_DATA_DIR);
+    vehicle::SetDataPath(std::string(CHRONO_DATA_DIR) + "vehicle/");
 
     // Build vehicle.
     if (config.vehicle_model == "hmmwv")

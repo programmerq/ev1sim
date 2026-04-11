@@ -50,6 +50,7 @@ void SimApp::SetupVisualization() {
     m_vis = chrono_types::make_shared<ChWheeledVehicleVisualSystemIrrlicht>();
     m_vis->SetWindowTitle("EV1 Simulator");
     m_vis->SetWindowSize(1280, 720);
+    m_vis->SetDriverType(irr::video::EDT_OPENGL);
 
     // Chase camera defaults (we override positioning via CameraManager,
     // but Chrono needs a chase camera configured to initialise properly).
