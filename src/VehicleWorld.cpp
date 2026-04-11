@@ -1,7 +1,9 @@
 #include "VehicleWorld.h"
 
-#include "chrono/core/ChTypes.h"
+#include "chrono/core/ChGlobal.h"
+#include "chrono/core/ChRotation.h"
 #include "chrono_vehicle/ChVehicleModelData.h"
+#include "chrono_vehicle/ChSubsysDefs.h"
 #include "chrono_models/vehicle/sedan/Sedan.h"
 #include "chrono_models/vehicle/hmmwv/HMMWV.h"
 
@@ -150,9 +152,8 @@ void VehicleWorld::ResetVehicle() {
     body->SetPos(m_spawn_pos);
     body->SetRot(m_spawn_rot);
     body->SetPosDt(ChVector3d(0, 0, 0));
-    body->SetRotDt(ChQuaterniond(1, 0, 0, 0));
+    body->SetAngVelLocal(ChVector3d(0, 0, 0));
     body->SetPosDt2(ChVector3d(0, 0, 0));
-    body->SetRotDt2(ChQuaterniond(1, 0, 0, 0));
     // Note: this resets the chassis but not individual wheel/suspension states.
     // Good enough for a quick respawn; a full reset would recreate the vehicle.
 }
@@ -212,15 +213,13 @@ VehicleState VehicleWorld::GetState() const {
     int n_axles = std::min(static_cast<int>(m_vehicle->GetNumberAxles()), 2);
     int idx = 0;
     for (int a = 0; a < n_axles && idx < 4; ++a) {
-        auto axle = m_vehicle->GetAxle(a);
-        for (int side = 0; side < 2 && idx < 4; ++side) {
-            s.wheel_omega[idx++] = axle->m_wheels[side]->GetPos_dt();
-        }
+        s.wheel_omega[idx++] = m_vehicle->GetSpindleOmega(a, vehicle::LEFT);
+        s.wheel_omega[idx++] = m_vehicle->GetSpindleOmega(a, vehicle::RIGHT);
     }
 
-    // Steering angle (first steering subsystem).
-    if (m_vehicle->GetNumberSteeringMechanisms() > 0)
-        s.steering_angle = m_vehicle->GetSteering(0);
+    // Steering angle (first axle, left side).
+    if (n_axles > 0)
+        s.steering_angle = m_vehicle->GetSteeringAngle(0, vehicle::LEFT);
 
     // Echo applied commands.
     auto& cmd = m_driver->GetCommand();

@@ -2,7 +2,7 @@
 
 #include "DriverCommand.h"
 
-#include "chrono_vehicle/driver/ChDriver.h"
+#include "chrono_vehicle/ChDriver.h"
 
 // Bridge between our framework-agnostic DriverCommand and Chrono's
 // ChDriver interface.  VehicleWorld passes this to Chrono's

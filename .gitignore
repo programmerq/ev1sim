@@ -1,7 +1,12 @@
 build/
+deps/
+_deps/
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
+CTestTestfile.cmake
+DartConfiguration.tcl
+*_include.cmake
 Makefile
 compile_commands.json
 *.o

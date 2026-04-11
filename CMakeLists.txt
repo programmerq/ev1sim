@@ -6,7 +6,30 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # ── Chrono (must be pre-installed with Vehicle + Irrlicht modules) ──────────
+# Auto-detect local deps/ install; override with -DChrono_DIR=<path>
+if(NOT Chrono_DIR AND EXISTS "${CMAKE_SOURCE_DIR}/deps/chrono-install/lib/cmake/Chrono")
+    set(Chrono_DIR "${CMAKE_SOURCE_DIR}/deps/chrono-install/lib/cmake/Chrono")
+endif()
 find_package(Chrono REQUIRED COMPONENTS Vehicle Irrlicht CONFIG)
+
+# Chrono uses old-style CMake variables rather than imported targets.
+# Apply its compiler flags, include dirs, and linker flags globally for
+# all targets that need Chrono.
+include_directories(${CHRONO_INCLUDE_DIRS})
+add_compile_options(${CHRONO_CXX_FLAGS})
+add_link_options(${CHRONO_LINKER_FLAGS})
+
+# Ensure Chrono shared libraries are found at runtime via RPATH.
+set(CMAKE_BUILD_RPATH_USE_ORIGIN TRUE)
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+# Extract library directories from CHRONO_LIBRARIES for RPATH.
+set(_chrono_rpaths "")
+foreach(_lib ${CHRONO_LIBRARIES})
+    get_filename_component(_dir "${_lib}" DIRECTORY)
+    list(APPEND _chrono_rpaths "${_dir}")
+endforeach()
+list(REMOVE_DUPLICATES _chrono_rpaths)
+set(CMAKE_BUILD_RPATH "${_chrono_rpaths}")
 
 # ── nlohmann/json (header-only, fetched at configure time) ──────────────────
 include(FetchContent)
@@ -31,7 +54,7 @@ add_executable(ev1sim
 
 target_include_directories(ev1sim PRIVATE src)
 target_link_libraries(ev1sim PRIVATE
-    ${CHRONO_TARGETS}
+    ${CHRONO_LIBRARIES}
     nlohmann_json::nlohmann_json
 )
 
@@ -64,7 +87,7 @@ if(BUILD_TESTS)
     target_link_libraries(ev1sim_tests PRIVATE
         Catch2::Catch2WithMain
         nlohmann_json::nlohmann_json
-        ${CHRONO_TARGETS}
+        ${CHRONO_LIBRARIES}
     )
 
     include(CTest)
