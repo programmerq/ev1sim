@@ -11,6 +11,8 @@ TEST_CASE("DriverCommand default-initialises to safe values", "[DriverCommand]")
     CHECK(cmd.steering    == 0.0);
     CHECK(cmd.parking_brake  == false);
     CHECK(cmd.reset_vehicle  == false);
+    CHECK(cmd.horn_low   == false);
+    CHECK(cmd.horn_high  == false);
 }
 
 TEST_CASE("DriverCommand fields are independently assignable", "[DriverCommand]") {

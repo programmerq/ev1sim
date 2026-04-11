@@ -72,14 +72,20 @@ DriverCommand KeyboardInputController::Update(double dt) {
     if (m_keys[irr::KEY_ESCAPE])
         m_quit = true;
 
-    return DriverCommand{
-        m_throttle,
-        m_brake,      // front_brake  (same for first pass)
-        m_brake,      // rear_brake
-        m_steering,
-        m_parking_brake,
-        do_reset,
-    };
+    DriverCommand cmd;
+    cmd.throttle      = m_throttle;
+    cmd.front_brake   = m_brake;
+    cmd.rear_brake    = m_brake;
+    cmd.steering      = m_steering;
+    cmd.parking_brake = m_parking_brake;
+    cmd.reset_vehicle = do_reset;
+
+    // Horn — direct key state, no ramping.
+    // B = steering-wheel horn (both tones), O = hi only, L = lo only.
+    cmd.horn_low  = m_keys[irr::KEY_KEY_B] || m_keys[irr::KEY_KEY_L];
+    cmd.horn_high = m_keys[irr::KEY_KEY_B] || m_keys[irr::KEY_KEY_O];
+
+    return cmd;
 }
 
 // ---------------------------------------------------------------------------

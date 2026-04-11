@@ -134,3 +134,38 @@ TEST_CASE("Camera cycle is consumable one-shot", "[Keyboard]") {
     CHECK(ctrl.ConsumeCameraCycle() == true);
     CHECK(ctrl.ConsumeCameraCycle() == false);  // consumed
 }
+
+// -----------------------------------------------------------------------
+TEST_CASE("Horn B key sounds both tones", "[Keyboard]") {
+    auto ctrl = MakeController();
+
+    ctrl.SetKeyPressed(irr::KEY_KEY_B, true);
+    auto cmd = ctrl.Update(0.016);
+    CHECK(cmd.horn_low  == true);
+    CHECK(cmd.horn_high == true);
+
+    ctrl.SetKeyPressed(irr::KEY_KEY_B, false);
+    cmd = ctrl.Update(0.016);
+    CHECK(cmd.horn_low  == false);
+    CHECK(cmd.horn_high == false);
+}
+
+// -----------------------------------------------------------------------
+TEST_CASE("Horn O key sounds high tone only", "[Keyboard]") {
+    auto ctrl = MakeController();
+
+    ctrl.SetKeyPressed(irr::KEY_KEY_O, true);
+    auto cmd = ctrl.Update(0.016);
+    CHECK(cmd.horn_low  == false);
+    CHECK(cmd.horn_high == true);
+}
+
+// -----------------------------------------------------------------------
+TEST_CASE("Horn L key sounds low tone only", "[Keyboard]") {
+    auto ctrl = MakeController();
+
+    ctrl.SetKeyPressed(irr::KEY_KEY_L, true);
+    auto cmd = ctrl.Update(0.016);
+    CHECK(cmd.horn_low  == true);
+    CHECK(cmd.horn_high == false);
+}

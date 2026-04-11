@@ -10,4 +10,8 @@ struct DriverCommand {
     double steering    = 0.0;   // -1..1  (positive = left turn, Chrono convention)
     bool   parking_brake  = false;
     bool   reset_vehicle  = false;
+
+    // Horn tones — controlled by BCM or directly by keyboard.
+    bool   horn_low   = false;  // 400 Hz tone
+    bool   horn_high  = false;  // 500 Hz tone
 };
