@@ -203,6 +203,22 @@ void macos_enable_fullscreen() {
     win.styleMask |= NSWindowStyleMaskResizable;
 }
 
+void macos_apply_viewport() {
+    // Query the actual framebuffer pixel dimensions each frame.
+    // On Retina this is 2× the logical size; after resize/fullscreen
+    // it reflects the new window geometry.  Override Irrlicht's
+    // glViewport so rendering fills the entire framebuffer.
+    NSWindow* win = find_irrlicht_window();
+    if (!win) return;
+    NSView* content = [win contentView];
+    if (!content) return;
+
+    NSRect backing = [content convertRectToBacking:[content bounds]];
+    glViewport(0, 0,
+               (GLsizei)backing.size.width,
+               (GLsizei)backing.size.height);
+}
+
 #pragma clang diagnostic pop
 
 #else  // !__APPLE__
@@ -212,5 +228,6 @@ void macos_activate_app()          {}
 void macos_fix_retina_viewport()   {}
 void macos_setup_menu_bar()        {}
 void macos_enable_fullscreen()     {}
+void macos_apply_viewport()        {}
 
 #endif

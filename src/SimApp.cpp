@@ -113,6 +113,7 @@ void SimApp::Run() {
 
         // --- Render ---
         m_vis->BeginScene();
+        macos_apply_viewport();   // override glViewport for Retina / resize
         m_vis->Render();
         m_telemetry->DrawHUD(m_vis->GetDevice(),
                              m_world->GetState(),
