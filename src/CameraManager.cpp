@@ -166,11 +166,23 @@ bool CameraManager::OnEvent(const irr::SEvent& event) {
     if (event.EventType != irr::EET_MOUSE_INPUT_EVENT)
         return false;
 
-    // Only consume mouse events in free-look mode.
+    const auto& me = event.MouseInput;
+
+    // Mouse wheel zooms in ALL camera modes.
+    if (me.Event == irr::EMIE_MOUSE_WHEEL) {
+        if (m_mode == CameraMode::FreeLook) {
+            // Free-look: adjust orbit distance directly.
+            m_orbit_dist = std::clamp(m_orbit_dist - me.Wheel * 2.0, 2.0, 100.0);
+        } else {
+            // Other modes: adjust shared zoom multiplier.
+            Zoom(-me.Wheel * 0.3);
+        }
+        return true;
+    }
+
+    // Drag / click events only in free-look mode.
     if (m_mode != CameraMode::FreeLook)
         return false;
-
-    const auto& me = event.MouseInput;
 
     switch (me.Event) {
         case irr::EMIE_LMOUSE_PRESSED_DOWN:
@@ -193,10 +205,6 @@ bool CameraManager::OnEvent(const irr::SEvent& event) {
             m_last_mx = me.X;
             m_last_my = me.Y;
             return m_dragging;
-
-        case irr::EMIE_MOUSE_WHEEL:
-            m_orbit_dist = std::clamp(m_orbit_dist - me.Wheel * 2.0, 2.0, 100.0);
-            return true;
 
         default:
             return false;

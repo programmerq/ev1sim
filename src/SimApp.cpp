@@ -44,7 +44,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
     m_vis->AddUserEventReceiver(m_camera.get());
 
     std::cout << "[SimApp] Ready.  Controls: WASD=drive  Space=park brake  "
-                 "Q/R=respawn  C=camera  +/-=zoom  B=horn  O=hi  L=lo  Esc=quit\n";
+                 "R=respawn  C=camera  Scroll=zoom  B=horn  O=hi  L=lo  Esc=quit\n";
 }
 
 SimApp::~SimApp() = default;
@@ -65,7 +65,13 @@ void SimApp::SetupVisualization() {
 
     m_vis->Initialize();
     m_vis->AddSkyBox();
-    m_vis->AddTypicalLights();
+
+    // Directional sun light with strong ambient so the whole map is lit
+    // (AddTypicalLights only adds two point lights near the origin).
+    m_vis->AddLightDirectional(60, 60,
+        chrono::ChColor(0.8f, 0.8f, 0.8f),   // ambient
+        chrono::ChColor(0.3f, 0.3f, 0.3f),   // specular
+        chrono::ChColor(1.0f, 1.0f, 0.9f));  // diffuse (warm sun)
     m_vis->AttachVehicle(&m_world->GetVehicle());
 
     // macOS platform fixes (no-ops on other platforms).
@@ -94,9 +100,6 @@ void SimApp::Run() {
             m_world->ResetVehicle();
         if (m_keyboard->ConsumeCameraCycle())
             m_camera->CycleMode();
-        double zoom = m_keyboard->ConsumeZoomDelta();
-        if (zoom != 0.0)
-            m_camera->Zoom(zoom);
         if (m_keyboard->QuitRequested())
             break;
 

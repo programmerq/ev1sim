@@ -255,14 +255,31 @@ void VehicleWorld::Advance(double step) {
 // ---------------------------------------------------------------------------
 
 void VehicleWorld::ResetVehicle() {
-    auto body = m_vehicle->GetChassisBody();
-    body->SetPos(m_spawn_pos);
-    body->SetRot(m_spawn_rot);
-    body->SetPosDt(ChVector3d(0, 0, 0));
-    body->SetAngVelLocal(ChVector3d(0, 0, 0));
-    body->SetPosDt2(ChVector3d(0, 0, 0));
-    // Note: this resets the chassis but not individual wheel/suspension states.
-    // Good enough for a quick respawn; a full reset would recreate the vehicle.
+    // Teleport the entire vehicle (chassis + wheels + suspension + steering)
+    // by computing the rigid transform from current pose to spawn pose and
+    // applying it to every non-fixed body in the system.
+    auto chassis = m_vehicle->GetChassisBody();
+    ChVector3d    old_pos = chassis->GetPos();
+    ChQuaterniond old_rot = chassis->GetRot();
+
+    // Rotation from old orientation to spawn orientation.
+    ChQuaterniond rot_delta = m_spawn_rot * old_rot.GetInverse();
+
+    for (auto& body : m_system->GetBodies()) {
+        if (body->IsFixed())
+            continue;
+
+        // Rotate each body's offset from the old chassis position,
+        // then translate to spawn.
+        ChVector3d rel = body->GetPos() - old_pos;
+        body->SetPos(m_spawn_pos + rot_delta.Rotate(rel));
+        body->SetRot(rot_delta * body->GetRot());
+
+        // Zero all velocities so the car is at rest.
+        body->SetPosDt(ChVector3d(0, 0, 0));
+        body->SetAngVelLocal(ChVector3d(0, 0, 0));
+        body->SetPosDt2(ChVector3d(0, 0, 0));
+    }
 }
 
 // ---------------------------------------------------------------------------
