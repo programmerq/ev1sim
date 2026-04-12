@@ -1,0 +1,20 @@
+{
+    "spawn": {
+        "x": 1380.0,
+        "y": 600.0,
+        "z": 322.5,
+        "yaw_deg": 94.0
+    },
+    "patches": [
+        {
+            "mesh": "milford_asphault.obj",
+            "surface": "asphalt",
+            "friction": 0.9
+        },
+        {
+            "mesh": "milford_terrain.obj",
+            "surface": "grass",
+            "friction": 0.4
+        }
+    ]
+}

@@ -46,7 +46,8 @@ Config Config::LoadFromFile(const std::string& path) {
         read_if(t, "surface",  cfg.terrain.surface);
         read_if(t, "length_m", cfg.terrain.length_m);
         read_if(t, "width_m",  cfg.terrain.width_m);
-        read_if(t, "friction", cfg.terrain.friction);
+        read_if(t, "friction",   cfg.terrain.friction);
+        read_if(t, "level_file", cfg.terrain.level_file);
     }
 
     if (j.contains("simulation")) {
@@ -124,6 +125,9 @@ void Config::ApplyCliOverrides(int argc, char* argv[]) {
         } else if (arg == "--render-fps") {
             auto v = next();
             if (!v.empty()) simulation.render_fps = std::stoi(v);
+        } else if (arg == "--level") {
+            terrain.type = "level";
+            terrain.level_file = next();
         } else if (arg == "--hud") {
             auto v = next();
             telemetry.show_hud = (v == "true" || v == "1");

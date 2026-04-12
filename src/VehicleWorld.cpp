@@ -7,7 +7,10 @@
 #include "chrono_models/vehicle/sedan/Sedan.h"
 #include "chrono_models/vehicle/hmmwv/HMMWV.h"
 
+#include <nlohmann/json.hpp>
+
 #include <cmath>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 
@@ -22,7 +25,14 @@ using namespace chrono::vehicle;
 // Construction
 // ---------------------------------------------------------------------------
 
-VehicleWorld::VehicleWorld(const Config& config) {
+VehicleWorld::VehicleWorld(const Config& config_in) {
+    // Mutable copy — the level file may override spawn position.
+    Config config = config_in;
+
+    // If a level file is specified, load it first (overrides spawn + terrain).
+    if (config.terrain.type == "level" && !config.terrain.level_file.empty())
+        LoadLevelFile(config.terrain.level_file, config);
+
     // Compute spawn pose.
     double yaw_rad = config.spawn.yaw_deg * M_PI / 180.0;
     m_spawn_pos = ChVector3d(config.spawn.x, config.spawn.y, config.spawn.z);
@@ -45,8 +55,13 @@ VehicleWorld::VehicleWorld(const Config& config) {
     CreateTerrain(config);
 
     std::cout << "[VehicleWorld] Initialised: model=" << config.vehicle_model
-              << "  surface=" << config.terrain.surface
-              << "  friction=" << config.terrain.friction << "\n";
+              << "  terrain=" << config.terrain.type;
+    if (config.terrain.type == "level")
+        std::cout << "  level=" << config.terrain.level_file;
+    else
+        std::cout << "  surface=" << config.terrain.surface
+                  << "  friction=" << config.terrain.friction;
+    std::cout << "\n";
 }
 
 VehicleWorld::~VehicleWorld() = default;
@@ -103,20 +118,102 @@ void VehicleWorld::CreateHMMWV(const Config& cfg) {
 void VehicleWorld::CreateTerrain(const Config& cfg) {
     m_terrain = std::make_unique<RigidTerrain>(m_system);
 
-    auto mat = chrono_types::make_shared<ChContactMaterialSMC>();
-    mat->SetFriction(static_cast<float>(cfg.terrain.friction));
-    mat->SetRestitution(0.01f);
+    if (cfg.terrain.type == "level" && !m_level_patches.empty()) {
+        // ── Mesh-based level terrain ──
+        // Resolve mesh paths relative to the level file's directory.
+        std::string level_dir;
+        auto slash = cfg.terrain.level_file.find_last_of("/\\");
+        if (slash != std::string::npos)
+            level_dir = cfg.terrain.level_file.substr(0, slash + 1);
 
-    auto patch = m_terrain->AddPatch(
-        mat,
-        ChCoordsys<>(ChVector3d(0, 0, 0), QUNIT),
-        cfg.terrain.length_m,
-        cfg.terrain.width_m);
+        for (auto& lp : m_level_patches) {
+            auto mat = chrono_types::make_shared<ChContactMaterialSMC>();
+            mat->SetFriction(static_cast<float>(lp.friction));
+            mat->SetRestitution(0.01f);
 
-    // Apply a simple texture if available (non-fatal if missing).
-    patch->SetTexture(GetDataFile("terrain/textures/tile4.jpg"), 200, 200);
+            std::string mesh_path = level_dir + lp.mesh_file;
+            std::cout << "[VehicleWorld] Loading patch: " << lp.surface
+                      << "  mesh=" << mesh_path
+                      << "  friction=" << lp.friction << "\n";
+
+            m_terrain->AddPatch(
+                mat,
+                ChCoordsys<>(ChVector3d(0, 0, 0), QUNIT),
+                mesh_path,
+                true,   // connected mesh (better collision)
+                0.0,    // sweep sphere radius
+                true);  // visualization
+        }
+    } else {
+        // ── Flat box terrain (original default) ──
+        auto mat = chrono_types::make_shared<ChContactMaterialSMC>();
+        mat->SetFriction(static_cast<float>(cfg.terrain.friction));
+        mat->SetRestitution(0.01f);
+
+        auto patch = m_terrain->AddPatch(
+            mat,
+            ChCoordsys<>(ChVector3d(0, 0, 0), QUNIT),
+            cfg.terrain.length_m,
+            cfg.terrain.width_m);
+
+        patch->SetTexture(GetDataFile("terrain/textures/tile4.jpg"), 200, 200);
+    }
 
     m_terrain->Initialize();
+}
+
+// ---------------------------------------------------------------------------
+// Level file loading
+// ---------------------------------------------------------------------------
+
+void VehicleWorld::LoadLevelFile(const std::string& level_file, Config& cfg) {
+    std::ifstream f(level_file);
+    if (!f.is_open()) {
+        std::cerr << "[VehicleWorld] Cannot open level file: " << level_file
+                  << " — falling back to flat terrain.\n";
+        cfg.terrain.type = "rigid_plane";
+        return;
+    }
+
+    nlohmann::json j;
+    try {
+        j = nlohmann::json::parse(f);
+    } catch (const nlohmann::json::parse_error& e) {
+        std::cerr << "[VehicleWorld] Level JSON error: " << e.what() << "\n";
+        cfg.terrain.type = "rigid_plane";
+        return;
+    }
+
+    // ── Spawn point (overrides config.spawn) ──
+    if (j.contains("spawn")) {
+        auto& sp = j["spawn"];
+        if (sp.contains("x"))       cfg.spawn.x       = sp["x"].get<double>();
+        if (sp.contains("y"))       cfg.spawn.y       = sp["y"].get<double>();
+        if (sp.contains("z"))       cfg.spawn.z       = sp["z"].get<double>();
+        if (sp.contains("yaw_deg")) cfg.spawn.yaw_deg = sp["yaw_deg"].get<double>();
+        std::cout << "[VehicleWorld] Level spawn: ("
+                  << cfg.spawn.x << ", " << cfg.spawn.y << ", " << cfg.spawn.z
+                  << ")  yaw=" << cfg.spawn.yaw_deg << " deg\n";
+    }
+
+    // ── Terrain patches ──
+    if (j.contains("patches")) {
+        for (auto& p : j["patches"]) {
+            LevelPatch lp;
+            lp.mesh_file = p.value("mesh", "");
+            lp.surface   = p.value("surface", "unknown");
+            lp.friction  = p.value("friction", 0.9);
+
+            if (lp.mesh_file.empty()) {
+                std::cerr << "[VehicleWorld] Patch missing 'mesh' field — skipped.\n";
+                continue;
+            }
+            m_level_patches.push_back(std::move(lp));
+        }
+    }
+
+    std::cout << "[VehicleWorld] Level loaded: " << m_level_patches.size()
+              << " patches from " << level_file << "\n";
 }
 
 // ---------------------------------------------------------------------------

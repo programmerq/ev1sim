@@ -6,11 +6,15 @@ struct Config {
     std::string vehicle_model = "sedan";  // "sedan" or "hmmwv"
 
     struct Terrain {
-        std::string type    = "rigid_plane";
+        std::string type    = "rigid_plane";  // "rigid_plane" or "level"
         std::string surface = "asphalt";
         double length_m  = 400.0;
         double width_m   = 400.0;
         double friction  = 0.9;
+
+        // When type == "level", path to a JSON level file that defines
+        // mesh patches, surface types, friction, and spawn point.
+        std::string level_file;
     } terrain;
 
     struct Simulation {

@@ -14,6 +14,8 @@ namespace chrono::vehicle::sedan { class Sedan; }
 namespace chrono::vehicle::hmmwv { class HMMWV_Full; }
 
 #include <memory>
+#include <string>
+#include <vector>
 
 // Owns the Chrono physics system, vehicle model, terrain, and driver bridge.
 // Provides framework-agnostic state queries for telemetry and camera.
@@ -43,6 +45,7 @@ private:
     void CreateSedan(const Config& cfg);
     void CreateHMMWV(const Config& cfg);
     void CreateTerrain(const Config& cfg);
+    void LoadLevelFile(const std::string& level_file, Config& cfg);
 
     // One of these is populated depending on vehicle_model.
     std::unique_ptr<chrono::vehicle::sedan::Sedan>      m_sedan;
@@ -58,4 +61,12 @@ private:
     // Spawn pose for reset.
     chrono::ChVector3d     m_spawn_pos;
     chrono::ChQuaterniond  m_spawn_rot;
+
+    // Level file patch definitions (populated by LoadLevelFile).
+    struct LevelPatch {
+        std::string mesh_file;
+        std::string surface;
+        double      friction = 0.9;
+    };
+    std::vector<LevelPatch> m_level_patches;
 };
