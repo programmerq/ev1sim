@@ -33,6 +33,10 @@ public:
     // True once after C was tapped (consumed on read).
     bool ConsumeCameraCycle();
 
+    // Zoom delta: positive = zoom out, negative = zoom in.
+    // Returns accumulated zoom delta since last call, then resets.
+    double ConsumeZoomDelta();
+
     // True if Esc was pressed.
     bool QuitRequested() const { return m_quit; }
 
@@ -51,6 +55,7 @@ private:
     bool m_c_prev     = false;
     bool m_camera_cycle = false;
     bool m_quit         = false;
+    double m_zoom_delta = 0.0;
 
     std::array<bool, irr::KEY_KEY_CODES_COUNT> m_keys = {};
 };

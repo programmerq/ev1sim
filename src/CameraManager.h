@@ -17,6 +17,9 @@ public:
     CameraMode GetMode() const { return m_mode; }
     std::string GetModeName() const;
 
+    /// Adjust camera distance.  Positive = zoom out, negative = zoom in.
+    void Zoom(double delta);
+
     // Call after vis->Advance() and before vis->BeginScene() each frame.
     void Update(const VehiclePose& pose);
 
@@ -33,6 +36,9 @@ private:
     // Chase / follow parameters
     double m_chase_dist   = 6.0;
     double m_chase_height = 2.0;
+
+    // Zoom multiplier (applied to chase/topdown/freelook distances).
+    double m_zoom = 1.0;
 
     // Free-look orbit state
     double m_orbit_yaw   = 0.0;     // degrees

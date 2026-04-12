@@ -1,22 +1,13 @@
 {
   "vehicle_model": "sedan",
   "terrain": {
-    "type": "rigid_plane",
-    "surface": "asphalt",
-    "length_m": 400.0,
-    "width_m": 400.0,
-    "friction": 0.9
+    "type": "level",
+    "level_file": "level/milford.json"
   },
   "simulation": {
     "step_size_s": 0.002,
     "render_fps": 60,
     "realtime": true
-  },
-  "spawn": {
-    "x": 0.0,
-    "y": 0.0,
-    "z": 0.5,
-    "yaw_deg": 0.0
   },
   "camera": {
     "default_mode": "chase",

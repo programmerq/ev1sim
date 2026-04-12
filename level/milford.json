@@ -9,12 +9,16 @@
         {
             "mesh": "milford_asphault.obj",
             "surface": "asphalt",
-            "friction": 0.9
+            "friction": 0.9,
+            "texture": "road.jpg",
+            "texture_scale": 20.0
         },
         {
             "mesh": "milford_terrain.obj",
             "surface": "grass",
-            "friction": 0.4
+            "friction": 0.4,
+            "texture": "greenwhite.png",
+            "texture_scale": 50.0
         }
     ]
 }

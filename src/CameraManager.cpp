@@ -42,6 +42,10 @@ std::string CameraManager::GetModeName() const {
     }
 }
 
+void CameraManager::Zoom(double delta) {
+    m_zoom = std::clamp(m_zoom + delta, 0.2, 20.0);
+}
+
 void CameraManager::SetModeFromString(const std::string& name) {
     if (name == "chase")     m_mode = CameraMode::Chase;
     else if (name == "hood")     m_mode = CameraMode::Hood;
@@ -69,9 +73,11 @@ void CameraManager::Update(const VehiclePose& pose) {
 
 void CameraManager::ApplyChase(const VehiclePose& p) {
     // Behind and above the vehicle, looking at it.
-    auto pos = v3(p.px - p.fx * m_chase_dist + p.ux * m_chase_height,
-                  p.py - p.fy * m_chase_dist + p.uy * m_chase_height,
-                  p.pz - p.fz * m_chase_dist + p.uz * m_chase_height);
+    double dist   = m_chase_dist   * m_zoom;
+    double height = m_chase_height * m_zoom;
+    auto pos = v3(p.px - p.fx * dist + p.ux * height,
+                  p.py - p.fy * dist + p.uy * height,
+                  p.pz - p.fz * dist + p.uz * height);
     auto tgt = v3(p.px, p.py, p.pz);
     auto up  = v3(p.ux, p.uy, p.uz);
 
@@ -115,7 +121,7 @@ void CameraManager::ApplyRear(const VehiclePose& p) {
 }
 
 void CameraManager::ApplyTopDown(const VehiclePose& p) {
-    double height = 30.0;
+    double height = 30.0 * m_zoom;
     auto pos = v3(p.px + p.ux * height,
                   p.py + p.uy * height,
                   p.pz + p.uz * height);
@@ -139,9 +145,10 @@ void CameraManager::ApplyFreeLook(const VehiclePose& p) {
     double sy = std::sin(yaw_rad);
 
     // Offset in world frame (Z-up convention).
-    double ox = m_orbit_dist * cp * cy;
-    double oy = m_orbit_dist * cp * sy;
-    double oz = m_orbit_dist * sp;
+    double dist = m_orbit_dist * m_zoom;
+    double ox = dist * cp * cy;
+    double oy = dist * cp * sy;
+    double oz = dist * sp;
 
     auto pos = v3(p.px + ox, p.py + oy, p.pz + oz);
     auto tgt = v3(p.px, p.py, p.pz);

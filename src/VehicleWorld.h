@@ -66,7 +66,9 @@ private:
     struct LevelPatch {
         std::string mesh_file;
         std::string surface;
-        double      friction = 0.9;
+        double      friction       = 0.9;
+        std::string texture;          // filename in Chrono data/textures/
+        double      texture_scale  = 10.0;
     };
     std::vector<LevelPatch> m_level_patches;
 };

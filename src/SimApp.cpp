@@ -44,7 +44,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
     m_vis->AddUserEventReceiver(m_camera.get());
 
     std::cout << "[SimApp] Ready.  Controls: WASD=drive  Space=park brake  "
-                 "R=reset  C=camera  B=horn  O=hi  L=lo  Esc=quit\n";
+                 "Q/R=respawn  C=camera  +/-=zoom  B=horn  O=hi  L=lo  Esc=quit\n";
 }
 
 SimApp::~SimApp() = default;
@@ -64,6 +64,7 @@ void SimApp::SetupVisualization() {
         0.5);
 
     m_vis->Initialize();
+    m_vis->AddSkyBox();
     m_vis->AddTypicalLights();
     m_vis->AttachVehicle(&m_world->GetVehicle());
 
@@ -93,6 +94,9 @@ void SimApp::Run() {
             m_world->ResetVehicle();
         if (m_keyboard->ConsumeCameraCycle())
             m_camera->CycleMode();
+        double zoom = m_keyboard->ConsumeZoomDelta();
+        if (zoom != 0.0)
+            m_camera->Zoom(zoom);
         if (m_keyboard->QuitRequested())
             break;
 

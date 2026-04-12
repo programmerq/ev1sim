@@ -136,13 +136,20 @@ void VehicleWorld::CreateTerrain(const Config& cfg) {
                       << "  mesh=" << mesh_path
                       << "  friction=" << lp.friction << "\n";
 
-            m_terrain->AddPatch(
+            auto patch = m_terrain->AddPatch(
                 mat,
                 ChCoordsys<>(ChVector3d(0, 0, 0), QUNIT),
                 mesh_path,
                 true,   // connected mesh (better collision)
                 0.0,    // sweep sphere radius
                 true);  // visualization
+
+            // Apply texture if specified.
+            if (!lp.texture.empty()) {
+                std::string tex_path = level_dir + lp.texture;
+                float scale = static_cast<float>(lp.texture_scale);
+                patch->SetTexture(tex_path, scale, scale);
+            }
         }
     } else {
         // ── Flat box terrain (original default) ──
@@ -200,9 +207,11 @@ void VehicleWorld::LoadLevelFile(const std::string& level_file, Config& cfg) {
     if (j.contains("patches")) {
         for (auto& p : j["patches"]) {
             LevelPatch lp;
-            lp.mesh_file = p.value("mesh", "");
-            lp.surface   = p.value("surface", "unknown");
-            lp.friction  = p.value("friction", 0.9);
+            lp.mesh_file      = p.value("mesh", "");
+            lp.surface        = p.value("surface", "unknown");
+            lp.friction       = p.value("friction", 0.9);
+            lp.texture        = p.value("texture", "");
+            lp.texture_scale  = p.value("texture_scale", 10.0);
 
             if (lp.mesh_file.empty()) {
                 std::cerr << "[VehicleWorld] Patch missing 'mesh' field — skipped.\n";

@@ -57,8 +57,9 @@ DriverCommand KeyboardInputController::Update(double dt) {
         m_parking_brake = !m_parking_brake;
     m_space_prev = space_now;
 
-    // --- Reset vehicle (R one-shot) ---
-    bool r_now = m_keys[irr::KEY_KEY_R];
+    // --- Reset vehicle (R or Q one-shot) ---
+    // R = reset, Q = respawn (same effect: teleport back to spawn).
+    bool r_now = m_keys[irr::KEY_KEY_R] || m_keys[irr::KEY_KEY_Q];
     bool do_reset = r_now && !m_r_prev;
     m_r_prev = r_now;
 
@@ -67,6 +68,12 @@ DriverCommand KeyboardInputController::Update(double dt) {
     if (c_now && !m_c_prev)
         m_camera_cycle = true;
     m_c_prev = c_now;
+
+    // --- Zoom (+/- keys) ---
+    if (m_keys[irr::KEY_PLUS] || m_keys[irr::KEY_ADD])
+        m_zoom_delta -= 0.15 * dt / 0.016;   // zoom in (reduce distance)
+    if (m_keys[irr::KEY_MINUS] || m_keys[irr::KEY_SUBTRACT])
+        m_zoom_delta += 0.15 * dt / 0.016;   // zoom out (increase distance)
 
     // --- Quit (Esc) ---
     if (m_keys[irr::KEY_ESCAPE])
@@ -92,5 +99,11 @@ DriverCommand KeyboardInputController::Update(double dt) {
 bool KeyboardInputController::ConsumeCameraCycle() {
     bool v = m_camera_cycle;
     m_camera_cycle = false;
+    return v;
+}
+
+double KeyboardInputController::ConsumeZoomDelta() {
+    double v = m_zoom_delta;
+    m_zoom_delta = 0.0;
     return v;
 }
