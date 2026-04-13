@@ -1,5 +1,5 @@
 {
-  "vehicle_model": "sedan",
+  "vehicle_model": "ev1",
   "terrain": {
     "type": "level",
     "level_file": "level/milford.json"

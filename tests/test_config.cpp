@@ -20,7 +20,7 @@ static std::string WriteTempJson(const std::string& content) {
 // -----------------------------------------------------------------------
 TEST_CASE("Config built-in defaults are sane", "[Config]") {
     Config cfg;
-    CHECK(cfg.vehicle_model == "sedan");
+    CHECK(cfg.vehicle_model == "ev1");
     CHECK(cfg.terrain.friction == 0.9);
     CHECK(cfg.simulation.step_size_s == 0.002);
     CHECK(cfg.simulation.realtime == true);
@@ -55,7 +55,7 @@ TEST_CASE("Config loads values from JSON file", "[Config]") {
 // -----------------------------------------------------------------------
 TEST_CASE("Config missing file falls back to defaults", "[Config]") {
     Config cfg = Config::LoadFromFile("/tmp/ev1sim_nonexistent_file.json");
-    CHECK(cfg.vehicle_model == "sedan");
+    CHECK(cfg.vehicle_model == "ev1");
     CHECK(cfg.terrain.friction == 0.9);
 }
 

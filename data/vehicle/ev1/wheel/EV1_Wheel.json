@@ -1,0 +1,14 @@
+{
+  "Name":                       "EV1 Wheel",
+  "Type":                       "Wheel",
+  "Template":                   "Wheel",
+
+  "Mass":                       8.0,
+  "Inertia":                    [0.088, 0.154, 0.088],
+
+  "Visualization": {
+    "Mesh Filename": "ev1/ev1_rim.obj",
+    "Radius": 0.1778,
+    "Width": 0.14
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "Name": "EV1 Vehicle",
+  "Type": "Vehicle",
+  "Template": "WheeledVehicle",
+
+  "Chassis": {
+    "Input File": "ev1/chassis/EV1_Chassis.json"
+  },
+
+  "Axles": [
+    {
+      "Suspension Input File": "ev1/suspension/EV1_FrontDoubleWishbone.json",
+      "Suspension Location": [ 1.256, 0, 0.37 ],
+      "Steering Index": 0,
+      "Left Wheel Input File": "ev1/wheel/EV1_Wheel.json",
+      "Right Wheel Input File": "ev1/wheel/EV1_Wheel.json",
+      "Left Brake Input File": "ev1/brake/EV1_BrakeSimple.json",
+      "Right Brake Input File": "ev1/brake/EV1_BrakeSimple.json"
+    },
+
+    {
+      "Suspension Input File": "ev1/suspension/EV1_RearDoubleWishbone.json",
+      "Suspension Location": [ -1.256, 0, 0.37 ],
+      "Left Wheel Input File": "ev1/wheel/EV1_Wheel.json",
+      "Right Wheel Input File": "ev1/wheel/EV1_Wheel.json",
+      "Left Brake Input File": "ev1/brake/EV1_BrakeSimple.json",
+      "Right Brake Input File": "ev1/brake/EV1_BrakeSimple.json"
+    }
+  ],
+
+  "Steering Subsystems": [
+    {
+      "Input File": "ev1/steering/EV1_RackPinion.json",
+      "Location": [ 1.1, 0, 0.27 ],
+      "Orientation": [ 1, 0, 0, 0 ]
+    }
+  ],
+
+  "Wheelbase": 2.512,
+  "Minimum Turning Radius": 10.8,
+  "Maximum Steering Angle (deg)": 13.5,
+
+  "Driveline": {
+    "Input File": "ev1/driveline/EV1_Driveline2WD.json",
+    "Suspension Indexes": [ 0 ]
+  }
+}

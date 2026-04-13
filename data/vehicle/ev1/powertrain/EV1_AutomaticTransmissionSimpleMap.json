@@ -1,0 +1,13 @@
+{
+  "Name": "EV1 Single-Speed Transmission",
+  "Type": "Transmission",
+  "Template": "AutomaticTransmissionSimpleMap",
+
+  "Gear Box": {
+    "Reverse Gear Ratio": -1.0,
+    "Forward Gear Ratios": [1.0],
+    "Shift Points Map RPM": [
+      [0, 13000]
+    ]
+  }
+}

@@ -33,6 +33,9 @@ public:
     // True once after C was tapped (consumed on read).
     bool ConsumeCameraCycle();
 
+    // True once after P was tapped (consumed on read).
+    bool ConsumePauseToggle();
+
     // True if Esc was pressed.
     bool QuitRequested() const { return m_quit; }
 
@@ -49,7 +52,9 @@ private:
     bool m_space_prev = false;
     bool m_r_prev     = false;
     bool m_c_prev     = false;
+    bool m_p_prev     = false;
     bool m_camera_cycle = false;
+    bool m_pause_toggle = false;
     bool m_quit         = false;
 
     std::array<bool, irr::KEY_KEY_CODES_COUNT> m_keys = {};

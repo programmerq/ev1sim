@@ -33,4 +33,5 @@ private:
 
     std::shared_ptr<chrono::vehicle::ChWheeledVehicleVisualSystemIrrlicht> m_vis;
     chrono::ChRealtimeStepTimer m_realtime_timer;
+    bool m_paused = false;
 };

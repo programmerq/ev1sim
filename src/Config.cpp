@@ -131,6 +131,8 @@ void Config::ApplyCliOverrides(int argc, char* argv[]) {
         } else if (arg == "--hud") {
             auto v = next();
             telemetry.show_hud = (v == "true" || v == "1");
+        } else if (arg == "--paused") {
+            start_paused = true;
         } else {
             std::cerr << "[Config] Unknown flag: " << arg << "\n";
         }

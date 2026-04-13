@@ -43,8 +43,12 @@ SimApp::SimApp(const Config& config) : m_config(config) {
     // Register camera manager's mouse handler with Irrlicht.
     m_vis->AddUserEventReceiver(m_camera.get());
 
+    m_paused = m_config.start_paused;
+
     std::cout << "[SimApp] Ready.  Controls: WASD=drive  Space=park brake  "
-                 "R=respawn  C=camera  Scroll=zoom  B=horn  O=hi  L=lo  Esc=quit\n";
+                 "P=pause  R=respawn  C=camera  Scroll=zoom  B=horn  O=hi  L=lo  Esc=quit\n";
+    if (m_paused)
+        std::cout << "[SimApp] Started PAUSED — press P to begin simulation\n";
 }
 
 SimApp::~SimApp() = default;
@@ -100,14 +104,20 @@ void SimApp::Run() {
             m_world->ResetVehicle();
         if (m_keyboard->ConsumeCameraCycle())
             m_camera->CycleMode();
+        if (m_keyboard->ConsumePauseToggle()) {
+            m_paused = !m_paused;
+            std::cout << (m_paused ? "[SimApp] PAUSED" : "[SimApp] RESUMED") << std::endl;
+        }
         if (m_keyboard->QuitRequested())
             break;
 
-        // --- Physics sub-stepping ---
-        for (int i = 0; i < steps_per_frame; ++i) {
-            double t = m_world->GetSimTime();
-            m_world->Synchronize(t);
-            m_world->Advance(step);
+        // --- Physics sub-stepping (skipped when paused) ---
+        if (!m_paused) {
+            for (int i = 0; i < steps_per_frame; ++i) {
+                double t = m_world->GetSimTime();
+                m_world->Synchronize(t);
+                m_world->Advance(step);
+            }
         }
 
         // --- Visualisation sync/advance ---
@@ -126,6 +136,19 @@ void SimApp::Run() {
                              m_world->GetState(),
                              m_camera->GetModeName(),
                              m_config.terrain.surface);
+
+        // Draw PAUSED overlay.
+        if (m_paused) {
+            auto* gui  = m_vis->GetDevice()->getGUIEnvironment();
+            auto* font = gui->getBuiltInFont();
+            if (font) {
+                auto dim = m_vis->GetDevice()->getVideoDriver()->getScreenSize();
+                irr::core::recti rect(dim.Width / 2 - 40, 30, dim.Width / 2 + 40, 50);
+                font->draw(L"[ PAUSED ]", rect,
+                           irr::video::SColor(255, 255, 200, 0), true, true);
+            }
+        }
+
         m_vis->EndScene();
 
         // --- Horn audio ---

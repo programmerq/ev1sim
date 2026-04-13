@@ -68,6 +68,12 @@ DriverCommand KeyboardInputController::Update(double dt) {
         m_camera_cycle = true;
     m_c_prev = c_now;
 
+    // --- Pause toggle (P one-shot, consumed via ConsumePauseToggle) ---
+    bool p_now = m_keys[irr::KEY_KEY_P];
+    if (p_now && !m_p_prev)
+        m_pause_toggle = true;
+    m_p_prev = p_now;
+
     // --- Quit (Esc) ---
     if (m_keys[irr::KEY_ESCAPE])
         m_quit = true;
@@ -92,6 +98,12 @@ DriverCommand KeyboardInputController::Update(double dt) {
 bool KeyboardInputController::ConsumeCameraCycle() {
     bool v = m_camera_cycle;
     m_camera_cycle = false;
+    return v;
+}
+
+bool KeyboardInputController::ConsumePauseToggle() {
+    bool v = m_pause_toggle;
+    m_pause_toggle = false;
     return v;
 }
 

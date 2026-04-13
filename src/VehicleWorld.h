@@ -8,6 +8,7 @@
 #include "chrono/physics/ChSystemSMC.h"
 #include "chrono_vehicle/terrain/RigidTerrain.h"
 #include "chrono_vehicle/wheeled_vehicle/ChWheeledVehicle.h"
+#include "chrono_vehicle/wheeled_vehicle/vehicle/WheeledVehicle.h"
 
 // Forward declarations for vehicle model wrappers
 namespace chrono::vehicle::sedan { class Sedan; }
@@ -42,12 +43,14 @@ public:
     chrono::ChSystem&                    GetSystem()  { return *m_system; }
 
 private:
+    void CreateEV1(const Config& cfg);
     void CreateSedan(const Config& cfg);
     void CreateHMMWV(const Config& cfg);
     void CreateTerrain(const Config& cfg);
     void LoadLevelFile(const std::string& level_file, Config& cfg);
 
     // One of these is populated depending on vehicle_model.
+    std::unique_ptr<chrono::vehicle::WheeledVehicle>    m_ev1;
     std::unique_ptr<chrono::vehicle::sedan::Sedan>      m_sedan;
     std::unique_ptr<chrono::vehicle::hmmwv::HMMWV_Full> m_hmmwv;
 

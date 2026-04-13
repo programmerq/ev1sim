@@ -83,6 +83,15 @@ target_compile_definitions(ev1sim PRIVATE
     CHRONO_DATA_DIR="${CHRONO_DATA_DIR}"
 )
 
+# ── Copy EV1 vehicle data into the Chrono data directory ───────────────────
+# This makes the EV1 JSON definitions and meshes discoverable via
+# vehicle::GetDataFile("ev1/...").
+file(GLOB_RECURSE EV1_DATA_FILES "${CMAKE_SOURCE_DIR}/data/vehicle/ev1/*")
+foreach(_f ${EV1_DATA_FILES})
+    file(RELATIVE_PATH _rel "${CMAKE_SOURCE_DIR}/data/vehicle/ev1" "${_f}")
+    configure_file("${_f}" "${CHRONO_DATA_DIR}/vehicle/ev1/${_rel}" COPYONLY)
+endforeach()
+
 # ── Unit tests (optional) ──────────────────────────────────────────────────
 option(BUILD_TESTS "Build unit tests" ON)
 if(BUILD_TESTS)

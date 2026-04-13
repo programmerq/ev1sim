@@ -1,0 +1,20 @@
+{
+  "Name":                       "EV1 Rack-Pinion Steering",
+  "Type":                       "Steering",
+  "Template":                   "RackPinion",
+
+  "Steering Link":
+  {
+    "Mass":                     1.6,
+    "COM":                      0,
+    "Inertia":                  [0.105, 0.00008, 0.105],
+    "Radius":                   0.03,
+    "Length":                    0.46
+  },
+
+  "Pinion":
+  {
+    "Radius":                   0.3,
+    "Maximum Angle (deg)":      10.0
+  }
+}

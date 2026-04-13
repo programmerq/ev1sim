@@ -1,0 +1,7 @@
+{
+  "Name":                       "EV1 Brake",
+  "Type":                       "Brake",
+  "Template":                   "BrakeSimple",
+
+  "Maximum Torque":             1800
+}

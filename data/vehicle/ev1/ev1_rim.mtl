@@ -1,0 +1,12 @@
+# Blender 5.1.0 MTL File: 'GMEV1.blend'
+# www.blender.org
+
+newmtl rim
+Ns 40.000000
+Ka 0.20 0.20 0.20
+Kd 0.55 0.55 0.55
+Ks 0.70 0.70 0.70
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2

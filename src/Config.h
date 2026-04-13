@@ -3,7 +3,7 @@
 #include <string>
 
 struct Config {
-    std::string vehicle_model = "sedan";  // "sedan" or "hmmwv"
+    std::string vehicle_model = "ev1";  // "ev1", "sedan", or "hmmwv"
 
     struct Terrain {
         std::string type    = "rigid_plane";  // "rigid_plane" or "level"
@@ -49,6 +49,8 @@ struct Config {
         std::string log_file    = "telemetry.csv";
         bool        show_hud    = true;
     } telemetry;
+
+    bool start_paused = false;
 
     // Load from JSON file.  Missing keys keep their defaults.
     static Config LoadFromFile(const std::string& path);

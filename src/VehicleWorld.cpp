@@ -4,6 +4,9 @@
 #include "chrono/core/ChRotation.h"
 #include "chrono_vehicle/ChVehicleModelData.h"
 #include "chrono_vehicle/ChSubsysDefs.h"
+#include "chrono_vehicle/ChPowertrainAssembly.h"
+#include "chrono_vehicle/utils/ChUtilsJSON.h"
+#include "chrono_vehicle/wheeled_vehicle/vehicle/WheeledVehicle.h"
 #include "chrono_models/vehicle/sedan/Sedan.h"
 #include "chrono_models/vehicle/hmmwv/HMMWV.h"
 
@@ -43,7 +46,9 @@ VehicleWorld::VehicleWorld(const Config& config_in) {
     vehicle::SetDataPath(std::string(CHRONO_DATA_DIR) + "vehicle/");
 
     // Build vehicle.
-    if (config.vehicle_model == "hmmwv")
+    if (config.vehicle_model == "ev1")
+        CreateEV1(config);
+    else if (config.vehicle_model == "hmmwv")
         CreateHMMWV(config);
     else
         CreateSedan(config);
@@ -69,6 +74,74 @@ VehicleWorld::~VehicleWorld() = default;
 // ---------------------------------------------------------------------------
 // Vehicle creation helpers
 // ---------------------------------------------------------------------------
+
+void VehicleWorld::CreateEV1(const Config& cfg) {
+    std::string vehicle_json = vehicle::GetDataFile("ev1/vehicle/EV1_Vehicle.json");
+    std::string engine_json  = vehicle::GetDataFile("ev1/powertrain/EV1_EngineSimpleMap.json");
+    std::string trans_json   = vehicle::GetDataFile("ev1/powertrain/EV1_AutomaticTransmissionSimpleMap.json");
+    std::string tire_json    = vehicle::GetDataFile("ev1/tire/EV1_TMeasyTire.json");
+
+    // Create the vehicle from JSON (without powertrain/tires — we attach those manually).
+    m_ev1 = std::make_unique<vehicle::WheeledVehicle>(
+        vehicle_json, ChContactMethod::SMC, false, false);
+    m_ev1->SetCollisionSystemType(ChCollisionSystem::Type::BULLET);
+    m_ev1->Initialize(ChCoordsys<>(m_spawn_pos, m_spawn_rot));
+
+    m_vehicle = m_ev1.get();
+    m_system  = m_ev1->GetSystem();
+
+    // Powertrain: engine + single-speed transmission.
+    auto engine       = vehicle::ReadEngineJSON(engine_json);
+    auto transmission = vehicle::ReadTransmissionJSON(trans_json);
+    auto powertrain   = chrono_types::make_shared<vehicle::ChPowertrainAssembly>(engine, transmission);
+    m_ev1->InitializePowertrain(powertrain);
+
+    // Tires on all wheels.
+    for (auto& axle : m_ev1->GetAxles()) {
+        for (auto& wheel : axle->GetWheels()) {
+            auto tire = vehicle::ReadTireJSON(tire_json);
+            m_ev1->InitializeTire(tire, wheel, VisualizationType::MESH);
+        }
+    }
+
+    // Set tire step size.
+    for (auto& axle : m_ev1->GetAxles()) {
+        for (auto& wheel : axle->GetWheels()) {
+            wheel->GetTire()->SetStepsize(cfg.simulation.step_size_s);
+        }
+    }
+
+    m_vehicle->SetChassisVisualizationType(VisualizationType::MESH);
+    m_vehicle->SetSuspensionVisualizationType(VisualizationType::PRIMITIVES);
+    m_vehicle->SetSteeringVisualizationType(VisualizationType::PRIMITIVES);
+    m_vehicle->SetWheelVisualizationType(VisualizationType::MESH);
+    m_vehicle->SetTireVisualizationType(VisualizationType::MESH);
+
+    // --- Debug: dump suspension geometry after init ---
+    std::cout << "[EV1] Chassis init pos: ("
+              << m_spawn_pos.x() << ", " << m_spawn_pos.y() << ", " << m_spawn_pos.z() << ")\n" << std::flush;
+
+    for (int a = 0; a < static_cast<int>(m_vehicle->GetNumberAxles()); ++a) {
+        auto posL = m_vehicle->GetSpindlePos(a, vehicle::LEFT);
+        auto posR = m_vehicle->GetSpindlePos(a, vehicle::RIGHT);
+        std::cout << "[EV1] Axle " << a << " spindle L: ("
+                  << posL.x() << ", " << posL.y() << ", " << posL.z() << ")\n";
+        std::cout << "[EV1] Axle " << a << " spindle R: ("
+                  << posR.x() << ", " << posR.y() << ", " << posR.z() << ")\n";
+    }
+
+    // --- Debug: dump chassis visual model materials ---
+    auto chassis_body = m_vehicle->GetChassisBody();
+    if (auto vis_model = chassis_body->GetVisualModel()) {
+        std::cout << "[EV1] Chassis visual model: " << vis_model->GetNumShapes() << " shape(s)\n";
+        for (unsigned s = 0; s < vis_model->GetNumShapes(); ++s) {
+            auto shape = vis_model->GetShape(s);
+            std::cout << "[EV1]   Shape " << s << ": " << shape->GetNumMaterials()
+                      << " material(s), type=" << typeid(*shape).name() << "\n";
+        }
+    }
+    std::cout << std::flush;
+}
 
 void VehicleWorld::CreateSedan(const Config& cfg) {
     using namespace chrono::vehicle::sedan;
@@ -234,20 +307,26 @@ void VehicleWorld::Synchronize(double time) {
     m_driver->Synchronize(time);
     m_terrain->Synchronize(time);
 
-    if (m_sedan)
+    if (m_ev1) {
+        m_ev1->Synchronize(time, inputs, *m_terrain);
+    } else if (m_sedan) {
         m_sedan->Synchronize(time, inputs, *m_terrain);
-    else
+    } else {
         m_hmmwv->Synchronize(time, inputs, *m_terrain);
+    }
 }
 
 void VehicleWorld::Advance(double step) {
     m_driver->Advance(step);
     m_terrain->Advance(step);
 
-    if (m_sedan)
+    if (m_ev1) {
+        m_ev1->Advance(step);
+    } else if (m_sedan) {
         m_sedan->Advance(step);
-    else
+    } else {
         m_hmmwv->Advance(step);
+    }
 }
 
 // ---------------------------------------------------------------------------
