@@ -34,7 +34,7 @@ WHEELBASE_MODEL = 1.1825 + 1.1003  # 2.2828
 WHEELBASE_REAL = 2.512
 SCALE = WHEELBASE_REAL / WHEELBASE_MODEL  # ~1.1004
 
-CENTER_Y = -(-1.1825 + 1.1003) / 2.0  # longitudinal center (+0.0411)
+CENTER_Y = (-1.1825 + 1.1003) / 2.0  # longitudinal center (-0.0411)
 GROUND_Z = 0.5953                      # tire contact patch Z
 
 # 4×4 transform: SCALE * R_z(90°) with origin offset

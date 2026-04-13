@@ -10,7 +10,7 @@
   "Axles": [
     {
       "Suspension Input File": "ev1/suspension/EV1_FrontDoubleWishbone.json",
-      "Suspension Location": [ 1.256, 0, 0.37 ],
+      "Suspension Location": [ 1.346, 0, 0.37 ],
       "Steering Index": 0,
       "Left Wheel Input File": "ev1/wheel/EV1_Wheel.json",
       "Right Wheel Input File": "ev1/wheel/EV1_Wheel.json",
@@ -20,7 +20,7 @@
 
     {
       "Suspension Input File": "ev1/suspension/EV1_RearDoubleWishbone.json",
-      "Suspension Location": [ -1.256, 0, 0.37 ],
+      "Suspension Location": [ -1.166, 0, 0.37 ],
       "Left Wheel Input File": "ev1/wheel/EV1_Wheel.json",
       "Right Wheel Input File": "ev1/wheel/EV1_Wheel.json",
       "Left Brake Input File": "ev1/brake/EV1_BrakeSimple.json",
@@ -31,7 +31,7 @@
   "Steering Subsystems": [
     {
       "Input File": "ev1/steering/EV1_RackPinion.json",
-      "Location": [ 1.1, 0, 0.27 ],
+      "Location": [ 1.19, 0, 0.27 ],
       "Orientation": [ 1, 0, 0, 0 ]
     }
   ],
