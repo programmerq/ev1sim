@@ -43,10 +43,17 @@ SimApp::SimApp(const Config& config) : m_config(config) {
     // Register camera manager's mouse handler with Irrlicht.
     m_vis->AddUserEventReceiver(m_camera.get());
 
+    // 7. Vehicle lights — needs Irrlicht scene graph to be populated.
+    m_lights = std::make_unique<VehicleLights>();
+
+    // 8. Vehicle panels (hood, trunk, doors) — state-only until panel OBJs exist.
+    m_panels = std::make_unique<VehiclePanels>();
+
     m_paused = m_config.start_paused;
 
     std::cout << "[SimApp] Ready.  Controls: WASD=drive  Space=park brake  "
-                 "P=pause  R=respawn  C=camera  Scroll=zoom  B=horn  O=hi  L=lo  Esc=quit\n";
+                 "P=pause  R=respawn  C=camera  Scroll=zoom  B=horn  O=hi  L=lo  "
+                 "H=headlights  F=hood  T=trunk  [=doorL  ]=doorR  Esc=quit\n";
     if (m_paused)
         std::cout << "[SimApp] Started PAUSED — press P to begin simulation\n";
 }
@@ -110,6 +117,19 @@ void SimApp::Run() {
         }
         if (m_keyboard->QuitRequested())
             break;
+        if (m_keyboard->ConsumeHeadlightToggle()) {
+            if (m_lights_demo) {
+                // First H press: headlamps exit demo blink, set to low beam.
+                m_lights_demo = false;
+                m_headlight_mode = 1;
+                std::cout << "[SimApp] Headlamps: LOW BEAM (other bulbs still blinking)\n";
+            } else {
+                // Cycle: off → low → high → off
+                m_headlight_mode = (m_headlight_mode + 1) % 3;
+                const char* names[] = {"OFF", "LOW BEAM", "HIGH BEAM"};
+                std::cout << "[SimApp] Headlamps: " << names[m_headlight_mode] << "\n";
+            }
+        }
 
         // --- Physics sub-stepping (skipped when paused) ---
         if (!m_paused) {
@@ -128,6 +148,35 @@ void SimApp::Run() {
         // --- Camera override ---
         m_camera->Update(m_world->GetPose());
 
+        // --- Panel toggles (1-4) ---
+        for (int i = 0; i < VehiclePanels::NUM_PANELS; ++i) {
+            if (m_keyboard->ConsumePanelToggle(i))
+                m_panels->Toggle(static_cast<PanelID>(i));
+        }
+
+        // --- Vehicle lights ---
+        // Lazy-init: the Irrlicht scene nodes are created during the
+        // first Synchronize/Advance cycle, so we initialise on first use.
+        if (!m_lights->IsInitialized()) {
+            auto* smgr = m_vis->GetDevice()->getSceneManager();
+            m_lights->Initialize(smgr);
+        }
+
+        // All bulbs blink at unique frequencies for identification.
+        m_lights->UpdateDemoMode(t);
+
+        // H key overrides headlamp bulbs only.
+        if (!m_lights_demo) {
+            bool low  = (m_headlight_mode >= 1);
+            bool high = (m_headlight_mode >= 2);
+            m_lights->SetState(LightID::LLBH, low);
+            m_lights->SetState(LightID::RLBH, low);
+            m_lights->SetState(LightID::LHBH, high);
+            m_lights->SetState(LightID::RHBH, high);
+        }
+
+        m_lights->ApplyToScene();
+
         // --- Render ---
         m_vis->BeginScene();
         macos_apply_viewport();   // override glViewport for Retina / resize
@@ -136,6 +185,8 @@ void SimApp::Run() {
                              m_world->GetState(),
                              m_camera->GetModeName(),
                              m_config.terrain.surface);
+        m_lights->DrawHUD(m_vis->GetDevice());
+        m_panels->DrawHUD(m_vis->GetDevice());
 
         // Draw PAUSED overlay.
         if (m_paused) {

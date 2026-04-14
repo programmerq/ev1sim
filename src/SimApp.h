@@ -5,6 +5,8 @@
 #include "HornAudio.h"
 #include "KeyboardInputController.h"
 #include "Telemetry.h"
+#include "VehicleLights.h"
+#include "VehiclePanels.h"
 #include "VehicleWorld.h"
 
 #include "chrono/core/ChRealtimeStep.h"
@@ -30,8 +32,14 @@ private:
     std::unique_ptr<CameraManager>          m_camera;
     std::unique_ptr<Telemetry>              m_telemetry;
     std::unique_ptr<HornAudio>              m_horn;
+    std::unique_ptr<VehicleLights>          m_lights;
+    std::unique_ptr<VehiclePanels>          m_panels;
 
     std::shared_ptr<chrono::vehicle::ChWheeledVehicleVisualSystemIrrlicht> m_vis;
     chrono::ChRealtimeStepTimer m_realtime_timer;
     bool m_paused = false;
+
+    // Headlight mode: 0=off, 1=low beam, 2=high beam
+    int  m_headlight_mode = 0;
+    bool m_lights_demo = true;  // Start in demo blink mode
 };
