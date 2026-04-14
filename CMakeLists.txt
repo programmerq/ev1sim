@@ -60,6 +60,8 @@ add_executable(ev1sim
     src/Config.cpp
     src/Telemetry.cpp
     src/HornAudio.cpp
+    src/VehicleLights.cpp
+    src/VehiclePanels.cpp
     ${MACOS_PLATFORM_SRC}
 )
 

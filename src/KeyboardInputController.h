@@ -36,6 +36,12 @@ public:
     // True once after P was tapped (consumed on read).
     bool ConsumePauseToggle();
 
+    // True once after H was tapped (consumed on read).
+    bool ConsumeHeadlightToggle();
+
+    // Panel toggles: F=hood, T=trunk, [=left door, ]=right door.
+    bool ConsumePanelToggle(int index);
+
     // True if Esc was pressed.
     bool QuitRequested() const { return m_quit; }
 
@@ -53,9 +59,16 @@ private:
     bool m_r_prev     = false;
     bool m_c_prev     = false;
     bool m_p_prev     = false;
-    bool m_camera_cycle = false;
-    bool m_pause_toggle = false;
-    bool m_quit         = false;
+    bool m_h_prev     = false;
+    bool m_camera_cycle    = false;
+    bool m_pause_toggle    = false;
+    bool m_headlight_toggle = false;
+
+    // Panel toggle keys: KEY_KEY_1 through KEY_KEY_4
+    bool m_panel_prev[4]   = {};
+    bool m_panel_toggle[4] = {};
+
+    bool m_quit             = false;
 
     std::array<bool, irr::KEY_KEY_CODES_COUNT> m_keys = {};
 };

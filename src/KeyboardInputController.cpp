@@ -74,6 +74,25 @@ DriverCommand KeyboardInputController::Update(double dt) {
         m_pause_toggle = true;
     m_p_prev = p_now;
 
+    // --- Headlight toggle (H one-shot, consumed via ConsumeHeadlightToggle) ---
+    bool h_now = m_keys[irr::KEY_KEY_H];
+    if (h_now && !m_h_prev)
+        m_headlight_toggle = true;
+    m_h_prev = h_now;
+
+    // --- Panel toggles (F=hood, T=trunk, [=doorL, ]=doorR) ---
+    {
+        static const irr::EKEY_CODE panel_keys[4] = {
+            irr::KEY_KEY_F, irr::KEY_KEY_T, irr::KEY_OEM_4, irr::KEY_OEM_6
+        };
+        for (int i = 0; i < 4; ++i) {
+            bool now = m_keys[panel_keys[i]];
+            if (now && !m_panel_prev[i])
+                m_panel_toggle[i] = true;
+            m_panel_prev[i] = now;
+        }
+    }
+
     // --- Quit (Esc) ---
     if (m_keys[irr::KEY_ESCAPE])
         m_quit = true;
@@ -104,6 +123,19 @@ bool KeyboardInputController::ConsumeCameraCycle() {
 bool KeyboardInputController::ConsumePauseToggle() {
     bool v = m_pause_toggle;
     m_pause_toggle = false;
+    return v;
+}
+
+bool KeyboardInputController::ConsumeHeadlightToggle() {
+    bool v = m_headlight_toggle;
+    m_headlight_toggle = false;
+    return v;
+}
+
+bool KeyboardInputController::ConsumePanelToggle(int index) {
+    if (index < 0 || index >= 4) return false;
+    bool v = m_panel_toggle[index];
+    m_panel_toggle[index] = false;
     return v;
 }
 
