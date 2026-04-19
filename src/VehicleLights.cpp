@@ -131,6 +131,43 @@ void VehicleLights::UpdateDemoMode(double sim_time) {
 }
 
 // ---------------------------------------------------------------------------
+// Chase demo — one bulb at a time, walking clockwise around the car.
+// Order starts at CHMSL, goes down the right side to the right reverse lamp,
+// wraps across the front, and comes back up the left side.
+// ---------------------------------------------------------------------------
+
+void VehicleLights::UpdateChaseDemo(double sim_time) {
+    static constexpr LightID kChaseOrder[NUM_LIGHTS] = {
+        LightID::CHMSL,
+        LightID::RBL,   // rear right reverse
+        LightID::RRTL,  // rear right tail
+        LightID::RRSL,  // rear right stop
+        LightID::RRTS,  // rear right turn signal
+        LightID::RRSM,  // rear right side marker
+        LightID::RFML,  // front right side marker
+        LightID::RFTS,  // front right turn signal
+        LightID::RLBH,  // front right headlamp lo
+        LightID::RHBH,  // front right headlamp hi
+        LightID::LHBH,  // front left headlamp hi
+        LightID::LLBH,  // front left headlamp lo
+        LightID::LFTS,  // front left turn signal
+        LightID::LFML,  // front left side marker
+        LightID::LRSM,  // rear left side marker
+        LightID::LRTS,  // rear left turn signal
+        LightID::LRSL,  // rear left stop
+        LightID::LRTL,  // rear left tail
+        LightID::LBL,   // rear left reverse
+    };
+    constexpr double kStepSeconds = 0.2;
+
+    double t = (sim_time < 0.0) ? 0.0 : sim_time;
+    int idx = static_cast<int>(t / kStepSeconds) % NUM_LIGHTS;
+
+    for (int i = 0; i < NUM_LIGHTS; ++i) m_state[i] = false;
+    m_state[static_cast<int>(kChaseOrder[idx])] = true;
+}
+
+// ---------------------------------------------------------------------------
 // Classify glass type from Irrlicht material properties
 // ---------------------------------------------------------------------------
 

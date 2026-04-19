@@ -49,6 +49,22 @@ SimApp::SimApp(const Config& config) : m_config(config) {
     // 8. Vehicle panels (hood, trunk, doors) — state-only until panel OBJs exist.
     m_panels = std::make_unique<VehiclePanels>();
 
+    // 9. External electrical-simulator connector.  Non-blocking — if the
+    //    electric sim isn't running yet, the connector retries each Tick().
+    ExternalSimConnector::Options ext_opts;
+    ext_opts.enabled            = m_config.external_sim.enabled;
+    ext_opts.bus_name           = m_config.external_sim.bus_name;
+    ext_opts.reconnect_period_s = m_config.external_sim.reconnect_period_s;
+    m_external_sim = std::make_unique<ExternalSimConnector>(ext_opts);
+    m_external_sim->Start();
+    if (ext_opts.enabled) {
+        std::cout << "[SimApp] External sim: enabled, bus='"
+                  << ext_opts.bus_name << "' ("
+                  << m_external_sim->StatusString() << ")\n";
+    }
+
+    m_lights_demo = m_config.lights.demo_mode;
+
     m_paused = m_config.start_paused;
 
     std::cout << "[SimApp] Ready.  Controls: WASD=drive  Space=park brake  "
@@ -118,17 +134,14 @@ void SimApp::Run() {
         if (m_keyboard->QuitRequested())
             break;
         if (m_keyboard->ConsumeHeadlightToggle()) {
-            if (m_lights_demo) {
-                // First H press: headlamps exit demo blink, set to low beam.
-                m_lights_demo = false;
-                m_headlight_mode = 1;
-                std::cout << "[SimApp] Headlamps: LOW BEAM (other bulbs still blinking)\n";
-            } else {
-                // Cycle: off → low → high → off
-                m_headlight_mode = (m_headlight_mode + 1) % 3;
-                const char* names[] = {"OFF", "LOW BEAM", "HIGH BEAM"};
-                std::cout << "[SimApp] Headlamps: " << names[m_headlight_mode] << "\n";
+            // H disables any running demo and cycles the headlamps.
+            if (m_lights_demo != "off") {
+                std::cout << "[SimApp] Lights demo OFF (was " << m_lights_demo << ")\n";
+                m_lights_demo = "off";
             }
+            m_headlight_mode = (m_headlight_mode + 1) % 3;
+            const char* names[] = {"OFF", "LOW BEAM", "HIGH BEAM"};
+            std::cout << "[SimApp] Headlamps: " << names[m_headlight_mode] << "\n";
         }
 
         // --- Physics sub-stepping (skipped when paused) ---
@@ -162,11 +175,32 @@ void SimApp::Run() {
             m_lights->Initialize(smgr);
         }
 
-        // All bulbs blink at unique frequencies for identification.
-        m_lights->UpdateDemoMode(t);
+        // --- External sim sync (publish panel sensors, drain bulb/horn cmds) ---
+        for (int i = 0; i < VehiclePanels::NUM_PANELS; ++i) {
+            m_external_sim->SetPanelSensor(static_cast<PanelID>(i),
+                                           m_panels->IsOpen(static_cast<PanelID>(i)));
+        }
+        m_external_sim->Tick(t);
 
-        // H key overrides headlamp bulbs only.
-        if (!m_lights_demo) {
+        const bool ext_driving_bulbs =
+            m_external_sim->IsConnected() && m_external_sim->HasReceivedBulbData();
+
+        if (m_lights_demo == "blink") {
+            // All bulbs blink at unique frequencies for identification.
+            m_lights->UpdateDemoMode(t);
+        } else if (m_lights_demo == "chase") {
+            // One bulb at a time, ~0.2s each, walking around the vehicle.
+            m_lights->UpdateChaseDemo(t);
+        } else if (ext_driving_bulbs) {
+            // Bulb state is fully authored by the external electrical sim.
+            for (int i = 0; i < NUM_LIGHTS; ++i) {
+                m_lights->SetState(static_cast<LightID>(i),
+                                   m_external_sim->GetBulbCmd(static_cast<LightID>(i)));
+            }
+        } else {
+            // Demo off, no external sim — all bulbs default off, H drives headlamps.
+            for (int i = 0; i < NUM_LIGHTS; ++i)
+                m_lights->SetState(static_cast<LightID>(i), false);
             bool low  = (m_headlight_mode >= 1);
             bool high = (m_headlight_mode >= 2);
             m_lights->SetState(LightID::LLBH, low);
@@ -202,8 +236,14 @@ void SimApp::Run() {
 
         m_vis->EndScene();
 
-        // --- Horn audio ---
-        m_horn->SetTones(cmd.horn_low, cmd.horn_high);
+        // --- Horn audio (external sim commands OR'd with keyboard input) ---
+        bool horn_low  = cmd.horn_low;
+        bool horn_high = cmd.horn_high;
+        if (m_external_sim->IsConnected()) {
+            horn_low  = horn_low  || m_external_sim->GetHornLowCmd();
+            horn_high = horn_high || m_external_sim->GetHornHighCmd();
+        }
+        m_horn->SetTones(horn_low, horn_high);
 
         // --- Telemetry logging ---
         m_telemetry->Record(m_world->GetState(), render_dt);

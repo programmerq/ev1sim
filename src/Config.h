@@ -50,6 +50,21 @@ struct Config {
         bool        show_hud    = true;
     } telemetry;
 
+    struct Lights {
+        // Built-in demo pattern, for diagnostics independent of the
+        // electrical sim:
+        //   "off"   — all bulbs off (default; electric sim drives them)
+        //   "blink" — every bulb blinks at a unique frequency
+        //   "chase" — one bulb at a time, walking around the vehicle
+        std::string demo_mode = "off";
+    } lights;
+
+    struct ExternalSim {
+        bool        enabled            = false;
+        std::string bus_name           = "electricsim_harness_bus";
+        double      reconnect_period_s = 1.0;
+    } external_sim;
+
     bool start_paused = false;
 
     // Load from JSON file.  Missing keys keep their defaults.
