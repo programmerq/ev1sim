@@ -47,13 +47,46 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
 }
 
 TEST_CASE("FindEndpoint returns bulb command rows", "[ExternalSim]") {
-    const auto* lhbh = ExternalSimConnector::FindEndpoint(4000);
-    REQUIRE(lhbh != nullptr);
-    CHECK(std::string(lhbh->qualified_name) == "vehicle.body.lhbh.bulb_cmd");
-    CHECK(lhbh->input_to_sim);
+    // Signal 4000 is BACKUP_LEFT in the electric sim's LightIdx enum, which
+    // on our side is LBL (Left Backup Lamp).
+    const auto* lbl = ExternalSimConnector::FindEndpoint(4000);
+    REQUIRE(lbl != nullptr);
+    CHECK(std::string(lbl->qualified_name) == "vehicle.body.lbl.bulb_cmd");
+    CHECK(lbl->input_to_sim);
 
     // One past the last bulb ID is unused.
     CHECK(ExternalSimConnector::FindEndpoint(4019) == nullptr);
+}
+
+TEST_CASE("Bulb signal IDs mirror the electric sim's LightIdx order",
+          "[ExternalSim]") {
+    // Signal slot -> expected LightID mapping, derived from the electric sim's
+    // LightIdx enum.  If either side changes, this test should fail loudly.
+    struct Row { std::uint32_t sid; LightID expect; };
+    const Row rows[] = {
+        {4000, LightID::LBL},    {4001, LightID::RBL},
+        {4002, LightID::LHBH},   {4003, LightID::RHBH},
+        {4004, LightID::LLBH},   {4005, LightID::RLBH},
+        {4006, LightID::LRSM},   {4007, LightID::RRSM},
+        {4008, LightID::LFML},   {4009, LightID::RFML},
+        {4010, LightID::LFTS},   {4011, LightID::RFTS},
+        {4012, LightID::LRTS},   {4013, LightID::RRTS},
+        {4014, LightID::LRSL},   {4015, LightID::CHMSL}, {4016, LightID::RRSL},
+        // ev1sim-only tail filaments, past the shared range.
+        {4017, LightID::LRTL},   {4018, LightID::RRTL},
+    };
+    for (const auto& r : rows) {
+        ExternalSimConnector c;
+        c.DebugInjectDelta(r.sid, true);
+        INFO("signal_id " << r.sid << " -> LightID idx "
+                          << static_cast<int>(r.expect));
+        CHECK(c.GetBulbCmd(r.expect));
+        // Only the expected LightID should have been flipped.
+        for (int i = 0; i < NUM_LIGHTS; ++i) {
+            if (static_cast<LightID>(i) != r.expect)
+                CHECK_FALSE(c.GetBulbCmd(static_cast<LightID>(i)));
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -108,21 +141,22 @@ TEST_CASE("Injected deltas latch bulb commands", "[ExternalSim]") {
     ExternalSimConnector c;
     CHECK_FALSE(c.HasReceivedBulbData());
 
-    c.DebugInjectDelta(4000, true);   // LHBH
-    CHECK(c.GetBulbCmd(LightID::LHBH));
+    // First slot = BACKUP_LEFT in the electric sim = LBL here.
+    c.DebugInjectDelta(4000, true);
+    CHECK(c.GetBulbCmd(LightID::LBL));
     CHECK(c.HasReceivedBulbData());
 
     c.DebugInjectDelta(4000, false);
-    CHECK_FALSE(c.GetBulbCmd(LightID::LHBH));
+    CHECK_FALSE(c.GetBulbCmd(LightID::LBL));
     CHECK(c.HasReceivedBulbData());   // latched on first ever write
 
-    // CHMSL is a lone bulb well inside the range.
-    c.DebugInjectDelta(4000 + static_cast<int>(LightID::CHMSL), true);
+    // CHMSL sits at slot 15 (between STOPLAMP_LEFT and STOPLAMP_RIGHT).
+    c.DebugInjectDelta(4015, true);
     CHECK(c.GetBulbCmd(LightID::CHMSL));
 
-    // Last bulb in the range (RBL = 18).
+    // Last slot of the ev1sim range is RRTL (tail filament).
     c.DebugInjectDelta(4018, true);
-    CHECK(c.GetBulbCmd(LightID::RBL));
+    CHECK(c.GetBulbCmd(LightID::RRTL));
 }
 
 TEST_CASE("Injected deltas latch horn commands", "[ExternalSim]") {
