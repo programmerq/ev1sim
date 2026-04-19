@@ -13,11 +13,36 @@
 namespace {
 
 // ---------------------------------------------------------------------------
-// Signal ID layout (see header comment for the big picture).
+// Signal ID layout
 //
-//   4000..4018  bulb_cmd for LightID 0..18                (input to ev1sim)
-//   4020        horn_low_cmd                               (input to ev1sim)
-//   4021        horn_high_cmd                              (input to ev1sim)
+// Bulb command IDs (4000..4018) mirror the external electrical sim's LightIdx
+// enum so both sides agree on which physical bulb a given ID drives.  The
+// first 17 slots match the electric sim's catalog 1:1; the final two slots
+// (LRTL/RRTL) model the dual-filament tail-lamp elements separately — the
+// electric sim doesn't currently publish those and simply leaves them unused.
+//
+//   4000  BACKUP_LEFT                -> LBL
+//   4001  BACKUP_RIGHT               -> RBL
+//   4002  HEADLAMP_HI_LEFT           -> LHBH
+//   4003  HEADLAMP_HI_RIGHT          -> RHBH
+//   4004  HEADLAMP_LO_LEFT           -> LLBH
+//   4005  HEADLAMP_LO_RIGHT          -> RLBH
+//   4006  SIDE_MARKER_REAR_LEFT      -> LRSM
+//   4007  SIDE_MARKER_REAR_RIGHT     -> RRSM
+//   4008  SIGNAL_FRONT_MARKER_LEFT   -> LFML
+//   4009  SIGNAL_FRONT_MARKER_RIGHT  -> RFML
+//   4010  SIGNAL_FRONT_TURN_LEFT     -> LFTS
+//   4011  SIGNAL_FRONT_TURN_RIGHT    -> RFTS
+//   4012  SIGNAL_REAR_LEFT           -> LRTS  (rear turn signal)
+//   4013  SIGNAL_REAR_RIGHT          -> RRTS
+//   4014  STOPLAMP_LEFT              -> LRSL
+//   4015  CHMSL                      -> CHMSL
+//   4016  STOPLAMP_RIGHT             -> RRSL
+//   4017  (ev1sim-only)              -> LRTL  (left rear tail filament)
+//   4018  (ev1sim-only)              -> RRTL
+//
+//   4020  horn_low_cmd                               (input to ev1sim)
+//   4021  horn_high_cmd                              (input to ev1sim)
 //   4030..4033  panel ajar switches (HOOD/TRUNK/DL/DR)    (output from ev1sim)
 // ---------------------------------------------------------------------------
 constexpr std::uint32_t kBulbCmdBase   = 4000;
@@ -25,9 +50,23 @@ constexpr std::uint32_t kHornLowCmd    = 4020;
 constexpr std::uint32_t kHornHighCmd   = 4021;
 constexpr std::uint32_t kPanelBase     = 4030;
 
-// Stable short lowercase names for each LightID, used to build qualified
-// signal names like "vehicle.body.lhbh.bulb_cmd".
-constexpr const char* kBulbShort[] = {
+// Mapping from signal slot (kBulbCmdBase + slot) to LightID.  Order must stay
+// locked to the electric sim's LightIdx enum for the first 17 entries.
+constexpr LightID kBulbOrder[NUM_LIGHTS] = {
+    LightID::LBL,    LightID::RBL,
+    LightID::LHBH,   LightID::RHBH,
+    LightID::LLBH,   LightID::RLBH,
+    LightID::LRSM,   LightID::RRSM,
+    LightID::LFML,   LightID::RFML,
+    LightID::LFTS,   LightID::RFTS,
+    LightID::LRTS,   LightID::RRTS,
+    LightID::LRSL,   LightID::CHMSL,  LightID::RRSL,
+    LightID::LRTL,   LightID::RRTL,   // ev1sim-only dual-filament tail elements
+};
+
+// Short / qualified names indexed by LightID enum value (not by signal slot).
+// Keeps the EV1-manual abbreviation stable regardless of wire-level ordering.
+constexpr const char* kBulbShort[NUM_LIGHTS] = {
     "lhbh_bulb_cmd",  "llbh_bulb_cmd",
     "rhbh_bulb_cmd",  "rlbh_bulb_cmd",
     "lfts_bulb_cmd",  "rfts_bulb_cmd",
@@ -39,10 +78,8 @@ constexpr const char* kBulbShort[] = {
     "chmsl_bulb_cmd",
     "lbl_bulb_cmd",   "rbl_bulb_cmd",
 };
-static_assert(sizeof(kBulbShort) / sizeof(kBulbShort[0]) == NUM_LIGHTS,
-              "kBulbShort must cover every LightID");
 
-constexpr const char* kBulbQualified[] = {
+constexpr const char* kBulbQualified[NUM_LIGHTS] = {
     "vehicle.body.lhbh.bulb_cmd",  "vehicle.body.llbh.bulb_cmd",
     "vehicle.body.rhbh.bulb_cmd",  "vehicle.body.rlbh.bulb_cmd",
     "vehicle.body.lfts.bulb_cmd",  "vehicle.body.rfts.bulb_cmd",
@@ -54,8 +91,14 @@ constexpr const char* kBulbQualified[] = {
     "vehicle.body.chmsl.bulb_cmd",
     "vehicle.body.lbl.bulb_cmd",   "vehicle.body.rbl.bulb_cmd",
 };
-static_assert(sizeof(kBulbQualified) / sizeof(kBulbQualified[0]) == NUM_LIGHTS,
-              "kBulbQualified must cover every LightID");
+
+// Look up the LightID that corresponds to an inbound bulb signal_id, or -1
+// if the signal is outside our bulb command range.
+int LightIdForBulbSignal(std::uint32_t signal_id) {
+    if (signal_id < kBulbCmdBase || signal_id >= kBulbCmdBase + NUM_LIGHTS)
+        return -1;
+    return static_cast<int>(kBulbOrder[signal_id - kBulbCmdBase]);
+}
 
 struct PanelNames { const char* qualified; const char* shortname; };
 constexpr PanelNames kPanelNames[] = {
@@ -76,9 +119,10 @@ constexpr int kNumEndpoints = NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS;
 std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     std::array<ExternalSimConnector::Endpoint, kNumEndpoints> out{};
     int i = 0;
-    for (int b = 0; b < NUM_LIGHTS; ++b, ++i) {
-        out[i] = {kBulbCmdBase + static_cast<std::uint32_t>(b),
-                  kBulbQualified[b], kBulbShort[b], /*input_to_sim=*/true};
+    for (int slot = 0; slot < NUM_LIGHTS; ++slot, ++i) {
+        const int lid = static_cast<int>(kBulbOrder[slot]);
+        out[i] = {kBulbCmdBase + static_cast<std::uint32_t>(slot),
+                  kBulbQualified[lid], kBulbShort[lid], /*input_to_sim=*/true};
     }
     out[i++] = {kHornLowCmd,  "vehicle.body.horn.low_cmd",  "horn_low_cmd",  true};
     out[i++] = {kHornHighCmd, "vehicle.body.horn.high_cmd", "horn_high_cmd", true};
@@ -243,9 +287,9 @@ bool ExternalSimConnector::GetPanelSensor(PanelID panel) const {
 // Test / internal: apply an inbound signal value (as if decoded from a frame).
 // ---------------------------------------------------------------------------
 void ExternalSimConnector::DebugInjectDelta(std::uint32_t signal_id, bool value) {
-    if (signal_id >= kBulbCmdBase &&
-        signal_id <  kBulbCmdBase + NUM_LIGHTS) {
-        m_state->bulb[signal_id - kBulbCmdBase] = value;
+    int lid = LightIdForBulbSignal(signal_id);
+    if (lid >= 0) {
+        m_state->bulb[lid] = value;
         m_state->received_any_bulb = true;
     } else if (signal_id == kHornLowCmd) {
         m_state->horn_low = value;
