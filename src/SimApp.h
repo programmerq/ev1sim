@@ -20,11 +20,15 @@ public:
     explicit SimApp(const Config& config);
     ~SimApp();
 
-    // Blocking — runs until the user closes the window or presses Esc.
+    // Blocking.  In interactive mode, runs until the user closes the window,
+    // presses Esc, or simulation.max_time_s elapses.  In headless mode, runs
+    // until max_time_s elapses or SIGINT is received.
     void Run();
 
 private:
     void SetupVisualization();
+    void RunWithVisualization();
+    void RunHeadless();
 
     Config m_config;
 
