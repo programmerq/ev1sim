@@ -82,8 +82,25 @@ cd /path/to/ev1sim
 | `--friction <val>` | Custom friction coefficient | (from surface preset) |
 | `--render-fps <n>` | Target render FPS | `60` |
 | `--hud <bool>` | Show on-screen HUD | `true` |
+| `--headless` | Run without a window (no Irrlicht, no rendering) | off |
+| `--max-time <s>` | Exit after this many seconds of sim time (`0` = no limit) | `0` |
 
 CLI flags override config file values.
+
+### Headless mode
+
+```bash
+# Physics + telemetry + external-sim I/O, no window.
+# Exits on max-time or SIGINT.
+./build/ev1sim --headless --max-time 10
+
+# Faster than real-time, useful in CI:
+./build/ev1sim --headless --max-time 10 --realtime false
+```
+
+Headless mode is intended for scripted scenario runs against the external
+electronic simulator.  Keyboard input is not available; the driver command
+stays at zero throttle/brake/steering until a scripted driver is added.
 
 ## Controls
 
