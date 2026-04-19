@@ -75,6 +75,15 @@ struct Config {
         double      reconnect_period_s = 1.0;
     } external_sim;
 
+    // Built-in accel-hold-brake scripted scenario.  Only active when
+    // enabled == true (usually paired with --headless for CI use).
+    struct Scripted {
+        bool   enabled            = false;
+        double target_speed_kph   = 40.0;
+        double hold_time_s        = 1.0;
+        double stop_threshold_mps = 0.1;
+    } scripted;
+
     bool start_paused = false;
 
     // Load from JSON file.  Missing keys keep their defaults.

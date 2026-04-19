@@ -5,6 +5,7 @@
 #include "ExternalSimConnector.h"
 #include "HornAudio.h"
 #include "KeyboardInputController.h"
+#include "ScriptedDriver.h"
 #include "Telemetry.h"
 #include "VehicleLights.h"
 #include "VehiclePanels.h"
@@ -40,6 +41,7 @@ private:
     std::unique_ptr<VehicleLights>          m_lights;
     std::unique_ptr<VehiclePanels>          m_panels;
     std::unique_ptr<ExternalSimConnector>   m_external_sim;
+    std::unique_ptr<ScriptedDriver>         m_scripted;
 
     std::shared_ptr<chrono::vehicle::ChWheeledVehicleVisualSystemIrrlicht> m_vis;
     chrono::ChRealtimeStepTimer m_realtime_timer;

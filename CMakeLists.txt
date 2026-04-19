@@ -95,6 +95,7 @@ add_executable(ev1sim
     src/KeyboardInputController.cpp
     src/CameraManager.cpp
     src/Config.cpp
+    src/ScriptedDriver.cpp
     src/Telemetry.cpp
     src/HornAudio.cpp
     src/VehicleLights.cpp

@@ -84,6 +84,16 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                   << m_external_sim->StatusString() << ")\n";
     }
 
+    // Scripted driver (optional).  Currently one built-in scenario:
+    // accel → hold → brake → done.
+    if (m_config.scripted.enabled) {
+        ScriptedDriver::Params p;
+        p.target_speed_mps   = m_config.scripted.target_speed_kph / 3.6;
+        p.hold_time_s        = m_config.scripted.hold_time_s;
+        p.stop_threshold_mps = m_config.scripted.stop_threshold_mps;
+        m_scripted = std::make_unique<ScriptedDriver>(p);
+    }
+
     m_lights_demo = m_config.lights.demo_mode;
 
     m_paused = m_config.start_paused;
@@ -312,14 +322,21 @@ void SimApp::RunHeadless() {
         std::max(1, static_cast<int>(std::round(tick_dt / step)));
     const double max_time = m_config.simulation.max_time_s;
 
-    // Default driver command — zero throttle/brake/steering.  A scripted
-    // driver will replace this in a later change.
-    const DriverCommand zero_cmd{};
-    m_world->GetDriver().SetCommand(zero_cmd);
+    // Default driver command — zero throttle/brake/steering when no scripted
+    // driver is configured.
+    if (!m_scripted)
+        m_world->GetDriver().SetCommand(DriverCommand{});
 
     const auto wall_start = std::chrono::steady_clock::now();
 
     while (!g_stop_requested.load(std::memory_order_relaxed)) {
+        // --- Scripted driver (if any) — reads previous-tick state and
+        //     emits a new command before we step physics.
+        if (m_scripted) {
+            DriverCommand cmd = m_scripted->Update(m_world->GetState());
+            m_world->GetDriver().SetCommand(cmd);
+        }
+
         // --- Physics sub-stepping (no pause control in headless) ---
         for (int i = 0; i < steps_per_tick; ++i) {
             const double t = m_world->GetSimTime();
@@ -354,6 +371,13 @@ void SimApp::RunHeadless() {
                 std::chrono::duration_cast<std::chrono::steady_clock::duration>(
                     std::chrono::duration<double>(t));
             std::this_thread::sleep_until(target);
+        }
+
+        // --- Scripted-scenario complete ---
+        if (m_scripted && m_scripted->IsDone()) {
+            std::cout << "[SimApp] Scripted scenario complete at t="
+                      << t << "s — exiting.\n";
+            break;
         }
 
         // --- Max-time exit ---
