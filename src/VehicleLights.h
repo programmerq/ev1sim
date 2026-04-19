@@ -62,6 +62,12 @@ public:
     /// so you can visually verify each lamp group works independently.
     void UpdateDemoMode(double sim_time);
 
+    /// Chase demo — illuminate one bulb at a time, stepping clockwise
+    /// around the vehicle starting at the CHMSL.  Useful for verifying
+    /// that each LightID maps to the expected physical lamp.  Each bulb
+    /// stays on for ~0.2 s, then advances.
+    void UpdateChaseDemo(double sim_time);
+
     /// Push current light states to the Irrlicht mesh materials.
     /// Call once per frame, before BeginScene.
     void ApplyToScene();

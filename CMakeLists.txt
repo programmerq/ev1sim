@@ -40,6 +40,43 @@ FetchContent_Declare(json
 )
 FetchContent_MakeAvailable(json)
 
+# ── electricsim connector (optional) ────────────────────────────────────────
+# If the electricsim repo is checked out next to this one (or pointed at via
+# -DELECTRICSIM_DIR=<path>), we build a small static library from its I/O
+# sources (no simavr / libelf / firmware needed) and link the main executable
+# against it.  Otherwise we fall back to a stub so --external-sim is a no-op.
+if(NOT ELECTRICSIM_DIR)
+    # Walk up a few levels — handles both the main checkout and the
+    # .claude/worktrees/<name> case where the worktree lives several
+    # directories below the shared workspace root.
+    foreach(_cand
+            "${CMAKE_SOURCE_DIR}/../electricsim"
+            "${CMAKE_SOURCE_DIR}/../../electricsim"
+            "${CMAKE_SOURCE_DIR}/../../../electricsim"
+            "${CMAKE_SOURCE_DIR}/../../../../electricsim"
+            "${CMAKE_SOURCE_DIR}/../../../../../electricsim")
+        if(EXISTS "${_cand}/src/io/shm_transport.hpp")
+            get_filename_component(ELECTRICSIM_DIR "${_cand}" ABSOLUTE)
+            break()
+        endif()
+    endforeach()
+endif()
+
+set(EV1SIM_HAVE_EXTERNAL_SIM FALSE)
+if(ELECTRICSIM_DIR AND EXISTS "${ELECTRICSIM_DIR}/src/io/shm_transport.hpp")
+    message(STATUS "electricsim connector: ${ELECTRICSIM_DIR}")
+    add_library(electricsim_connector STATIC
+        "${ELECTRICSIM_DIR}/src/io/signal_catalog.cpp"
+        "${ELECTRICSIM_DIR}/src/io/protocol.cpp"
+        "${ELECTRICSIM_DIR}/src/io/shm_transport.cpp"
+        "${ELECTRICSIM_DIR}/src/io/bridge_adapter.cpp")
+    target_include_directories(electricsim_connector PUBLIC
+        "${ELECTRICSIM_DIR}/src/io")
+    set(EV1SIM_HAVE_EXTERNAL_SIM TRUE)
+else()
+    message(STATUS "electricsim connector: not found (set ELECTRICSIM_DIR to enable external sim)")
+endif()
+
 # ── macOS Objective-C++ support ─────────────────────────────────────────────
 if(APPLE)
     enable_language(OBJCXX)
@@ -62,6 +99,7 @@ add_executable(ev1sim
     src/HornAudio.cpp
     src/VehicleLights.cpp
     src/VehiclePanels.cpp
+    src/ExternalSimConnector.cpp
     ${MACOS_PLATFORM_SRC}
 )
 
@@ -70,6 +108,10 @@ target_link_libraries(ev1sim PRIVATE
     ${CHRONO_LIBRARIES}
     nlohmann_json::nlohmann_json
 )
+if(EV1SIM_HAVE_EXTERNAL_SIM)
+    target_link_libraries(ev1sim PRIVATE electricsim_connector)
+    target_compile_definitions(ev1sim PRIVATE EV1SIM_HAVE_EXTERNAL_SIM=1)
+endif()
 
 # Link macOS frameworks for platform fixes and audio.
 if(APPLE)
@@ -110,8 +152,10 @@ if(BUILD_TESTS)
         tests/test_config.cpp
         tests/test_driver_command.cpp
         tests/test_keyboard_input.cpp
+        tests/test_external_sim_connector.cpp
         src/Config.cpp
         src/KeyboardInputController.cpp
+        src/ExternalSimConnector.cpp
     )
 
     target_include_directories(ev1sim_tests PRIVATE src)
@@ -120,6 +164,10 @@ if(BUILD_TESTS)
         nlohmann_json::nlohmann_json
         ${CHRONO_LIBRARIES}
     )
+    if(EV1SIM_HAVE_EXTERNAL_SIM)
+        target_link_libraries(ev1sim_tests PRIVATE electricsim_connector)
+        target_compile_definitions(ev1sim_tests PRIVATE EV1SIM_HAVE_EXTERNAL_SIM=1)
+    endif()
 
     include(CTest)
     include(Catch)

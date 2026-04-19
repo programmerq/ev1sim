@@ -88,6 +88,21 @@ Config Config::LoadFromFile(const std::string& path) {
         read_if(tl, "show_hud",     cfg.telemetry.show_hud);
     }
 
+    if (j.contains("lights") && j["lights"].contains("demo_mode")) {
+        // Accept either a string ("off"/"blink"/"chase") or, for backward
+        // compatibility, a boolean (true -> "blink", false -> "off").
+        const auto& v = j["lights"]["demo_mode"];
+        if (v.is_string())       cfg.lights.demo_mode = v.get<std::string>();
+        else if (v.is_boolean()) cfg.lights.demo_mode = v.get<bool>() ? "blink" : "off";
+    }
+
+    if (j.contains("external_sim")) {
+        auto& x = j["external_sim"];
+        read_if(x, "enabled",            cfg.external_sim.enabled);
+        read_if(x, "bus_name",           cfg.external_sim.bus_name);
+        read_if(x, "reconnect_period_s", cfg.external_sim.reconnect_period_s);
+    }
+
     return cfg;
 }
 
@@ -133,6 +148,20 @@ void Config::ApplyCliOverrides(int argc, char* argv[]) {
             telemetry.show_hud = (v == "true" || v == "1");
         } else if (arg == "--paused") {
             start_paused = true;
+        } else if (arg == "--external-sim") {
+            auto v = next();
+            external_sim.enabled = (v == "true" || v == "1" || v == "on");
+        } else if (arg == "--external-sim-bus") {
+            auto v = next();
+            if (!v.empty()) external_sim.bus_name = v;
+        } else if (arg == "--lights-demo") {
+            auto v = next();
+            if (v == "true" || v == "1" || v == "on")      lights.demo_mode = "blink";
+            else if (v == "false" || v == "0" || v == "off") lights.demo_mode = "off";
+            else if (v == "blink" || v == "chase")          lights.demo_mode = v;
+            else if (!v.empty()) {
+                std::cerr << "[Config] Unknown --lights-demo value: " << v << "\n";
+            }
         } else {
             std::cerr << "[Config] Unknown flag: " << arg << "\n";
         }

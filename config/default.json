@@ -25,5 +25,13 @@
     "log_to_file": false,
     "log_file": "telemetry.csv",
     "show_hud": true
+  },
+  "lights": {
+    "demo_mode": "off"
+  },
+  "external_sim": {
+    "enabled": true,
+    "bus_name": "electricsim_harness_bus",
+    "reconnect_period_s": 1.0
   }
 }
