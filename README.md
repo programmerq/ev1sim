@@ -84,6 +84,9 @@ cd /path/to/ev1sim
 | `--hud <bool>` | Show on-screen HUD | `true` |
 | `--headless` | Run without a window (no Irrlicht, no rendering) | off |
 | `--max-time <s>` | Exit after this many seconds of sim time (`0` = no limit) | `0` |
+| `--scripted-accel-brake` | Enable built-in accel → hold → brake scenario | off |
+| `--target-kph <n>` | Target speed for the scripted scenario (implies enabled) | `40` |
+| `--hold-time <s>` | Hold target speed for this long before braking | `1.0` |
 
 CLI flags override config file values.
 
@@ -99,8 +102,28 @@ CLI flags override config file values.
 ```
 
 Headless mode is intended for scripted scenario runs against the external
-electronic simulator.  Keyboard input is not available; the driver command
-stays at zero throttle/brake/steering until a scripted driver is added.
+electronic simulator.  Keyboard input is not available; without a scripted
+driver the command stays at zero throttle/brake/steering.
+
+### Built-in accel → hold → brake scenario
+
+A minimal scripted driver with three phases:
+
+1. **Accel** — full throttle until vehicle speed reaches `--target-kph`
+2. **Hold** — maintain target speed for `--hold-time` seconds (default `1.0`)
+3. **Brake** — full brake until speed falls below `stop_threshold_mps` (0.1 m/s)
+
+When the Brake phase completes, the sim exits.  The sample config
+[`config/accel_brake.json`](config/accel_brake.json) runs the scenario
+headless on a flat plane.
+
+```bash
+./build/ev1sim --config config/accel_brake.json
+# or compose with CLI flags:
+./build/ev1sim --headless --realtime false --target-kph 30 --hold-time 1
+```
+
+Phase transitions are logged to stdout (`[ScriptedDriver] Phase -> Hold`).
 
 ## Controls
 
