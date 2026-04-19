@@ -55,6 +55,8 @@ Config Config::LoadFromFile(const std::string& path) {
         read_if(s, "step_size_s", cfg.simulation.step_size_s);
         read_if(s, "render_fps",  cfg.simulation.render_fps);
         read_if(s, "realtime",    cfg.simulation.realtime);
+        read_if(s, "headless",    cfg.simulation.headless);
+        read_if(s, "max_time_s",  cfg.simulation.max_time_s);
     }
 
     if (j.contains("spawn")) {
@@ -148,6 +150,11 @@ void Config::ApplyCliOverrides(int argc, char* argv[]) {
             telemetry.show_hud = (v == "true" || v == "1");
         } else if (arg == "--paused") {
             start_paused = true;
+        } else if (arg == "--headless") {
+            simulation.headless = true;
+        } else if (arg == "--max-time") {
+            auto v = next();
+            if (!v.empty()) simulation.max_time_s = std::stod(v);
         } else if (arg == "--external-sim") {
             auto v = next();
             external_sim.enabled = (v == "true" || v == "1" || v == "on");
