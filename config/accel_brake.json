@@ -1,0 +1,37 @@
+{
+  "vehicle_model": "ev1",
+  "terrain": {
+    "type": "rigid_plane",
+    "surface": "asphalt",
+    "friction": 0.9,
+    "length_m": 400.0,
+    "width_m": 400.0
+  },
+  "spawn": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.5,
+    "yaw_deg": 0.0
+  },
+  "simulation": {
+    "step_size_s": 0.002,
+    "render_fps": 60,
+    "realtime": false,
+    "headless": true,
+    "max_time_s": 30.0
+  },
+  "telemetry": {
+    "log_rate_hz": 5.0,
+    "log_to_file": false,
+    "show_hud": false
+  },
+  "external_sim": {
+    "enabled": false
+  },
+  "scripted": {
+    "enabled": true,
+    "target_speed_kph": 30.0,
+    "hold_time_s": 1.0,
+    "stop_threshold_mps": 0.1
+  }
+}

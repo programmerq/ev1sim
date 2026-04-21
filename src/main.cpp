@@ -18,14 +18,14 @@ int main(int argc, char* argv[]) {
     Config config = Config::LoadFromFile(config_path);
     config.ApplyCliOverrides(argc, argv);
 
-    // 2. Run.
+    // 2. Run.  SimApp::Run returns one of SimApp::kExit* codes — propagate
+    //    to the shell so CI can distinguish normal completion, scenario
+    //    timeout, SIGINT, and usage errors.
     try {
         SimApp app(config);
-        app.Run();
+        return app.Run();
     } catch (const std::exception& e) {
         std::cerr << "[Fatal] " << e.what() << "\n";
         return 1;
     }
-
-    return 0;
 }

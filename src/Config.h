@@ -21,6 +21,16 @@ struct Config {
         double step_size_s = 0.002;
         int    render_fps  = 60;
         bool   realtime    = true;
+
+        // Headless run: skip Irrlicht window and rendering.  Physics, telemetry,
+        // and the external-sim connector still run normally.  Intended for
+        // CI-style scenario runs — see max_time_s for automatic termination.
+        bool   headless    = false;
+
+        // Exit after this many seconds of simulated time (0 = no limit).
+        // Applies in both headless and interactive modes; in interactive mode
+        // closing the window or pressing Esc still works.
+        double max_time_s  = 0.0;
     } simulation;
 
     struct Spawn {
@@ -65,12 +75,22 @@ struct Config {
         double      reconnect_period_s = 1.0;
     } external_sim;
 
+    // Built-in accel-hold-brake scripted scenario.  Only active when
+    // enabled == true (usually paired with --headless for CI use).
+    struct Scripted {
+        bool   enabled            = false;
+        double target_speed_kph   = 40.0;
+        double hold_time_s        = 1.0;
+        double stop_threshold_mps = 0.1;
+    } scripted;
+
     bool start_paused = false;
 
     // Load from JSON file.  Missing keys keep their defaults.
     static Config LoadFromFile(const std::string& path);
 
     // Merge CLI arguments on top of current values.
-    // Recognised flags: --config, --vehicle, --surface, --step-size, --realtime
+    // Recognised flags: --config, --vehicle, --surface, --step-size, --realtime,
+    // --headless, --max-time, ...
     void ApplyCliOverrides(int argc, char* argv[]);
 };

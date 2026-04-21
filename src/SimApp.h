@@ -5,6 +5,7 @@
 #include "ExternalSimConnector.h"
 #include "HornAudio.h"
 #include "KeyboardInputController.h"
+#include "ScriptedDriver.h"
 #include "Telemetry.h"
 #include "VehicleLights.h"
 #include "VehiclePanels.h"
@@ -20,11 +21,27 @@ public:
     explicit SimApp(const Config& config);
     ~SimApp();
 
-    // Blocking — runs until the user closes the window or presses Esc.
-    void Run();
+    // Exit codes returned from Run().  Chosen to be CI-friendly:
+    //   0   — successful completion (scripted Done, user-closed window, or
+    //          max_time with no scripted scenario active)
+    //   2   — max_time_s expired while a scripted scenario was still running
+    //   130 — SIGINT (conventional 128+SIGINT_number)
+    //   64  — usage/config error (EX_USAGE)
+    static constexpr int kExitSuccess     = 0;
+    static constexpr int kExitTimeout     = 2;
+    static constexpr int kExitInterrupted = 130;
+    static constexpr int kExitUsage       = 64;
+
+    // Blocking.  In interactive mode, runs until the user closes the window,
+    // presses Esc, or simulation.max_time_s elapses.  In headless mode, runs
+    // until max_time_s elapses, the scripted scenario finishes, or SIGINT is
+    // received.  Returns one of the kExit* codes.
+    int Run();
 
 private:
     void SetupVisualization();
+    int  RunWithVisualization();
+    int  RunHeadless();
 
     Config m_config;
 
@@ -36,6 +53,7 @@ private:
     std::unique_ptr<VehicleLights>          m_lights;
     std::unique_ptr<VehiclePanels>          m_panels;
     std::unique_ptr<ExternalSimConnector>   m_external_sim;
+    std::unique_ptr<ScriptedDriver>         m_scripted;
 
     std::shared_ptr<chrono::vehicle::ChWheeledVehicleVisualSystemIrrlicht> m_vis;
     chrono::ChRealtimeStepTimer m_realtime_timer;

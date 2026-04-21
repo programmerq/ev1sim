@@ -2,24 +2,42 @@
 #include "MacOSPlatform.h"
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <cmath>
+#include <csignal>
 #include <iostream>
+#include <thread>
 
 using namespace chrono;
 using namespace chrono::vehicle;
 
+namespace {
+// Headless-only: flipped by SIGINT so the run loop can exit cleanly.
+// Static lifetime is fine — only SimApp::RunHeadless installs/reads it.
+std::atomic<bool> g_stop_requested{false};
+
+extern "C" void HeadlessSigintHandler(int) {
+    g_stop_requested.store(true, std::memory_order_relaxed);
+}
+}  // namespace
+
 // ---------------------------------------------------------------------------
 SimApp::SimApp(const Config& config) : m_config(config) {
+    const bool headless = m_config.simulation.headless;
+
     // 1. Physics world.
     m_world = std::make_unique<VehicleWorld>(m_config);
 
-    // 2. Keyboard input.
-    KeyboardInputController::Rates rates;
-    rates.steer_rate        = m_config.input.steer_rate;
-    rates.steer_return_rate = m_config.input.steer_return_rate;
-    rates.throttle_rise     = m_config.input.throttle_rise_rate;
-    rates.brake_rise        = m_config.input.brake_rise_rate;
-    m_keyboard = std::make_unique<KeyboardInputController>(rates);
+    // 2. Keyboard input — only when we have an Irrlicht window to attach to.
+    if (!headless) {
+        KeyboardInputController::Rates rates;
+        rates.steer_rate        = m_config.input.steer_rate;
+        rates.steer_return_rate = m_config.input.steer_return_rate;
+        rates.throttle_rise     = m_config.input.throttle_rise_rate;
+        rates.brake_rise        = m_config.input.brake_rise_rate;
+        m_keyboard = std::make_unique<KeyboardInputController>(rates);
+    }
 
     // 3. Telemetry.
     m_telemetry = std::make_unique<Telemetry>(
@@ -28,23 +46,26 @@ SimApp::SimApp(const Config& config) : m_config(config) {
         m_config.telemetry.log_file,
         m_config.telemetry.show_hud);
 
-    // 4. Horn audio.
+    // 4. Horn audio — CoreAudio on macOS, no-op elsewhere.  Safe headless.
     m_horn = std::make_unique<HornAudio>();
 
-    // 5. Visualization (creates window).
-    SetupVisualization();
+    // 5. Visualization (creates window).  Skipped entirely in headless mode;
+    //    no Irrlicht device, no window, no OpenGL context.
+    if (!headless) {
+        SetupVisualization();
 
-    // 6. Camera manager — needs the Irrlicht camera node from vis.
-    auto* cam_node = m_vis->GetActiveCamera();
-    m_camera = std::make_unique<CameraManager>(
-        cam_node, m_config.camera.chase_distance, m_config.camera.chase_height);
-    m_camera->SetModeFromString(m_config.camera.default_mode);
+        // 6. Camera manager — needs the Irrlicht camera node from vis.
+        auto* cam_node = m_vis->GetActiveCamera();
+        m_camera = std::make_unique<CameraManager>(
+            cam_node, m_config.camera.chase_distance, m_config.camera.chase_height);
+        m_camera->SetModeFromString(m_config.camera.default_mode);
 
-    // Register camera manager's mouse handler with Irrlicht.
-    m_vis->AddUserEventReceiver(m_camera.get());
+        // Register camera manager's mouse handler with Irrlicht.
+        m_vis->AddUserEventReceiver(m_camera.get());
 
-    // 7. Vehicle lights — needs Irrlicht scene graph to be populated.
-    m_lights = std::make_unique<VehicleLights>();
+        // 7. Vehicle lights — needs Irrlicht scene graph to be populated.
+        m_lights = std::make_unique<VehicleLights>();
+    }
 
     // 8. Vehicle panels (hood, trunk, doors) — state-only until panel OBJs exist.
     m_panels = std::make_unique<VehiclePanels>();
@@ -63,15 +84,36 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                   << m_external_sim->StatusString() << ")\n";
     }
 
+    // Scripted driver (optional).  Currently one built-in scenario:
+    // accel → hold → brake → done.
+    if (m_config.scripted.enabled) {
+        ScriptedDriver::Params p;
+        p.target_speed_mps   = m_config.scripted.target_speed_kph / 3.6;
+        p.hold_time_s        = m_config.scripted.hold_time_s;
+        p.stop_threshold_mps = m_config.scripted.stop_threshold_mps;
+        m_scripted = std::make_unique<ScriptedDriver>(p);
+    }
+
     m_lights_demo = m_config.lights.demo_mode;
 
     m_paused = m_config.start_paused;
 
-    std::cout << "[SimApp] Ready.  Controls: WASD=drive  Space=park brake  "
-                 "P=pause  R=respawn  C=camera  Scroll=zoom  B=horn  O=hi  L=lo  "
-                 "H=headlights  F=hood  T=trunk  [=doorL  ]=doorR  Esc=quit\n";
-    if (m_paused)
-        std::cout << "[SimApp] Started PAUSED — press P to begin simulation\n";
+    if (headless) {
+        std::cout << "[SimApp] Headless mode — no window.  Exits ";
+        if (m_scripted)
+            std::cout << "when the scripted scenario completes";
+        if (m_config.simulation.max_time_s > 0.0) {
+            if (m_scripted) std::cout << ", ";
+            std::cout << "at sim_time " << m_config.simulation.max_time_s << "s";
+        }
+        std::cout << ", or on SIGINT.\n";
+    } else {
+        std::cout << "[SimApp] Ready.  Controls: WASD=drive  Space=park brake  "
+                     "P=pause  R=respawn  C=camera  Scroll=zoom  B=horn  O=hi  L=lo  "
+                     "H=headlights  F=hood  T=trunk  [=doorL  ]=doorR  Esc=quit\n";
+        if (m_paused)
+            std::cout << "[SimApp] Started PAUSED — press P to begin simulation\n";
+    }
 }
 
 SimApp::~SimApp() = default;
@@ -112,14 +154,40 @@ void SimApp::SetupVisualization() {
 }
 
 // ---------------------------------------------------------------------------
-void SimApp::Run() {
+int SimApp::Run() {
+    if (m_config.simulation.headless) {
+        // Guard against the hang-forever foot-gun: headless with no terminator
+        // and no scripted scenario would loop until SIGINT, which is a bad
+        // default for CI.  Require at least one way to exit automatically.
+        const bool has_max_time = m_config.simulation.max_time_s > 0.0;
+        const bool has_scripted = m_config.scripted.enabled;
+        if (!has_max_time && !has_scripted) {
+            std::cerr << "[SimApp] --headless requires at least one of "
+                         "--max-time <s> or a scripted scenario "
+                         "(e.g. --scripted-accel-brake).  Otherwise the "
+                         "run can only be ended by SIGINT.\n";
+            return kExitUsage;
+        }
+        return RunHeadless();
+    }
+    return RunWithVisualization();
+}
+
+// ---------------------------------------------------------------------------
+int SimApp::RunWithVisualization() {
     double step     = m_config.simulation.step_size_s;
     double render_dt = 1.0 / std::max(1, m_config.simulation.render_fps);
     int    steps_per_frame = std::max(1, static_cast<int>(std::round(render_dt / step)));
+    double max_time = m_config.simulation.max_time_s;
 
     while (m_vis->Run()) {
         // --- Input (once per render frame) ---
+        // Keyboard always runs to provide one-shot actions (pause, camera,
+        // quit, etc.), but the drive command comes from the scripted driver
+        // when configured — useful for visually debugging a scenario.
         DriverCommand cmd = m_keyboard->Update(render_dt);
+        if (m_scripted && !m_paused)
+            cmd = m_scripted->Update(m_world->GetState());
         m_world->GetDriver().SetCommand(cmd);
 
         // Handle one-shot actions.
@@ -251,5 +319,123 @@ void SimApp::Run() {
         // --- Realtime pacing ---
         if (m_config.simulation.realtime)
             m_realtime_timer.Spin(step * steps_per_frame);
+
+        // --- Scripted-scenario complete ---
+        if (m_scripted && m_scripted->IsDone()) {
+            std::cout << "[SimApp] Scripted scenario complete at t="
+                      << m_world->GetSimTime() << "s — exiting.\n";
+            return kExitSuccess;
+        }
+
+        // --- Max-time exit (shared with headless) ---
+        if (max_time > 0.0 && m_world->GetSimTime() >= max_time) {
+            const bool scripted_unfinished = m_scripted && !m_scripted->IsDone();
+            if (scripted_unfinished) {
+                std::cerr << "[SimApp] max_time_s reached with scripted "
+                             "scenario still in phase '"
+                          << m_scripted->PhaseName() << "' — timeout.\n";
+                return kExitTimeout;
+            }
+            std::cout << "[SimApp] max_time_s reached — exiting.\n";
+            return kExitSuccess;
+        }
     }
+    // Window closed / Esc pressed — normal exit.
+    return kExitSuccess;
+}
+
+// ---------------------------------------------------------------------------
+int SimApp::RunHeadless() {
+    // Install SIGINT handler so Ctrl-C breaks out of the loop cleanly.
+    g_stop_requested.store(false, std::memory_order_relaxed);
+    struct sigaction new_sa{}, old_sa{};
+    new_sa.sa_handler = &HeadlessSigintHandler;
+    sigemptyset(&new_sa.sa_mask);
+    sigaction(SIGINT, &new_sa, &old_sa);
+
+    const double step     = m_config.simulation.step_size_s;
+    const double tick_dt  = 1.0 / std::max(1, m_config.simulation.render_fps);
+    const int    steps_per_tick =
+        std::max(1, static_cast<int>(std::round(tick_dt / step)));
+    const double max_time = m_config.simulation.max_time_s;
+
+    // Default driver command — zero throttle/brake/steering when no scripted
+    // driver is configured.
+    if (!m_scripted)
+        m_world->GetDriver().SetCommand(DriverCommand{});
+
+    const auto wall_start = std::chrono::steady_clock::now();
+
+    while (!g_stop_requested.load(std::memory_order_relaxed)) {
+        // --- Scripted driver (if any) — reads previous-tick state and
+        //     emits a new command before we step physics.
+        if (m_scripted) {
+            DriverCommand cmd = m_scripted->Update(m_world->GetState());
+            m_world->GetDriver().SetCommand(cmd);
+        }
+
+        // --- Physics sub-stepping (no pause control in headless) ---
+        for (int i = 0; i < steps_per_tick; ++i) {
+            const double t = m_world->GetSimTime();
+            m_world->Synchronize(t);
+            m_world->Advance(step);
+        }
+
+        const double t = m_world->GetSimTime();
+
+        // --- External sim sync (panel sensors, bulb/horn cmds) ---
+        for (int i = 0; i < VehiclePanels::NUM_PANELS; ++i) {
+            m_external_sim->SetPanelSensor(
+                static_cast<PanelID>(i),
+                m_panels->IsOpen(static_cast<PanelID>(i)));
+        }
+        m_external_sim->Tick(t);
+
+        // --- Horn audio (external-sim-driven only in headless) ---
+        bool horn_low = false, horn_high = false;
+        if (m_external_sim->IsConnected()) {
+            horn_low  = m_external_sim->GetHornLowCmd();
+            horn_high = m_external_sim->GetHornHighCmd();
+        }
+        m_horn->SetTones(horn_low, horn_high);
+
+        // --- Telemetry logging ---
+        m_telemetry->Record(m_world->GetState(), tick_dt);
+
+        // --- Realtime pacing (sim-time vs wall-time) ---
+        if (m_config.simulation.realtime) {
+            const auto target = wall_start +
+                std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                    std::chrono::duration<double>(t));
+            std::this_thread::sleep_until(target);
+        }
+
+        // --- Scripted-scenario complete ---
+        if (m_scripted && m_scripted->IsDone()) {
+            std::cout << "[SimApp] Scripted scenario complete at t="
+                      << t << "s — exiting.\n";
+            sigaction(SIGINT, &old_sa, nullptr);
+            return kExitSuccess;
+        }
+
+        // --- Max-time exit ---
+        if (max_time > 0.0 && t >= max_time) {
+            const bool scripted_unfinished = m_scripted && !m_scripted->IsDone();
+            if (scripted_unfinished) {
+                std::cerr << "[SimApp] max_time_s reached with scripted "
+                             "scenario still in phase '"
+                          << m_scripted->PhaseName() << "' — timeout.\n";
+                sigaction(SIGINT, &old_sa, nullptr);
+                return kExitTimeout;
+            }
+            std::cout << "[SimApp] max_time_s reached — exiting.\n";
+            sigaction(SIGINT, &old_sa, nullptr);
+            return kExitSuccess;
+        }
+    }
+
+    // Fell out of the loop -> SIGINT was the only possible cause.
+    std::cout << "[SimApp] SIGINT — exiting.\n";
+    sigaction(SIGINT, &old_sa, nullptr);
+    return kExitInterrupted;
 }
