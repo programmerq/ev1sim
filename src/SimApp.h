@@ -21,15 +21,27 @@ public:
     explicit SimApp(const Config& config);
     ~SimApp();
 
+    // Exit codes returned from Run().  Chosen to be CI-friendly:
+    //   0   — successful completion (scripted Done, user-closed window, or
+    //          max_time with no scripted scenario active)
+    //   2   — max_time_s expired while a scripted scenario was still running
+    //   130 — SIGINT (conventional 128+SIGINT_number)
+    //   64  — usage/config error (EX_USAGE)
+    static constexpr int kExitSuccess     = 0;
+    static constexpr int kExitTimeout     = 2;
+    static constexpr int kExitInterrupted = 130;
+    static constexpr int kExitUsage       = 64;
+
     // Blocking.  In interactive mode, runs until the user closes the window,
     // presses Esc, or simulation.max_time_s elapses.  In headless mode, runs
-    // until max_time_s elapses or SIGINT is received.
-    void Run();
+    // until max_time_s elapses, the scripted scenario finishes, or SIGINT is
+    // received.  Returns one of the kExit* codes.
+    int Run();
 
 private:
     void SetupVisualization();
-    void RunWithVisualization();
-    void RunHeadless();
+    int  RunWithVisualization();
+    int  RunHeadless();
 
     Config m_config;
 

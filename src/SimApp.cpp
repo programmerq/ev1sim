@@ -99,10 +99,14 @@ SimApp::SimApp(const Config& config) : m_config(config) {
     m_paused = m_config.start_paused;
 
     if (headless) {
-        std::cout << "[SimApp] Headless mode — no window.";
-        if (m_config.simulation.max_time_s > 0.0)
-            std::cout << "  Exits at sim_time " << m_config.simulation.max_time_s << "s";
-        std::cout << " or on SIGINT.\n";
+        std::cout << "[SimApp] Headless mode — no window.  Exits ";
+        if (m_scripted)
+            std::cout << "when the scripted scenario completes";
+        if (m_config.simulation.max_time_s > 0.0) {
+            if (m_scripted) std::cout << ", ";
+            std::cout << "at sim_time " << m_config.simulation.max_time_s << "s";
+        }
+        std::cout << ", or on SIGINT.\n";
     } else {
         std::cout << "[SimApp] Ready.  Controls: WASD=drive  Space=park brake  "
                      "P=pause  R=respawn  C=camera  Scroll=zoom  B=horn  O=hi  L=lo  "
@@ -150,15 +154,27 @@ void SimApp::SetupVisualization() {
 }
 
 // ---------------------------------------------------------------------------
-void SimApp::Run() {
-    if (m_config.simulation.headless)
-        RunHeadless();
-    else
-        RunWithVisualization();
+int SimApp::Run() {
+    if (m_config.simulation.headless) {
+        // Guard against the hang-forever foot-gun: headless with no terminator
+        // and no scripted scenario would loop until SIGINT, which is a bad
+        // default for CI.  Require at least one way to exit automatically.
+        const bool has_max_time = m_config.simulation.max_time_s > 0.0;
+        const bool has_scripted = m_config.scripted.enabled;
+        if (!has_max_time && !has_scripted) {
+            std::cerr << "[SimApp] --headless requires at least one of "
+                         "--max-time <s> or a scripted scenario "
+                         "(e.g. --scripted-accel-brake).  Otherwise the "
+                         "run can only be ended by SIGINT.\n";
+            return kExitUsage;
+        }
+        return RunHeadless();
+    }
+    return RunWithVisualization();
 }
 
 // ---------------------------------------------------------------------------
-void SimApp::RunWithVisualization() {
+int SimApp::RunWithVisualization() {
     double step     = m_config.simulation.step_size_s;
     double render_dt = 1.0 / std::max(1, m_config.simulation.render_fps);
     int    steps_per_frame = std::max(1, static_cast<int>(std::round(render_dt / step)));
@@ -302,13 +318,18 @@ void SimApp::RunWithVisualization() {
         // --- Max-time exit (shared with headless) ---
         if (max_time > 0.0 && m_world->GetSimTime() >= max_time) {
             std::cout << "[SimApp] max_time_s reached — exiting.\n";
-            break;
+            // No scripted scenario in visualization mode today, so hitting
+            // max_time here is simply "user-requested timeout" and is
+            // treated as a clean exit.
+            return kExitSuccess;
         }
     }
+    // Window closed / Esc pressed — normal exit.
+    return kExitSuccess;
 }
 
 // ---------------------------------------------------------------------------
-void SimApp::RunHeadless() {
+int SimApp::RunHeadless() {
     // Install SIGINT handler so Ctrl-C breaks out of the loop cleanly.
     g_stop_requested.store(false, std::memory_order_relaxed);
     struct sigaction new_sa{}, old_sa{};
@@ -377,19 +398,28 @@ void SimApp::RunHeadless() {
         if (m_scripted && m_scripted->IsDone()) {
             std::cout << "[SimApp] Scripted scenario complete at t="
                       << t << "s — exiting.\n";
-            break;
+            sigaction(SIGINT, &old_sa, nullptr);
+            return kExitSuccess;
         }
 
         // --- Max-time exit ---
         if (max_time > 0.0 && t >= max_time) {
+            const bool scripted_unfinished = m_scripted && !m_scripted->IsDone();
+            if (scripted_unfinished) {
+                std::cerr << "[SimApp] max_time_s reached with scripted "
+                             "scenario still in phase '"
+                          << m_scripted->PhaseName() << "' — timeout.\n";
+                sigaction(SIGINT, &old_sa, nullptr);
+                return kExitTimeout;
+            }
             std::cout << "[SimApp] max_time_s reached — exiting.\n";
-            break;
+            sigaction(SIGINT, &old_sa, nullptr);
+            return kExitSuccess;
         }
     }
 
-    if (g_stop_requested.load(std::memory_order_relaxed))
-        std::cout << "[SimApp] SIGINT — exiting.\n";
-
-    // Restore previous SIGINT handler.
+    // Fell out of the loop -> SIGINT was the only possible cause.
+    std::cout << "[SimApp] SIGINT — exiting.\n";
     sigaction(SIGINT, &old_sa, nullptr);
+    return kExitInterrupted;
 }
