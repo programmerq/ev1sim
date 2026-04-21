@@ -140,6 +140,76 @@ TEST_CASE("Config --external-sim and --lights-demo CLI flags", "[Config]") {
 }
 
 // -----------------------------------------------------------------------
+TEST_CASE("Config headless + max-time defaults and JSON", "[Config][headless]") {
+    Config cfg;
+    CHECK(cfg.simulation.headless == false);
+    CHECK(cfg.simulation.max_time_s == 0.0);
+
+    auto path = WriteTempJson(R"({
+        "simulation": { "headless": true, "max_time_s": 12.5 }
+    })");
+    Config loaded = Config::LoadFromFile(path);
+    CHECK(loaded.simulation.headless == true);
+    CHECK_THAT(loaded.simulation.max_time_s, WithinAbs(12.5, 1e-9));
+}
+
+// -----------------------------------------------------------------------
+TEST_CASE("Config --headless and --max-time CLI flags", "[Config][headless]") {
+    Config cfg;
+    const char* args[] = {"ev1sim", "--headless", "--max-time", "7.5"};
+    cfg.ApplyCliOverrides(4, const_cast<char**>(args));
+
+    CHECK(cfg.simulation.headless == true);
+    CHECK_THAT(cfg.simulation.max_time_s, WithinAbs(7.5, 1e-9));
+}
+
+// -----------------------------------------------------------------------
+TEST_CASE("Config scripted block defaults and JSON", "[Config][scripted]") {
+    Config cfg;
+    CHECK(cfg.scripted.enabled == false);
+    CHECK_THAT(cfg.scripted.target_speed_kph, WithinAbs(40.0, 1e-9));
+    CHECK_THAT(cfg.scripted.hold_time_s,      WithinAbs(1.0,  1e-9));
+    CHECK_THAT(cfg.scripted.stop_threshold_mps, WithinAbs(0.1, 1e-9));
+
+    auto path = WriteTempJson(R"({
+        "scripted": {
+            "enabled": true,
+            "target_speed_kph": 55.0,
+            "hold_time_s": 2.5,
+            "stop_threshold_mps": 0.25
+        }
+    })");
+    Config loaded = Config::LoadFromFile(path);
+    CHECK(loaded.scripted.enabled == true);
+    CHECK_THAT(loaded.scripted.target_speed_kph,   WithinAbs(55.0,  1e-9));
+    CHECK_THAT(loaded.scripted.hold_time_s,        WithinAbs(2.5,   1e-9));
+    CHECK_THAT(loaded.scripted.stop_threshold_mps, WithinAbs(0.25,  1e-9));
+}
+
+// -----------------------------------------------------------------------
+TEST_CASE("Config scripted CLI flags (--target-kph implies enabled)",
+          "[Config][scripted]") {
+    // --scripted-accel-brake alone enables with defaults.
+    {
+        Config cfg;
+        const char* args[] = {"ev1sim", "--scripted-accel-brake"};
+        cfg.ApplyCliOverrides(2, const_cast<char**>(args));
+        CHECK(cfg.scripted.enabled == true);
+        CHECK_THAT(cfg.scripted.target_speed_kph, WithinAbs(40.0, 1e-9));
+    }
+
+    // --target-kph implies enabled and sets target.
+    {
+        Config cfg;
+        const char* args[] = {"ev1sim", "--target-kph", "25", "--hold-time", "0.5"};
+        cfg.ApplyCliOverrides(5, const_cast<char**>(args));
+        CHECK(cfg.scripted.enabled == true);
+        CHECK_THAT(cfg.scripted.target_speed_kph, WithinAbs(25.0, 1e-9));
+        CHECK_THAT(cfg.scripted.hold_time_s,      WithinAbs(0.5,  1e-9));
+    }
+}
+
+// -----------------------------------------------------------------------
 TEST_CASE("Config CLI --config flag is skipped by ApplyCliOverrides", "[Config]") {
     Config cfg;
     const char* args[] = {"ev1sim", "--config", "some/path.json", "--vehicle", "hmmwv"};

@@ -154,9 +154,11 @@ if(BUILD_TESTS)
         tests/test_driver_command.cpp
         tests/test_keyboard_input.cpp
         tests/test_external_sim_connector.cpp
+        tests/test_scripted_driver.cpp
         src/Config.cpp
         src/KeyboardInputController.cpp
         src/ExternalSimConnector.cpp
+        src/ScriptedDriver.cpp
     )
 
     target_include_directories(ev1sim_tests PRIVATE src)
