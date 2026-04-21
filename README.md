@@ -105,6 +105,20 @@ Headless mode is intended for scripted scenario runs against the external
 electronic simulator.  Keyboard input is not available; without a scripted
 driver the command stays at zero throttle/brake/steering.
 
+`--headless` requires at least one way to terminate automatically — either
+`--max-time <s>` or a scripted scenario.  Running `--headless` with
+neither is a usage error (exit `64`) rather than a silent hang.
+
+#### Exit codes
+
+| Code | Meaning |
+|------|---------|
+| `0`  | Successful completion (scripted `Done`, window closed, or `max_time` with no scripted scenario) |
+| `2`  | `max_time_s` expired while a scripted scenario was still running — scenario timeout |
+| `130`| SIGINT (Ctrl-C) |
+| `64` | Usage error (e.g. `--headless` with no way to terminate) |
+| `1`  | Fatal exception during run |
+
 ### Built-in accel → hold → brake scenario
 
 A minimal scripted driver with three phases:
@@ -113,15 +127,28 @@ A minimal scripted driver with three phases:
 2. **Hold** — maintain target speed for `--hold-time` seconds (default `1.0`)
 3. **Brake** — full brake until speed falls below `stop_threshold_mps` (0.1 m/s)
 
-When the Brake phase completes, the sim exits.  The sample config
+When the Brake phase completes, the sim exits `0`.  The sample config
 [`config/accel_brake.json`](config/accel_brake.json) runs the scenario
-headless on a flat plane.
+headless on a flat rigid plane.
 
 ```bash
 ./build/ev1sim --config config/accel_brake.json
-# or compose with CLI flags:
-./build/ev1sim --headless --realtime false --target-kph 30 --hold-time 1
+
+# Compose with CLI flags (defaults to the Milford level — see caveat below):
+./build/ev1sim --headless --realtime false --target-kph 30 --hold-time 1 --max-time 30
 ```
+
+**Terrain caveat.** The scenario's Brake phase ends when forward speed
+falls below `stop_threshold_mps`.  On the default Milford level the
+vehicle sits on a slope, so full brakes don't fully arrest it and the
+Brake phase may never complete.  For reliable CI use, point the
+scenario at a flat terrain — either via `terrain.type: "rigid_plane"`
+in the config (as `config/accel_brake.json` does) or via
+`--level <flat-level.json>`.  The `--max-time` backstop will flag this
+case with exit code `2` rather than hanging.
+
+The scripted driver also runs in windowed mode when enabled, which is
+handy for visually debugging a scenario before sending it to CI.
 
 Phase transitions are logged to stdout (`[ScriptedDriver] Phase -> Hold`).
 
