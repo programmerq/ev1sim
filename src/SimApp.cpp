@@ -182,7 +182,12 @@ int SimApp::RunWithVisualization() {
 
     while (m_vis->Run()) {
         // --- Input (once per render frame) ---
+        // Keyboard always runs to provide one-shot actions (pause, camera,
+        // quit, etc.), but the drive command comes from the scripted driver
+        // when configured — useful for visually debugging a scenario.
         DriverCommand cmd = m_keyboard->Update(render_dt);
+        if (m_scripted && !m_paused)
+            cmd = m_scripted->Update(m_world->GetState());
         m_world->GetDriver().SetCommand(cmd);
 
         // Handle one-shot actions.
@@ -315,12 +320,23 @@ int SimApp::RunWithVisualization() {
         if (m_config.simulation.realtime)
             m_realtime_timer.Spin(step * steps_per_frame);
 
+        // --- Scripted-scenario complete ---
+        if (m_scripted && m_scripted->IsDone()) {
+            std::cout << "[SimApp] Scripted scenario complete at t="
+                      << m_world->GetSimTime() << "s — exiting.\n";
+            return kExitSuccess;
+        }
+
         // --- Max-time exit (shared with headless) ---
         if (max_time > 0.0 && m_world->GetSimTime() >= max_time) {
+            const bool scripted_unfinished = m_scripted && !m_scripted->IsDone();
+            if (scripted_unfinished) {
+                std::cerr << "[SimApp] max_time_s reached with scripted "
+                             "scenario still in phase '"
+                          << m_scripted->PhaseName() << "' — timeout.\n";
+                return kExitTimeout;
+            }
             std::cout << "[SimApp] max_time_s reached — exiting.\n";
-            // No scripted scenario in visualization mode today, so hitting
-            // max_time here is simply "user-requested timeout" and is
-            // treated as a clean exit.
             return kExitSuccess;
         }
     }
