@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include <cmath>
 #include <fstream>
 #include <nlohmann/json.hpp>
 
@@ -72,29 +73,47 @@ TEST_CASE("flat_split_mu level splits friction along Y axis", "[Level]") {
     auto j = ReadLevel("level/flat_split_mu.json");
 
     REQUIRE(j.contains("spawn"));
-    // Vehicle spawns with the chassis straddling y=0.
+    // Vehicle spawns with the chassis straddling y=0 so wheels end up on
+    // both sides of the split once it crosses into the split-mu zone.
     CHECK_THAT(j["spawn"]["y"].get<double>(), WithinAbs(0.0, 1e-9));
+    const double spawn_x = j["spawn"]["x"].get<double>();
 
     REQUIRE(j.contains("patches"));
     const auto& patches = j["patches"];
-    REQUIRE(patches.size() == 2);
+    // 1 full-asphalt runway + 2 split-mu lanes.
+    REQUIRE(patches.size() == 3);
 
-    // Asphalt on +Y side.
-    const auto& asphalt = patches[0];
-    CHECK(asphalt["surface"] == "asphalt");
-    CHECK(asphalt["center"][1].get<double>() > 0.0);
-    CHECK_THAT(asphalt["friction"].get<double>(), WithinAbs(0.9, 1e-9));
+    // Collect patches by their role: the runway straddles y=0 and is
+    // pure asphalt; the split lanes sit on +Y (asphalt) and -Y (ice).
+    const nlohmann::json* runway      = nullptr;
+    const nlohmann::json* split_asph  = nullptr;
+    const nlohmann::json* split_ice   = nullptr;
+    for (const auto& p : patches) {
+        const double cy      = p["center"][1].get<double>();
+        const std::string s  = p["surface"].get<std::string>();
+        if (s == "asphalt" && std::abs(cy) < 1e-9)     runway     = &p;
+        else if (s == "asphalt" && cy > 0.0)           split_asph = &p;
+        else if (s == "ice"     && cy < 0.0)           split_ice  = &p;
+    }
+    REQUIRE(runway     != nullptr);
+    REQUIRE(split_asph != nullptr);
+    REQUIRE(split_ice  != nullptr);
 
-    // Ice on -Y side.
-    const auto& ice = patches[1];
-    CHECK(ice["surface"] == "ice");
-    CHECK(ice["center"][1].get<double>() < 0.0);
-    CHECK(ice["friction"].get<double>() < 0.2);
+    // Runway gives the car room to get up to speed on pure asphalt
+    // before the split starts.  Spawn must sit on it.
+    CHECK((*runway)["friction"].get<double>() == 0.9);
+    const double rx = (*runway)["center"][0].get<double>();
+    const double rl = (*runway)["size"  ][0].get<double>();
+    CHECK(spawn_x >= rx - rl / 2.0);
+    CHECK(spawn_x <= rx + rl / 2.0);
+    // Runway ends at/before the split zone begins.
+    CHECK(rx + rl / 2.0 <= 0.0 + 1e-9);
 
-    // Both patches cover a long straight with real run-out so the driver
-    // has room to brake and the yaw disturbance can play out (≥ 400 m).
-    CHECK(asphalt["size"][0].get<double>() >= 400.0);
-    CHECK(ice    ["size"][0].get<double>() >= 400.0);
+    // Split-mu zone: long, so the yaw disturbance can play out.
+    CHECK_THAT((*split_asph)["friction"].get<double>(), WithinAbs(0.9, 1e-9));
+    CHECK((*split_ice)["friction"].get<double>() < 0.2);
+    CHECK((*split_asph)["size"][0].get<double>() >= 400.0);
+    CHECK((*split_ice )["size"][0].get<double>() >= 400.0);
 }
 
 // -----------------------------------------------------------------------

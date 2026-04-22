@@ -21,8 +21,8 @@
   },
   "scripted": {
     "enabled": true,
-    "target_speed_kph": 40.0,
-    "hold_time_s": 1.0,
+    "target_speed_kph": 60.0,
+    "hold_time_s": 4.0,
     "stop_threshold_mps": 0.5
   }
 }

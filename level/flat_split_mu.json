@@ -1,6 +1,6 @@
 {
     "spawn": {
-        "x": -200.0,
+        "x": -60.0,
         "y": 0.0,
         "z": 0.5,
         "yaw_deg": 0.0
@@ -10,7 +10,16 @@
             "type": "plane",
             "surface": "asphalt",
             "friction": 0.9,
-            "center": [0.0, 7.5, 0.0],
+            "center": [-40.0, 0.0, 0.0],
+            "size":   [80.0, 30.0],
+            "texture": "road.jpg",
+            "texture_scale": 5.0
+        },
+        {
+            "type": "plane",
+            "surface": "asphalt",
+            "friction": 0.9,
+            "center": [250.0, 7.5, 0.0],
             "size":   [500.0, 15.0],
             "texture": "road.jpg",
             "texture_scale": 5.0
@@ -19,7 +28,7 @@
             "type": "plane",
             "surface": "ice",
             "friction": 0.08,
-            "center": [0.0, -7.5, 0.0],
+            "center": [250.0, -7.5, 0.0],
             "size":   [500.0, 15.0],
             "texture": "chrono:textures/bluewhite.png",
             "texture_scale": 10.0
