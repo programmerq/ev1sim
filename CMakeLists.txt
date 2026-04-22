@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+
 # ── Chrono (must be pre-installed with Vehicle + Irrlicht modules) ──────────
 # Auto-detect local deps/ install; override with -DChrono_DIR=<path>
 if(NOT Chrono_DIR AND EXISTS "${CMAKE_SOURCE_DIR}/deps/chrono-install/lib/cmake/Chrono")
@@ -17,6 +18,13 @@ find_package(Chrono REQUIRED COMPONENTS Vehicle Irrlicht CONFIG)
 # all targets that need Chrono.
 include_directories(${CHRONO_INCLUDE_DIRS})
 add_compile_options(${CHRONO_CXX_FLAGS})
+
+# Chrono's chrono-config.cmake hard-codes `-Wl,-no_compact_unwind` into
+# CHRONO_LINKER_FLAGS.  On Apple Silicon that strips the __unwind_info
+# section the runtime needs to walk the stack on `throw`, silently breaking
+# every try/catch in the program (uncaught exceptions abort with libc++abi
+# even when a matching handler is in main).  Drop it.
+list(REMOVE_ITEM CHRONO_LINKER_FLAGS "-Wl,-no_compact_unwind")
 add_link_options(${CHRONO_LINKER_FLAGS})
 
 # Ensure Chrono shared libraries are found at runtime via RPATH.

@@ -209,8 +209,7 @@ void Config::ApplyCliOverrides(int argc, char* argv[]) {
                     std::cerr << "[Config] --level '" << v
                               << "' did not match any of: " << v << ", "
                               << v << ".json, level/" << v << ", level/"
-                              << v << ".json — loading will fall back to "
-                              "the flat rigid plane.\n";
+                              << v << ".json — the loader will error out.\n";
                 }
                 terrain.level_file = resolved;
             }

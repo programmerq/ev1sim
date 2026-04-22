@@ -33,25 +33,18 @@ VehicleWorld::VehicleWorld(const Config& config_in) {
     Config config = config_in;
 
     // If a level file is specified, load it first (overrides spawn + terrain).
+    // LoadLevelFile throws on open/parse failure — callers see a fatal exit
+    // rather than a silent rigid-plane fallback that hides the mistake.
     const bool level_requested =
         config.terrain.type == "level" && !config.terrain.level_file.empty();
-    const std::string requested_level_file = config.terrain.level_file;
-    if (level_requested)
+    if (level_requested) {
         LoadLevelFile(config.terrain.level_file, config);
-
-    // Compute the HUD terrain label after the potential fallback.  If
-    // LoadLevelFile couldn't open the file it rewrites type to
-    // "rigid_plane"; surface the mismatch honestly instead of echoing
-    // the requested level.
-    if (level_requested && config.terrain.type == "level") {
-        auto slash = requested_level_file.find_last_of("/\\");
-        auto dot   = requested_level_file.find_last_of('.');
+        auto slash = config.terrain.level_file.find_last_of("/\\");
+        auto dot   = config.terrain.level_file.find_last_of('.');
         auto start = (slash == std::string::npos) ? 0 : slash + 1;
         auto end   = (dot != std::string::npos && dot > start)
-                         ? dot : requested_level_file.size();
-        m_terrain_label = "level: " + requested_level_file.substr(start, end - start);
-    } else if (level_requested) {
-        m_terrain_label = "rigid_plane (level load failed)";
+                         ? dot : config.terrain.level_file.size();
+        m_terrain_label = "level: " + config.terrain.level_file.substr(start, end - start);
     } else {
         m_terrain_label = config.terrain.surface;
     }
@@ -290,19 +283,18 @@ void VehicleWorld::CreateTerrain(const Config& cfg) {
 void VehicleWorld::LoadLevelFile(const std::string& level_file, Config& cfg) {
     std::ifstream f(level_file);
     if (!f.is_open()) {
-        std::cerr << "[VehicleWorld] Cannot open level file: " << level_file
-                  << " — falling back to flat terrain.\n";
-        cfg.terrain.type = "rigid_plane";
-        return;
+        throw std::runtime_error(
+            "Cannot open level file: " + level_file +
+            " (check the path; --level also accepts a bare stem like "
+            "'flat_ice_transition' that resolves to level/<stem>.json)");
     }
 
     nlohmann::json j;
     try {
         j = nlohmann::json::parse(f);
     } catch (const nlohmann::json::parse_error& e) {
-        std::cerr << "[VehicleWorld] Level JSON error: " << e.what() << "\n";
-        cfg.terrain.type = "rigid_plane";
-        return;
+        throw std::runtime_error(
+            "Level JSON parse error in " + level_file + ": " + e.what());
     }
 
     // ── Spawn point (overrides config.spawn) ──
