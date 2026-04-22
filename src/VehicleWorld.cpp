@@ -229,9 +229,18 @@ void VehicleWorld::CreateTerrain(const Config& cfg) {
                     true);  // visualization
             }
 
-            // Apply texture if specified.
+            // Apply texture if specified.  A "chrono:" prefix resolves via
+            // the Chrono data directory (e.g. "chrono:textures/blue.png");
+            // anything else is relative to the level JSON's directory.
             if (!lp.texture.empty()) {
-                std::string tex_path = level_dir + lp.texture;
+                std::string tex_path;
+                const std::string chrono_prefix = "chrono:";
+                if (lp.texture.rfind(chrono_prefix, 0) == 0) {
+                    tex_path = GetChronoDataFile(
+                        lp.texture.substr(chrono_prefix.size()));
+                } else {
+                    tex_path = level_dir + lp.texture;
+                }
                 float scale = static_cast<float>(lp.texture_scale);
                 patch->SetTexture(tex_path, scale, scale);
             }
