@@ -152,6 +152,66 @@ handy for visually debugging a scenario before sending it to CI.
 
 Phase transitions are logged to stdout (`[ScriptedDriver] Phase -> Hold`).
 
+## Scenario levels
+
+Level JSON files in [`level/`](level/) describe the terrain under the
+vehicle.  Each patch has a `type` (`plane` or `mesh`), a friction
+coefficient, and optional texture.  `plane` patches take `size` (L × W,
+metres) and `center` (x, y, z); `mesh` patches reference an OBJ file.
+`type` defaults to `mesh` when omitted, so existing mesh-based levels
+need no changes.
+
+| Level | Purpose | Shape | Companion config |
+|-------|---------|-------|------------------|
+| [`milford.json`](level/milford.json) | Proving-ground mesh (slope caveat above) | asphalt + grass OBJ meshes | `config/default.json` |
+| [`flat_ice_transition.json`](level/flat_ice_transition.json) | Traction / ABS across a high-µ → low-µ transition | 100 m asphalt → 100 m ice, 20 m wide | [`config/ice_transition.json`](config/ice_transition.json) |
+| [`flat_split_mu.json`](level/flat_split_mu.json) | Split-µ ABS / stability — left wheels on ice, right on asphalt | two 200 m × 10 m strips along the Y axis | [`config/split_mu.json`](config/split_mu.json) |
+
+Both new scenarios run headlessly with the built-in accel → hold → brake
+driver:
+
+```bash
+./build/ev1sim --config config/ice_transition.json   # exit 0 on success
+./build/ev1sim --config config/split_mu.json         # exit 0 on success
+```
+
+For interactive (keyboard) inspection:
+
+```bash
+./build/ev1sim --level level/flat_ice_transition.json
+```
+
+### `environment` config block (optional)
+
+```jsonc
+"environment": {
+  "time_of_day": "day",           // "day" | "dusk" | "night" — ambient + sun preset
+  "ambient":     [0.4, 0.4, 0.4], // RGB override, wins over preset
+  "sun_elevation_deg": 55.0,      // override, wins over preset
+  "ambient_temp_c": 20.0          // stub — no consumer yet (see TODO)
+}
+```
+
+Headless runs ignore this block.
+
+### Planned scenarios (TODO)
+
+These need either new geometry or a scripted steering phase and are
+deferred:
+
+- **Flat skidpad + constant-steer scripted phase** — enables headless
+  circle/steady-state handling tests.
+- **Moose test / double-lane-change** — needs scripted-steer waypoints.
+- **Bumpy / washboard road** — heightmap OBJ or Chrono `RigidTerrain`
+  bmp heightmap for suspension response.
+- **Wet asphalt (~0.5) and snow (~0.2) transition levels** — additional
+  friction presets paired with `flat_ice_transition.json`.
+- **Brake / tire temperature hooks** — Chrono has no native thermal
+  model; `Config::Environment::ambient_temp_c` is reserved for future
+  consumers.  No code reads it yet.
+- **Milford rework** — re-spawn on a flat apron so brake tests are
+  reliable there too.
+
 ## Controls
 
 | Key | Action |

@@ -1,0 +1,26 @@
+{
+    "spawn": {
+        "x": -40.0,
+        "y": 0.0,
+        "z": 0.5,
+        "yaw_deg": 0.0
+    },
+    "patches": [
+        {
+            "type": "plane",
+            "surface": "asphalt",
+            "friction": 0.9,
+            "center": [-50.0, 0.0, 0.0],
+            "size":   [100.0, 20.0],
+            "texture": "road.jpg",
+            "texture_scale": 5.0
+        },
+        {
+            "type": "plane",
+            "surface": "ice",
+            "friction": 0.08,
+            "center": [50.0, 0.0, 0.0],
+            "size":   [100.0, 20.0]
+        }
+    ]
+}

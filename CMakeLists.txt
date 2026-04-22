@@ -155,6 +155,7 @@ if(BUILD_TESTS)
         tests/test_keyboard_input.cpp
         tests/test_external_sim_connector.cpp
         tests/test_scripted_driver.cpp
+        tests/test_level_file.cpp
         src/Config.cpp
         src/KeyboardInputController.cpp
         src/ExternalSimConnector.cpp
@@ -162,6 +163,9 @@ if(BUILD_TESTS)
     )
 
     target_include_directories(ev1sim_tests PRIVATE src)
+    target_compile_definitions(ev1sim_tests PRIVATE
+        EV1SIM_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+    )
     target_link_libraries(ev1sim_tests PRIVATE
         Catch2::Catch2WithMain
         nlohmann_json::nlohmann_json

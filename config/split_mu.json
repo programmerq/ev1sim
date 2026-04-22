@@ -1,0 +1,28 @@
+{
+  "vehicle_model": "ev1",
+  "terrain": {
+    "type": "level",
+    "level_file": "level/flat_split_mu.json"
+  },
+  "simulation": {
+    "step_size_s": 0.002,
+    "render_fps": 60,
+    "realtime": false,
+    "headless": true,
+    "max_time_s": 40.0
+  },
+  "telemetry": {
+    "log_rate_hz": 5.0,
+    "log_to_file": false,
+    "show_hud": false
+  },
+  "external_sim": {
+    "enabled": false
+  },
+  "scripted": {
+    "enabled": true,
+    "target_speed_kph": 40.0,
+    "hold_time_s": 1.0,
+    "stop_threshold_mps": 0.5
+  }
+}
