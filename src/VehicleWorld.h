@@ -42,6 +42,12 @@ public:
     chrono::vehicle::RigidTerrain&       GetTerrain() { return *m_terrain; }
     chrono::ChSystem&                    GetSystem()  { return *m_system; }
 
+    // HUD-facing label reflecting the actual terrain in use.  For a
+    // successfully loaded level this is "level: <stem>"; if the level
+    // file was missing/invalid and we fell back to a rigid plane, this
+    // is "rigid_plane (fallback)" so the HUD doesn't lie.
+    const std::string& GetTerrainLabel() const { return m_terrain_label; }
+
 private:
     void CreateEV1(const Config& cfg);
     void CreateSedan(const Config& cfg);
@@ -81,4 +87,7 @@ private:
         double      texture_scale  = 10.0;
     };
     std::vector<LevelPatch> m_level_patches;
+
+    // Truthful HUD label computed after LoadLevelFile / CreateTerrain.
+    std::string m_terrain_label;
 };

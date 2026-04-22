@@ -287,21 +287,13 @@ int SimApp::RunWithVisualization() {
         m_vis->BeginScene();
         macos_apply_viewport();   // override glViewport for Retina / resize
         m_vis->Render();
-        // For level-mode terrain, show the level file stem rather than
-        // the meaningless default terrain.surface ("asphalt").
-        std::string surface_label = m_config.terrain.surface;
-        if (m_config.terrain.type == "level" && !m_config.terrain.level_file.empty()) {
-            const auto& lf = m_config.terrain.level_file;
-            auto slash = lf.find_last_of("/\\");
-            auto dot   = lf.find_last_of('.');
-            auto start = (slash == std::string::npos) ? 0 : slash + 1;
-            auto end   = (dot != std::string::npos && dot > start) ? dot : lf.size();
-            surface_label = "level: " + lf.substr(start, end - start);
-        }
+        // Ask the world for the truthful terrain label — it reflects the
+        // actual loaded terrain, including the rigid-plane fallback when
+        // a requested level file was missing or invalid.
         m_telemetry->DrawHUD(m_vis->GetDevice(),
                              m_world->GetState(),
                              m_camera->GetModeName(),
-                             surface_label);
+                             m_world->GetTerrainLabel());
         m_lights->DrawHUD(m_vis->GetDevice());
         m_panels->DrawHUD(m_vis->GetDevice());
 

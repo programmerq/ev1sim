@@ -1,5 +1,6 @@
 #include "Config.h"
 
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <nlohmann/json.hpp>
@@ -188,7 +189,31 @@ void Config::ApplyCliOverrides(int argc, char* argv[]) {
             if (!v.empty()) simulation.render_fps = std::stoi(v);
         } else if (arg == "--level") {
             terrain.type = "level";
-            terrain.level_file = next();
+            std::string v = next();
+            if (!v.empty()) {
+                // Friendly resolution: --level accepts a bare stem
+                // ("flat_ice_transition") or a full path.  Try the input
+                // verbatim first, then common level/ variants so short
+                // names just work.
+                namespace fs = std::filesystem;
+                const std::string candidates[] = {
+                    v, v + ".json", "level/" + v, "level/" + v + ".json",
+                };
+                std::string resolved = v;
+                bool found = false;
+                for (const auto& c : candidates) {
+                    std::error_code ec;
+                    if (fs::exists(c, ec) && !ec) { resolved = c; found = true; break; }
+                }
+                if (!found) {
+                    std::cerr << "[Config] --level '" << v
+                              << "' did not match any of: " << v << ", "
+                              << v << ".json, level/" << v << ", level/"
+                              << v << ".json — loading will fall back to "
+                              "the flat rigid plane.\n";
+                }
+                terrain.level_file = resolved;
+            }
         } else if (arg == "--hud") {
             auto v = next();
             telemetry.show_hud = (v == "true" || v == "1");

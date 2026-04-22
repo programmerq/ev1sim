@@ -33,8 +33,28 @@ VehicleWorld::VehicleWorld(const Config& config_in) {
     Config config = config_in;
 
     // If a level file is specified, load it first (overrides spawn + terrain).
-    if (config.terrain.type == "level" && !config.terrain.level_file.empty())
+    const bool level_requested =
+        config.terrain.type == "level" && !config.terrain.level_file.empty();
+    const std::string requested_level_file = config.terrain.level_file;
+    if (level_requested)
         LoadLevelFile(config.terrain.level_file, config);
+
+    // Compute the HUD terrain label after the potential fallback.  If
+    // LoadLevelFile couldn't open the file it rewrites type to
+    // "rigid_plane"; surface the mismatch honestly instead of echoing
+    // the requested level.
+    if (level_requested && config.terrain.type == "level") {
+        auto slash = requested_level_file.find_last_of("/\\");
+        auto dot   = requested_level_file.find_last_of('.');
+        auto start = (slash == std::string::npos) ? 0 : slash + 1;
+        auto end   = (dot != std::string::npos && dot > start)
+                         ? dot : requested_level_file.size();
+        m_terrain_label = "level: " + requested_level_file.substr(start, end - start);
+    } else if (level_requested) {
+        m_terrain_label = "rigid_plane (level load failed)";
+    } else {
+        m_terrain_label = config.terrain.surface;
+    }
 
     // Compute spawn pose.
     double yaw_rad = config.spawn.yaw_deg * M_PI / 180.0;
