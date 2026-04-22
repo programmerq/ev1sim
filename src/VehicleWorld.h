@@ -43,10 +43,15 @@ public:
     chrono::ChSystem&                    GetSystem()  { return *m_system; }
 
     // HUD-facing label reflecting the actual terrain in use.  For a
-    // successfully loaded level this is "level: <stem>"; if the level
-    // file was missing/invalid and we fell back to a rigid plane, this
-    // is "rigid_plane (fallback)" so the HUD doesn't lie.
+    // successfully loaded level this is "level: <stem>"; otherwise it
+    // echoes the plain surface name from config.
     const std::string& GetTerrainLabel() const { return m_terrain_label; }
+
+    // Per-wheel ground friction, queried at each spindle's XY on the
+    // terrain.  Order matches VehicleState::wheel_omega: FL, FR, RL, RR.
+    // Any wheel past the vehicle's actual wheel count is -1.
+    struct WheelFrictions { double mu[4]; };
+    WheelFrictions GetWheelFrictions() const;
 
 private:
     void CreateEV1(const Config& cfg);

@@ -16,11 +16,14 @@ public:
     // Call every render frame.
     void Record(const VehicleState& state, double dt);
 
-    // Call between BeginScene/EndScene.
+    // Call between BeginScene/EndScene.  `wheel_mu` holds the ground
+    // friction coefficient under each wheel (FL, FR, RL, RR); values
+    // <0 are skipped in the display.  Pass nullptr to omit the line.
     void DrawHUD(irr::IrrlichtDevice* device,
                  const VehicleState& state,
                  const std::string& camera_mode,
-                 const std::string& surface);
+                 const std::string& surface,
+                 const double* wheel_mu);
 
 private:
     double m_log_interval;

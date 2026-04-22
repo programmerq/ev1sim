@@ -60,7 +60,8 @@ void Telemetry::Record(const VehicleState& s, double dt) {
 void Telemetry::DrawHUD(irr::IrrlichtDevice* device,
                         const VehicleState& state,
                         const std::string& camera_mode,
-                        const std::string& surface) {
+                        const std::string& surface,
+                        const double* wheel_mu) {
     if (!m_show_hud || !device) return;
 
     auto* gui  = device->getGUIEnvironment();
@@ -90,6 +91,25 @@ void Telemetry::DrawHUD(irr::IrrlichtDevice* device,
 
     draw("Camera: " + camera_mode, yellow);
     draw("Surface: " + surface, yellow);
+
+    // Per-wheel ground friction — makes split-mu and transition levels
+    // legible at a glance (e.g. asphalt wheels at 0.90 vs ice at 0.08).
+    if (wheel_mu) {
+        char mu_buf[160];
+        auto fmt = [](double v, char* out, size_t n) {
+            if (v < 0) std::snprintf(out, n, "  -  ");
+            else       std::snprintf(out, n, "%.2f", v);
+        };
+        char fl[8], fr[8], rl[8], rr[8];
+        fmt(wheel_mu[0], fl, sizeof(fl));
+        fmt(wheel_mu[1], fr, sizeof(fr));
+        fmt(wheel_mu[2], rl, sizeof(rl));
+        fmt(wheel_mu[3], rr, sizeof(rr));
+        std::snprintf(mu_buf, sizeof(mu_buf),
+                      "mu:  FL=%s  FR=%s  RL=%s  RR=%s",
+                      fl, fr, rl, rr);
+        draw(mu_buf, yellow);
+    }
 
     std::snprintf(buf, sizeof(buf), "Sim time: %.1f s", state.sim_time);
     draw(buf, yellow);

@@ -439,6 +439,19 @@ VehiclePose VehicleWorld::GetPose() const {
     };
 }
 
+VehicleWorld::WheelFrictions VehicleWorld::GetWheelFrictions() const {
+    WheelFrictions out{{-1.0, -1.0, -1.0, -1.0}};
+    int n_axles = std::min(static_cast<int>(m_vehicle->GetNumberAxles()), 2);
+    int idx = 0;
+    for (int a = 0; a < n_axles && idx < 4; ++a) {
+        auto pL = m_vehicle->GetSpindlePos(a, vehicle::LEFT);
+        auto pR = m_vehicle->GetSpindlePos(a, vehicle::RIGHT);
+        out.mu[idx++] = m_terrain->GetCoefficientFriction(pL);
+        out.mu[idx++] = m_terrain->GetCoefficientFriction(pR);
+    }
+    return out;
+}
+
 VehicleState VehicleWorld::GetState() const {
     VehicleState s;
     s.sim_time = m_system->GetChTime();

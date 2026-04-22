@@ -290,10 +290,12 @@ int SimApp::RunWithVisualization() {
         // Ask the world for the truthful terrain label — it reflects the
         // actual loaded terrain, including the rigid-plane fallback when
         // a requested level file was missing or invalid.
+        auto mu = m_world->GetWheelFrictions();
         m_telemetry->DrawHUD(m_vis->GetDevice(),
                              m_world->GetState(),
                              m_camera->GetModeName(),
-                             m_world->GetTerrainLabel());
+                             m_world->GetTerrainLabel(),
+                             mu.mu);
         m_lights->DrawHUD(m_vis->GetDevice());
         m_panels->DrawHUD(m_vis->GetDevice());
 
