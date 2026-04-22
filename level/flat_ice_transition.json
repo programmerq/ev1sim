@@ -11,7 +11,7 @@
             "surface": "asphalt",
             "friction": 0.9,
             "center": [-50.0, 0.0, 0.0],
-            "size":   [100.0, 20.0],
+            "size":   [100.0, 60.0],
             "texture": "road.jpg",
             "texture_scale": 5.0
         },
@@ -19,8 +19,8 @@
             "type": "plane",
             "surface": "ice",
             "friction": 0.08,
-            "center": [50.0, 0.0, 0.0],
-            "size":   [100.0, 20.0],
+            "center": [250.0, 0.0, 0.0],
+            "size":   [500.0, 60.0],
             "texture": "chrono:textures/bluewhite.png",
             "texture_scale": 10.0
         }
