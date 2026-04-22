@@ -90,6 +90,42 @@ Config Config::LoadFromFile(const std::string& path) {
         read_if(tl, "show_hud",     cfg.telemetry.show_hud);
     }
 
+    if (j.contains("environment")) {
+        auto& e = j["environment"];
+        // Apply preset first, so explicit overrides below take precedence.
+        if (e.contains("time_of_day")) {
+            cfg.environment.time_of_day = e["time_of_day"].get<std::string>();
+            const std::string& tod = cfg.environment.time_of_day;
+            if (tod == "day") {
+                cfg.environment.ambient_r = 0.8;
+                cfg.environment.ambient_g = 0.8;
+                cfg.environment.ambient_b = 0.8;
+                cfg.environment.sun_elevation_deg = 60.0;
+            } else if (tod == "dusk") {
+                cfg.environment.ambient_r = 0.5;
+                cfg.environment.ambient_g = 0.35;
+                cfg.environment.ambient_b = 0.3;
+                cfg.environment.sun_elevation_deg = 15.0;
+            } else if (tod == "night") {
+                cfg.environment.ambient_r = 0.1;
+                cfg.environment.ambient_g = 0.1;
+                cfg.environment.ambient_b = 0.15;
+                cfg.environment.sun_elevation_deg = -10.0;
+            } else {
+                std::cerr << "[Config] Unknown environment.time_of_day '"
+                          << tod << "' — keeping defaults.\n";
+            }
+        }
+        if (e.contains("ambient") && e["ambient"].is_array()
+            && e["ambient"].size() >= 3) {
+            cfg.environment.ambient_r = e["ambient"][0].get<double>();
+            cfg.environment.ambient_g = e["ambient"][1].get<double>();
+            cfg.environment.ambient_b = e["ambient"][2].get<double>();
+        }
+        read_if(e, "sun_elevation_deg", cfg.environment.sun_elevation_deg);
+        read_if(e, "ambient_temp_c",    cfg.environment.ambient_temp_c);
+    }
+
     if (j.contains("lights") && j["lights"].contains("demo_mode")) {
         // Accept either a string ("off"/"blink"/"chase") or, for backward
         // compatibility, a boolean (true -> "blink", false -> "off").

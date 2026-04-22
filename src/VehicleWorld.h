@@ -67,10 +67,17 @@ private:
 
     // Level file patch definitions (populated by LoadLevelFile).
     struct LevelPatch {
-        std::string mesh_file;
+        enum class Kind { Mesh, Plane };
+        Kind        kind           = Kind::Mesh;
+        std::string mesh_file;                   // Kind::Mesh
+        double      center_x       = 0.0;        // Kind::Plane
+        double      center_y       = 0.0;
+        double      center_z       = 0.0;
+        double      size_l         = 0.0;        // length along X (m)
+        double      size_w         = 0.0;        // width  along Y (m)
         std::string surface;
         double      friction       = 0.9;
-        std::string texture;          // filename in Chrono data/textures/
+        std::string texture;                     // path relative to level JSON
         double      texture_scale  = 10.0;
     };
     std::vector<LevelPatch> m_level_patches;

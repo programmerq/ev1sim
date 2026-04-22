@@ -60,6 +60,20 @@ struct Config {
         bool        show_hud    = true;
     } telemetry;
 
+    // Ambient lighting preset for the Irrlicht scene.  Headless runs
+    // ignore this block.  Presets set ambient RGB and sun elevation; the
+    // explicit override fields (when not negative / empty) win over the
+    // preset.  ambient_temp_c is a stub for future brake/tire thermal
+    // hooks — no consumer reads it yet.
+    struct Environment {
+        std::string time_of_day      = "day";   // "day" | "dusk" | "night"
+        double      ambient_r        = 0.8;
+        double      ambient_g        = 0.8;
+        double      ambient_b        = 0.8;
+        double      sun_elevation_deg = 60.0;
+        double      ambient_temp_c   = 20.0;    // stub — not yet consumed
+    } environment;
+
     struct Lights {
         // Built-in demo pattern, for diagnostics independent of the
         // electrical sim:

@@ -135,10 +135,14 @@ void SimApp::SetupVisualization() {
     m_vis->Initialize();
     m_vis->AddSkyBox();
 
-    // Directional sun light with strong ambient so the whole map is lit
-    // (AddTypicalLights only adds two point lights near the origin).
-    m_vis->AddLightDirectional(60, 60,
-        chrono::ChColor(0.8f, 0.8f, 0.8f),   // ambient
+    // Directional sun light with ambient from the environment preset.
+    // AddLightDirectional(elevation_deg, azimuth_deg, ambient, specular, diffuse).
+    const auto& env = m_config.environment;
+    m_vis->AddLightDirectional(
+        static_cast<float>(env.sun_elevation_deg), 60.0f,
+        chrono::ChColor(static_cast<float>(env.ambient_r),
+                        static_cast<float>(env.ambient_g),
+                        static_cast<float>(env.ambient_b)),
         chrono::ChColor(0.3f, 0.3f, 0.3f),   // specular
         chrono::ChColor(1.0f, 1.0f, 0.9f));  // diffuse (warm sun)
     m_vis->AttachVehicle(&m_world->GetVehicle());

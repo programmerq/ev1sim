@@ -192,8 +192,8 @@ void VehicleWorld::CreateTerrain(const Config& cfg) {
     m_terrain = std::make_unique<RigidTerrain>(m_system);
 
     if (cfg.terrain.type == "level" && !m_level_patches.empty()) {
-        // ── Mesh-based level terrain ──
-        // Resolve mesh paths relative to the level file's directory.
+        // ── Level terrain (mesh and/or flat plane patches) ──
+        // Resolve asset paths relative to the level file's directory.
         std::string level_dir;
         auto slash = cfg.terrain.level_file.find_last_of("/\\");
         if (slash != std::string::npos)
@@ -204,18 +204,30 @@ void VehicleWorld::CreateTerrain(const Config& cfg) {
             mat->SetFriction(static_cast<float>(lp.friction));
             mat->SetRestitution(0.01f);
 
-            std::string mesh_path = level_dir + lp.mesh_file;
-            std::cout << "[VehicleWorld] Loading patch: " << lp.surface
-                      << "  mesh=" << mesh_path
-                      << "  friction=" << lp.friction << "\n";
-
-            auto patch = m_terrain->AddPatch(
-                mat,
-                ChCoordsys<>(ChVector3d(0, 0, 0), QUNIT),
-                mesh_path,
-                true,   // connected mesh (better collision)
-                0.0,    // sweep sphere radius
-                true);  // visualization
+            std::shared_ptr<RigidTerrain::Patch> patch;
+            if (lp.kind == LevelPatch::Kind::Plane) {
+                std::cout << "[VehicleWorld] Loading patch: " << lp.surface
+                          << "  plane center=(" << lp.center_x << ", "
+                          << lp.center_y << ", " << lp.center_z << ")"
+                          << "  size=(" << lp.size_l << " x " << lp.size_w << ")"
+                          << "  friction=" << lp.friction << "\n";
+                patch = m_terrain->AddPatch(
+                    mat,
+                    ChCoordsys<>(ChVector3d(lp.center_x, lp.center_y, lp.center_z), QUNIT),
+                    lp.size_l, lp.size_w);
+            } else {
+                std::string mesh_path = level_dir + lp.mesh_file;
+                std::cout << "[VehicleWorld] Loading patch: " << lp.surface
+                          << "  mesh=" << mesh_path
+                          << "  friction=" << lp.friction << "\n";
+                patch = m_terrain->AddPatch(
+                    mat,
+                    ChCoordsys<>(ChVector3d(0, 0, 0), QUNIT),
+                    mesh_path,
+                    true,   // connected mesh (better collision)
+                    0.0,    // sweep sphere radius
+                    true);  // visualization
+            }
 
             // Apply texture if specified.
             if (!lp.texture.empty()) {
@@ -280,14 +292,36 @@ void VehicleWorld::LoadLevelFile(const std::string& level_file, Config& cfg) {
     if (j.contains("patches")) {
         for (auto& p : j["patches"]) {
             LevelPatch lp;
-            lp.mesh_file      = p.value("mesh", "");
             lp.surface        = p.value("surface", "unknown");
             lp.friction       = p.value("friction", 0.9);
             lp.texture        = p.value("texture", "");
             lp.texture_scale  = p.value("texture_scale", 10.0);
 
-            if (lp.mesh_file.empty()) {
-                std::cerr << "[VehicleWorld] Patch missing 'mesh' field — skipped.\n";
+            const std::string type = p.value("type", "mesh");
+            if (type == "mesh") {
+                lp.kind      = LevelPatch::Kind::Mesh;
+                lp.mesh_file = p.value("mesh", "");
+                if (lp.mesh_file.empty()) {
+                    std::cerr << "[VehicleWorld] mesh patch missing 'mesh' field — skipped.\n";
+                    continue;
+                }
+            } else if (type == "plane") {
+                lp.kind = LevelPatch::Kind::Plane;
+                if (!p.contains("size") || !p["size"].is_array() || p["size"].size() < 2) {
+                    std::cerr << "[VehicleWorld] plane patch missing 'size': [L,W] — skipped.\n";
+                    continue;
+                }
+                lp.size_l = p["size"][0].get<double>();
+                lp.size_w = p["size"][1].get<double>();
+                if (p.contains("center") && p["center"].is_array()) {
+                    auto& c = p["center"];
+                    if (c.size() >= 1) lp.center_x = c[0].get<double>();
+                    if (c.size() >= 2) lp.center_y = c[1].get<double>();
+                    if (c.size() >= 3) lp.center_z = c[2].get<double>();
+                }
+            } else {
+                std::cerr << "[VehicleWorld] unknown patch type '" << type
+                          << "' — skipped.\n";
                 continue;
             }
             m_level_patches.push_back(std::move(lp));

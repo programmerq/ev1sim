@@ -210,6 +210,46 @@ TEST_CASE("Config scripted CLI flags (--target-kph implies enabled)",
 }
 
 // -----------------------------------------------------------------------
+TEST_CASE("Config environment defaults to day preset values", "[Config][Env]") {
+    Config cfg;
+    CHECK(cfg.environment.time_of_day == "day");
+    CHECK_THAT(cfg.environment.ambient_r, WithinAbs(0.8, 1e-9));
+    CHECK_THAT(cfg.environment.ambient_g, WithinAbs(0.8, 1e-9));
+    CHECK_THAT(cfg.environment.ambient_b, WithinAbs(0.8, 1e-9));
+    CHECK_THAT(cfg.environment.sun_elevation_deg, WithinAbs(60.0, 1e-9));
+    CHECK_THAT(cfg.environment.ambient_temp_c,    WithinAbs(20.0, 1e-9));
+}
+
+// -----------------------------------------------------------------------
+TEST_CASE("Config environment preset resolves ambient + sun", "[Config][Env]") {
+    auto path = WriteTempJson(R"({
+        "environment": { "time_of_day": "night" }
+    })");
+    Config cfg = Config::LoadFromFile(path);
+    CHECK(cfg.environment.time_of_day == "night");
+    CHECK(cfg.environment.ambient_r < 0.3);
+    CHECK(cfg.environment.sun_elevation_deg < 0.0);
+}
+
+// -----------------------------------------------------------------------
+TEST_CASE("Config environment explicit overrides beat the preset", "[Config][Env]") {
+    auto path = WriteTempJson(R"({
+        "environment": {
+            "time_of_day": "day",
+            "ambient": [0.1, 0.2, 0.3],
+            "sun_elevation_deg": 12.5,
+            "ambient_temp_c": -5.0
+        }
+    })");
+    Config cfg = Config::LoadFromFile(path);
+    CHECK_THAT(cfg.environment.ambient_r, WithinAbs(0.1, 1e-9));
+    CHECK_THAT(cfg.environment.ambient_g, WithinAbs(0.2, 1e-9));
+    CHECK_THAT(cfg.environment.ambient_b, WithinAbs(0.3, 1e-9));
+    CHECK_THAT(cfg.environment.sun_elevation_deg, WithinAbs(12.5, 1e-9));
+    CHECK_THAT(cfg.environment.ambient_temp_c,    WithinAbs(-5.0, 1e-9));
+}
+
+// -----------------------------------------------------------------------
 TEST_CASE("Config CLI --config flag is skipped by ApplyCliOverrides", "[Config]") {
     Config cfg;
     const char* args[] = {"ev1sim", "--config", "some/path.json", "--vehicle", "hmmwv"};
