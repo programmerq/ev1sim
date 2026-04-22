@@ -499,5 +499,10 @@ VehicleState VehicleWorld::GetState() const {
     s.applied_rear_brake  = cmd.rear_brake;
     s.applied_steering    = cmd.steering;
 
+    s.brake_cmd[0] = cmd.front_brake;  // FL
+    s.brake_cmd[1] = cmd.front_brake;  // FR
+    s.brake_cmd[2] = cmd.rear_brake;   // RL
+    s.brake_cmd[3] = cmd.rear_brake;   // RR
+
     return s;
 }

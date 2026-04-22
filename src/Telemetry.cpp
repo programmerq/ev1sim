@@ -26,7 +26,8 @@ void Telemetry::Record(const VehicleState& s, double dt) {
 
     // CSV header (once).
     if (m_file.is_open() && !m_file_header_written) {
-        m_file << "sim_time,speed_mps,throttle,front_brake,rear_brake,"
+        m_file << "sim_time,speed_mps,throttle,"
+                  "brake_fl,brake_fr,brake_rl,brake_rr,"
                   "steering,pos_x,pos_y,pos_z,yaw_deg,"
                   "wheel_fl_omega,wheel_fr_omega,wheel_rl_omega,wheel_rr_omega\n";
         m_file_header_written = true;
@@ -49,8 +50,8 @@ void Telemetry::Record(const VehicleState& s, double dt) {
         m_file << s.sim_time << ","
                << s.speed_mps << ","
                << s.applied_throttle << ","
-               << s.applied_front_brake << ","
-               << s.applied_rear_brake << ","
+               << s.brake_cmd[0] << "," << s.brake_cmd[1] << ","
+               << s.brake_cmd[2] << "," << s.brake_cmd[3] << ","
                << s.applied_steering << ","
                << s.pos_x << "," << s.pos_y << "," << s.pos_z << ","
                << s.yaw_deg << ","
