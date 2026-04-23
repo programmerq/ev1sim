@@ -21,7 +21,7 @@
     "max_time_s": 30.0
   },
   "telemetry": {
-    "log_rate_hz": 5.0,
+    "log_rate_hz": 200.0,
     "log_to_file": false,
     "show_hud": false
   },

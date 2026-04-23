@@ -30,7 +30,7 @@
     "brake_rise_rate": 2.0
   },
   "telemetry": {
-    "log_rate_hz": 10.0,
+    "log_rate_hz": 200.0,
     "log_to_file": false,
     "log_file": "telemetry.csv",
     "show_hud": true
