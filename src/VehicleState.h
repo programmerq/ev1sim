@@ -28,6 +28,12 @@ struct VehicleState {
     // Wheel angular speeds (rad/s): FL, FR, RL, RR
     std::array<double, 4> wheel_omega = {0, 0, 0, 0};
 
+    // Per-wheel terrain friction coefficient (FL, FR, RL, RR); -1 = unavailable
+    std::array<double, 4> wheel_mu = {-1, -1, -1, -1};
+
+    // Per-wheel longitudinal slip ratio: 0 = free rolling, +1 = locked, -1 = spinning
+    std::array<double, 4> slip_ratio = {0, 0, 0, 0};
+
     // Per-wheel brake command (0..1), FL, FR, RL, RR.  Currently mirrors
     // front/rear axle values; future ABS/ESC logic will produce distinct
     // per-wheel values that feed per-wheel brake torque directly.

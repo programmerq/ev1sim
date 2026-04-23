@@ -12,6 +12,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <iostream>
@@ -480,12 +481,32 @@ VehicleState VehicleWorld::GetState() const {
     s.accel_lat  = acc_local.y();
     s.accel_vert = acc_local.z();
 
-    // Wheel angular speeds (assumes 2 axles, 2 wheels each).
+    // Wheel angular speeds and terrain friction (assumes 2 axles, 2 wheels each).
     int n_axles = std::min(static_cast<int>(m_vehicle->GetNumberAxles()), 2);
     int idx = 0;
     for (int a = 0; a < n_axles && idx < 4; ++a) {
         s.wheel_omega[idx++] = m_vehicle->GetSpindleOmega(a, vehicle::LEFT);
         s.wheel_omega[idx++] = m_vehicle->GetSpindleOmega(a, vehicle::RIGHT);
+    }
+    idx = 0;
+    for (int a = 0; a < n_axles && idx < 4; ++a) {
+        auto pL = m_vehicle->GetSpindlePos(a, vehicle::LEFT);
+        auto pR = m_vehicle->GetSpindlePos(a, vehicle::RIGHT);
+        s.wheel_mu[idx++] = m_terrain->GetCoefficientFriction(pL);
+        s.wheel_mu[idx++] = m_terrain->GetCoefficientFriction(pR);
+    }
+
+    // Per-wheel longitudinal slip ratio (braking convention: 0=free, +1=locked).
+    // Undefined below 0.1 m/s — left as zero to avoid divide-by-noise at standstill.
+    {
+        constexpr double kTireRadius = 0.2915;  // EV1 TMeasy unloaded radius [m]
+        double v = std::abs(s.speed_mps);
+        if (v > 0.1) {
+            for (int i = 0; i < 4; ++i) {
+                double vw = std::abs(s.wheel_omega[i]) * kTireRadius;
+                s.slip_ratio[i] = std::clamp((v - vw) / v, -1.0, 1.0);
+            }
+        }
     }
 
     // Steering angle (first axle, left side).

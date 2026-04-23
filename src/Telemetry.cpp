@@ -26,37 +26,48 @@ void Telemetry::Record(const VehicleState& s, double dt) {
 
     // CSV header (once).
     if (m_file.is_open() && !m_file_header_written) {
-        m_file << "sim_time,speed_mps,throttle,"
+        m_file << "sim_time,speed_mps,"
+                  "accel_long,accel_lat,accel_vert,"
+                  "yaw_rate,roll_rate,"
+                  "throttle,steer_cmd,steer_angle_rad,"
                   "brake_fl,brake_fr,brake_rl,brake_rr,"
-                  "steering,pos_x,pos_y,pos_z,yaw_deg,"
-                  "wheel_fl_omega,wheel_fr_omega,wheel_rl_omega,wheel_rr_omega\n";
+                  "pos_x,pos_y,pos_z,yaw_deg,"
+                  "wheel_fl_omega,wheel_fr_omega,wheel_rl_omega,wheel_rr_omega,"
+                  "wheel_mu_fl,wheel_mu_fr,wheel_mu_rl,wheel_mu_rr,"
+                  "slip_fl,slip_fr,slip_rl,slip_rr\n";
         m_file_header_written = true;
     }
 
     // Console log.
     char buf[256];
     std::snprintf(buf, sizeof(buf),
-        "[%.2fs] spd=%.1f m/s  thr=%.2f  brk=%.2f/%.2f  str=%+.2f  "
-        "pos=(%.1f,%.1f,%.1f)  yaw=%.1f",
+        "[%.2fs] spd=%.1f m/s  ax=%.2f ay=%.2f  yawR=%.2f  "
+        "thr=%.2f  brk=%.2f/%.2f  str=%+.2f",
         s.sim_time, s.speed_mps,
+        s.accel_long, s.accel_lat, s.yaw_rate,
         s.applied_throttle,
         s.applied_front_brake, s.applied_rear_brake,
-        s.applied_steering,
-        s.pos_x, s.pos_y, s.pos_z, s.yaw_deg);
+        s.applied_steering);
     std::cout << buf << "\n";
 
     // CSV row.
     if (m_file.is_open()) {
         m_file << s.sim_time << ","
                << s.speed_mps << ","
+               << s.accel_long << "," << s.accel_lat << "," << s.accel_vert << ","
+               << s.yaw_rate << "," << s.roll_rate << ","
                << s.applied_throttle << ","
+               << s.applied_steering << "," << s.steering_angle << ","
                << s.brake_cmd[0] << "," << s.brake_cmd[1] << ","
                << s.brake_cmd[2] << "," << s.brake_cmd[3] << ","
-               << s.applied_steering << ","
                << s.pos_x << "," << s.pos_y << "," << s.pos_z << ","
                << s.yaw_deg << ","
                << s.wheel_omega[0] << "," << s.wheel_omega[1] << ","
-               << s.wheel_omega[2] << "," << s.wheel_omega[3] << "\n";
+               << s.wheel_omega[2] << "," << s.wheel_omega[3] << ","
+               << s.wheel_mu[0] << "," << s.wheel_mu[1] << ","
+               << s.wheel_mu[2] << "," << s.wheel_mu[3] << ","
+               << s.slip_ratio[0] << "," << s.slip_ratio[1] << ","
+               << s.slip_ratio[2] << "," << s.slip_ratio[3] << "\n";
     }
 }
 
