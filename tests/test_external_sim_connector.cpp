@@ -1,25 +1,30 @@
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include "ExternalSimConnector.h"
 
 #include <set>
 #include <string>
 
+using Catch::Matchers::WithinAbs;
+
 // ---------------------------------------------------------------------------
 // Endpoint registry
 // ---------------------------------------------------------------------------
 
 TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
-    const int expected = NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS;
+    constexpr int kNumDynamics = 15;  // 7 chassis + 4 wheel_omega + 4 slip_ratio
+    const int expected = NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumDynamics;
     REQUIRE(ExternalSimConnector::EndpointCount() == expected);
 
     // Unique signal IDs and names.
     std::set<std::uint32_t> ids;
     std::set<std::string>   qualified;
     std::set<std::string>   shorts;
-    int bulb_count  = 0;
-    int horn_count  = 0;
-    int panel_count = 0;
+    int bulb_count     = 0;
+    int horn_count     = 0;
+    int panel_count    = 0;
+    int dynamics_count = 0;
 
     const auto* eps = ExternalSimConnector::Endpoints();
     for (int i = 0; i < ExternalSimConnector::EndpointCount(); ++i) {
@@ -37,13 +42,17 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
         } else if (e.signal_id >= 4030 && e.signal_id <= 4033) {
             CHECK_FALSE(e.input_to_sim);    // panel sensors are outputs
             ++panel_count;
+        } else if (e.signal_id >= 4100 && e.signal_id <= 4123) {
+            CHECK_FALSE(e.input_to_sim);    // dynamics signals are outputs
+            ++dynamics_count;
         } else {
             FAIL("Unexpected signal_id " << e.signal_id);
         }
     }
-    CHECK(bulb_count  == NUM_LIGHTS);
-    CHECK(horn_count  == 2);
-    CHECK(panel_count == VehiclePanels::NUM_PANELS);
+    CHECK(bulb_count     == NUM_LIGHTS);
+    CHECK(horn_count     == 2);
+    CHECK(panel_count    == VehiclePanels::NUM_PANELS);
+    CHECK(dynamics_count == kNumDynamics);
 }
 
 TEST_CASE("FindEndpoint returns bulb command rows", "[ExternalSim]") {
@@ -56,6 +65,23 @@ TEST_CASE("FindEndpoint returns bulb command rows", "[ExternalSim]") {
 
     // One past the last bulb ID is unused.
     CHECK(ExternalSimConnector::FindEndpoint(4019) == nullptr);
+}
+
+TEST_CASE("FindEndpoint returns dynamics rows", "[ExternalSim]") {
+    // speed_mps lives at 4100.
+    const auto* spd = ExternalSimConnector::FindEndpoint(4100);
+    REQUIRE(spd != nullptr);
+    CHECK(std::string(spd->qualified_name) == "vehicle.dynamics.speed_mps");
+    CHECK_FALSE(spd->input_to_sim);   // output from ev1sim
+
+    // Rear-right slip ratio is the last dynamics signal at 4123.
+    const auto* sr = ExternalSimConnector::FindEndpoint(4123);
+    REQUIRE(sr != nullptr);
+    CHECK(std::string(sr->qualified_name) == "vehicle.dynamics.slip_ratio_rr");
+    CHECK_FALSE(sr->input_to_sim);
+
+    // Gap in the signal ID space: 4107 is not assigned.
+    CHECK(ExternalSimConnector::FindEndpoint(4107) == nullptr);
 }
 
 TEST_CASE("Bulb signal IDs mirror the electric sim's LightIdx order",
@@ -179,6 +205,13 @@ TEST_CASE("Injected deltas to panel IDs are ignored", "[ExternalSim]") {
     CHECK_FALSE(c.GetPanelSensor(PanelID::HOOD));
 }
 
+TEST_CASE("Injected deltas to dynamics IDs are silently dropped", "[ExternalSim]") {
+    // Dynamics signals are outputs — inbound writes must be ignored.
+    ExternalSimConnector c;
+    c.DebugInjectDelta(4100, true);   // speed_mps
+    CHECK_FALSE(c.HasReceivedBulbData());
+}
+
 TEST_CASE("Unknown signal IDs are silently dropped", "[ExternalSim]") {
     ExternalSimConnector c;
     c.DebugInjectDelta(9999, true);
@@ -200,4 +233,27 @@ TEST_CASE("Panel ajar state round-trips through the connector", "[ExternalSim]")
     c.SetPanelSensor(PanelID::TRUNK, false);
     CHECK(c.GetPanelSensor(PanelID::HOOD));
     CHECK_FALSE(c.GetPanelSensor(PanelID::TRUNK));
+}
+
+// ---------------------------------------------------------------------------
+// VehicleState publishing round-trip (stub build: just tests the store).
+// ---------------------------------------------------------------------------
+
+TEST_CASE("SetVehicleState stores values without crashing", "[ExternalSim]") {
+    ExternalSimConnector c;
+
+    VehicleState vs{};
+    vs.speed_mps      = 13.4;
+    vs.accel_long     = -2.1;
+    vs.accel_lat      =  0.5;
+    vs.yaw_rate       =  0.3;
+    vs.applied_throttle    = 0.0;
+    vs.applied_front_brake = 0.6;
+    vs.applied_rear_brake  = 0.6;
+    vs.wheel_omega    = {12.0, 12.1, 11.9, 11.8};
+    vs.slip_ratio     = {0.05, 0.05, 0.04, 0.04};
+
+    // Must not throw; Tick is a no-op in the stub build but must not crash.
+    CHECK_NOTHROW(c.SetVehicleState(vs));
+    CHECK_NOTHROW(c.Tick(0.0));
 }

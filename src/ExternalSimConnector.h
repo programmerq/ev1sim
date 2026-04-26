@@ -2,6 +2,7 @@
 
 #include "VehicleLights.h"
 #include "VehiclePanels.h"
+#include "VehicleState.h"
 
 #include <cstdint>
 #include <memory>
@@ -17,9 +18,12 @@
 /// drive it.
 ///
 /// Endpoints exposed (see Endpoints()):
-///   - 19 bulb command inputs      (electric sim -> ev1sim), one per LightID
-///   - 2  horn tone command inputs (electric sim -> ev1sim), low + high
+///   - 19 bulb command inputs       (electric sim -> ev1sim), one per LightID
+///   - 2  horn tone command inputs  (electric sim -> ev1sim), low + high
 ///   - 4  panel ajar switch outputs (ev1sim -> electric sim), hood/trunk/L/R door
+///   - 15 vehicle dynamics outputs  (ev1sim -> electric sim), float32 each:
+///        speed, accel (long/lat), yaw rate, throttle/brake commands,
+///        per-wheel angular speeds (FL/FR/RL/RR), per-wheel slip ratios
 ///
 /// Signal IDs live in the 4000-block so they don't collide with the harness
 /// example's 3000-block.
@@ -97,6 +101,11 @@ public:
     /// connector publishes a DeltaBatch only when a value changes.
     void SetPanelSensor(PanelID panel, bool ajar);
     bool GetPanelSensor(PanelID panel) const;
+
+    /// Outgoing vehicle dynamics snapshot — SimApp writes this every frame
+    /// and Tick() publishes it as a float32 DeltaBatch so the electric sim
+    /// can model BTCM, regen braking, ABS, etc.
+    void SetVehicleState(const VehicleState& state);
 
     // ---------------------------------------------------------------------
     // Endpoint registry (static — stable across instances)
