@@ -370,6 +370,11 @@ void VehicleWorld::Synchronize(double time) {
     } else {
         m_hmmwv->Synchronize(time, inputs, *m_terrain);
     }
+
+    // Override per-axle brakes with the actuated pressures/positions.
+    // Must run after the vehicle Synchronize so we win over Chrono's
+    // unified-m_braking pass (which we zeroed in driver Synchronize).
+    m_driver->ApplyBrakes(time);
 }
 
 void VehicleWorld::Advance(double step) {
@@ -524,6 +529,11 @@ VehicleState VehicleWorld::GetState() const {
     s.brake_cmd[1] = cmd.front_brake;  // FR
     s.brake_cmd[2] = cmd.rear_brake;   // RL
     s.brake_cmd[3] = cmd.rear_brake;   // RR
+
+    // Actual actuator states after dynamics (lag for front, rate-limit for rear).
+    const auto& act = m_driver->GetActuatorState();
+    s.front_brake_pressure = act.front_pressure;
+    s.rear_brake_position  = act.rear_position;
 
     return s;
 }

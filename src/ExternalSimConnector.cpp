@@ -51,10 +51,12 @@ namespace {
 //   4101  vehicle.dynamics.accel_long          longitudinal accel (m/s^2, chassis frame)
 //   4102  vehicle.dynamics.accel_lat           lateral accel (m/s^2, chassis frame)
 //   4103  vehicle.dynamics.yaw_rate            yaw rate (rad/s)
-//   4104  vehicle.dynamics.applied_throttle    0..1
-//   4105  vehicle.dynamics.applied_front_brake 0..1
-//   4106  vehicle.dynamics.applied_rear_brake  0..1
-//   4110  vehicle.dynamics.wheel_omega_fl      rad/s (front-left)
+//   4104  vehicle.dynamics.applied_throttle      0..1  (commanded)
+//   4105  vehicle.dynamics.applied_front_brake   0..1  (commanded)
+//   4106  vehicle.dynamics.applied_rear_brake    0..1  (commanded)
+//   4107  vehicle.dynamics.front_brake_pressure  0..1  (actual, after hydraulic lag)
+//   4108  vehicle.dynamics.rear_brake_position   0..1  (actual, after rate-limit)
+//   4110  vehicle.dynamics.wheel_omega_fl        rad/s (front-left)
 //   4111  vehicle.dynamics.wheel_omega_fr      rad/s (front-right)
 //   4112  vehicle.dynamics.wheel_omega_rl      rad/s (rear-left)
 //   4113  vehicle.dynamics.wheel_omega_rr      rad/s (rear-right)
@@ -137,21 +139,25 @@ static_assert(sizeof(kPanelNames) / sizeof(kPanelNames[0]) ==
 // ---------------------------------------------------------------------------
 struct DynNames { std::uint32_t offset; const char* qualified; const char* shortname; };
 constexpr DynNames kDynamicsNames[] = {
-    {0,  "vehicle.dynamics.speed_mps",           "speed_mps"},
-    {1,  "vehicle.dynamics.accel_long",          "accel_long"},
-    {2,  "vehicle.dynamics.accel_lat",           "accel_lat"},
-    {3,  "vehicle.dynamics.yaw_rate",            "yaw_rate"},
-    {4,  "vehicle.dynamics.applied_throttle",    "applied_throttle"},
-    {5,  "vehicle.dynamics.applied_front_brake", "applied_front_brake"},
-    {6,  "vehicle.dynamics.applied_rear_brake",  "applied_rear_brake"},
-    {10, "vehicle.dynamics.wheel_omega_fl",      "wheel_omega_fl"},
-    {11, "vehicle.dynamics.wheel_omega_fr",      "wheel_omega_fr"},
-    {12, "vehicle.dynamics.wheel_omega_rl",      "wheel_omega_rl"},
-    {13, "vehicle.dynamics.wheel_omega_rr",      "wheel_omega_rr"},
-    {20, "vehicle.dynamics.slip_ratio_fl",       "slip_ratio_fl"},
-    {21, "vehicle.dynamics.slip_ratio_fr",       "slip_ratio_fr"},
-    {22, "vehicle.dynamics.slip_ratio_rl",       "slip_ratio_rl"},
-    {23, "vehicle.dynamics.slip_ratio_rr",       "slip_ratio_rr"},
+    {0,  "vehicle.dynamics.speed_mps",            "speed_mps"},
+    {1,  "vehicle.dynamics.accel_long",           "accel_long"},
+    {2,  "vehicle.dynamics.accel_lat",            "accel_lat"},
+    {3,  "vehicle.dynamics.yaw_rate",             "yaw_rate"},
+    {4,  "vehicle.dynamics.applied_throttle",     "applied_throttle"},
+    {5,  "vehicle.dynamics.applied_front_brake",  "applied_front_brake"},
+    {6,  "vehicle.dynamics.applied_rear_brake",   "applied_rear_brake"},
+    // Actuated brake states (after dynamics model) — what the hardware
+    // actually delivers vs. what was commanded:
+    {7,  "vehicle.dynamics.front_brake_pressure", "front_brake_pressure"},
+    {8,  "vehicle.dynamics.rear_brake_position",  "rear_brake_position"},
+    {10, "vehicle.dynamics.wheel_omega_fl",       "wheel_omega_fl"},
+    {11, "vehicle.dynamics.wheel_omega_fr",       "wheel_omega_fr"},
+    {12, "vehicle.dynamics.wheel_omega_rl",       "wheel_omega_rl"},
+    {13, "vehicle.dynamics.wheel_omega_rr",       "wheel_omega_rr"},
+    {20, "vehicle.dynamics.slip_ratio_fl",        "slip_ratio_fl"},
+    {21, "vehicle.dynamics.slip_ratio_fr",        "slip_ratio_fr"},
+    {22, "vehicle.dynamics.slip_ratio_rl",        "slip_ratio_rl"},
+    {23, "vehicle.dynamics.slip_ratio_rr",        "slip_ratio_rr"},
 };
 constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
                                                sizeof(kDynamicsNames[0]));
@@ -502,7 +508,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
     if (st.has_vstate) {
         const auto& vs = st.vstate;
         std::vector<DeltaRecord> dyn;
-        dyn.reserve(kNumDynamics);
+        dyn.reserve(static_cast<std::size_t>(kNumDynamics));
         dyn.push_back(MakeFloatDelta(4100, static_cast<float>(vs.speed_mps)));
         dyn.push_back(MakeFloatDelta(4101, static_cast<float>(vs.accel_long)));
         dyn.push_back(MakeFloatDelta(4102, static_cast<float>(vs.accel_lat)));
@@ -510,6 +516,8 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         dyn.push_back(MakeFloatDelta(4104, static_cast<float>(vs.applied_throttle)));
         dyn.push_back(MakeFloatDelta(4105, static_cast<float>(vs.applied_front_brake)));
         dyn.push_back(MakeFloatDelta(4106, static_cast<float>(vs.applied_rear_brake)));
+        dyn.push_back(MakeFloatDelta(4107, static_cast<float>(vs.front_brake_pressure)));
+        dyn.push_back(MakeFloatDelta(4108, static_cast<float>(vs.rear_brake_position)));
         for (int w = 0; w < 4; ++w)
             dyn.push_back(MakeFloatDelta(4110 + static_cast<std::uint32_t>(w),
                                          static_cast<float>(vs.wheel_omega[w])));
