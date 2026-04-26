@@ -1,6 +1,7 @@
 #include "ExternalSimConnector.h"
 
 #include <array>
+#include <cstring>
 #include <iostream>
 #include <string>
 
@@ -44,11 +45,29 @@ namespace {
 //   4020  horn_low_cmd                               (input to ev1sim)
 //   4021  horn_high_cmd                              (input to ev1sim)
 //   4030..4033  panel ajar switches (HOOD/TRUNK/DL/DR)    (output from ev1sim)
+//
+// Vehicle dynamics signals (all float32 IEEE 754 LE, output from ev1sim):
+//   4100  vehicle.dynamics.speed_mps           forward speed (m/s)
+//   4101  vehicle.dynamics.accel_long          longitudinal accel (m/s^2, chassis frame)
+//   4102  vehicle.dynamics.accel_lat           lateral accel (m/s^2, chassis frame)
+//   4103  vehicle.dynamics.yaw_rate            yaw rate (rad/s)
+//   4104  vehicle.dynamics.applied_throttle    0..1
+//   4105  vehicle.dynamics.applied_front_brake 0..1
+//   4106  vehicle.dynamics.applied_rear_brake  0..1
+//   4110  vehicle.dynamics.wheel_omega_fl      rad/s (front-left)
+//   4111  vehicle.dynamics.wheel_omega_fr      rad/s (front-right)
+//   4112  vehicle.dynamics.wheel_omega_rl      rad/s (rear-left)
+//   4113  vehicle.dynamics.wheel_omega_rr      rad/s (rear-right)
+//   4120  vehicle.dynamics.slip_ratio_fl       0=free rolling, +1=locked, -1=spinning
+//   4121  vehicle.dynamics.slip_ratio_fr
+//   4122  vehicle.dynamics.slip_ratio_rl
+//   4123  vehicle.dynamics.slip_ratio_rr
 // ---------------------------------------------------------------------------
-constexpr std::uint32_t kBulbCmdBase   = 4000;
-constexpr std::uint32_t kHornLowCmd    = 4020;
-constexpr std::uint32_t kHornHighCmd   = 4021;
-constexpr std::uint32_t kPanelBase     = 4030;
+constexpr std::uint32_t kBulbCmdBase    = 4000;
+constexpr std::uint32_t kHornLowCmd     = 4020;
+constexpr std::uint32_t kHornHighCmd    = 4021;
+constexpr std::uint32_t kPanelBase      = 4030;
+constexpr std::uint32_t kDynamicsBase   = 4100;
 
 // Mapping from signal slot (kBulbCmdBase + slot) to LightID.  Order must stay
 // locked to the electric sim's LightIdx enum for the first 17 entries.
@@ -112,9 +131,36 @@ static_assert(sizeof(kPanelNames) / sizeof(kPanelNames[0]) ==
               "kPanelNames must cover every PanelID");
 
 // ---------------------------------------------------------------------------
+// Vehicle dynamics endpoint names.
+// Ordered to match kDynamicsBase + index; gaps in the signal ID space (e.g.
+// 4107-4109) are skipped by using explicit offsets in BuildEndpoints().
+// ---------------------------------------------------------------------------
+struct DynNames { std::uint32_t offset; const char* qualified; const char* shortname; };
+constexpr DynNames kDynamicsNames[] = {
+    {0,  "vehicle.dynamics.speed_mps",           "speed_mps"},
+    {1,  "vehicle.dynamics.accel_long",          "accel_long"},
+    {2,  "vehicle.dynamics.accel_lat",           "accel_lat"},
+    {3,  "vehicle.dynamics.yaw_rate",            "yaw_rate"},
+    {4,  "vehicle.dynamics.applied_throttle",    "applied_throttle"},
+    {5,  "vehicle.dynamics.applied_front_brake", "applied_front_brake"},
+    {6,  "vehicle.dynamics.applied_rear_brake",  "applied_rear_brake"},
+    {10, "vehicle.dynamics.wheel_omega_fl",      "wheel_omega_fl"},
+    {11, "vehicle.dynamics.wheel_omega_fr",      "wheel_omega_fr"},
+    {12, "vehicle.dynamics.wheel_omega_rl",      "wheel_omega_rl"},
+    {13, "vehicle.dynamics.wheel_omega_rr",      "wheel_omega_rr"},
+    {20, "vehicle.dynamics.slip_ratio_fl",       "slip_ratio_fl"},
+    {21, "vehicle.dynamics.slip_ratio_fr",       "slip_ratio_fr"},
+    {22, "vehicle.dynamics.slip_ratio_rl",       "slip_ratio_rl"},
+    {23, "vehicle.dynamics.slip_ratio_rr",       "slip_ratio_rr"},
+};
+constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
+                                               sizeof(kDynamicsNames[0]));
+
+// ---------------------------------------------------------------------------
 // Build the endpoint table once.
 // ---------------------------------------------------------------------------
-constexpr int kNumEndpoints = NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS;
+constexpr int kNumEndpoints =
+    NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumDynamics;
 
 std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     std::array<ExternalSimConnector::Endpoint, kNumEndpoints> out{};
@@ -129,6 +175,11 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     for (int p = 0; p < VehiclePanels::NUM_PANELS; ++p, ++i) {
         out[i] = {kPanelBase + static_cast<std::uint32_t>(p),
                   kPanelNames[p].qualified, kPanelNames[p].shortname,
+                  /*input_to_sim=*/false};
+    }
+    for (int d = 0; d < kNumDynamics; ++d, ++i) {
+        out[i] = {kDynamicsBase + kDynamicsNames[d].offset,
+                  kDynamicsNames[d].qualified, kDynamicsNames[d].shortname,
                   /*input_to_sim=*/false};
     }
     return out;
@@ -168,6 +219,11 @@ struct ExternalSimConnector::State {
     bool panel[VehiclePanels::NUM_PANELS]      = {};
     bool panel_published[VehiclePanels::NUM_PANELS] = {};
     bool panel_ever_published                  = false;
+
+    // Vehicle dynamics snapshot — updated by SetVehicleState() each frame,
+    // published in Tick() as float32 signals.
+    VehicleState vstate{};
+    bool         has_vstate = false;
 
     // Timers (sim_time_s based).
     double next_presence_time  = 0.0;
@@ -283,6 +339,11 @@ bool ExternalSimConnector::GetPanelSensor(PanelID panel) const {
     return m_state->panel[idx];
 }
 
+void ExternalSimConnector::SetVehicleState(const VehicleState& state) {
+    m_state->vstate    = state;
+    m_state->has_vstate = true;
+}
+
 // ---------------------------------------------------------------------------
 // Test / internal: apply an inbound signal value (as if decoded from a frame).
 // ---------------------------------------------------------------------------
@@ -330,6 +391,21 @@ DeltaRecord MakeDefineDelta(std::uint32_t signal_id, const char* name) {
     d.bit_width = 8;
     const std::string s = std::string(name) + "|source:ev1sim";
     d.payload.assign(s.begin(), s.end());
+    return d;
+}
+
+// IEEE 754 float32, little-endian payload.
+DeltaRecord MakeFloatDelta(std::uint32_t signal_id, float value) {
+    DeltaRecord d{};
+    d.signal_id = signal_id;
+    d.encoding  = SignalEncoding::Float;
+    d.bit_width = 32;
+    std::uint32_t bits;
+    std::memcpy(&bits, &value, sizeof(bits));
+    d.payload.push_back(static_cast<std::uint8_t>( bits        & 0xFF));
+    d.payload.push_back(static_cast<std::uint8_t>((bits >>  8) & 0xFF));
+    d.payload.push_back(static_cast<std::uint8_t>((bits >> 16) & 0xFF));
+    d.payload.push_back(static_cast<std::uint8_t>((bits >> 24) & 0xFF));
     return d;
 }
 
@@ -422,7 +498,41 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         }
     }
 
-    // 4. Announce our endpoints periodically so other bus peers can discover us.
+    // 4. Publish vehicle dynamics snapshot (float32 signals, every frame).
+    if (st.has_vstate) {
+        const auto& vs = st.vstate;
+        std::vector<DeltaRecord> dyn;
+        dyn.reserve(kNumDynamics);
+        dyn.push_back(MakeFloatDelta(4100, static_cast<float>(vs.speed_mps)));
+        dyn.push_back(MakeFloatDelta(4101, static_cast<float>(vs.accel_long)));
+        dyn.push_back(MakeFloatDelta(4102, static_cast<float>(vs.accel_lat)));
+        dyn.push_back(MakeFloatDelta(4103, static_cast<float>(vs.yaw_rate)));
+        dyn.push_back(MakeFloatDelta(4104, static_cast<float>(vs.applied_throttle)));
+        dyn.push_back(MakeFloatDelta(4105, static_cast<float>(vs.applied_front_brake)));
+        dyn.push_back(MakeFloatDelta(4106, static_cast<float>(vs.applied_rear_brake)));
+        for (int w = 0; w < 4; ++w)
+            dyn.push_back(MakeFloatDelta(4110 + static_cast<std::uint32_t>(w),
+                                         static_cast<float>(vs.wheel_omega[w])));
+        for (int w = 0; w < 4; ++w)
+            dyn.push_back(MakeFloatDelta(4120 + static_cast<std::uint32_t>(w),
+                                         static_cast<float>(vs.slip_ratio[w])));
+
+        Frame df{};
+        df.header.type              = FrameType::DeltaBatch;
+        df.header.stream_id         = kStreamEv1Sim;
+        df.header.sequence          = st.sequence++;
+        df.header.monotonic_time_ns = NowNs();
+        df.deltas                   = std::move(dyn);
+        if (!st.transport->publish_frame(df)) {
+            std::cerr << "[ExternalSim] publish_frame (dynamics) failed — reconnecting\n";
+            st.transport.reset();
+            st.status = Status::Connecting;
+            st.next_reconnect_time = sim_time_s + m_opts.reconnect_period_s;
+            return;
+        }
+    }
+
+    // 5. Announce our endpoints periodically so other bus peers can discover us.
     if (sim_time_s >= st.next_presence_time) {
         Frame def{};
         def.header.type              = FrameType::SignalDefine;

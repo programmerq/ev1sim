@@ -247,11 +247,12 @@ int SimApp::RunWithVisualization() {
             m_lights->Initialize(smgr);
         }
 
-        // --- External sim sync (publish panel sensors, drain bulb/horn cmds) ---
+        // --- External sim sync (publish panel sensors + dynamics, drain bulb/horn cmds) ---
         for (int i = 0; i < VehiclePanels::NUM_PANELS; ++i) {
             m_external_sim->SetPanelSensor(static_cast<PanelID>(i),
                                            m_panels->IsOpen(static_cast<PanelID>(i)));
         }
+        m_external_sim->SetVehicleState(m_world->GetState());
         m_external_sim->Tick(t);
 
         const bool ext_driving_bulbs =
@@ -392,12 +393,13 @@ int SimApp::RunHeadless() {
 
         const double t = m_world->GetSimTime();
 
-        // --- External sim sync (panel sensors, bulb/horn cmds) ---
+        // --- External sim sync (panel sensors + dynamics, bulb/horn cmds) ---
         for (int i = 0; i < VehiclePanels::NUM_PANELS; ++i) {
             m_external_sim->SetPanelSensor(
                 static_cast<PanelID>(i),
                 m_panels->IsOpen(static_cast<PanelID>(i)));
         }
+        m_external_sim->SetVehicleState(m_world->GetState());
         m_external_sim->Tick(t);
 
         // --- Horn audio (external-sim-driven only in headless) ---
