@@ -44,4 +44,16 @@ struct VehicleState {
     double applied_front_brake  = 0.0;
     double applied_rear_brake   = 0.0;
     double applied_steering     = 0.0;
+
+    // Actual brake actuator states after dynamics are applied.
+    // These differ from the applied_* commands by the lag/rate-limit model
+    // in CommandDriver::Advance(), which reflects real hardware behaviour:
+    //
+    //   front_brake_pressure — hydraulic caliper pressure ratio (0..1)
+    //     First-order lag: τ_apply ≈ 50 ms, τ_release ≈ 80 ms.
+    //
+    //   rear_brake_position  — electric drum shoe position ratio (0..1)
+    //     Rate-limited actuator: max rate ≈ 3.33 /s (full stroke ~300 ms).
+    double front_brake_pressure = 0.0;
+    double rear_brake_position  = 0.0;
 };

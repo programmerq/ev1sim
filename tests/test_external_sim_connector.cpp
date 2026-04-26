@@ -13,7 +13,7 @@ using Catch::Matchers::WithinAbs;
 // ---------------------------------------------------------------------------
 
 TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
-    constexpr int kNumDynamics = 15;  // 7 chassis + 4 wheel_omega + 4 slip_ratio
+    constexpr int kNumDynamics = 17;  // 9 chassis + 4 wheel_omega + 4 slip_ratio
     const int expected = NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumDynamics;
     REQUIRE(ExternalSimConnector::EndpointCount() == expected);
 
@@ -42,7 +42,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
         } else if (e.signal_id >= 4030 && e.signal_id <= 4033) {
             CHECK_FALSE(e.input_to_sim);    // panel sensors are outputs
             ++panel_count;
-        } else if (e.signal_id >= 4100 && e.signal_id <= 4123) {
+        } else if ((e.signal_id >= 4100 && e.signal_id <= 4108) ||
+                   (e.signal_id >= 4110 && e.signal_id <= 4113) ||
+                   (e.signal_id >= 4120 && e.signal_id <= 4123)) {
             CHECK_FALSE(e.input_to_sim);    // dynamics signals are outputs
             ++dynamics_count;
         } else {
