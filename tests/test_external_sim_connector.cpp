@@ -13,7 +13,7 @@ using Catch::Matchers::WithinAbs;
 // ---------------------------------------------------------------------------
 
 TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
-    constexpr int kNumDynamics = 17;  // 9 chassis + 4 wheel_omega + 4 slip_ratio
+    constexpr int kNumDynamics = 18;  // 10 chassis/actuator + 4 wheel_omega + 4 slip_ratio
     const int expected = NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumDynamics;
     REQUIRE(ExternalSimConnector::EndpointCount() == expected);
 
@@ -42,7 +42,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
         } else if (e.signal_id >= 4030 && e.signal_id <= 4033) {
             CHECK_FALSE(e.input_to_sim);    // panel sensors are outputs
             ++panel_count;
-        } else if ((e.signal_id >= 4100 && e.signal_id <= 4108) ||
+        } else if ((e.signal_id >= 4100 && e.signal_id <= 4109) ||
                    (e.signal_id >= 4110 && e.signal_id <= 4113) ||
                    (e.signal_id >= 4120 && e.signal_id <= 4123)) {
             CHECK_FALSE(e.input_to_sim);    // dynamics signals are outputs
@@ -96,8 +96,14 @@ TEST_CASE("FindEndpoint returns dynamics rows", "[ExternalSim]") {
     CHECK(std::string(rbp->qualified_name) == "vehicle.dynamics.rear_brake_position");
     CHECK_FALSE(rbp->input_to_sim);
 
-    // 4109 is still a gap (between actuator-state block and wheel-omega block).
-    CHECK(ExternalSimConnector::FindEndpoint(4109) == nullptr);
+    // Steering torque (front-axle Mz sum, fed to force-feedback peers) at 4109.
+    const auto* st = ExternalSimConnector::FindEndpoint(4109);
+    REQUIRE(st != nullptr);
+    CHECK(std::string(st->qualified_name) == "vehicle.dynamics.steering_torque");
+    CHECK_FALSE(st->input_to_sim);
+
+    // 4114-4119 stays a gap between wheel-omega and slip-ratio blocks.
+    CHECK(ExternalSimConnector::FindEndpoint(4114) == nullptr);
 }
 
 TEST_CASE("Bulb signal IDs mirror the electric sim's LightIdx order",

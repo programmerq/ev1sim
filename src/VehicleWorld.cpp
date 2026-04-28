@@ -518,6 +518,24 @@ VehicleState VehicleWorld::GetState() const {
     if (n_axles > 0)
         s.steering_angle = m_vehicle->GetSteeringAngle(0, vehicle::LEFT);
 
+    // Steering reaction torque: sum of front-axle tire self-aligning moments
+    // (Mz) reported in each tire's local contact-patch frame.  This is the
+    // physically meaningful quantity that a force-feedback peer needs to
+    // produce on-centre return and grip "feel"; the FFB peer maps it through
+    // its own steering-ratio / direction / saturation curve.
+    if (n_axles > 0) {
+        double mz_sum = 0.0;
+        for (auto side : {vehicle::LEFT, vehicle::RIGHT}) {
+            if (auto tire = m_vehicle->GetTire(0, side)) {
+                ChCoordsys<> tire_frame;
+                vehicle::TerrainForce tf =
+                    tire->ReportTireForceLocal(m_terrain.get(), tire_frame);
+                mz_sum += tf.moment.z();
+            }
+        }
+        s.steering_torque = mz_sum;
+    }
+
     // Echo applied commands.
     auto& cmd = m_driver->GetCommand();
     s.applied_throttle    = cmd.throttle;

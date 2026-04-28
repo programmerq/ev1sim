@@ -56,6 +56,7 @@ namespace {
 //   4106  vehicle.dynamics.applied_rear_brake    0..1  (commanded)
 //   4107  vehicle.dynamics.front_brake_pressure  0..1  (actual, after hydraulic lag)
 //   4108  vehicle.dynamics.rear_brake_position   0..1  (actual, after rate-limit)
+//   4109  vehicle.dynamics.steering_torque       Nm    (front-axle Mz sum, FFB feed)
 //   4110  vehicle.dynamics.wheel_omega_fl        rad/s (front-left)
 //   4111  vehicle.dynamics.wheel_omega_fr      rad/s (front-right)
 //   4112  vehicle.dynamics.wheel_omega_rl      rad/s (rear-left)
@@ -135,8 +136,7 @@ static_assert(sizeof(kPanelNames) / sizeof(kPanelNames[0]) ==
 // ---------------------------------------------------------------------------
 // Vehicle dynamics endpoint names.
 // Ordered to match kDynamicsBase + index; gaps in the signal ID space (e.g.
-// 4109, 4114-4119, 4124+) are skipped by using explicit offsets in
-// BuildEndpoints().
+// 4114-4119, 4124+) are skipped by using explicit offsets in BuildEndpoints().
 // ---------------------------------------------------------------------------
 struct DynNames { std::uint32_t offset; const char* qualified; const char* shortname; };
 constexpr DynNames kDynamicsNames[] = {
@@ -151,6 +151,7 @@ constexpr DynNames kDynamicsNames[] = {
     // actually delivers vs. what was commanded:
     {7,  "vehicle.dynamics.front_brake_pressure", "front_brake_pressure"},
     {8,  "vehicle.dynamics.rear_brake_position",  "rear_brake_position"},
+    {9,  "vehicle.dynamics.steering_torque",      "steering_torque"},
     {10, "vehicle.dynamics.wheel_omega_fl",       "wheel_omega_fl"},
     {11, "vehicle.dynamics.wheel_omega_fr",       "wheel_omega_fr"},
     {12, "vehicle.dynamics.wheel_omega_rl",       "wheel_omega_rl"},
@@ -519,6 +520,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         dyn.push_back(MakeFloatDelta(4106, static_cast<float>(vs.applied_rear_brake)));
         dyn.push_back(MakeFloatDelta(4107, static_cast<float>(vs.front_brake_pressure)));
         dyn.push_back(MakeFloatDelta(4108, static_cast<float>(vs.rear_brake_position)));
+        dyn.push_back(MakeFloatDelta(4109, static_cast<float>(vs.steering_torque)));
         for (int w = 0; w < 4; ++w)
             dyn.push_back(MakeFloatDelta(4110 + static_cast<std::uint32_t>(w),
                                          static_cast<float>(vs.wheel_omega[w])));

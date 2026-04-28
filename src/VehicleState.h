@@ -56,4 +56,11 @@ struct VehicleState {
     //     Rate-limited actuator: max rate ≈ 3.33 /s (full stroke ~300 ms).
     double front_brake_pressure = 0.0;
     double rear_brake_position  = 0.0;
+
+    // Steering reaction torque (Nm) — sum of front-axle tire self-aligning
+    // moments about the wheel-local vertical axis (≈ kingpin axis).  Sign
+    // follows the tire model's Mz convention; consumers (e.g. force-feedback
+    // peers) apply their own scaling and direction.  Zero when no front
+    // tires are in ground contact.
+    double steering_torque = 0.0;
 };
