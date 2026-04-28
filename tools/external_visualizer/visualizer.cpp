@@ -31,6 +31,11 @@ using electricsim::external_visualizer::Component;
 using electricsim::external_visualizer::kComponents;
 
 constexpr std::uint32_t kStreamVisualizer = 0x5649535Au; // "VISZ"
+// Intentionally pinned to the legacy harness bus: this visualizer pairs with
+// electricsim's `ex_lighting_controller` demo on `electricsim_harness_bus`.
+// The main ev1sim binary now defaults to `electricsim_chassis_bus` (the
+// physics ↔ electrical boundary bus).  Don't bump this constant blindly —
+// it would break the legacy lighting demo.
 constexpr char kBusName[] = "electricsim_harness_bus";
 
 struct ComponentState {

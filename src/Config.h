@@ -85,7 +85,7 @@ struct Config {
 
     struct ExternalSim {
         bool        enabled            = false;
-        std::string bus_name           = "electricsim_harness_bus";
+        std::string bus_name           = "electricsim_chassis_bus";
         double      reconnect_period_s = 1.0;
     } external_sim;
 

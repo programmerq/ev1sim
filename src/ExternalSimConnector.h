@@ -27,11 +27,21 @@
 ///
 /// Signal IDs live in the 4000-block so they don't collide with the harness
 /// example's 3000-block.
+///
+/// Integration boundary
+/// --------------------
+/// This connector exposes ev1sim as a flat list of buttons, lights, switches,
+/// and sensors on a dedicated chassis bus.  It is deliberately ignorant of
+/// electricsim's module structure — there is no concept of BTCM, BPM, AD,
+/// charger, or any other ECU here.  When adding new endpoints, name them in
+/// vehicle terms (`vehicle.panel.*`, `vehicle.dynamics.*`, `avr0.lights.*`),
+/// never in ECU/module terms.  Anything that needs to know "which ECU
+/// consumes this signal" lives on the electricsim side of the boundary.
 class ExternalSimConnector {
 public:
     struct Options {
         bool        enabled          = false;
-        std::string bus_name         = "electricsim_harness_bus";
+        std::string bus_name         = "electricsim_chassis_bus";
         // How often to republish SignalDefine frames so other bus peers can
         // introspect our endpoints.
         double      presence_period_s = 2.0;

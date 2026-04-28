@@ -109,7 +109,7 @@ TEST_CASE("Config accepts legacy boolean demo_mode", "[Config]") {
 TEST_CASE("Config external_sim defaults off with stock bus name", "[Config]") {
     Config cfg;
     CHECK(cfg.external_sim.enabled == false);
-    CHECK(cfg.external_sim.bus_name == "electricsim_harness_bus");
+    CHECK(cfg.external_sim.bus_name == "electricsim_chassis_bus");
     CHECK(cfg.lights.demo_mode == "off");
 }
 
