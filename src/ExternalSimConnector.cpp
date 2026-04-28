@@ -135,7 +135,8 @@ static_assert(sizeof(kPanelNames) / sizeof(kPanelNames[0]) ==
 // ---------------------------------------------------------------------------
 // Vehicle dynamics endpoint names.
 // Ordered to match kDynamicsBase + index; gaps in the signal ID space (e.g.
-// 4107-4109) are skipped by using explicit offsets in BuildEndpoints().
+// 4109, 4114-4119, 4124+) are skipped by using explicit offsets in
+// BuildEndpoints().
 // ---------------------------------------------------------------------------
 struct DynNames { std::uint32_t offset; const char* qualified; const char* shortname; };
 constexpr DynNames kDynamicsNames[] = {

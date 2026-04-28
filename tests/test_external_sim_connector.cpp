@@ -82,8 +82,22 @@ TEST_CASE("FindEndpoint returns dynamics rows", "[ExternalSim]") {
     CHECK(std::string(sr->qualified_name) == "vehicle.dynamics.slip_ratio_rr");
     CHECK_FALSE(sr->input_to_sim);
 
-    // Gap in the signal ID space: 4107 is not assigned.
-    CHECK(ExternalSimConnector::FindEndpoint(4107) == nullptr);
+    // Brake-actuator-state signals (added alongside independent front/rear
+    // brake-actuator dynamics) live at 4107 (front_brake_pressure) and 4108
+    // (rear_brake_position).  These are the actual hardware-side values
+    // after lag/rate-limit, distinct from the 4105/4106 commanded inputs.
+    const auto* fbp = ExternalSimConnector::FindEndpoint(4107);
+    REQUIRE(fbp != nullptr);
+    CHECK(std::string(fbp->qualified_name) == "vehicle.dynamics.front_brake_pressure");
+    CHECK_FALSE(fbp->input_to_sim);
+
+    const auto* rbp = ExternalSimConnector::FindEndpoint(4108);
+    REQUIRE(rbp != nullptr);
+    CHECK(std::string(rbp->qualified_name) == "vehicle.dynamics.rear_brake_position");
+    CHECK_FALSE(rbp->input_to_sim);
+
+    // 4109 is still a gap (between actuator-state block and wheel-omega block).
+    CHECK(ExternalSimConnector::FindEndpoint(4109) == nullptr);
 }
 
 TEST_CASE("Bulb signal IDs mirror the electric sim's LightIdx order",
