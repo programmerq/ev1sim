@@ -59,8 +59,8 @@ public:
     /// An externally-visible endpoint on the I/O fabric.
     struct Endpoint {
         std::uint32_t signal_id;
-        const char*   qualified_name;   // e.g. "vehicle.body.lhbh.bulb_cmd"
-        const char*   short_name;       // e.g. "lhbh_bulb_cmd"
+        const char*   qualified_name;   // e.g. "vehicle.body.lhbh.bulb_feed_line"
+        const char*   short_name;       // e.g. "lhbh_bulb_feed_line"
         bool          input_to_sim;     // true: electric sim drives this; false: ev1sim publishes
     };
 

@@ -16,7 +16,7 @@ namespace {
 // ---------------------------------------------------------------------------
 // Signal ID layout
 //
-// Bulb command IDs (4000..4018) mirror the external electrical sim's LightIdx
+// Bulb feed-line IDs (4000..4018) mirror the external electrical sim's LightIdx
 // enum so both sides agree on which physical bulb a given ID drives.  The
 // first 17 slots match the electric sim's catalog 1:1; the final two slots
 // (LRTL/RRTL) model the dual-filament tail-lamp elements separately — the
@@ -42,8 +42,8 @@ namespace {
 //   4017  (ev1sim-only)              -> LRTL  (left rear tail filament)
 //   4018  (ev1sim-only)              -> RRTL
 //
-//   4020  horn_low_cmd                               (input to ev1sim)
-//   4021  horn_high_cmd                              (input to ev1sim)
+//   4020  horn_low_drive_line                        (input to ev1sim)
+//   4021  horn_high_drive_line                       (input to ev1sim)
 //   4030..4033  panel ajar switches (HOOD/TRUNK/DL/DR)    (output from ev1sim)
 //
 // Vehicle dynamics signals (all float32 IEEE 754 LE, output from ev1sim):
@@ -89,29 +89,29 @@ constexpr LightID kBulbOrder[NUM_LIGHTS] = {
 // Short / qualified names indexed by LightID enum value (not by signal slot).
 // Keeps the EV1-manual abbreviation stable regardless of wire-level ordering.
 constexpr const char* kBulbShort[NUM_LIGHTS] = {
-    "lhbh_bulb_cmd",  "llbh_bulb_cmd",
-    "rhbh_bulb_cmd",  "rlbh_bulb_cmd",
-    "lfts_bulb_cmd",  "rfts_bulb_cmd",
-    "lfml_bulb_cmd",  "rfml_bulb_cmd",
-    "lrsl_bulb_cmd",  "rrsl_bulb_cmd",
-    "lrtl_bulb_cmd",  "rrtl_bulb_cmd",
-    "lrts_bulb_cmd",  "rrts_bulb_cmd",
-    "lrsm_bulb_cmd",  "rrsm_bulb_cmd",
-    "chmsl_bulb_cmd",
-    "lbl_bulb_cmd",   "rbl_bulb_cmd",
+    "lhbh_bulb_feed_line",  "llbh_bulb_feed_line",
+    "rhbh_bulb_feed_line",  "rlbh_bulb_feed_line",
+    "lfts_bulb_feed_line",  "rfts_bulb_feed_line",
+    "lfml_bulb_feed_line",  "rfml_bulb_feed_line",
+    "lrsl_bulb_feed_line",  "rrsl_bulb_feed_line",
+    "lrtl_bulb_feed_line",  "rrtl_bulb_feed_line",
+    "lrts_bulb_feed_line",  "rrts_bulb_feed_line",
+    "lrsm_bulb_feed_line",  "rrsm_bulb_feed_line",
+    "chmsl_bulb_feed_line",
+    "lbl_bulb_feed_line",   "rbl_bulb_feed_line",
 };
 
 constexpr const char* kBulbQualified[NUM_LIGHTS] = {
-    "vehicle.body.lhbh.bulb_cmd",  "vehicle.body.llbh.bulb_cmd",
-    "vehicle.body.rhbh.bulb_cmd",  "vehicle.body.rlbh.bulb_cmd",
-    "vehicle.body.lfts.bulb_cmd",  "vehicle.body.rfts.bulb_cmd",
-    "vehicle.body.lfml.bulb_cmd",  "vehicle.body.rfml.bulb_cmd",
-    "vehicle.body.lrsl.bulb_cmd",  "vehicle.body.rrsl.bulb_cmd",
-    "vehicle.body.lrtl.bulb_cmd",  "vehicle.body.rrtl.bulb_cmd",
-    "vehicle.body.lrts.bulb_cmd",  "vehicle.body.rrts.bulb_cmd",
-    "vehicle.body.lrsm.bulb_cmd",  "vehicle.body.rrsm.bulb_cmd",
-    "vehicle.body.chmsl.bulb_cmd",
-    "vehicle.body.lbl.bulb_cmd",   "vehicle.body.rbl.bulb_cmd",
+    "vehicle.body.lhbh.bulb_feed_line",  "vehicle.body.llbh.bulb_feed_line",
+    "vehicle.body.rhbh.bulb_feed_line",  "vehicle.body.rlbh.bulb_feed_line",
+    "vehicle.body.lfts.bulb_feed_line",  "vehicle.body.rfts.bulb_feed_line",
+    "vehicle.body.lfml.bulb_feed_line",  "vehicle.body.rfml.bulb_feed_line",
+    "vehicle.body.lrsl.bulb_feed_line",  "vehicle.body.rrsl.bulb_feed_line",
+    "vehicle.body.lrtl.bulb_feed_line",  "vehicle.body.rrtl.bulb_feed_line",
+    "vehicle.body.lrts.bulb_feed_line",  "vehicle.body.rrts.bulb_feed_line",
+    "vehicle.body.lrsm.bulb_feed_line",  "vehicle.body.rrsm.bulb_feed_line",
+    "vehicle.body.chmsl.bulb_feed_line",
+    "vehicle.body.lbl.bulb_feed_line",   "vehicle.body.rbl.bulb_feed_line",
 };
 
 // Look up the LightID that corresponds to an inbound bulb signal_id, or -1
@@ -178,8 +178,8 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
         out[i] = {kBulbCmdBase + static_cast<std::uint32_t>(slot),
                   kBulbQualified[lid], kBulbShort[lid], /*input_to_sim=*/true};
     }
-    out[i++] = {kHornLowCmd,  "vehicle.body.horn.low_cmd",  "horn_low_cmd",  true};
-    out[i++] = {kHornHighCmd, "vehicle.body.horn.high_cmd", "horn_high_cmd", true};
+    out[i++] = {kHornLowCmd,  "vehicle.body.horn.low_drive_line",  "horn_low_drive_line",  true};
+    out[i++] = {kHornHighCmd, "vehicle.body.horn.high_drive_line", "horn_high_drive_line", true};
     for (int p = 0; p < VehiclePanels::NUM_PANELS; ++p, ++i) {
         out[i] = {kPanelBase + static_cast<std::uint32_t>(p),
                   kPanelNames[p].qualified, kPanelNames[p].shortname,

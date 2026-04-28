@@ -34,10 +34,10 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
         CHECK(shorts.insert(e.short_name).second);
 
         if (e.signal_id >= 4000 && e.signal_id <= 4018) {
-            CHECK(e.input_to_sim);          // bulb cmds flow into ev1sim
+            CHECK(e.input_to_sim);          // bulb feed lines flow into ev1sim
             ++bulb_count;
         } else if (e.signal_id == 4020 || e.signal_id == 4021) {
-            CHECK(e.input_to_sim);          // horn cmds too
+            CHECK(e.input_to_sim);          // horn drive lines too
             ++horn_count;
         } else if (e.signal_id >= 4030 && e.signal_id <= 4033) {
             CHECK_FALSE(e.input_to_sim);    // panel sensors are outputs
@@ -57,12 +57,12 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     CHECK(dynamics_count == kNumDynamics);
 }
 
-TEST_CASE("FindEndpoint returns bulb command rows", "[ExternalSim]") {
+TEST_CASE("FindEndpoint returns bulb feed-line rows", "[ExternalSim]") {
     // Signal 4000 is BACKUP_LEFT in the electric sim's LightIdx enum, which
     // on our side is LBL (Left Backup Lamp).
     const auto* lbl = ExternalSimConnector::FindEndpoint(4000);
     REQUIRE(lbl != nullptr);
-    CHECK(std::string(lbl->qualified_name) == "vehicle.body.lbl.bulb_cmd");
+    CHECK(std::string(lbl->qualified_name) == "vehicle.body.lbl.bulb_feed_line");
     CHECK(lbl->input_to_sim);
 
     // One past the last bulb ID is unused.
