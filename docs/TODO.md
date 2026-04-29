@@ -65,6 +65,15 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   ABS modulation visible in the vehicle's dynamics.
 - [ ] Same pattern for **throttle** (BTCM/PIM), **steering assist** etc.
 
+## Sim-time sync — ev1sim publisher side
+
+To unblock electricsim from running in lockstep with faster-than-realtime
+ev1sim runs, ev1sim should publish a sim-time tick on the chassis bus
+(`kSigChassisSimTimeNs`, suggested chassis ID 4070).  Cross-repo design
+lives in electricsim/docs/TODO.md under "Sim-time sync".  ev1sim's part:
+publish the current Chrono sim-time on every step, encoded as uint64_t
+little-endian nanoseconds, on the chassis segment.
+
 ## Future: physical sim rig
 - [ ] Adapt the user's physical driving sim rig with a lookalike RSA, seat
   belt sensor, IPC display, chime/horn sound effects.  Hook real HVAC

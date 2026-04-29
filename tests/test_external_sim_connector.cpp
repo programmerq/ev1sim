@@ -13,20 +13,32 @@ using Catch::Matchers::WithinAbs;
 // ---------------------------------------------------------------------------
 
 TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
-    constexpr int kNumDynamics = 18;  // 10 chassis/actuator + 4 wheel_omega + 4 slip_ratio
-    constexpr int kNumCombSw   = 3;   // combination switch: low_beam, flash_to_pass, park_headlamp
-    const int expected = NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumCombSw + kNumDynamics;
+    constexpr int kNumDynamics    = 18;  // 10 chassis/actuator + 4 wheel_omega + 4 slip_ratio
+    constexpr int kNumCombSw      = 3;   // combination switch: low_beam, flash_to_pass, park_headlamp
+    constexpr int kNumChargeCplr  = 1;   // charge coupler present (4060, stub)
+    constexpr int kNumPrnd        = 4;   // PRND selector lines (4050-4053)
+    // Driver inputs on the main harness segment (electricsim_ev1_bus), output
+    // from ev1sim: brake_pedal_q8 (6900), steering_deg_q8 (6901),
+    // gear_selector (6902), throttle_q8 (6903), brake_switch (6904),
+    // seatbelt_buckled (6964).
+    constexpr int kNumDriverInputs = 6;
+    const int expected = NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS +
+                         kNumCombSw + kNumChargeCplr + kNumPrnd +
+                         kNumDynamics + kNumDriverInputs;
     REQUIRE(ExternalSimConnector::EndpointCount() == expected);
 
     // Unique signal IDs and names.
     std::set<std::uint32_t> ids;
     std::set<std::string>   qualified;
     std::set<std::string>   shorts;
-    int bulb_count     = 0;
-    int horn_count     = 0;
-    int panel_count    = 0;
-    int comb_sw_count  = 0;
-    int dynamics_count = 0;
+    int bulb_count          = 0;
+    int horn_count          = 0;
+    int panel_count         = 0;
+    int comb_sw_count       = 0;
+    int charge_coupler_count = 0;
+    int prnd_count          = 0;
+    int dynamics_count      = 0;
+    int driver_input_count  = 0;
 
     const auto* eps = ExternalSimConnector::Endpoints();
     for (int i = 0; i < ExternalSimConnector::EndpointCount(); ++i) {
@@ -47,20 +59,36 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
         } else if (e.signal_id >= 4040 && e.signal_id <= 4042) {
             CHECK_FALSE(e.input_to_sim);    // combination switch outputs
             ++comb_sw_count;
+        } else if (e.signal_id >= 4050 && e.signal_id <= 4053) {
+            CHECK_FALSE(e.input_to_sim);    // PRND selector lines are outputs
+            ++prnd_count;
+        } else if (e.signal_id == 4060) {
+            CHECK_FALSE(e.input_to_sim);    // charge coupler present is an output
+            ++charge_coupler_count;
         } else if ((e.signal_id >= 4100 && e.signal_id <= 4109) ||
                    (e.signal_id >= 4110 && e.signal_id <= 4113) ||
                    (e.signal_id >= 4120 && e.signal_id <= 4123)) {
             CHECK_FALSE(e.input_to_sim);    // dynamics signals are outputs
             ++dynamics_count;
+        } else if ((e.signal_id >= 6900 && e.signal_id <= 6904) ||
+                   e.signal_id == 6964) {
+            // Driver inputs on the main harness segment — outputs from ev1sim.
+            // 6900=brake_pedal_q8  6901=steering_deg_q8  6902=gear_selector
+            // 6903=throttle_q8     6904=brake_switch      6964=seatbelt_buckled
+            CHECK_FALSE(e.input_to_sim);
+            ++driver_input_count;
         } else {
             FAIL("Unexpected signal_id " << e.signal_id);
         }
     }
-    CHECK(bulb_count     == NUM_LIGHTS);
-    CHECK(horn_count     == 2);
-    CHECK(panel_count    == VehiclePanels::NUM_PANELS);
-    CHECK(comb_sw_count  == kNumCombSw);
-    CHECK(dynamics_count == kNumDynamics);
+    CHECK(bulb_count           == NUM_LIGHTS);
+    CHECK(horn_count           == 2);
+    CHECK(panel_count          == VehiclePanels::NUM_PANELS);
+    CHECK(comb_sw_count        == kNumCombSw);
+    CHECK(prnd_count           == kNumPrnd);
+    CHECK(charge_coupler_count == kNumChargeCplr);
+    CHECK(dynamics_count       == kNumDynamics);
+    CHECK(driver_input_count   == kNumDriverInputs);
 }
 
 TEST_CASE("FindEndpoint returns bulb feed-line rows", "[ExternalSim]") {
@@ -248,6 +276,21 @@ TEST_CASE("Combination switch endpoints have correct IDs and direction", "[Exter
 TEST_CASE("SetCombSwOutputs stores without crashing", "[ExternalSim]") {
     ExternalSimConnector c;
     CHECK_NOTHROW(c.SetCombSwOutputs(true, false, true));
+    CHECK_NOTHROW(c.Tick(0.0));
+}
+
+TEST_CASE("ChargeCoupler endpoint has correct ID and direction", "[ExternalSim]") {
+    const auto* ep = ExternalSimConnector::FindEndpoint(4060);
+    REQUIRE(ep != nullptr);
+    CHECK(std::string(ep->qualified_name) == "vehicle.body.charge_coupler.present");
+    CHECK(std::string(ep->short_name)     == "charge_coupler_present");
+    CHECK_FALSE(ep->input_to_sim);   // output from ev1sim
+}
+
+TEST_CASE("SetChargeCouplerPresent stores without crashing", "[ExternalSim]") {
+    ExternalSimConnector c;
+    CHECK_NOTHROW(c.SetChargeCouplerPresent(false));
+    CHECK_NOTHROW(c.SetChargeCouplerPresent(true));
     CHECK_NOTHROW(c.Tick(0.0));
 }
 

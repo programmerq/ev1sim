@@ -81,6 +81,28 @@ constexpr std::uint32_t kCombSwFlashToPassOutId  = 4041;
 constexpr std::uint32_t kCombSwParkHeadlampOutId = 4042;
 constexpr int           kNumCombSw               = 3;
 
+// Charge coupler presence (ev1sim → electricsim, chassis segment).
+//   4060  vehicle.body.charge_coupler.present
+//         True when the J1772/Avcon paddle is mated.  Stubbed false for now.
+constexpr std::uint32_t kChargeCouplerPresentId = 4060;
+
+// PRND selector lines (ev1sim → electricsim, chassis segment).
+// Four PIM prnd_a/b/c/d cavities — physical wires from floor lever to PIM.
+// Encoding (Gray-coded with parity, propulsion manual p. 343):
+//   PARK    A=0 B=1 C=1 D=0
+//   REVERSE A=0 B=0 C=1 D=1
+//   NEUTRAL A=1 B=0 C=1 D=0
+//   DRIVE   A=1 B=0 C=0 D=1
+//   4050  vehicle.driver.prnd_selector_a
+//   4051  vehicle.driver.prnd_selector_b
+//   4052  vehicle.driver.prnd_selector_c
+//   4053  vehicle.driver.prnd_selector_d  (even-parity bit)
+constexpr std::uint32_t kPrndSelectorAId = 4050;
+constexpr std::uint32_t kPrndSelectorBId = 4051;
+constexpr std::uint32_t kPrndSelectorCId = 4052;
+constexpr std::uint32_t kPrndSelectorDId = 4053;
+constexpr int           kNumPrndSelector = 4;
+
 constexpr std::uint32_t kDynamicsBase   = 4100;
 
 // Driver input signal IDs on the main harness segment (electricsim_ev1_bus).
@@ -89,6 +111,13 @@ constexpr std::uint32_t kSigDriverBrakePedalQ8    = 6900U;
 constexpr std::uint32_t kSigDriverSteeringDegQ8   = 6901U;
 constexpr std::uint32_t kSigDriverGearSelector    = 6902U;
 constexpr std::uint32_t kSigDriverThrottleQ8      = 6903U;
+// Brake switch (discrete bool, 0/1) — locked in lockstep with electricsim
+// ev1_driver_inputs.hpp kSigDriverBrakeSwitch = 6904.
+constexpr std::uint32_t kSigDriverBrakeSwitch     = 6904U;
+// Driver seatbelt buckle — locked in lockstep with kSigDriverSeatbeltBuckled = 6964.
+constexpr std::uint32_t kSigDriverSeatbeltBuckled = 6964U;
+// Number of driver-input endpoints on the main harness segment.
+constexpr int           kNumDriverInputs          = 6;
 
 // Mapping from signal slot (kBulbCmdBase + slot) to LightID.  Order must stay
 // locked to the electric sim's LightIdx enum for the first 17 entries.
@@ -185,8 +214,14 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // ---------------------------------------------------------------------------
 // Build the endpoint table once.
 // ---------------------------------------------------------------------------
+// kNumDriverInputs covers the 4 existing driver inputs (6900-6903) plus the
+// 2 new ones (brake_switch 6904, seatbelt_buckled 6964) — all on the main
+// harness segment (electricsim_ev1_bus), output from ev1sim.
+// +1 for the charge coupler presence (ID 4060, chassis segment).
+// +kNumPrndSelector for the 4 PRND selector lines (IDs 4050-4053, chassis segment).
 constexpr int kNumEndpoints =
-    NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumCombSw + kNumDynamics;
+    NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumCombSw + 1 /*charge_coupler*/ +
+    kNumPrndSelector + kNumDynamics + kNumDriverInputs;
 
 std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     std::array<ExternalSimConnector::Endpoint, kNumEndpoints> out{};
@@ -212,11 +247,36 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     out[i++] = {kCombSwParkHeadlampOutId,
                 "vehicle.body.combination_switch.park_headlamp_out",
                 "comb_sw_park_headlamp_out", false};
+    out[i++] = {kChargeCouplerPresentId,
+                "vehicle.body.charge_coupler.present",
+                "charge_coupler_present", false};
+    out[i++] = {kPrndSelectorAId,
+                "vehicle.driver.prnd_selector_a", "prnd_selector_a", false};
+    out[i++] = {kPrndSelectorBId,
+                "vehicle.driver.prnd_selector_b", "prnd_selector_b", false};
+    out[i++] = {kPrndSelectorCId,
+                "vehicle.driver.prnd_selector_c", "prnd_selector_c", false};
+    out[i++] = {kPrndSelectorDId,
+                "vehicle.driver.prnd_selector_d", "prnd_selector_d", false};
     for (int d = 0; d < kNumDynamics; ++d, ++i) {
         out[i] = {kDynamicsBase + kDynamicsNames[d].offset,
                   kDynamicsNames[d].qualified, kDynamicsNames[d].shortname,
                   /*input_to_sim=*/false};
     }
+    // Driver inputs on the main harness segment (electricsim_ev1_bus).
+    // All are outputs from ev1sim (input_to_sim=false).
+    out[i++] = {kSigDriverBrakePedalQ8,
+                "vehicle.driver.brake_pedal_q8", "driver_brake_pedal_q8", false};
+    out[i++] = {kSigDriverSteeringDegQ8,
+                "vehicle.driver.steering_deg_q8", "driver_steering_deg_q8", false};
+    out[i++] = {kSigDriverGearSelector,
+                "vehicle.driver.gear_selector", "driver_gear_selector", false};
+    out[i++] = {kSigDriverThrottleQ8,
+                "vehicle.driver.throttle_q8", "driver_throttle_q8", false};
+    out[i++] = {kSigDriverBrakeSwitch,
+                "vehicle.driver.brake_switch", "driver_brake_switch", false};
+    out[i++] = {kSigDriverSeatbeltBuckled,
+                "vehicle.driver.seatbelt_buckled", "driver_seatbelt_buckled", false};
     return out;
 }
 
@@ -280,6 +340,29 @@ struct ExternalSimConnector::State {
     std::int16_t  driver_steering_pub = 0x7FFF;
     std::uint8_t  driver_gear_pub    = 0xFF;
     std::uint8_t  driver_throttle_pub = 0xFF;
+    // New discrete driver inputs (ID 6904, 6964) on the main harness segment.
+    bool          driver_brake_switch      = false;
+    bool          driver_seatbelt_buckled  = true;   // default: always buckled
+    // Published sentinels (use 0xFF-equivalent to force first publish).
+    std::int8_t   driver_brake_switch_pub     = -1;  // -1 forces first publish
+    std::int8_t   driver_seatbelt_buckled_pub = -1;  // -1 forces first publish
+
+    // Charge coupler presence (ID 4060, chassis segment).
+    // Stubbed false; future floating-UI panel or charge-door animation updates this.
+    bool          charge_coupler_present     = false;
+    std::int8_t   charge_coupler_present_pub = -1;   // -1 forces first publish
+
+    // PRND selector lines (IDs 4050-4053, chassis segment).
+    // Wire-level booleans encoding the 4-bit Gray-coded PRND pattern.
+    // Default: PARK (A=0, B=1, C=1, D=0).
+    bool prnd_a     = false;
+    bool prnd_b     = true;
+    bool prnd_c     = true;
+    bool prnd_d     = false;
+    std::int8_t prnd_a_pub = -1;   // -1 forces first publish
+    std::int8_t prnd_b_pub = -1;
+    std::int8_t prnd_c_pub = -1;
+    std::int8_t prnd_d_pub = -1;
 
     // Timers (sim_time_s based).
     double next_presence_time  = 0.0;
@@ -426,6 +509,25 @@ void ExternalSimConnector::SetDriverGearSelector(std::uint8_t enum_v) {
     m_state->driver_gear = enum_v;
 }
 
+void ExternalSimConnector::SetDriverBrakeSwitch(bool pressed) {
+    m_state->driver_brake_switch = pressed;
+}
+
+void ExternalSimConnector::SetDriverSeatbeltBuckled(bool buckled) {
+    m_state->driver_seatbelt_buckled = buckled;
+}
+
+void ExternalSimConnector::SetChargeCouplerPresent(bool present) {
+    m_state->charge_coupler_present = present;
+}
+
+void ExternalSimConnector::SetPrndSelector(bool a, bool b, bool c, bool d) {
+    m_state->prnd_a = a;
+    m_state->prnd_b = b;
+    m_state->prnd_c = c;
+    m_state->prnd_d = d;
+}
+
 // ---------------------------------------------------------------------------
 // Test / internal: apply an inbound signal value (as if decoded from a frame).
 // ---------------------------------------------------------------------------
@@ -548,6 +650,12 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         st.status    = Status::Connected;
         st.next_presence_time    = 0.0;
         st.panel_ever_published  = false;  // re-publish all panels after reconnect
+        // Force re-publish of all chassis outputs after reconnect.
+        st.charge_coupler_present_pub = -1;
+        st.prnd_a_pub = -1;
+        st.prnd_b_pub = -1;
+        st.prnd_c_pub = -1;
+        st.prnd_d_pub = -1;
         std::cout << "[ExternalSim] connected to bus '"
                   << m_opts.bus_name << "'\n";
     }
@@ -598,6 +706,27 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         st.comb_sw_flash_to_pass_pub = st.comb_sw_flash_to_pass;
         st.comb_sw_park_headlamp_pub = st.comb_sw_park_headlamp;
         st.comb_sw_ever_published    = true;
+    }
+
+    // Charge coupler presence (ID 4060) — publish delta on change.
+    if (st.charge_coupler_present_pub < 0 ||
+        static_cast<bool>(st.charge_coupler_present_pub) != st.charge_coupler_present) {
+        outbound.push_back(MakeBoolDelta(kChargeCouplerPresentId, st.charge_coupler_present));
+        st.charge_coupler_present_pub = static_cast<std::int8_t>(st.charge_coupler_present ? 1 : 0);
+    }
+
+    // PRND selector lines (IDs 4050-4053) — publish deltas on change.
+    {
+        auto pub_prnd = [&](std::uint32_t id, bool val, std::int8_t& pub) {
+            if (pub < 0 || static_cast<bool>(pub) != val) {
+                outbound.push_back(MakeBoolDelta(id, val));
+                pub = static_cast<std::int8_t>(val ? 1 : 0);
+            }
+        };
+        pub_prnd(kPrndSelectorAId, st.prnd_a, st.prnd_a_pub);
+        pub_prnd(kPrndSelectorBId, st.prnd_b, st.prnd_b_pub);
+        pub_prnd(kPrndSelectorCId, st.prnd_c, st.prnd_c_pub);
+        pub_prnd(kPrndSelectorDId, st.prnd_d, st.prnd_d_pub);
     }
 
     if (!outbound.empty()) {
@@ -674,10 +803,12 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             st.main_sequence++;
             st.main_transport = std::move(candidate);
             // Reset published sentinels so we force-publish on first tick.
-            st.driver_brake_pub    = 0xFF;
-            st.driver_steering_pub = 0x7FFF;
-            st.driver_gear_pub     = 0xFF;
-            st.driver_throttle_pub = 0xFF;
+            st.driver_brake_pub            = 0xFF;
+            st.driver_steering_pub         = 0x7FFF;
+            st.driver_gear_pub             = 0xFF;
+            st.driver_throttle_pub         = 0xFF;
+            st.driver_brake_switch_pub     = -1;
+            st.driver_seatbelt_buckled_pub = -1;
             std::cout << "[ExternalSim] connected to main harness bus '"
                       << m_opts.main_harness_bus_name << "'\n";
         }
@@ -696,6 +827,18 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             st.driver_steering_pub = st.driver_steering_q8;
             st.driver_gear_pub     = st.driver_gear;
             st.driver_throttle_pub = st.driver_throttle_q8;
+        }
+        // Brake switch and seatbelt — publish on change (separate booleans so
+        // they don't force-publish the Q8 group and vice-versa).
+        const std::int8_t brake_sw_val = st.driver_brake_switch ? 1 : 0;
+        if (brake_sw_val != st.driver_brake_switch_pub) {
+            drv.push_back(MakeBoolDelta(kSigDriverBrakeSwitch, st.driver_brake_switch));
+            st.driver_brake_switch_pub = brake_sw_val;
+        }
+        const std::int8_t seatbelt_val = st.driver_seatbelt_buckled ? 1 : 0;
+        if (seatbelt_val != st.driver_seatbelt_buckled_pub) {
+            drv.push_back(MakeBoolDelta(kSigDriverSeatbeltBuckled, st.driver_seatbelt_buckled));
+            st.driver_seatbelt_buckled_pub = seatbelt_val;
         }
         if (!drv.empty()) {
             Frame mf{};

@@ -294,6 +294,10 @@ int SimApp::RunWithVisualization() {
                                              cs.pin_flash_to_pass_out(),
                                              cs.pin_park_headlamp_out());
         }
+        // Charge coupler presence (chassis bus, ID 4060).  Stubbed false until
+        // a floating-UI panel or charge-door animation sets it.
+        m_external_sim->SetChargeCouplerPresent(
+            m_physical->charge_coupler().present());
         // Driver inputs (main harness segment, IDs 6900-6903).  Local physics
         // path keeps using `cmd` directly; this just makes the inputs visible
         // to BTCM/LHJB/etc. on the bus.  PRND not modeled in DriverCommand
@@ -318,6 +322,13 @@ int SimApp::RunWithVisualization() {
             m_external_sim->SetDriverThrottleQ8(clamp01_q8(cmd.throttle));
             m_external_sim->SetDriverSteeringDegQ8(steer_deg_q8(cmd.steering));
             m_external_sim->SetDriverGearSelector(3);  // D — TODO PRND cycling
+            // Brake switch (6904): derive from brake travel with hysteresis.
+            bool brake_sw = m_physical->brake_switch().update(cmd.front_brake);
+            m_external_sim->SetDriverBrakeSwitch(brake_sw);
+            // Seatbelt (6964): default true — driver always buckled.
+            // TODO: add a floating-UI toggle in docs/TODO.md panel item so
+            // the user can unbuckle during development testing.
+            m_external_sim->SetDriverSeatbeltBuckled(true);
         }
         m_external_sim->Tick(t);
 
@@ -491,6 +502,10 @@ int SimApp::RunHeadless() {
                                              cs.pin_flash_to_pass_out(),
                                              cs.pin_park_headlamp_out());
         }
+        // Charge coupler presence (chassis bus, ID 4060).  Stubbed false until
+        // a floating-UI panel or charge-door animation sets it.
+        m_external_sim->SetChargeCouplerPresent(
+            m_physical->charge_coupler().present());
         // Driver inputs — publish the override-adjusted values so the bus
         // reflects what the vehicle is actually doing (IDs 6900-6903).
         {
@@ -503,6 +518,13 @@ int SimApp::RunHeadless() {
             m_external_sim->SetDriverThrottleQ8(clamp01_q8(cmd.throttle));
             m_external_sim->SetDriverSteeringDegQ8(0);  // no keyboard in headless
             m_external_sim->SetDriverGearSelector(3);    // D — TODO PRND cycling
+            // Brake switch (6904): derive from brake travel with hysteresis.
+            bool brake_sw = m_physical->brake_switch().update(cmd.front_brake);
+            m_external_sim->SetDriverBrakeSwitch(brake_sw);
+            // Seatbelt (6964): default true — driver always buckled.
+            // TODO: add a floating-UI toggle in docs/TODO.md panel item so
+            // the user can unbuckle during development testing.
+            m_external_sim->SetDriverSeatbeltBuckled(true);
         }
         m_external_sim->Tick(t);
 

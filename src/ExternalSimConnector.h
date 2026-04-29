@@ -142,6 +142,32 @@ public:
     void SetDriverSteeringDegQ8(std::int16_t q8);
     void SetDriverGearSelector(std::uint8_t enum_v);
 
+    /// Outgoing brake-switch state (ID 6904) — derived from brake travel
+    /// hysteresis in PhysicalWorld::BrakeSwitch.  Encoded as 1-byte uint8
+    /// (0=released, 1=applied).  Published on main harness segment.
+    void SetDriverBrakeSwitch(bool pressed);
+
+    /// Outgoing seatbelt buckle state (ID 6964).  Encoded as 1-byte uint8
+    /// (0=unbuckled, 1=buckled).  Published on main harness segment.
+    /// Defaults to true (driver always buckled) until a UI toggle is added —
+    /// see docs/TODO.md for the floating-UI panel item.
+    void SetDriverSeatbeltBuckled(bool buckled);
+
+    /// Outgoing charge coupler presence — publishes delta on change on the
+    /// chassis segment (ID 4060).  Stubbed false today; future floating-UI
+    /// panel or charge-door animation will call set_present(true).
+    void SetChargeCouplerPresent(bool present);
+
+    /// Outgoing PRND selector wire-level pin states — four lines from the
+    /// floor selector lever to the PIM (IDs 4050-4053, chassis segment).
+    /// Encoding: Gray-coded with even parity per propulsion manual p. 343.
+    ///   PARK:    a=0 b=1 c=1 d=0
+    ///   REVERSE: a=0 b=0 c=1 d=1
+    ///   NEUTRAL: a=1 b=0 c=1 d=0
+    ///   DRIVE:   a=1 b=0 c=0 d=1
+    /// SimApp calls this each tick with the PrndSelector's current pin outputs.
+    void SetPrndSelector(bool a, bool b, bool c, bool d);
+
     // ---------------------------------------------------------------------
     // Endpoint registry (static — stable across instances)
     // ---------------------------------------------------------------------
