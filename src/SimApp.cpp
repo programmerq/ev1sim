@@ -339,6 +339,12 @@ int SimApp::RunWithVisualization() {
                       << (m_physical->hazard_switch().on() ? "ON" : "OFF") << "\n";
         }
 
+        // Auto-cancel turn signal from steering travel.
+        // run every frame regardless of pause so the state machine stays current.
+        m_physical->turn_signal_stalk().update_for_steering(cmd.steering, render_dt);
+        if (m_physical->turn_signal_stalk().consume_auto_cancel_event())
+            std::cout << "[SimApp] Turn signal: AUTO-CANCEL\n";
+
         // --- Physics sub-stepping (skipped when paused) ---
         if (!m_paused) {
             for (int i = 0; i < steps_per_frame; ++i) {
@@ -680,6 +686,12 @@ int SimApp::RunHeadless() {
         }
 
         m_world->GetDriver().SetCommand(cmd);
+
+        // Auto-cancel turn signal from steering travel (headless: scripted driver
+        // may supply non-zero steering; keyboard path is absent).
+        m_physical->turn_signal_stalk().update_for_steering(cmd.steering, tick_dt);
+        if (m_physical->turn_signal_stalk().consume_auto_cancel_event())
+            std::cout << "[SimApp] Turn signal: AUTO-CANCEL\n";
 
         // --- Physics sub-stepping (no pause control in headless) ---
         for (int i = 0; i < steps_per_tick; ++i) {

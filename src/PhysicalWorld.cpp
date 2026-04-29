@@ -100,12 +100,40 @@ bool PrndSelector::pin_d() const {
 // TurnSignalStalk
 // ---------------------------------------------------------------------------
 
+// Auto-cancel tuning constants.
+//
+// kTravelThreshold:      Steering deflection in the active direction (0..1 range)
+//                        past which "you've turned" — after this the machine
+//                        watches for return-to-center.  0.33 ≈ 30° of 90° max.
+// kReturnThreshold:      After travel is confirmed, returning PAST this value
+//                        in the opposite direction triggers the cancel.
+//                        Small positive value so the wheel only needs to cross
+//                        center by a tiny amount.
+// kOppositeCancelThreshold: Steering in the WRONG direction past this threshold
+//                        sustained for kOppositeCancelTime_s triggers wrong-side
+//                        cancel (e.g. left-signal while turning right).
+// kOppositeCancelTime_s: How long (seconds) the driver must hold the opposite
+//                        steering past threshold before wrong-side cancel fires.
+static constexpr double kTravelThreshold         = 0.33;
+static constexpr double kReturnThreshold         = 0.05;
+static constexpr double kOppositeCancelThreshold = 0.50;
+static constexpr double kOppositeCancelTime_s    = 0.50;
+
+void TurnSignalStalk::reset_ac_state() {
+    m_ac_state           = AcState::Inactive;
+    m_opp_cancel_accum_s = 0.0;
+}
+
 void TurnSignalStalk::toggle_left() {
     switch (m_position) {
         case Position::OFF:   m_position = Position::LEFT;  break;
         case Position::LEFT:  m_position = Position::OFF;   break;
         case Position::RIGHT: m_position = Position::LEFT;  break;
     }
+    reset_ac_state();
+    // If we just became active, enter WaitingForTravel.
+    if (m_position == Position::LEFT)
+        m_ac_state = AcState::WaitingForTravel;
 }
 
 void TurnSignalStalk::toggle_right() {
@@ -114,6 +142,81 @@ void TurnSignalStalk::toggle_right() {
         case Position::RIGHT: m_position = Position::OFF;   break;
         case Position::LEFT:  m_position = Position::RIGHT; break;
     }
+    reset_ac_state();
+    // If we just became active, enter WaitingForTravel.
+    if (m_position == Position::RIGHT)
+        m_ac_state = AcState::WaitingForTravel;
+}
+
+void TurnSignalStalk::update_for_steering(double s, double dt_s) {
+    // Nothing to track when stalk is OFF.
+    if (m_position == Position::OFF) {
+        reset_ac_state();
+        return;
+    }
+
+    // Convention: positive s = steering LEFT, negative s = steering RIGHT.
+    // For LEFT signal: "active direction" is positive s (left), "opposite" is negative.
+    // For RIGHT signal: "active direction" is negative s (right), "opposite" is positive.
+    const bool is_left   = (m_position == Position::LEFT);
+    const double active  = is_left ?  s : -s;  // positive = toward active signal side
+    const double opp     = is_left ? -s :  s;  // positive = toward opposite side
+
+    switch (m_ac_state) {
+        case AcState::Inactive:
+            // Shouldn't happen (we set WaitingForTravel on toggle), but be safe.
+            m_ac_state = AcState::WaitingForTravel;
+            break;
+
+        case AcState::WaitingForTravel:
+            // Check for wrong-side cancel: driver steers hard the wrong way.
+            if (opp > kOppositeCancelThreshold) {
+                m_opp_cancel_accum_s += dt_s;
+                if (m_opp_cancel_accum_s >= kOppositeCancelTime_s) {
+                    // Wrong-side cancel.
+                    m_position           = Position::OFF;
+                    m_auto_cancel_event  = true;
+                    reset_ac_state();
+                    return;
+                }
+            } else {
+                m_opp_cancel_accum_s = 0.0;
+            }
+            // Check for normal travel threshold met in the active direction.
+            if (active > kTravelThreshold) {
+                m_ac_state           = AcState::WaitingForReturn;
+                m_opp_cancel_accum_s = 0.0;  // reset opp timer for this new phase
+            }
+            break;
+
+        case AcState::WaitingForReturn:
+            // Check for wrong-side cancel even in this phase.
+            if (opp > kOppositeCancelThreshold) {
+                m_opp_cancel_accum_s += dt_s;
+                if (m_opp_cancel_accum_s >= kOppositeCancelTime_s) {
+                    m_position          = Position::OFF;
+                    m_auto_cancel_event = true;
+                    reset_ac_state();
+                    return;
+                }
+            } else {
+                m_opp_cancel_accum_s = 0.0;
+            }
+            // Return-to-center cancel: active-direction steering dropped back
+            // below the small return threshold (close to or past center).
+            if (active < kReturnThreshold) {
+                m_position          = Position::OFF;
+                m_auto_cancel_event = true;
+                reset_ac_state();
+            }
+            break;
+    }
+}
+
+bool TurnSignalStalk::consume_auto_cancel_event() {
+    const bool was = m_auto_cancel_event;
+    m_auto_cancel_event = false;
+    return was;
 }
 
 // ---------------------------------------------------------------------------

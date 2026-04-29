@@ -166,11 +166,13 @@ if(BUILD_TESTS)
         tests/test_scripted_driver.cpp
         tests/test_level_file.cpp
         tests/test_vehicle_lights.cpp
+        tests/test_physical_world.cpp
         src/Config.cpp
         src/KeyboardInputController.cpp
         src/ExternalSimConnector.cpp
         src/ScriptedDriver.cpp
         src/VehicleLights.cpp
+        src/PhysicalWorld.cpp
     )
 
     target_include_directories(ev1sim_tests PRIVATE src)

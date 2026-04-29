@@ -147,9 +147,15 @@ private:
 ///   toggle_left():  OFF → LEFT; LEFT → OFF; RIGHT → LEFT
 ///   toggle_right(): OFF → RIGHT; RIGHT → OFF; LEFT → RIGHT
 ///
-/// Auto-cancel (return-to-center after sufficient steering travel) is skipped
-/// for keyboard ergonomics — manual toggle is the simple model.
-/// TODO: add auto-cancel once a floating-UI panel lands per docs/TODO.md.
+/// Auto-cancel: after the driver turns the steering wheel past a travel
+/// threshold in the active direction and then returns past center, the stalk
+/// automatically returns to OFF.  Also cancels if the driver steers sustained
+/// in the opposite direction past a higher threshold (wrong-side cancel).
+///
+/// Call update_for_steering() once per tick with the normalized steering
+/// value (-1..+1, positive = left) from DriverCommand.steering.
+/// After the call, consume_auto_cancel_event() returns true for exactly one
+/// tick if an auto-cancel just occurred.
 class TurnSignalStalk {
 public:
     enum class Position { OFF, LEFT, RIGHT };
@@ -160,12 +166,35 @@ public:
     /// Cycle the stalk toward RIGHT.  OFF→RIGHT, RIGHT→OFF, LEFT→RIGHT.
     void toggle_right();
 
+    /// Update the auto-cancel state machine from current steering input.
+    /// steering_normalized: -1..+1 (positive = left, matching Chrono convention).
+    /// dt_s: elapsed time in seconds since last call (used for timed opposite-cancel).
+    /// Sets an internal flag readable via consume_auto_cancel_event() if a cancel fires.
+    void update_for_steering(double steering_normalized, double dt_s);
+
+    /// Returns true and clears the flag if an auto-cancel fired this tick.
+    bool consume_auto_cancel_event();
+
     Position position()    const { return m_position; }
     bool active_left()     const { return m_position == Position::LEFT;  }
     bool active_right()    const { return m_position == Position::RIGHT; }
 
 private:
+    /// Internal auto-cancel state machine states (per active signal direction).
+    enum class AcState {
+        Inactive,         ///< Not tracking (stalk is OFF).
+        WaitingForTravel, ///< Stalk active; waiting for steering past travel threshold.
+        WaitingForReturn, ///< Travel seen; waiting for steering to return past center.
+    };
+
+    /// Reset auto-cancel state machine (called on any manual toggle).
+    void reset_ac_state();
+
     Position m_position = Position::OFF;
+
+    AcState  m_ac_state           = AcState::Inactive;
+    double   m_opp_cancel_accum_s = 0.0;  ///< Accumulated time steering past opp threshold.
+    bool     m_auto_cancel_event  = false; ///< Cleared by consume_auto_cancel_event().
 };
 
 /// Hazard warning switch (dashboard pushbutton).

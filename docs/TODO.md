@@ -12,10 +12,9 @@ future-UI input on one side, chassis-segment signal publishing on the other.
 - [ ] **Hazard switch** (latched push-button on column).  Defer keyboard
   binding; needs a floating UI panel for click-to-toggle (see floating-UI
   item below).
-- [ ] **Turn signal stalk** — left/right detents with return-to-center
-  behavior.  Shares the same physical column as the combination switch.
-  Needs `kSigDriverTurnSignalLeft/Right` pinned in
-  `electricsim/src/io/ev1_driver_inputs.hpp`.
+- [x] **Turn signal stalk** — left/right detents with return-to-center
+  behavior (auto-cancel from steering travel implemented).  Shares the same
+  physical column as the combination switch.
 - [ ] **Wiper switch** — off, intermittent, low, high (+ delay).  Right
   column stalk.
 - [ ] **Cruise control stalk** — set, resume, cancel, +/-.  Left column
