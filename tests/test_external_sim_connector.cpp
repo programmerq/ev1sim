@@ -414,3 +414,116 @@ TEST_CASE("SetVehicleState stores values without crashing", "[ExternalSim]") {
     CHECK_NOTHROW(c.SetVehicleState(vs));
     CHECK_NOTHROW(c.Tick(0.0));
 }
+
+// ---------------------------------------------------------------------------
+// BTCM front ABS solenoid — GetAbsPhaseFront freshness and phase decoding.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("GetAbsPhaseFront returns stale APPLY when no solenoid data received",
+          "[ExternalSim][ABS]") {
+    ExternalSimConnector c;
+    // No inject — timestamps are 0, freshness window is 200 ms.
+    auto phase = c.GetAbsPhaseFront(std::chrono::milliseconds(200));
+    using Phase = ExternalSimConnector::AbsPhaseFront::Phase;
+    CHECK_FALSE(phase.fl_fresh);
+    CHECK_FALSE(phase.fr_fresh);
+    // Stale path always returns APPLY (safe default).
+    CHECK(phase.fl == Phase::APPLY);
+    CHECK(phase.fr == Phase::APPLY);
+}
+
+TEST_CASE("GetAbsPhaseFront decodes APPLY phase: iso=0, dump=0",
+          "[ExternalSim][ABS]") {
+    ExternalSimConnector c;
+    // Inject iso=0, dump=0 for both wheels → APPLY.
+    c.DebugInjectDelta(5010, false);  // FL_ISO = 0
+    c.DebugInjectDelta(5011, false);  // FL_DMP = 0
+    c.DebugInjectDelta(5012, false);  // FR_ISO = 0
+    c.DebugInjectDelta(5013, false);  // FR_DMP = 0
+
+    auto phase = c.GetAbsPhaseFront(std::chrono::milliseconds(200));
+    using Phase = ExternalSimConnector::AbsPhaseFront::Phase;
+    CHECK(phase.fl_fresh);
+    CHECK(phase.fr_fresh);
+    CHECK(phase.fl == Phase::APPLY);
+    CHECK(phase.fr == Phase::APPLY);
+}
+
+TEST_CASE("GetAbsPhaseFront decodes HOLD phase: iso=1, dump=0",
+          "[ExternalSim][ABS]") {
+    ExternalSimConnector c;
+    c.DebugInjectDelta(5010, true);   // FL_ISO = 1
+    c.DebugInjectDelta(5011, false);  // FL_DMP = 0
+    c.DebugInjectDelta(5012, true);   // FR_ISO = 1
+    c.DebugInjectDelta(5013, false);  // FR_DMP = 0
+
+    auto phase = c.GetAbsPhaseFront(std::chrono::milliseconds(200));
+    using Phase = ExternalSimConnector::AbsPhaseFront::Phase;
+    CHECK(phase.fl_fresh);
+    CHECK(phase.fr_fresh);
+    CHECK(phase.fl == Phase::HOLD);
+    CHECK(phase.fr == Phase::HOLD);
+}
+
+TEST_CASE("GetAbsPhaseFront decodes DUMP phase: iso=1, dump=1",
+          "[ExternalSim][ABS]") {
+    ExternalSimConnector c;
+    c.DebugInjectDelta(5010, true);   // FL_ISO = 1
+    c.DebugInjectDelta(5011, true);   // FL_DMP = 1
+    c.DebugInjectDelta(5012, true);   // FR_ISO = 1
+    c.DebugInjectDelta(5013, true);   // FR_DMP = 1
+
+    auto phase = c.GetAbsPhaseFront(std::chrono::milliseconds(200));
+    using Phase = ExternalSimConnector::AbsPhaseFront::Phase;
+    CHECK(phase.fl_fresh);
+    CHECK(phase.fr_fresh);
+    CHECK(phase.fl == Phase::DUMP);
+    CHECK(phase.fr == Phase::DUMP);
+}
+
+TEST_CASE("GetAbsPhaseFront treats invalid iso=0,dump=1 as APPLY",
+          "[ExternalSim][ABS]") {
+    ExternalSimConnector c;
+    // Invalid combination: iso=0, dump=1 → treated as APPLY.
+    c.DebugInjectDelta(5010, false);  // FL_ISO = 0
+    c.DebugInjectDelta(5011, true);   // FL_DMP = 1  (invalid)
+    c.DebugInjectDelta(5012, false);  // FR_ISO = 0
+    c.DebugInjectDelta(5013, true);   // FR_DMP = 1  (invalid)
+
+    auto phase = c.GetAbsPhaseFront(std::chrono::milliseconds(200));
+    using Phase = ExternalSimConnector::AbsPhaseFront::Phase;
+    CHECK(phase.fl_fresh);
+    CHECK(phase.fr_fresh);
+    CHECK(phase.fl == Phase::APPLY);
+    CHECK(phase.fr == Phase::APPLY);
+}
+
+TEST_CASE("GetAbsPhaseFront marks stale after zero-length freshness window",
+          "[ExternalSim][ABS]") {
+    ExternalSimConnector c;
+    c.DebugInjectDelta(5010, true);
+    c.DebugInjectDelta(5011, false);
+    c.DebugInjectDelta(5012, true);
+    c.DebugInjectDelta(5013, false);
+
+    // A zero-length freshness window means everything is immediately stale.
+    auto phase = c.GetAbsPhaseFront(std::chrono::milliseconds(0));
+    CHECK_FALSE(phase.fl_fresh);
+    CHECK_FALSE(phase.fr_fresh);
+}
+
+TEST_CASE("GetAbsPhaseFront can mix fresh and stale per wheel",
+          "[ExternalSim][ABS]") {
+    ExternalSimConnector c;
+    // Only inject FL signals; FR has no data.
+    c.DebugInjectDelta(5010, true);   // FL_ISO = 1
+    c.DebugInjectDelta(5011, false);  // FL_DMP = 0  → FL=HOLD
+    // FR signals not injected → timestamps remain 0 → stale.
+
+    auto phase = c.GetAbsPhaseFront(std::chrono::milliseconds(200));
+    using Phase = ExternalSimConnector::AbsPhaseFront::Phase;
+    CHECK(phase.fl_fresh);
+    CHECK_FALSE(phase.fr_fresh);
+    CHECK(phase.fl == Phase::HOLD);
+    CHECK(phase.fr == Phase::APPLY);  // stale defaults to APPLY
+}

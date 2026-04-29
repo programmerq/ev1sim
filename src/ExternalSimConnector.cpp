@@ -146,6 +146,16 @@ constexpr int           kNumMotorSignals  = 2;
 // Locked in lockstep with electricsim/ev1/rsa/rsa_signals.hpp kSigRunModeBroadcast = 5711.
 constexpr std::uint32_t kSigRunModeBroadcast = 5711U;
 
+// BTCM front ABS solenoid signals — published by BTCM on the main harness segment.
+// ev1sim subscribes (input_to_sim direction); not registered as published endpoints.
+// Locked in lockstep with electricsim/ev1/btcm/btcm_signals.hpp:
+//   kSigSolFL_ISO = 5010, kSigSolFL_DMP = 5011
+//   kSigSolFR_ISO = 5012, kSigSolFR_DMP = 5013
+constexpr std::uint32_t kSigSolFL_ISO = 5010U;
+constexpr std::uint32_t kSigSolFL_DMP = 5011U;
+constexpr std::uint32_t kSigSolFR_ISO = 5012U;
+constexpr std::uint32_t kSigSolFR_DMP = 5013U;
+
 // Mapping from signal slot (kBulbCmdBase + slot) to LightID.  Order must stay
 // locked to the electric sim's LightIdx enum for the first 17 entries.
 constexpr LightID kBulbOrder[NUM_LIGHTS] = {
@@ -331,14 +341,16 @@ const std::array<ExternalSimConnector::Endpoint, kNumEndpoints>& EndpointTable()
     return table;
 }
 
-#if EV1SIM_HAVE_EXTERNAL_SIM
-constexpr std::uint32_t kStreamEv1Sim = 0x45563153u; // "EV1S"
-
+// NowNs() is used both in the full Tick() path and in GetAbsPhaseFront(), so
+// it lives outside the EV1SIM_HAVE_EXTERNAL_SIM guard.
 std::uint64_t NowNs() {
     return static_cast<std::uint64_t>(
         std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::steady_clock::now().time_since_epoch()).count());
 }
+
+#if EV1SIM_HAVE_EXTERNAL_SIM
+constexpr std::uint32_t kStreamEv1Sim = 0x45563153u; // "EV1S"
 #endif
 
 } // namespace
@@ -421,6 +433,17 @@ struct ExternalSimConnector::State {
     // Subscribed from RSA; 0xFF = never received.
     std::uint8_t  rsa_run_mode            = 0xFFu;
     bool          has_rsa_run_mode        = false;
+
+    // BTCM front ABS solenoid states (IDs 5010-5013, main harness segment).
+    // Subscribed from BTCM.  last_update_ns tracks freshness; 0 = never received.
+    bool          sol_fl_iso              = false;
+    bool          sol_fl_dmp             = false;
+    bool          sol_fr_iso              = false;
+    bool          sol_fr_dmp             = false;
+    std::uint64_t sol_fl_iso_ns          = 0;  // monotonic ns of last update
+    std::uint64_t sol_fl_dmp_ns          = 0;
+    std::uint64_t sol_fr_iso_ns          = 0;
+    std::uint64_t sol_fr_dmp_ns          = 0;
 
     // Charge coupler presence (ID 4060, chassis segment).
     // Stubbed false; future floating-UI panel or charge-door animation updates this.
@@ -639,6 +662,49 @@ bool ExternalSimConnector::HasReceivedRunMode() const {
     return m_state->has_rsa_run_mode;
 }
 
+ExternalSimConnector::AbsPhaseFront ExternalSimConnector::GetAbsPhaseFront(
+    std::chrono::milliseconds freshness_window) const {
+    AbsPhaseFront result{};
+    const auto& st = *m_state;
+
+    const std::uint64_t window_ns =
+        static_cast<std::uint64_t>(freshness_window.count()) * 1'000'000ULL;
+
+    // NowNs() is always available (defined outside the EV1SIM_HAVE_EXTERNAL_SIM
+    // guard) so freshness works correctly in both real and stub builds.
+    const std::uint64_t now_ns = NowNs();
+
+    // A wheel's data is fresh when *both* iso and dump have been received
+    // recently.  If either timestamp is 0 (never received), fresh = false.
+    auto is_fresh = [&](std::uint64_t ts_iso, std::uint64_t ts_dmp) -> bool {
+        if (ts_iso == 0 || ts_dmp == 0) return false;
+        if (now_ns < ts_iso || now_ns < ts_dmp) return false; // clock wrap guard
+        const std::uint64_t age_iso = now_ns - ts_iso;
+        const std::uint64_t age_dmp = now_ns - ts_dmp;
+        return age_iso <= window_ns && age_dmp <= window_ns;
+    };
+
+    auto decode_phase = [](bool iso, bool dmp) -> AbsPhaseFront::Phase {
+        if (!iso && !dmp) return AbsPhaseFront::Phase::APPLY;
+        if ( iso && !dmp) return AbsPhaseFront::Phase::HOLD;
+        if ( iso &&  dmp) return AbsPhaseFront::Phase::DUMP;
+        // iso=0, dump=1 is invalid per the ABS solenoid spec — treat as APPLY.
+        return AbsPhaseFront::Phase::APPLY;
+    };
+
+    result.fl_fresh = is_fresh(st.sol_fl_iso_ns, st.sol_fl_dmp_ns);
+    result.fr_fresh = is_fresh(st.sol_fr_iso_ns, st.sol_fr_dmp_ns);
+
+    result.fl = result.fl_fresh
+                    ? decode_phase(st.sol_fl_iso, st.sol_fl_dmp)
+                    : AbsPhaseFront::Phase::APPLY;
+    result.fr = result.fr_fresh
+                    ? decode_phase(st.sol_fr_iso, st.sol_fr_dmp)
+                    : AbsPhaseFront::Phase::APPLY;
+
+    return result;
+}
+
 // ---------------------------------------------------------------------------
 // Test / internal: apply an inbound signal value (as if decoded from a frame).
 // ---------------------------------------------------------------------------
@@ -651,6 +717,26 @@ void ExternalSimConnector::DebugInjectDelta(std::uint32_t signal_id, bool value)
         m_state->horn_low = value;
     } else if (signal_id == kHornHighCmd) {
         m_state->horn_high = value;
+    } else if (signal_id == kSigSolFL_ISO) {
+        m_state->sol_fl_iso    = value;
+        m_state->sol_fl_iso_ns = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count());
+    } else if (signal_id == kSigSolFL_DMP) {
+        m_state->sol_fl_dmp    = value;
+        m_state->sol_fl_dmp_ns = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count());
+    } else if (signal_id == kSigSolFR_ISO) {
+        m_state->sol_fr_iso    = value;
+        m_state->sol_fr_iso_ns = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count());
+    } else if (signal_id == kSigSolFR_DMP) {
+        m_state->sol_fr_dmp    = value;
+        m_state->sol_fr_dmp_ns = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count());
     }
     // Panel-sensor signals are outputs — ignore inbound.
 }
@@ -949,6 +1035,26 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                         st.rsa_run_mode     = new_mode;
                         st.has_rsa_run_mode = true;
                     }
+                } else if (d.signal_id == kSigSolFL_ISO && !d.payload.empty()) {
+                    st.sol_fl_iso     = (d.payload[0] & 1u) != 0;
+                    st.sol_fl_iso_ns  = polled.frame.header.monotonic_time_ns
+                                        ? polled.frame.header.monotonic_time_ns
+                                        : NowNs();
+                } else if (d.signal_id == kSigSolFL_DMP && !d.payload.empty()) {
+                    st.sol_fl_dmp     = (d.payload[0] & 1u) != 0;
+                    st.sol_fl_dmp_ns  = polled.frame.header.monotonic_time_ns
+                                        ? polled.frame.header.monotonic_time_ns
+                                        : NowNs();
+                } else if (d.signal_id == kSigSolFR_ISO && !d.payload.empty()) {
+                    st.sol_fr_iso     = (d.payload[0] & 1u) != 0;
+                    st.sol_fr_iso_ns  = polled.frame.header.monotonic_time_ns
+                                        ? polled.frame.header.monotonic_time_ns
+                                        : NowNs();
+                } else if (d.signal_id == kSigSolFR_DMP && !d.payload.empty()) {
+                    st.sol_fr_dmp     = (d.payload[0] & 1u) != 0;
+                    st.sol_fr_dmp_ns  = polled.frame.header.monotonic_time_ns
+                                        ? polled.frame.header.monotonic_time_ns
+                                        : NowNs();
                 }
             }
         }

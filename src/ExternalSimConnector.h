@@ -4,6 +4,7 @@
 #include "VehiclePanels.h"
 #include "VehicleState.h"
 
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -206,6 +207,29 @@ public:
 
     /// Returns true if we have received at least one RSA run-mode broadcast.
     bool HasReceivedRunMode() const;
+
+    /// ABS phase decoded from BTCM front solenoid (iso, dump) tuples.
+    /// BTCM publishes kSigSolFL_ISO (5010), kSigSolFL_DMP (5011),
+    /// kSigSolFR_ISO (5012), kSigSolFR_DMP (5013) on the main harness segment.
+    ///
+    /// Decoding table:
+    ///   iso=0, dump=0 → APPLY  (full local brake)
+    ///   iso=1, dump=0 → HOLD   (freeze previous brake torque)
+    ///   iso=1, dump=1 → DUMP   (release toward zero — 0.2× local brake)
+    ///   iso=0, dump=1 → invalid; treated as APPLY
+    struct AbsPhaseFront {
+        enum class Phase { APPLY, HOLD, DUMP };
+        Phase fl       = Phase::APPLY;
+        Phase fr       = Phase::APPLY;
+        bool  fl_fresh = false;   ///< true if FL data arrived within freshness_window
+        bool  fr_fresh = false;   ///< true if FR data arrived within freshness_window
+    };
+
+    /// Return the current per-wheel ABS phase for the front axle.
+    /// A wheel's phase is APPLY and marked stale (!fresh) when no iso/dump
+    /// update has arrived within freshness_window.
+    AbsPhaseFront GetAbsPhaseFront(
+        std::chrono::milliseconds freshness_window) const;
 
     // ---------------------------------------------------------------------
     // Endpoint registry (static — stable across instances)
