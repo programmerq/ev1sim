@@ -122,9 +122,29 @@ constexpr std::uint32_t kSigDriverTurnSignalLeft  = 6948U;
 constexpr std::uint32_t kSigDriverTurnSignalRight = 6949U;
 // Hazard switch request — locked in lockstep with kSigDriverHazardRequest = 6944.
 constexpr std::uint32_t kSigDriverHazardRequest   = 6944U;
+// RSA keypad code-ok — momentary 1-tick bool when ev1sim asserts correct code.
+// Locked in lockstep with electricsim kSigDriverRsaKeypadCodeOk = 6970.
+constexpr std::uint32_t kSigDriverRsaKeypadCodeOk = 6970U;
+// RSA mode button press — momentary 1-tick uint8 enum.
+// 0=NONE, 1=OFF, 2=ACC, 3=RUN, 4=START.
+// Locked in lockstep with electricsim kSigDriverRsaModeButton = 6971.
+constexpr std::uint32_t kSigDriverRsaModeButton   = 6971U;
 // Number of driver-input endpoints on the main harness segment.
-// 6900, 6901, 6902, 6903, 6904, 6944, 6948, 6949, 6964 = 9 total.
-constexpr int           kNumDriverInputs          = 9;
+// 6900, 6901, 6902, 6903, 6904, 6944, 6948, 6949, 6964, 6970, 6971 = 11 total.
+constexpr int           kNumDriverInputs          = 11;
+
+// Motor state signals on the chassis segment (ev1sim → electricsim, float32 LE).
+//   4070  vehicle.dynamics.motor_rpm        motor shaft RPM
+//   4071  vehicle.dynamics.motor_torque_nm  motor shaft torque (Nm, signed)
+constexpr std::uint32_t kSigMotorRpm      = 4070U;
+constexpr std::uint32_t kSigMotorTorqueNm = 4071U;
+constexpr int           kNumMotorSignals  = 2;
+
+// RSA run-mode broadcast — published by RSA on the main harness segment.
+// ev1sim subscribes to this (input_to_sim = true for subscription, but we
+// don't register it as an endpoint we publish — only receive).
+// Locked in lockstep with electricsim/ev1/rsa/rsa_signals.hpp kSigRunModeBroadcast = 5711.
+constexpr std::uint32_t kSigRunModeBroadcast = 5711U;
 
 // Mapping from signal slot (kBulbCmdBase + slot) to LightID.  Order must stay
 // locked to the electric sim's LightIdx enum for the first 17 entries.
@@ -221,14 +241,18 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // ---------------------------------------------------------------------------
 // Build the endpoint table once.
 // ---------------------------------------------------------------------------
-// kNumDriverInputs covers the 4 existing driver inputs (6900-6903) plus the
-// 2 new ones (brake_switch 6904, seatbelt_buckled 6964) — all on the main
-// harness segment (electricsim_ev1_bus), output from ev1sim.
+// kNumDriverInputs covers all driver inputs on the main harness segment
+// (electricsim_ev1_bus), all output from ev1sim:
+//   6900 brake_pedal_q8, 6901 steering_deg_q8, 6902 gear_selector,
+//   6903 throttle_q8, 6904 brake_switch, 6944 hazard_request,
+//   6948 turn_signal_left, 6949 turn_signal_right, 6964 seatbelt_buckled,
+//   6970 rsa_keypad_code_ok, 6971 rsa_mode_button  (11 total).
 // +1 for the charge coupler presence (ID 4060, chassis segment).
 // +kNumPrndSelector for the 4 PRND selector lines (IDs 4050-4053, chassis segment).
+// +kNumMotorSignals for motor RPM + torque (IDs 4070-4071, chassis segment).
 constexpr int kNumEndpoints =
     NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumCombSw + 1 /*charge_coupler*/ +
-    kNumPrndSelector + kNumDynamics + kNumDriverInputs;
+    kNumPrndSelector + kNumMotorSignals + kNumDynamics + kNumDriverInputs;
 
 std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     std::array<ExternalSimConnector::Endpoint, kNumEndpoints> out{};
@@ -265,6 +289,11 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.driver.prnd_selector_c", "prnd_selector_c", false};
     out[i++] = {kPrndSelectorDId,
                 "vehicle.driver.prnd_selector_d", "prnd_selector_d", false};
+    // Motor state signals (chassis segment, ev1sim → electricsim).
+    out[i++] = {kSigMotorRpm,
+                "vehicle.dynamics.motor_rpm", "motor_rpm", false};
+    out[i++] = {kSigMotorTorqueNm,
+                "vehicle.dynamics.motor_torque_nm", "motor_torque_nm", false};
     for (int d = 0; d < kNumDynamics; ++d, ++i) {
         out[i] = {kDynamicsBase + kDynamicsNames[d].offset,
                   kDynamicsNames[d].qualified, kDynamicsNames[d].shortname,
@@ -290,6 +319,10 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.driver.turn_signal_left", "driver_turn_signal_left", false};
     out[i++] = {kSigDriverTurnSignalRight,
                 "vehicle.driver.turn_signal_right", "driver_turn_signal_right", false};
+    out[i++] = {kSigDriverRsaKeypadCodeOk,
+                "vehicle.driver.rsa_keypad_code_ok", "driver_rsa_keypad_code_ok", false};
+    out[i++] = {kSigDriverRsaModeButton,
+                "vehicle.driver.rsa_mode_button", "driver_rsa_mode_button", false};
     return out;
 }
 
@@ -367,6 +400,27 @@ struct ExternalSimConnector::State {
     std::int8_t   driver_turn_left_pub    = -1;      // -1 forces first publish
     std::int8_t   driver_turn_right_pub   = -1;
     std::int8_t   driver_hazard_pub       = -1;
+
+    // RSA keypad code-ok (ID 6970) and mode button (ID 6971).
+    // Both are momentary one-shot signals; they are cleared to 0 after publish.
+    bool          driver_rsa_code_ok      = false;
+    std::uint8_t  driver_rsa_mode_button  = 0;
+    // Published sentinels: use -1 to force first publish; after that only
+    // publish when the value is non-zero (one-shot semantics).
+    std::int8_t   driver_rsa_code_ok_pub  = -1;
+    std::int8_t   driver_rsa_mode_btn_pub = -1;
+
+    // Motor state (IDs 4070-4071, chassis segment).
+    // Publish-on-change with small epsilon thresholds.
+    float         motor_rpm               = 0.0f;
+    float         motor_torque_nm         = 0.0f;
+    float         motor_rpm_pub           = -9999.0f;   // sentinel: always publish first
+    float         motor_torque_pub        = -9999.0f;
+
+    // RSA run-mode broadcast (ID 5711, main harness segment).
+    // Subscribed from RSA; 0xFF = never received.
+    std::uint8_t  rsa_run_mode            = 0xFFu;
+    bool          has_rsa_run_mode        = false;
 
     // Charge coupler presence (ID 4060, chassis segment).
     // Stubbed false; future floating-UI panel or charge-door animation updates this.
@@ -559,6 +613,30 @@ void ExternalSimConnector::SetPrndSelector(bool a, bool b, bool c, bool d) {
     m_state->prnd_b = b;
     m_state->prnd_c = c;
     m_state->prnd_d = d;
+}
+
+void ExternalSimConnector::SetDriverRsaKeypadCodeOk(bool ok) {
+    m_state->driver_rsa_code_ok = ok;
+}
+
+void ExternalSimConnector::SetDriverRsaModeButton(std::uint8_t button_enum) {
+    m_state->driver_rsa_mode_button = button_enum;
+}
+
+void ExternalSimConnector::SetMotorRpm(float rpm) {
+    m_state->motor_rpm = rpm;
+}
+
+void ExternalSimConnector::SetMotorTorqueNm(float torque_nm) {
+    m_state->motor_torque_nm = torque_nm;
+}
+
+std::uint8_t ExternalSimConnector::GetRsaRunMode() const {
+    return m_state->rsa_run_mode;
+}
+
+bool ExternalSimConnector::HasReceivedRunMode() const {
+    return m_state->has_rsa_run_mode;
 }
 
 // ---------------------------------------------------------------------------
@@ -815,8 +893,9 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         }
     }
 
-    // 5. Open / maintain the main harness segment (electricsim_ev1_bus) and
-    //    publish driver input signals.
+    // 5. Open / maintain the main harness segment (electricsim_ev1_bus),
+    //    drain incoming frames (RSA run-mode broadcast), and publish driver
+    //    input signals.
     if (!st.main_transport && sim_time_s >= st.next_main_reconnect_time) {
         SharedMemoryTransportOptions main_opts{};
         main_opts.name   = m_opts.main_harness_bus_name;
@@ -850,6 +929,30 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         }
     }
     if (st.main_transport) {
+        // Drain main harness incoming frames — subscribe to RSA run-mode broadcast.
+        for (;;) {
+            PollResult polled = st.main_transport->poll_frame(std::chrono::milliseconds(0));
+            if (polled.status == PollStatus::Timeout) break;
+            if (polled.status == PollStatus::Closed) {
+                std::cerr << "[ExternalSim] main harness transport closed — reconnecting\n";
+                st.main_transport.reset();
+                st.next_main_reconnect_time = sim_time_s + m_opts.reconnect_period_s;
+                goto main_transport_done;
+            }
+            if (polled.status == PollStatus::Corrupt) continue;
+            if (polled.frame.header.stream_id == kStreamEv1Sim) continue;  // our echo
+            if (polled.frame.header.type != FrameType::DeltaBatch) continue;
+            for (const auto& d : polled.frame.deltas) {
+                if (d.signal_id == kSigRunModeBroadcast && !d.payload.empty()) {
+                    const std::uint8_t new_mode = d.payload[0];
+                    if (!st.has_rsa_run_mode || st.rsa_run_mode != new_mode) {
+                        st.rsa_run_mode     = new_mode;
+                        st.has_rsa_run_mode = true;
+                    }
+                }
+            }
+        }
+
         std::vector<DeltaRecord> drv;
         if (st.driver_brake_q8    != st.driver_brake_pub ||
             st.driver_steering_q8 != st.driver_steering_pub ||
@@ -892,6 +995,23 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             drv.push_back(MakeBoolDelta(kSigDriverHazardRequest, st.driver_hazard));
             st.driver_hazard_pub = hazard_val;
         }
+        // RSA keypad code-ok (ID 6970) — one-shot: publish whenever true,
+        // then publish a zero to clear it on the next tick.
+        {
+            const std::int8_t code_ok_val = st.driver_rsa_code_ok ? 1 : 0;
+            if (st.driver_rsa_code_ok_pub < 0 || code_ok_val != st.driver_rsa_code_ok_pub) {
+                drv.push_back(MakeBoolDelta(kSigDriverRsaKeypadCodeOk, st.driver_rsa_code_ok));
+                st.driver_rsa_code_ok_pub = code_ok_val;
+            }
+        }
+        // RSA mode button (ID 6971) — one-shot: publish current value.
+        {
+            const std::int8_t mode_val = static_cast<std::int8_t>(st.driver_rsa_mode_button);
+            if (st.driver_rsa_mode_btn_pub < 0 || mode_val != st.driver_rsa_mode_btn_pub) {
+                drv.push_back(MakeU8Delta(kSigDriverRsaModeButton, st.driver_rsa_mode_button));
+                st.driver_rsa_mode_btn_pub = mode_val;
+            }
+        }
         if (!drv.empty()) {
             Frame mf{};
             mf.header.type              = FrameType::DeltaBatch;
@@ -903,6 +1023,40 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                 std::cerr << "[ExternalSim] publish_frame (driver inputs) failed\n";
                 st.main_transport.reset();
                 st.next_main_reconnect_time = sim_time_s + m_opts.reconnect_period_s;
+            }
+        }
+    }
+    main_transport_done:;
+
+    // 5b. Publish motor state (RPM + torque) on the chassis segment.
+    // Publish-on-change with small epsilon thresholds to avoid flooding.
+    {
+        constexpr float kRpmEps    = 0.01f;
+        constexpr float kTorqueEps = 0.01f;
+        const bool rpm_changed    = std::abs(st.motor_rpm - st.motor_rpm_pub) > kRpmEps;
+        const bool torque_changed = std::abs(st.motor_torque_nm - st.motor_torque_pub) > kTorqueEps;
+        if (rpm_changed || torque_changed) {
+            std::vector<DeltaRecord> mdyn;
+            if (rpm_changed) {
+                mdyn.push_back(MakeFloatDelta(kSigMotorRpm, st.motor_rpm));
+                st.motor_rpm_pub = st.motor_rpm;
+            }
+            if (torque_changed) {
+                mdyn.push_back(MakeFloatDelta(kSigMotorTorqueNm, st.motor_torque_nm));
+                st.motor_torque_pub = st.motor_torque_nm;
+            }
+            Frame mf{};
+            mf.header.type              = FrameType::DeltaBatch;
+            mf.header.stream_id         = kStreamEv1Sim;
+            mf.header.sequence          = st.sequence++;
+            mf.header.monotonic_time_ns = NowNs();
+            mf.deltas                   = std::move(mdyn);
+            if (!st.transport->publish_frame(mf)) {
+                std::cerr << "[ExternalSim] publish_frame (motor state) failed — reconnecting\n";
+                st.transport.reset();
+                st.status = Status::Connecting;
+                st.next_reconnect_time = sim_time_s + m_opts.reconnect_period_s;
+                return;
             }
         }
     }

@@ -17,14 +17,15 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     constexpr int kNumCombSw      = 3;   // combination switch: low_beam, flash_to_pass, park_headlamp
     constexpr int kNumChargeCplr  = 1;   // charge coupler present (4060, stub)
     constexpr int kNumPrnd        = 4;   // PRND selector lines (4050-4053)
+    constexpr int kNumMotor       = 2;   // motor_rpm (4070), motor_torque_nm (4071)
     // Driver inputs on the main harness segment (electricsim_ev1_bus), output
     // from ev1sim: brake_pedal_q8 (6900), steering_deg_q8 (6901),
     // gear_selector (6902), throttle_q8 (6903), brake_switch (6904),
     // hazard_request (6944), turn_signal_left (6948), turn_signal_right (6949),
-    // seatbelt_buckled (6964).
-    constexpr int kNumDriverInputs = 9;
+    // seatbelt_buckled (6964), rsa_keypad_code_ok (6970), rsa_mode_button (6971).
+    constexpr int kNumDriverInputs = 11;
     const int expected = NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS +
-                         kNumCombSw + kNumChargeCplr + kNumPrnd +
+                         kNumCombSw + kNumChargeCplr + kNumPrnd + kNumMotor +
                          kNumDynamics + kNumDriverInputs;
     REQUIRE(ExternalSimConnector::EndpointCount() == expected);
 
@@ -32,14 +33,14 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     std::set<std::uint32_t> ids;
     std::set<std::string>   qualified;
     std::set<std::string>   shorts;
-    int bulb_count          = 0;
-    int horn_count          = 0;
-    int panel_count         = 0;
-    int comb_sw_count       = 0;
+    int bulb_count           = 0;
+    int horn_count           = 0;
+    int panel_count          = 0;
+    int comb_sw_count        = 0;
     int charge_coupler_count = 0;
-    int prnd_count          = 0;
-    int dynamics_count      = 0;
-    int driver_input_count  = 0;
+    int prnd_count           = 0;
+    int dynamics_count       = 0;   // includes motor_rpm + motor_torque_nm
+    int driver_input_count   = 0;
 
     const auto* eps = ExternalSimConnector::Endpoints();
     for (int i = 0; i < ExternalSimConnector::EndpointCount(); ++i) {
@@ -66,6 +67,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
         } else if (e.signal_id == 4060) {
             CHECK_FALSE(e.input_to_sim);    // charge coupler present is an output
             ++charge_coupler_count;
+        } else if (e.signal_id == 4070 || e.signal_id == 4071) {
+            CHECK_FALSE(e.input_to_sim);    // motor RPM + torque are outputs
+            ++dynamics_count;
         } else if ((e.signal_id >= 4100 && e.signal_id <= 4109) ||
                    (e.signal_id >= 4110 && e.signal_id <= 4113) ||
                    (e.signal_id >= 4120 && e.signal_id <= 4123)) {
@@ -75,12 +79,15 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
                    e.signal_id == 6944 ||
                    e.signal_id == 6948 ||
                    e.signal_id == 6949 ||
-                   e.signal_id == 6964) {
+                   e.signal_id == 6964 ||
+                   e.signal_id == 6970 ||
+                   e.signal_id == 6971) {
             // Driver inputs on the main harness segment — outputs from ev1sim.
             // 6900=brake_pedal_q8  6901=steering_deg_q8  6902=gear_selector
             // 6903=throttle_q8     6904=brake_switch
             // 6944=hazard_request  6948=turn_signal_left  6949=turn_signal_right
             // 6964=seatbelt_buckled
+            // 6970=rsa_keypad_code_ok  6971=rsa_mode_button
             CHECK_FALSE(e.input_to_sim);
             ++driver_input_count;
         } else {
@@ -93,7 +100,8 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     CHECK(comb_sw_count        == kNumCombSw);
     CHECK(prnd_count           == kNumPrnd);
     CHECK(charge_coupler_count == kNumChargeCplr);
-    CHECK(dynamics_count       == kNumDynamics);
+    // dynamics_count includes the 18 original dynamics + 2 motor signals (4070-4071)
+    CHECK(dynamics_count       == kNumDynamics + kNumMotor);
     CHECK(driver_input_count   == kNumDriverInputs);
 }
 
@@ -277,6 +285,52 @@ TEST_CASE("Combination switch endpoints have correct IDs and direction", "[Exter
     CHECK(std::string(ph->qualified_name) ==
           "vehicle.body.combination_switch.park_headlamp_out");
     CHECK_FALSE(ph->input_to_sim);
+}
+
+TEST_CASE("Motor RPM and torque endpoints have correct IDs and direction", "[ExternalSim]") {
+    const auto* rpm = ExternalSimConnector::FindEndpoint(4070);
+    REQUIRE(rpm != nullptr);
+    CHECK(std::string(rpm->qualified_name) == "vehicle.dynamics.motor_rpm");
+    CHECK(std::string(rpm->short_name)     == "motor_rpm");
+    CHECK_FALSE(rpm->input_to_sim);   // output from ev1sim
+
+    const auto* torq = ExternalSimConnector::FindEndpoint(4071);
+    REQUIRE(torq != nullptr);
+    CHECK(std::string(torq->qualified_name) == "vehicle.dynamics.motor_torque_nm");
+    CHECK(std::string(torq->short_name)     == "motor_torque_nm");
+    CHECK_FALSE(torq->input_to_sim);  // output from ev1sim
+}
+
+TEST_CASE("RSA keypad endpoints have correct IDs and direction", "[ExternalSim]") {
+    const auto* code_ok = ExternalSimConnector::FindEndpoint(6970);
+    REQUIRE(code_ok != nullptr);
+    CHECK(std::string(code_ok->qualified_name) == "vehicle.driver.rsa_keypad_code_ok");
+    CHECK_FALSE(code_ok->input_to_sim);   // output from ev1sim
+
+    const auto* mode_btn = ExternalSimConnector::FindEndpoint(6971);
+    REQUIRE(mode_btn != nullptr);
+    CHECK(std::string(mode_btn->qualified_name) == "vehicle.driver.rsa_mode_button");
+    CHECK_FALSE(mode_btn->input_to_sim);  // output from ev1sim
+}
+
+TEST_CASE("SetMotorRpm and SetMotorTorqueNm store without crashing", "[ExternalSim]") {
+    ExternalSimConnector c;
+    CHECK_NOTHROW(c.SetMotorRpm(1500.0f));
+    CHECK_NOTHROW(c.SetMotorTorqueNm(-12.5f));
+    CHECK_NOTHROW(c.Tick(0.0));
+}
+
+TEST_CASE("SetDriverRsaKeypadCodeOk and SetDriverRsaModeButton store without crashing", "[ExternalSim]") {
+    ExternalSimConnector c;
+    CHECK_NOTHROW(c.SetDriverRsaKeypadCodeOk(true));
+    CHECK_NOTHROW(c.SetDriverRsaModeButton(3));  // RUN
+    CHECK_NOTHROW(c.Tick(0.0));
+}
+
+TEST_CASE("GetRsaRunMode returns 0xFF before any run-mode received", "[ExternalSim]") {
+    ExternalSimConnector c;
+    CHECK_FALSE(c.HasReceivedRunMode());
+    CHECK(c.GetRsaRunMode() == 0xFFu);
 }
 
 TEST_CASE("SetCombSwOutputs stores without crashing", "[ExternalSim]") {

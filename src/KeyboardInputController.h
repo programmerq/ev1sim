@@ -62,6 +62,9 @@ public:
     //       per docs/TODO.md.
     bool ConsumeHazardToggle();
 
+    // True once after '?' (Shift+/) was tapped — toggle keyboard help overlay.
+    bool ConsumeHelpToggle();
+
     // Momentary state of the U key — true while held.  Used for the
     // combination-switch flash-to-pass lever (not edge-detected; the lever
     // returns to neutral as soon as the driver releases it).
@@ -94,6 +97,7 @@ private:
     bool m_q_prev      = false;
     bool m_e_prev      = false;
     bool m_x_prev      = false;
+    bool m_slash_prev  = false;   // for '?' (Shift+/)
     bool m_camera_cycle       = false;
     bool m_pause_toggle       = false;
     bool m_headlight_toggle   = false;
@@ -103,6 +107,7 @@ private:
     bool m_turn_signal_left   = false;
     bool m_turn_signal_right  = false;
     bool m_hazard_toggle      = false;
+    bool m_help_toggle        = false;
 
     // Panel toggle keys: KEY_KEY_1 through KEY_KEY_4
     bool m_panel_prev[4]   = {};

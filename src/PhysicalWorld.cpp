@@ -1,5 +1,8 @@
 #include "PhysicalWorld.h"
 
+#include <irrlicht.h>
+#include <cstdio>
+
 namespace ev1sim {
 
 // ---------------------------------------------------------------------------
@@ -111,6 +114,158 @@ void TurnSignalStalk::toggle_right() {
         case Position::RIGHT: m_position = Position::OFF;   break;
         case Position::LEFT:  m_position = Position::RIGHT; break;
     }
+}
+
+// ---------------------------------------------------------------------------
+// PhysicalWorld::DrawHUD
+// ---------------------------------------------------------------------------
+
+void PhysicalWorld::DrawHUD(irr::IrrlichtDevice* device,
+                             std::uint8_t rsa_run_mode,
+                             bool has_rsa_run_mode) const {
+    if (!device) return;
+    auto* gui  = device->getGUIEnvironment();
+    auto* font = gui->getBuiltInFont();
+    if (!font) return;
+
+    // Position: left-column, below the telemetry lines.
+    // Telemetry occupies roughly lines 0-4 at y=10 with h=18; start at y=110.
+    const int x = 10;
+    int y = 110;
+    const int h = 18;
+    const int col_w = 400;
+
+    using irr::video::SColor;
+    using irr::core::rect;
+    using irr::core::stringw;
+
+    auto draw = [&](const char* text, SColor col) {
+        stringw ws(text);
+        font->draw(ws, rect<irr::s32>(x, y, x + col_w, y + h), col);
+        y += h;
+    };
+
+    // --- KEY state ---
+    // Top line: actual RSA run mode from bus.
+    // Bottom line: locally requested state from K cycler.
+    {
+        const char* actual_str = "---";
+        SColor actual_col(255, 160, 160, 160);  // grey = unknown
+        if (has_rsa_run_mode) {
+            switch (rsa_run_mode) {
+                case 0: actual_str = "OFF"; actual_col = SColor(255, 160, 160, 160); break;
+                case 1: actual_str = "ACC"; actual_col = SColor(255, 255, 200,  80); break;
+                case 2: actual_str = "RUN"; actual_col = SColor(255,  80, 220,  80); break;
+                default: actual_str = "?";  break;
+            }
+        }
+        char buf[64];
+        std::snprintf(buf, sizeof(buf), "KEY: %s", actual_str);
+        draw(buf, actual_col);
+
+        const char* req_str = m_rsa_keypad.expected_state_name();
+        SColor req_col(255, 200, 200, 200);
+        if      (m_rsa_keypad.expected_state() == RsaKeypadDriver::ExpectedState::RUN)
+            req_col = SColor(255,  80, 220,  80);
+        else if (m_rsa_keypad.expected_state() == RsaKeypadDriver::ExpectedState::ACC)
+            req_col = SColor(255, 255, 200,  80);
+        std::snprintf(buf, sizeof(buf), "REQ: %s", req_str);
+        draw(buf, req_col);
+    }
+
+    y += 4;  // small gap between groups
+
+    // --- Combination switch ---
+    {
+        const char* cs_names[] = {"OFF", "PARK", "ON", "HI"};
+        int cs_idx = static_cast<int>(m_comb_sw.position());
+        const char* ftp_str = m_comb_sw.flash_to_pass_held() ? "ON" : "-";
+        char buf[80];
+        std::snprintf(buf, sizeof(buf), "HEADLAMPS: %-4s  FTP: %s",
+                      cs_names[cs_idx], ftp_str);
+        SColor cs_col = (cs_idx > 0) ? SColor(255, 255, 220,  80)
+                                      : SColor(255, 160, 160, 160);
+        draw(buf, cs_col);
+    }
+
+    y += 4;
+
+    // --- PRND ---
+    {
+        const char* prnd_names[] = {"P", "R", "N", "D"};
+        int prnd_idx = static_cast<int>(m_prnd_sel.position());
+        char buf[40];
+        std::snprintf(buf, sizeof(buf), "GEAR: %s", prnd_names[prnd_idx]);
+        SColor prnd_col = (prnd_idx == 3) ? SColor(255,  80, 220,  80)  // D = green
+                        : (prnd_idx == 1) ? SColor(255, 255, 100, 100)  // R = red
+                        :                   SColor(255, 220, 220, 220);  // P/N = white
+        draw(buf, prnd_col);
+    }
+
+    y += 4;
+
+    // --- Turn signals + hazard ---
+    {
+        using P = TurnSignalStalk::Position;
+        const auto ts_pos = m_turn_stalk.position();
+        SColor amber(255, 255, 180, 0);
+        SColor grey(255, 160, 160, 160);
+
+        const char* left_str  = (ts_pos == P::LEFT)  ? "<" : " ";
+        const char* right_str = (ts_pos == P::RIGHT) ? ">" : " ";
+        const char* hz_str    = m_hazard_sw.on() ? "ON" : "-";
+        char buf[80];
+        std::snprintf(buf, sizeof(buf), "TURN: %s OFF %s   HAZARD: %s",
+                      left_str, right_str, hz_str);
+        bool turn_active = (ts_pos != P::OFF);
+        bool hz_active   = m_hazard_sw.on();
+        SColor turn_col  = (turn_active || hz_active) ? amber : grey;
+        draw(buf, turn_col);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RsaKeypadDriver
+// ---------------------------------------------------------------------------
+
+void RsaKeypadDriver::cycle_k() {
+    // Advance state and arm the appropriate one-shot outputs.
+    // Mode button enum values per the prompt:
+    //   0=NONE, 1=OFF, 2=ACC, 3=RUN, 4=START
+    switch (m_expected) {
+        case ExpectedState::OFF:
+            // OFF → RUN: user enters code (code_ok=1) then presses RUN.
+            m_code_ok_oneshot     = true;
+            m_mode_button_oneshot = 3;   // RUN
+            m_expected = ExpectedState::RUN;
+            break;
+        case ExpectedState::RUN:
+            // RUN → ACC: no code needed, just press ACC.
+            m_code_ok_oneshot     = false;
+            m_mode_button_oneshot = 2;   // ACC
+            m_expected = ExpectedState::ACC;
+            break;
+        case ExpectedState::ACC:
+            // ACC → OFF: press OFF.
+            m_code_ok_oneshot     = false;
+            m_mode_button_oneshot = 1;   // OFF
+            m_expected = ExpectedState::OFF;
+            break;
+    }
+}
+
+const char* RsaKeypadDriver::expected_state_name() const {
+    switch (m_expected) {
+        case ExpectedState::OFF: return "OFF";
+        case ExpectedState::RUN: return "RUN";
+        case ExpectedState::ACC: return "ACC";
+    }
+    return "OFF";
+}
+
+void RsaKeypadDriver::clear_oneshots() {
+    m_code_ok_oneshot     = false;
+    m_mode_button_oneshot = 0;
 }
 
 }  // namespace ev1sim

@@ -5,6 +5,8 @@
 using irr::video::SColor;
 
 VehiclePanels::VehiclePanels() {
+    // All panels default to closed (open=false).
+    // Doors initialised unlocked; locking model deferred per docs/TODO.md.
     m_panels[static_cast<int>(PanelID::HOOD)]       = {"HOOD"};
     m_panels[static_cast<int>(PanelID::TRUNK)]      = {"TRUNK"};
     m_panels[static_cast<int>(PanelID::DOOR_LEFT)]  = {"DOOR_L"};

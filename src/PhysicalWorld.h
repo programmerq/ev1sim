@@ -1,5 +1,11 @@
 #pragma once
 
+#include <cstdint>
+
+// Forward declaration — avoid pulling Irrlicht into every translation unit
+// that includes PhysicalWorld.h.
+namespace irr { class IrrlichtDevice; }
+
 namespace ev1sim {
 
 /// The combination (turn/headlamp/cruise) stalk on the left column.
@@ -176,8 +182,58 @@ private:
     bool m_on = false;
 };
 
+/// RSA exterior keypad + mode-button simulator.
+///
+/// The EV1 RSA (Remote Security Access) module controls the vehicle's run
+/// mode.  To start the vehicle the user must:
+///   1. Enter the correct 5-digit code on the door-pillar keypad
+///      (ev1sim simulates this via kSigDriverRsaKeypadCodeOk = 6970)
+///   2. Press the RUN button on the RSA HMI
+///      (ev1sim simulates this via kSigDriverRsaModeButton = 6971)
+///
+/// The K key in ev1sim cycles a local "expected key state" through:
+///   OFF → RUN  (publishes code_ok=1 for one tick, then mode_button=RUN)
+///   RUN → ACC  (publishes mode_button=ACC; no code_ok needed)
+///   ACC → OFF  (publishes mode_button=OFF)
+///   OFF → RUN  (wraps back to start)
+///
+/// Both outputs are momentary one-shots lasting exactly one tick; the next
+/// tick they return to zero.  RSA latches the mode internally.
+///
+/// TODO: per-digit keypad fidelity (digit-by-digit entry) is deferred —
+///       ev1sim currently sends the aggregate "code_ok" shortcut signal.
+class RsaKeypadDriver {
+public:
+    enum class ExpectedState { OFF, RUN, ACC };
+
+    /// Advance the cycle: OFF → RUN → ACC → OFF → …
+    void cycle_k();
+
+    /// Current locally-expected RSA state (for HUD display).
+    ExpectedState expected_state() const { return m_expected; }
+
+    /// Name string for HUD/logging ("OFF", "RUN", "ACC").
+    const char* expected_state_name() const;
+
+    /// One-shot momentary output for this tick.
+    /// Returns true for exactly one tick after the OFF→RUN transition.
+    bool code_ok_press_now() const { return m_code_ok_oneshot; }
+
+    /// One-shot momentary output for this tick.
+    /// Returns 0=NONE, 2=ACC, 3=RUN, 1=OFF per the enum in the prompt.
+    uint8_t mode_button_press_now() const { return m_mode_button_oneshot; }
+
+    /// Clear the one-shot outputs.  Call once per tick after consuming.
+    void clear_oneshots();
+
+private:
+    ExpectedState m_expected        = ExpectedState::OFF;
+    bool          m_code_ok_oneshot = false;
+    uint8_t       m_mode_button_oneshot = 0;
+};
+
 /// Container for all physical-world input components.
-/// Future additions (wiper stalk, RSA keypad, etc.) join here.
+/// Future additions (wiper stalk, etc.) join here.
 class PhysicalWorld {
 public:
     CombinationSwitch&       combination_switch()       { return m_comb_sw; }
@@ -198,6 +254,16 @@ public:
     HazardSwitch&       hazard_switch()       { return m_hazard_sw; }
     const HazardSwitch& hazard_switch() const { return m_hazard_sw; }
 
+    RsaKeypadDriver&       rsa_keypad()       { return m_rsa_keypad; }
+    const RsaKeypadDriver& rsa_keypad() const { return m_rsa_keypad; }
+
+    /// Draw HUD overlays for: key state, combination switch, PRND selector,
+    /// and turn signals/hazard.  Call between BeginScene and EndScene.
+    /// rsa_run_mode: most recently received RSA run mode (0=OFF,1=ACC,2=RUN;
+    ///               pass 0xFF if not yet received).
+    void DrawHUD(irr::IrrlichtDevice* device,
+                 std::uint8_t rsa_run_mode, bool has_rsa_run_mode) const;
+
 private:
     CombinationSwitch m_comb_sw;
     BrakeSwitch       m_brake_sw;
@@ -205,6 +271,7 @@ private:
     PrndSelector      m_prnd_sel;
     TurnSignalStalk   m_turn_stalk;
     HazardSwitch      m_hazard_sw;
+    RsaKeypadDriver   m_rsa_keypad;
 };
 
 }  // namespace ev1sim

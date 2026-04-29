@@ -1,6 +1,8 @@
 #include "SimApp.h"
 #include "MacOSPlatform.h"
 
+#include "chrono_vehicle/ChEngine.h"
+
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -104,7 +106,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
     m_paused = m_config.start_paused;
 
     // Startup banner — always printed regardless of headless/interactive mode.
-    std::cout << "[SimApp] Vehicle: KEY OFF (press K to enable propulsion)\n";
+    std::cout << "[SimApp] Vehicle: KEY OFF — press K to cycle RSA state (OFF→RUN→ACC→OFF)\n";
 
     if (headless) {
         std::cout << "[SimApp] Headless mode — no window.  Exits ";
@@ -225,14 +227,12 @@ int SimApp::RunWithVisualization() {
         }
         if (m_keyboard->QuitRequested())
             break;
-        // K = "Key on" toggle — temporary developer binding.
-        // TODO: wire to RSA's vehicle-on signal once pinned.
+        // K = cycle RSA key state: OFF → RUN → ACC → OFF → …
+        // Publishes momentary RSA keypad code_ok and mode_button signals.
         if (m_keyboard->ConsumeKeyOnToggle()) {
-            m_propulsion_enabled = !m_propulsion_enabled;
-            std::cout << "[SimApp] Vehicle: "
-                      << (m_propulsion_enabled ? "KEY ON  (propulsion enabled)"
-                                               : "KEY OFF (propulsion disabled)")
-                      << "\n";
+            m_physical->rsa_keypad().cycle_k();
+            std::cout << "[SimApp] Key request: "
+                      << m_physical->rsa_keypad().expected_state_name() << "\n";
         }
         if (m_keyboard->ConsumeHeadlightToggle()) {
             // H cycles the combination switch through OFF → PARK → ON → HI.
@@ -377,8 +377,41 @@ int SimApp::RunWithVisualization() {
                 m_physical->turn_signal_stalk().active_right());
             m_external_sim->SetDriverHazardRequest(
                 m_physical->hazard_switch().on());
+            // RSA keypad code-ok (6970) and mode button (6971) — one-shot.
+            m_external_sim->SetDriverRsaKeypadCodeOk(
+                m_physical->rsa_keypad().code_ok_press_now());
+            m_external_sim->SetDriverRsaModeButton(
+                m_physical->rsa_keypad().mode_button_press_now());
+        }
+        // Motor RPM and torque (chassis bus 4070-4071).
+        {
+            auto* engine = m_world->GetVehicle().GetEngine().get();
+            float motor_rpm = 0.0f;
+            float motor_torque = 0.0f;
+            if (engine) {
+                // GetMotorSpeed() returns rad/s; convert to RPM.
+                motor_rpm    = static_cast<float>(engine->GetMotorSpeed() * 60.0 / (2.0 * 3.14159265358979323846));
+                motor_torque = static_cast<float>(engine->GetOutputMotorshaftTorque());
+            }
+            m_external_sim->SetMotorRpm(motor_rpm);
+            m_external_sim->SetMotorTorqueNm(motor_torque);
         }
         m_external_sim->Tick(t);
+
+        // Subscribe to RSA run-mode broadcast and update propulsion gate.
+        if (m_external_sim->HasReceivedRunMode()) {
+            const std::uint8_t run_mode = m_external_sim->GetRsaRunMode();
+            // RSA run modes: 0=OFF, 1=ACC, 2=RUN (per rsa_scan.h).
+            const bool new_prop = (run_mode == 2 /*RUN*/);
+            if (new_prop != m_propulsion_enabled) {
+                m_propulsion_enabled = new_prop;
+                const char* mode_names[] = {"OFF", "ACC", "RUN"};
+                const char* mode_str = (run_mode < 3) ? mode_names[run_mode] : "UNKNOWN";
+                std::cout << "[SimApp] Run mode (from RSA): " << mode_str << "\n";
+            }
+        }
+        // Clear RSA keypad one-shots after Tick() has published them.
+        m_physical->rsa_keypad().clear_oneshots();
 
         const bool ext_driving_bulbs =
             m_external_sim->IsConnected() && m_external_sim->HasReceivedBulbData();
@@ -421,6 +454,9 @@ int SimApp::RunWithVisualization() {
                              mu.mu);
         m_lights->DrawHUD(m_vis->GetDevice());
         m_panels->DrawHUD(m_vis->GetDevice());
+        m_physical->DrawHUD(m_vis->GetDevice(),
+                            m_external_sim->GetRsaRunMode(),
+                            m_external_sim->HasReceivedRunMode());
 
         // Draw PAUSED overlay.
         if (m_paused) {
@@ -431,6 +467,67 @@ int SimApp::RunWithVisualization() {
                 irr::core::recti rect(dim.Width / 2 - 40, 30, dim.Width / 2 + 40, 50);
                 font->draw(L"[ PAUSED ]", rect,
                            irr::video::SColor(255, 255, 200, 0), true, true);
+            }
+        }
+
+        // Help overlay toggle (? key).
+        if (m_keyboard->ConsumeHelpToggle())
+            m_show_help = !m_show_help;
+        // Auto-hide after first 5 sim seconds.
+        const double sim_now = m_world->GetSimTime();
+        if (m_show_help && sim_now > m_help_hide_time) {
+            // Auto-hide only once (disable the timer by setting to a huge value).
+            m_show_help = false;
+            m_help_hide_time = 1e18;
+        }
+
+        // Draw keyboard help overlay.
+        if (m_show_help) {
+            auto* drv  = m_vis->GetDevice()->getVideoDriver();
+            auto* gui  = m_vis->GetDevice()->getGUIEnvironment();
+            auto* font = gui->getBuiltInFont();
+            if (drv && font) {
+                auto dim = drv->getScreenSize();
+                // Translucent dark background box.
+                const int bx = dim.Width / 2 - 220;
+                const int by = 60;
+                const int bw = 440;
+                const int bh = 280;
+                drv->draw2DRectangle(
+                    irr::video::SColor(180, 20, 20, 30),
+                    irr::core::recti(bx, by, bx + bw, by + bh));
+
+                const int h = 16;
+                int ry = by + 6;
+                irr::video::SColor hdr(255, 255, 220,  80);
+                irr::video::SColor dim_col(255, 160, 160, 160);
+                irr::video::SColor norm(255, 220, 220, 220);
+
+                auto drawL = [&](const wchar_t* text, irr::video::SColor col) {
+                    font->draw(text,
+                        irr::core::rect<irr::s32>(bx + 8, ry, bx + bw - 8, ry + h),
+                        col);
+                    ry += h;
+                };
+
+                drawL(L"KEYBOARD CONTROLS              [? to toggle]", hdr);
+                drawL(L"-----------------------------------------------", dim_col);
+                drawL(L"WASD/Arrows  drive (throttle, brake, steering)", norm);
+                drawL(L"Space        parking brake",                       norm);
+                drawL(L"K            key cycle: OFF -> RUN -> ACC -> OFF", norm);
+                drawL(L"H            headlamp: OFF -> PARK -> ON -> HI",  norm);
+                drawL(L"U            flash-to-pass (held)",                norm);
+                drawL(L"Q / E        turn signal left / right (toggle)",  norm);
+                drawL(L"X            hazard toggle",                       norm);
+                drawL(L", / .        PRND down / up",                      norm);
+                drawL(L"B / O / L    horn (both / high / low)",           norm);
+                drawL(L"F            hood toggle",                         norm);
+                drawL(L"T            trunk toggle",                        norm);
+                drawL(L"[ / ]        door L / R toggle",                  norm);
+                drawL(L"C            camera mode cycle",                   norm);
+                drawL(L"P            pause",                               norm);
+                drawL(L"R            respawn",                             norm);
+                drawL(L"Esc          quit",                                norm);
             }
         }
 
@@ -514,8 +611,8 @@ int SimApp::RunHeadless() {
         }
 
         // --- Propulsion enable gate (KEY OFF override) ---
-        // In headless mode m_propulsion_enabled stays false unless RSA's
-        // vehicle-on signal is wired (TODO).
+        // In headless mode no keyboard presses cycle the RSA state.
+        // Propulsion is enabled only if RSA broadcasts RUN on the bus.
         if (!m_propulsion_enabled) {
             cmd.throttle    = 0.0;
             cmd.front_brake = 1.0;
@@ -591,8 +688,35 @@ int SimApp::RunHeadless() {
                 m_physical->turn_signal_stalk().active_right());
             m_external_sim->SetDriverHazardRequest(
                 m_physical->hazard_switch().on());
+            // RSA keypad signals — headless: no key presses, publish zeros.
+            m_external_sim->SetDriverRsaKeypadCodeOk(false);
+            m_external_sim->SetDriverRsaModeButton(0);
+        }
+        // Motor RPM and torque (chassis bus 4070-4071).
+        {
+            auto* engine = m_world->GetVehicle().GetEngine().get();
+            float motor_rpm = 0.0f;
+            float motor_torque = 0.0f;
+            if (engine) {
+                motor_rpm    = static_cast<float>(engine->GetMotorSpeed() * 60.0 / (2.0 * 3.14159265358979323846));
+                motor_torque = static_cast<float>(engine->GetOutputMotorshaftTorque());
+            }
+            m_external_sim->SetMotorRpm(motor_rpm);
+            m_external_sim->SetMotorTorqueNm(motor_torque);
         }
         m_external_sim->Tick(t);
+
+        // Subscribe to RSA run-mode broadcast and update propulsion gate.
+        if (m_external_sim->HasReceivedRunMode()) {
+            const std::uint8_t run_mode = m_external_sim->GetRsaRunMode();
+            const bool new_prop = (run_mode == 2 /*RUN*/);
+            if (new_prop != m_propulsion_enabled) {
+                m_propulsion_enabled = new_prop;
+                const char* mode_names[] = {"OFF", "ACC", "RUN"};
+                const char* mode_str = (run_mode < 3) ? mode_names[run_mode] : "UNKNOWN";
+                std::cout << "[SimApp] Run mode (from RSA): " << mode_str << "\n";
+            }
+        }
 
         // --- Horn audio (external-sim-driven only in headless) ---
         bool horn_low = false, horn_high = false;

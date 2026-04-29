@@ -64,8 +64,13 @@ private:
     // Propulsion enable gate — false at startup so Chrono doesn't behave like
     // the vehicle is already running before the ECU pipeline is ready.
     // Brakes are clamped to 1.0 and throttle is forced to 0 while false.
-    // TODO: wire to RSA's vehicle-on signal once pinned; for now press K.
+    // Driven by RSA run-mode broadcast (kSigRunModeBroadcast, ID 5711).
     bool m_propulsion_enabled = false;
+
+    // Help overlay — show keyboard controls in a translucent box.
+    // Auto-show for the first 5 seconds, then toggle with '?'.
+    bool   m_show_help    = true;   // shown at startup
+    double m_help_hide_time = 5.0; // sim_time_s to auto-hide
 
     // Demo pattern for the bulbs — "off", "blink", or "chase".  Kept in the
     // codebase for diagnostics; defaults off now that the electrical sim

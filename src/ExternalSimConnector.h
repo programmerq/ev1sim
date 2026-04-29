@@ -181,6 +181,32 @@ public:
     /// SimApp calls this each tick with the PrndSelector's current pin outputs.
     void SetPrndSelector(bool a, bool b, bool c, bool d);
 
+    /// Outgoing RSA keypad code-ok signal (ID 6970, main harness segment).
+    /// Momentary 1-tick pulse when the user "enters the correct code".
+    /// Encoded as 1-byte uint8 (0=no, 1=yes).
+    void SetDriverRsaKeypadCodeOk(bool ok);
+
+    /// Outgoing RSA mode-button press (ID 6971, main harness segment).
+    /// Momentary 1-tick pulse indicating the user's button press.
+    /// Encoded as 1-byte uint8: 0=NONE, 1=OFF, 2=ACC, 3=RUN, 4=START.
+    void SetDriverRsaModeButton(std::uint8_t button_enum);
+
+    /// Outgoing motor RPM (ID 4070, chassis segment, float32 LE).
+    /// Motor shaft speed in RPM (positive forward).
+    void SetMotorRpm(float rpm);
+
+    /// Outgoing motor torque (ID 4071, chassis segment, float32 LE).
+    /// Motor shaft torque in Nm (signed; positive = driving torque).
+    void SetMotorTorqueNm(float torque_nm);
+
+    /// Incoming RSA run-mode broadcast (ID 5711, main harness segment).
+    /// uint8 enum: 0=OFF, 1=ACC, 2=RUN.  RSA publishes this on every tick.
+    /// Returns the most recently received value, or 0xFF if never received.
+    std::uint8_t GetRsaRunMode() const;
+
+    /// Returns true if we have received at least one RSA run-mode broadcast.
+    bool HasReceivedRunMode() const;
+
     // ---------------------------------------------------------------------
     // Endpoint registry (static — stable across instances)
     // ---------------------------------------------------------------------

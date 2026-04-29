@@ -118,6 +118,14 @@ DriverCommand KeyboardInputController::Update(double dt) {
         m_hazard_toggle = true;
     m_x_prev = x_now;
 
+    // --- Help overlay toggle ('?' = Shift+/, KEY_OEM_2 on many layouts) ---
+    // We detect KEY_OEM_2 (the '/' key) regardless of shift, which is fine
+    // since '/' is not otherwise bound.
+    bool slash_now = m_keys[irr::KEY_OEM_2];
+    if (slash_now && !m_slash_prev)
+        m_help_toggle = true;
+    m_slash_prev = slash_now;
+
     // --- Panel toggles (F=hood, T=trunk, [=doorL, ]=doorR) ---
     {
         static const irr::EKEY_CODE panel_keys[4] = {
@@ -210,6 +218,12 @@ bool KeyboardInputController::ConsumeTurnSignalRight() {
 bool KeyboardInputController::ConsumeHazardToggle() {
     bool v = m_hazard_toggle;
     m_hazard_toggle = false;
+    return v;
+}
+
+bool KeyboardInputController::ConsumeHelpToggle() {
+    bool v = m_help_toggle;
+    m_help_toggle = false;
     return v;
 }
 
