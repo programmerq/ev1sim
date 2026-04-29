@@ -70,7 +70,25 @@ constexpr std::uint32_t kBulbCmdBase    = 4000;
 constexpr std::uint32_t kHornLowCmd     = 4020;
 constexpr std::uint32_t kHornHighCmd    = 4021;
 constexpr std::uint32_t kPanelBase      = 4030;
+
+// Combination switch outputs (ev1sim → electricsim, chassis segment).
+// 6-way blue connector 12084699; 3 output pins meaningfully published.
+//   4040  combination_switch.low_beam_out         (pin C, YEL 525B)
+//   4041  combination_switch.flash_to_pass_out    (pin B, PPL 524B)
+//   4042  combination_switch.park_headlamp_out    (pin F, LTBLU 74)
+constexpr std::uint32_t kCombSwLowBeamOutId      = 4040;
+constexpr std::uint32_t kCombSwFlashToPassOutId  = 4041;
+constexpr std::uint32_t kCombSwParkHeadlampOutId = 4042;
+constexpr int           kNumCombSw               = 3;
+
 constexpr std::uint32_t kDynamicsBase   = 4100;
+
+// Driver input signal IDs on the main harness segment (electricsim_ev1_bus).
+// Encoding per electricsim/src/io/ev1_driver_inputs.hpp.
+constexpr std::uint32_t kSigDriverBrakePedalQ8    = 6900U;
+constexpr std::uint32_t kSigDriverSteeringDegQ8   = 6901U;
+constexpr std::uint32_t kSigDriverGearSelector    = 6902U;
+constexpr std::uint32_t kSigDriverThrottleQ8      = 6903U;
 
 // Mapping from signal slot (kBulbCmdBase + slot) to LightID.  Order must stay
 // locked to the electric sim's LightIdx enum for the first 17 entries.
@@ -168,7 +186,7 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // Build the endpoint table once.
 // ---------------------------------------------------------------------------
 constexpr int kNumEndpoints =
-    NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumDynamics;
+    NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumCombSw + kNumDynamics;
 
 std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     std::array<ExternalSimConnector::Endpoint, kNumEndpoints> out{};
@@ -185,6 +203,15 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                   kPanelNames[p].qualified, kPanelNames[p].shortname,
                   /*input_to_sim=*/false};
     }
+    out[i++] = {kCombSwLowBeamOutId,
+                "vehicle.body.combination_switch.low_beam_out",
+                "comb_sw_low_beam_out", false};
+    out[i++] = {kCombSwFlashToPassOutId,
+                "vehicle.body.combination_switch.flash_to_pass_out",
+                "comb_sw_flash_to_pass_out", false};
+    out[i++] = {kCombSwParkHeadlampOutId,
+                "vehicle.body.combination_switch.park_headlamp_out",
+                "comb_sw_park_headlamp_out", false};
     for (int d = 0; d < kNumDynamics; ++d, ++i) {
         out[i] = {kDynamicsBase + kDynamicsNames[d].offset,
                   kDynamicsNames[d].qualified, kDynamicsNames[d].shortname,
@@ -228,10 +255,31 @@ struct ExternalSimConnector::State {
     bool panel_published[VehiclePanels::NUM_PANELS] = {};
     bool panel_ever_published                  = false;
 
+    // Combination switch pin outputs — latched by SetCombSwOutputs(), published
+    // as wire-level booleans in Tick() when changed.
+    bool comb_sw_low_beam      = false;
+    bool comb_sw_flash_to_pass = false;
+    bool comb_sw_park_headlamp = false;
+    bool comb_sw_low_beam_pub      = false;
+    bool comb_sw_flash_to_pass_pub = false;
+    bool comb_sw_park_headlamp_pub = false;
+    bool comb_sw_ever_published    = false;
+
     // Vehicle dynamics snapshot — updated by SetVehicleState() each frame,
     // published in Tick() as float32 signals.
     VehicleState vstate{};
     bool         has_vstate = false;
+
+    // Driver input snapshot — latched by SetDriver*() methods,
+    // published to the main harness segment (electricsim_ev1_bus) in Tick().
+    std::uint8_t  driver_brake_q8    = 0;
+    std::int16_t  driver_steering_q8 = 0;
+    std::uint8_t  driver_gear        = 3;  // default D
+    std::uint8_t  driver_throttle_q8 = 0;
+    std::uint8_t  driver_brake_pub   = 0xFF;  // force first publish
+    std::int16_t  driver_steering_pub = 0x7FFF;
+    std::uint8_t  driver_gear_pub    = 0xFF;
+    std::uint8_t  driver_throttle_pub = 0xFF;
 
     // Timers (sim_time_s based).
     double next_presence_time  = 0.0;
@@ -239,7 +287,10 @@ struct ExternalSimConnector::State {
 
 #if EV1SIM_HAVE_EXTERNAL_SIM
     std::unique_ptr<electricsim::io::SharedMemoryTransport> transport;
-    std::uint64_t sequence = 1;
+    std::unique_ptr<electricsim::io::SharedMemoryTransport> main_transport;
+    std::uint64_t sequence      = 1;
+    std::uint64_t main_sequence = 1;
+    double next_main_reconnect_time = 0.0;
 #endif
 };
 
@@ -280,6 +331,7 @@ void ExternalSimConnector::Start() {
 void ExternalSimConnector::Stop() {
 #if EV1SIM_HAVE_EXTERNAL_SIM
     m_state->transport.reset();
+    m_state->main_transport.reset();
     m_state->status = m_opts.enabled ? Status::Connecting : Status::Disabled;
 #else
     m_state->status = m_opts.enabled ? Status::Unavailable : Status::Disabled;
@@ -352,6 +404,28 @@ void ExternalSimConnector::SetVehicleState(const VehicleState& state) {
     m_state->has_vstate = true;
 }
 
+void ExternalSimConnector::SetCombSwOutputs(bool low_beam, bool flash_to_pass, bool park_headlamp) {
+    m_state->comb_sw_low_beam      = low_beam;
+    m_state->comb_sw_flash_to_pass = flash_to_pass;
+    m_state->comb_sw_park_headlamp = park_headlamp;
+}
+
+void ExternalSimConnector::SetDriverBrakePedalQ8(std::uint8_t q8) {
+    m_state->driver_brake_q8 = q8;
+}
+
+void ExternalSimConnector::SetDriverThrottleQ8(std::uint8_t q8) {
+    m_state->driver_throttle_q8 = q8;
+}
+
+void ExternalSimConnector::SetDriverSteeringDegQ8(std::int16_t q8) {
+    m_state->driver_steering_q8 = q8;
+}
+
+void ExternalSimConnector::SetDriverGearSelector(std::uint8_t enum_v) {
+    m_state->driver_gear = enum_v;
+}
+
 // ---------------------------------------------------------------------------
 // Test / internal: apply an inbound signal value (as if decoded from a frame).
 // ---------------------------------------------------------------------------
@@ -417,6 +491,28 @@ DeltaRecord MakeFloatDelta(std::uint32_t signal_id, float value) {
     return d;
 }
 
+// uint8_t single-byte unsigned payload (Q8 pedal/gear).
+DeltaRecord MakeU8Delta(std::uint32_t signal_id, std::uint8_t value) {
+    DeltaRecord d{};
+    d.signal_id = signal_id;
+    d.encoding  = SignalEncoding::Unsigned;
+    d.bit_width = 8;
+    d.payload.push_back(value);
+    return d;
+}
+
+// int16_t two-byte signed little-endian payload (Q8 steering degrees).
+DeltaRecord MakeI16Delta(std::uint32_t signal_id, std::int16_t value) {
+    DeltaRecord d{};
+    d.signal_id = signal_id;
+    d.encoding  = SignalEncoding::Signed;
+    d.bit_width = 16;
+    const auto u = static_cast<std::uint16_t>(value);
+    d.payload.push_back(static_cast<std::uint8_t>(u & 0xFFu));
+    d.payload.push_back(static_cast<std::uint8_t>((u >> 8) & 0xFFu));
+    return d;
+}
+
 } // namespace
 
 void ExternalSimConnector::Tick(double sim_time_s) {
@@ -479,7 +575,8 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         }
     }
 
-    // 3. Publish any panel-sensor changes since last tick.
+    // 3. Publish any panel-sensor changes and combination switch pin changes
+    //    since last tick.
     std::vector<DeltaRecord> outbound;
     for (int p = 0; p < VehiclePanels::NUM_PANELS; ++p) {
         if (!st.panel_ever_published || st.panel[p] != st.panel_published[p]) {
@@ -489,6 +586,19 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         }
     }
     st.panel_ever_published = true;
+
+    if (!st.comb_sw_ever_published ||
+        st.comb_sw_low_beam      != st.comb_sw_low_beam_pub      ||
+        st.comb_sw_flash_to_pass != st.comb_sw_flash_to_pass_pub ||
+        st.comb_sw_park_headlamp != st.comb_sw_park_headlamp_pub) {
+        outbound.push_back(MakeBoolDelta(kCombSwLowBeamOutId,      st.comb_sw_low_beam));
+        outbound.push_back(MakeBoolDelta(kCombSwFlashToPassOutId,  st.comb_sw_flash_to_pass));
+        outbound.push_back(MakeBoolDelta(kCombSwParkHeadlampOutId, st.comb_sw_park_headlamp));
+        st.comb_sw_low_beam_pub      = st.comb_sw_low_beam;
+        st.comb_sw_flash_to_pass_pub = st.comb_sw_flash_to_pass;
+        st.comb_sw_park_headlamp_pub = st.comb_sw_park_headlamp;
+        st.comb_sw_ever_published    = true;
+    }
 
     if (!outbound.empty()) {
         Frame f{};
@@ -543,7 +653,66 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         }
     }
 
-    // 5. Announce our endpoints periodically so other bus peers can discover us.
+    // 5. Open / maintain the main harness segment (electricsim_ev1_bus) and
+    //    publish driver input signals.
+    if (!st.main_transport && sim_time_s >= st.next_main_reconnect_time) {
+        SharedMemoryTransportOptions main_opts{};
+        main_opts.name   = m_opts.main_harness_bus_name;
+        main_opts.create = true;
+        auto candidate = std::make_unique<SharedMemoryTransport>(main_opts);
+        Frame hb{};
+        hb.header.type              = FrameType::Heartbeat;
+        hb.header.stream_id         = kStreamEv1Sim;
+        hb.header.sequence          = st.main_sequence;
+        hb.header.monotonic_time_ns = NowNs();
+        if (!candidate->publish_frame(hb)) {
+            st.next_main_reconnect_time = sim_time_s + m_opts.reconnect_period_s;
+            std::cerr << "[ExternalSim] connect to main bus '"
+                      << m_opts.main_harness_bus_name
+                      << "' failed — retry in " << m_opts.reconnect_period_s << "s\n";
+        } else {
+            st.main_sequence++;
+            st.main_transport = std::move(candidate);
+            // Reset published sentinels so we force-publish on first tick.
+            st.driver_brake_pub    = 0xFF;
+            st.driver_steering_pub = 0x7FFF;
+            st.driver_gear_pub     = 0xFF;
+            st.driver_throttle_pub = 0xFF;
+            std::cout << "[ExternalSim] connected to main harness bus '"
+                      << m_opts.main_harness_bus_name << "'\n";
+        }
+    }
+    if (st.main_transport) {
+        std::vector<DeltaRecord> drv;
+        if (st.driver_brake_q8    != st.driver_brake_pub ||
+            st.driver_steering_q8 != st.driver_steering_pub ||
+            st.driver_gear        != st.driver_gear_pub ||
+            st.driver_throttle_q8 != st.driver_throttle_pub) {
+            drv.push_back(MakeU8Delta(kSigDriverBrakePedalQ8,  st.driver_brake_q8));
+            drv.push_back(MakeI16Delta(kSigDriverSteeringDegQ8, st.driver_steering_q8));
+            drv.push_back(MakeU8Delta(kSigDriverGearSelector,   st.driver_gear));
+            drv.push_back(MakeU8Delta(kSigDriverThrottleQ8,     st.driver_throttle_q8));
+            st.driver_brake_pub    = st.driver_brake_q8;
+            st.driver_steering_pub = st.driver_steering_q8;
+            st.driver_gear_pub     = st.driver_gear;
+            st.driver_throttle_pub = st.driver_throttle_q8;
+        }
+        if (!drv.empty()) {
+            Frame mf{};
+            mf.header.type              = FrameType::DeltaBatch;
+            mf.header.stream_id         = kStreamEv1Sim;
+            mf.header.sequence          = st.main_sequence++;
+            mf.header.monotonic_time_ns = NowNs();
+            mf.deltas                   = std::move(drv);
+            if (!st.main_transport->publish_frame(mf)) {
+                std::cerr << "[ExternalSim] publish_frame (driver inputs) failed\n";
+                st.main_transport.reset();
+                st.next_main_reconnect_time = sim_time_s + m_opts.reconnect_period_s;
+            }
+        }
+    }
+
+    // 6. Announce our endpoints periodically so other bus peers can discover us.
     if (sim_time_s >= st.next_presence_time) {
         Frame def{};
         def.header.type              = FrameType::SignalDefine;

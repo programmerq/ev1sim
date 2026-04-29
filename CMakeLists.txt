@@ -108,6 +108,7 @@ add_executable(ev1sim
     src/HornAudio.cpp
     src/VehicleLights.cpp
     src/VehiclePanels.cpp
+    src/PhysicalWorld.cpp
     src/ExternalSimConnector.cpp
     ${MACOS_PLATFORM_SRC}
 )
@@ -164,10 +165,12 @@ if(BUILD_TESTS)
         tests/test_external_sim_connector.cpp
         tests/test_scripted_driver.cpp
         tests/test_level_file.cpp
+        tests/test_vehicle_lights.cpp
         src/Config.cpp
         src/KeyboardInputController.cpp
         src/ExternalSimConnector.cpp
         src/ScriptedDriver.cpp
+        src/VehicleLights.cpp
     )
 
     target_include_directories(ev1sim_tests PRIVATE src)

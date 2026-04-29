@@ -42,6 +42,7 @@ public:
     struct Options {
         bool        enabled          = false;
         std::string bus_name         = "electricsim_chassis_bus";
+        std::string main_harness_bus_name = "electricsim_ev1_bus";
         // How often to republish SignalDefine frames so other bus peers can
         // introspect our endpoints.
         double      presence_period_s = 2.0;
@@ -55,6 +56,16 @@ public:
         Connecting,      // enabled, transport not yet open
         Connected,       // transport open, poll/publish live
     };
+
+    /// Endpoints exposed (see Endpoints()):
+    ///   - 19 bulb command inputs            (electric sim → ev1sim)
+    ///   - 2  horn tone command inputs        (electric sim → ev1sim)
+    ///   - 4  panel ajar switch outputs       (ev1sim → electric sim)
+    ///   - 3  combination switch pin outputs  (ev1sim → electric sim)
+    ///     4040 combination_switch.low_beam_out         (pin C, YEL 525B)
+    ///     4041 combination_switch.flash_to_pass_out    (pin B, PPL 524B)
+    ///     4042 combination_switch.park_headlamp_out    (pin F, LTBLU 74)
+    ///   - 15 vehicle dynamics outputs        (ev1sim → electric sim)
 
     /// An externally-visible endpoint on the I/O fabric.
     struct Endpoint {
@@ -116,6 +127,20 @@ public:
     /// and Tick() publishes it as a float32 DeltaBatch so the electric sim
     /// can model BTCM, regen braking, ABS, etc.
     void SetVehicleState(const VehicleState& state);
+
+    /// Outgoing combination switch pin states — three meaningful output pins
+    /// (B, C, F) per the service manual for the 6-way blue 12084699 connector.
+    /// Published as wire-level booleans on the chassis bus (IDs 4040-4042).
+    void SetCombSwOutputs(bool low_beam, bool flash_to_pass, bool park_headlamp);
+
+    /// Outgoing driver inputs — published to the main harness segment
+    /// (electricsim_ev1_bus, IDs 6900-6903).
+    /// q8 values: brake/throttle 0..255 (normalized × 256), steering signed
+    /// degrees × 256, gear enum 0=P 1=R 2=N 3=D.
+    void SetDriverBrakePedalQ8(std::uint8_t q8);
+    void SetDriverThrottleQ8(std::uint8_t q8);
+    void SetDriverSteeringDegQ8(std::int16_t q8);
+    void SetDriverGearSelector(std::uint8_t enum_v);
 
     // ---------------------------------------------------------------------
     // Endpoint registry (static — stable across instances)

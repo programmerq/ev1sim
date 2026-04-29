@@ -14,7 +14,8 @@ using Catch::Matchers::WithinAbs;
 
 TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     constexpr int kNumDynamics = 18;  // 10 chassis/actuator + 4 wheel_omega + 4 slip_ratio
-    const int expected = NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumDynamics;
+    constexpr int kNumCombSw   = 3;   // combination switch: low_beam, flash_to_pass, park_headlamp
+    const int expected = NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumCombSw + kNumDynamics;
     REQUIRE(ExternalSimConnector::EndpointCount() == expected);
 
     // Unique signal IDs and names.
@@ -24,6 +25,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     int bulb_count     = 0;
     int horn_count     = 0;
     int panel_count    = 0;
+    int comb_sw_count  = 0;
     int dynamics_count = 0;
 
     const auto* eps = ExternalSimConnector::Endpoints();
@@ -42,6 +44,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
         } else if (e.signal_id >= 4030 && e.signal_id <= 4033) {
             CHECK_FALSE(e.input_to_sim);    // panel sensors are outputs
             ++panel_count;
+        } else if (e.signal_id >= 4040 && e.signal_id <= 4042) {
+            CHECK_FALSE(e.input_to_sim);    // combination switch outputs
+            ++comb_sw_count;
         } else if ((e.signal_id >= 4100 && e.signal_id <= 4109) ||
                    (e.signal_id >= 4110 && e.signal_id <= 4113) ||
                    (e.signal_id >= 4120 && e.signal_id <= 4123)) {
@@ -54,6 +59,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     CHECK(bulb_count     == NUM_LIGHTS);
     CHECK(horn_count     == 2);
     CHECK(panel_count    == VehiclePanels::NUM_PANELS);
+    CHECK(comb_sw_count  == kNumCombSw);
     CHECK(dynamics_count == kNumDynamics);
 }
 
@@ -217,6 +223,32 @@ TEST_CASE("Injected deltas latch horn commands", "[ExternalSim]") {
     c.DebugInjectDelta(4020, false);
     CHECK_FALSE(c.GetHornLowCmd());
     CHECK(c.GetHornHighCmd());
+}
+
+TEST_CASE("Combination switch endpoints have correct IDs and direction", "[ExternalSim]") {
+    const auto* lb = ExternalSimConnector::FindEndpoint(4040);
+    REQUIRE(lb != nullptr);
+    CHECK(std::string(lb->qualified_name) ==
+          "vehicle.body.combination_switch.low_beam_out");
+    CHECK_FALSE(lb->input_to_sim);
+
+    const auto* ftp = ExternalSimConnector::FindEndpoint(4041);
+    REQUIRE(ftp != nullptr);
+    CHECK(std::string(ftp->qualified_name) ==
+          "vehicle.body.combination_switch.flash_to_pass_out");
+    CHECK_FALSE(ftp->input_to_sim);
+
+    const auto* ph = ExternalSimConnector::FindEndpoint(4042);
+    REQUIRE(ph != nullptr);
+    CHECK(std::string(ph->qualified_name) ==
+          "vehicle.body.combination_switch.park_headlamp_out");
+    CHECK_FALSE(ph->input_to_sim);
+}
+
+TEST_CASE("SetCombSwOutputs stores without crashing", "[ExternalSim]") {
+    ExternalSimConnector c;
+    CHECK_NOTHROW(c.SetCombSwOutputs(true, false, true));
+    CHECK_NOTHROW(c.Tick(0.0));
 }
 
 TEST_CASE("Injected deltas to panel IDs are ignored", "[ExternalSim]") {

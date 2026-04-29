@@ -39,6 +39,11 @@ public:
     // True once after H was tapped (consumed on read).
     bool ConsumeHeadlightToggle();
 
+    // Momentary state of the U key — true while held.  Used for the
+    // combination-switch flash-to-pass lever (not edge-detected; the lever
+    // returns to neutral as soon as the driver releases it).
+    bool IsFlashToPassHeld() const { return m_keys[irr::KEY_KEY_U]; }
+
     // Panel toggles: F=hood, T=trunk, [=left door, ]=right door.
     bool ConsumePanelToggle(int index);
 

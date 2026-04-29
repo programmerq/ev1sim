@@ -5,6 +5,7 @@
 #include "ExternalSimConnector.h"
 #include "HornAudio.h"
 #include "KeyboardInputController.h"
+#include "PhysicalWorld.h"
 #include "ScriptedDriver.h"
 #include "Telemetry.h"
 #include "VehicleLights.h"
@@ -52,6 +53,7 @@ private:
     std::unique_ptr<HornAudio>              m_horn;
     std::unique_ptr<VehicleLights>          m_lights;
     std::unique_ptr<VehiclePanels>          m_panels;
+    std::unique_ptr<ev1sim::PhysicalWorld>  m_physical;
     std::unique_ptr<ExternalSimConnector>   m_external_sim;
     std::unique_ptr<ScriptedDriver>         m_scripted;
 
@@ -59,8 +61,6 @@ private:
     chrono::ChRealtimeStepTimer m_realtime_timer;
     bool m_paused = false;
 
-    // Headlight mode: 0=off, 1=low beam, 2=high beam
-    int  m_headlight_mode = 0;
     // Demo pattern for the bulbs — "off", "blink", or "chase".  Kept in the
     // codebase for diagnostics; defaults off now that the electrical sim
     // drives the lamps.

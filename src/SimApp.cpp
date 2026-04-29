@@ -70,6 +70,11 @@ SimApp::SimApp(const Config& config) : m_config(config) {
     // 8. Vehicle panels (hood, trunk, doors) — state-only until panel OBJs exist.
     m_panels = std::make_unique<VehiclePanels>();
 
+    // 8b. Physical-world inputs (combination switch first; more components
+    //     to follow per docs/TODO.md).  These are driver-actuated switches
+    //     whose state is published wire-level on the chassis bus.
+    m_physical = std::make_unique<ev1sim::PhysicalWorld>();
+
     // 9. External electrical-simulator connector.  Non-blocking — if the
     //    electric sim isn't running yet, the connector retries each Tick().
     ExternalSimConnector::Options ext_opts;
@@ -206,15 +211,21 @@ int SimApp::RunWithVisualization() {
         if (m_keyboard->QuitRequested())
             break;
         if (m_keyboard->ConsumeHeadlightToggle()) {
-            // H disables any running demo and cycles the headlamps.
+            // H cycles the combination switch through OFF → PARK → ON → HI.
+            // The wire-level pin states are published on the chassis bus and
+            // LHJB drives the actual bulb feed lines back from there.
             if (m_lights_demo != "off") {
                 std::cout << "[SimApp] Lights demo OFF (was " << m_lights_demo << ")\n";
                 m_lights_demo = "off";
             }
-            m_headlight_mode = (m_headlight_mode + 1) % 3;
-            const char* names[] = {"OFF", "LOW BEAM", "HIGH BEAM"};
-            std::cout << "[SimApp] Headlamps: " << names[m_headlight_mode] << "\n";
+            m_physical->combination_switch().cycle_h();
+            const char* names[] = {"OFF", "PARK", "ON", "HI"};
+            int idx = static_cast<int>(m_physical->combination_switch().position());
+            std::cout << "[SimApp] CombSw: " << names[idx] << "\n";
         }
+        // U is momentary flash-to-pass (pulled-back lever).  Update each frame.
+        m_physical->combination_switch().set_flash_to_pass(
+            m_keyboard->IsFlashToPassHeld());
 
         // --- Physics sub-stepping (skipped when paused) ---
         if (!m_paused) {
@@ -247,12 +258,45 @@ int SimApp::RunWithVisualization() {
             m_lights->Initialize(smgr);
         }
 
-        // --- External sim sync (publish panel sensors + dynamics, drain bulb/horn cmds) ---
+        // --- External sim sync (publish panel sensors + dynamics + combo
+        //     switch + driver inputs; drain bulb/horn cmds) ---
         for (int i = 0; i < VehiclePanels::NUM_PANELS; ++i) {
             m_external_sim->SetPanelSensor(static_cast<PanelID>(i),
                                            m_panels->IsOpen(static_cast<PanelID>(i)));
         }
         m_external_sim->SetVehicleState(m_world->GetState());
+        // Combination switch wire-level outputs (chassis bus, IDs 4040-4042).
+        {
+            const auto& cs = m_physical->combination_switch();
+            m_external_sim->SetCombSwOutputs(cs.pin_low_beam_out(),
+                                             cs.pin_flash_to_pass_out(),
+                                             cs.pin_park_headlamp_out());
+        }
+        // Driver inputs (main harness segment, IDs 6900-6903).  Local physics
+        // path keeps using `cmd` directly; this just makes the inputs visible
+        // to BTCM/LHJB/etc. on the bus.  PRND not modeled in DriverCommand
+        // yet — default to D (3) and TODO it.
+        {
+            auto clamp01_q8 = [](double v) -> std::uint8_t {
+                if (v < 0.0) v = 0.0;
+                if (v > 1.0) v = 1.0;
+                return static_cast<std::uint8_t>(v * 255.0 + 0.5);
+            };
+            // Steering Q8 in degrees, signed.  cmd.steering is normalized
+            // -1..+1 (Chrono convention); map to ±90 deg as a placeholder.
+            auto steer_deg_q8 = [](double v) -> std::int16_t {
+                if (v < -1.0) v = -1.0;
+                if (v >  1.0) v =  1.0;
+                double deg_q8 = v * 90.0 * 256.0;
+                if (deg_q8 >  32767.0) deg_q8 =  32767.0;
+                if (deg_q8 < -32768.0) deg_q8 = -32768.0;
+                return static_cast<std::int16_t>(deg_q8);
+            };
+            m_external_sim->SetDriverBrakePedalQ8(clamp01_q8(cmd.front_brake));
+            m_external_sim->SetDriverThrottleQ8(clamp01_q8(cmd.throttle));
+            m_external_sim->SetDriverSteeringDegQ8(steer_deg_q8(cmd.steering));
+            m_external_sim->SetDriverGearSelector(3);  // D — TODO PRND cycling
+        }
         m_external_sim->Tick(t);
 
         const bool ext_driving_bulbs =
@@ -271,15 +315,12 @@ int SimApp::RunWithVisualization() {
                                    m_external_sim->GetBulbCmd(static_cast<LightID>(i)));
             }
         } else {
-            // Demo off, no external sim — all bulbs default off, H drives headlamps.
+            // No demo, no external sim — all bulbs stay off.  We deliberately
+            // do NOT have a local-fallback headlamp path: the user wants the
+            // ECU pipeline to be the only source of bulb state, so missing
+            // ECU output makes the missing wire visible rather than masking it.
             for (int i = 0; i < NUM_LIGHTS; ++i)
                 m_lights->SetState(static_cast<LightID>(i), false);
-            bool low  = (m_headlight_mode >= 1);
-            bool high = (m_headlight_mode >= 2);
-            m_lights->SetState(LightID::LLBH, low);
-            m_lights->SetState(LightID::RLBH, low);
-            m_lights->SetState(LightID::LHBH, high);
-            m_lights->SetState(LightID::RHBH, high);
         }
 
         m_lights->ApplyToScene();
@@ -393,13 +434,23 @@ int SimApp::RunHeadless() {
 
         const double t = m_world->GetSimTime();
 
-        // --- External sim sync (panel sensors + dynamics, bulb/horn cmds) ---
+        // --- External sim sync (panel sensors + dynamics + combo switch
+        //     + driver inputs; bulb/horn cmds drained inside Tick()) ---
         for (int i = 0; i < VehiclePanels::NUM_PANELS; ++i) {
             m_external_sim->SetPanelSensor(
                 static_cast<PanelID>(i),
                 m_panels->IsOpen(static_cast<PanelID>(i)));
         }
         m_external_sim->SetVehicleState(m_world->GetState());
+        // Combination switch: in headless mode no keyboard cycles it, so the
+        // pin states stay at their default (OFF position → all pins low).
+        // Still publish so downstream consumers see a defined initial state.
+        {
+            const auto& cs = m_physical->combination_switch();
+            m_external_sim->SetCombSwOutputs(cs.pin_low_beam_out(),
+                                             cs.pin_flash_to_pass_out(),
+                                             cs.pin_park_headlamp_out());
+        }
         m_external_sim->Tick(t);
 
         // --- Horn audio (external-sim-driven only in headless) ---
