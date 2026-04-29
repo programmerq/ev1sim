@@ -44,6 +44,14 @@ private:
     int  RunWithVisualization();
     int  RunHeadless();
 
+    /// Apply BTCM ABS per-wheel front brake modulation for the current tick.
+    /// Reads the current AbsPhaseFront from m_external_sim, computes modulated
+    /// per-wheel values, and (if fresh) calls ApplyFrontBrakePerWheel().
+    /// Also emits one INFO line per wheel on freshness transitions.
+    /// @param time       current sim time (seconds), forwarded to Chrono brake API
+    /// @param local_front_brake  the local (driver-commanded) front brake ratio [0..1]
+    void ApplyAbsFrontBrake(double time, double local_front_brake);
+
     Config m_config;
 
     std::unique_ptr<VehicleWorld>           m_world;
@@ -66,6 +74,19 @@ private:
     // Brakes are clamped to 1.0 and throttle is forced to 0 while false.
     // Driven by RSA run-mode broadcast (kSigRunModeBroadcast, ID 5711).
     bool m_propulsion_enabled = false;
+
+    // Per-wheel front brake modulation state (BTCM ABS integration).
+    // Holds the previous modulated brake torque ratio for each front wheel;
+    // used to implement HOLD phase (freeze-previous) semantics.
+    double m_abs_fl_prev = 0.0;  ///< previous FL modulated brake (0..1)
+    double m_abs_fr_prev = 0.0;  ///< previous FR modulated brake (0..1)
+
+    // Freshness-fallback logging state — emit one INFO line on transition.
+    bool m_abs_fl_was_fresh = false;  ///< was FL fresh on the previous tick?
+    bool m_abs_fr_was_fresh = false;  ///< was FR fresh on the previous tick?
+
+    // Freshness window for BTCM solenoid signals.
+    static constexpr std::chrono::milliseconds kAbsFreshnessWindow{200};
 
     // Help overlay — show keyboard controls in a translucent box.
     // Auto-show for the first 5 seconds, then toggle with '?'.

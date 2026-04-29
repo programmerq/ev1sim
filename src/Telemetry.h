@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ExternalSimConnector.h"
 #include "VehicleState.h"
 
 #include <irrlicht.h>
@@ -19,11 +20,13 @@ public:
     // Call between BeginScene/EndScene.  `wheel_mu` holds the ground
     // friction coefficient under each wheel (FL, FR, RL, RR); values
     // <0 are skipped in the display.  Pass nullptr to omit the line.
+    // `abs_phase` is optional — pass nullptr to omit the ABS line.
     void DrawHUD(irr::IrrlichtDevice* device,
                  const VehicleState& state,
                  const std::string& camera_mode,
                  const std::string& surface,
-                 const double* wheel_mu);
+                 const double* wheel_mu,
+                 const ExternalSimConnector::AbsPhaseFront* abs_phase = nullptr);
 
 private:
     double m_log_interval;

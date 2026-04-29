@@ -377,6 +377,12 @@ void VehicleWorld::Synchronize(double time) {
     m_driver->ApplyBrakes(time);
 }
 
+void VehicleWorld::ApplyFrontBrakePerWheel(double time, double brake_fl, double brake_fr) {
+    if (static_cast<int>(m_vehicle->GetNumberAxles()) < 1) return;
+    m_vehicle->GetBrake(0, vehicle::LEFT )->Synchronize(time, brake_fl);
+    m_vehicle->GetBrake(0, vehicle::RIGHT)->Synchronize(time, brake_fr);
+}
+
 void VehicleWorld::Advance(double step) {
     m_driver->Advance(step);
     m_terrain->Advance(step);

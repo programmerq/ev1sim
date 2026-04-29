@@ -170,6 +170,60 @@ void SimApp::SetupVisualization() {
 }
 
 // ---------------------------------------------------------------------------
+void SimApp::ApplyAbsFrontBrake(double time, double local_front_brake) {
+    using Phase = ExternalSimConnector::AbsPhaseFront::Phase;
+
+    const auto abs_phase = m_external_sim->GetAbsPhaseFront(kAbsFreshnessWindow);
+
+    // Log freshness transitions (one line per wheel).
+    if (abs_phase.fl_fresh != m_abs_fl_was_fresh) {
+        if (abs_phase.fl_fresh)
+            std::cout << "[SimApp] front-brake from BTCM (live) wheel=FL\n";
+        else
+            std::cout << "[SimApp] front-brake fallback (BTCM stale) wheel=FL\n";
+        m_abs_fl_was_fresh = abs_phase.fl_fresh;
+    }
+    if (abs_phase.fr_fresh != m_abs_fr_was_fresh) {
+        if (abs_phase.fr_fresh)
+            std::cout << "[SimApp] front-brake from BTCM (live) wheel=FR\n";
+        else
+            std::cout << "[SimApp] front-brake fallback (BTCM stale) wheel=FR\n";
+        m_abs_fr_was_fresh = abs_phase.fr_fresh;
+    }
+
+    // If neither wheel has fresh BTCM data, the symmetric front_pressure from
+    // CommandDriver::ApplyBrakes() (called inside VehicleWorld::Synchronize) is
+    // already in effect — nothing to do.
+    if (!abs_phase.fl_fresh && !abs_phase.fr_fresh) {
+        // Keep prev values in sync with local so HOLD doesn't freeze at stale values.
+        m_abs_fl_prev = local_front_brake;
+        m_abs_fr_prev = local_front_brake;
+        return;
+    }
+
+    // Compute per-wheel modulated brake ratio.
+    auto modulate = [&](Phase phase, double prev, double local) -> double {
+        switch (phase) {
+            case Phase::APPLY: return local;
+            case Phase::HOLD:  return prev;
+            case Phase::DUMP:  return 0.2 * local;
+        }
+        return local;  // unreachable
+    };
+
+    const double fl = modulate(abs_phase.fl, m_abs_fl_prev, local_front_brake);
+    const double fr = modulate(abs_phase.fr, m_abs_fr_prev, local_front_brake);
+
+    m_abs_fl_prev = fl;
+    m_abs_fr_prev = fr;
+
+    // Apply per-wheel front brakes via Chrono API, overriding the symmetric
+    // front_pressure CommandDriver::ApplyBrakes() already set in Synchronize().
+    // TODO: rear EMB clamp-position model needed for full rear-wheel modulation.
+    m_world->ApplyFrontBrakePerWheel(time, fl, fr);
+}
+
+// ---------------------------------------------------------------------------
 int SimApp::Run() {
     if (m_config.simulation.headless) {
         // Guard against the hang-forever foot-gun: headless with no terminator
@@ -290,6 +344,10 @@ int SimApp::RunWithVisualization() {
             for (int i = 0; i < steps_per_frame; ++i) {
                 double t = m_world->GetSimTime();
                 m_world->Synchronize(t);
+                // Per-wheel BTCM ABS modulation (front axle).
+                // Must follow Synchronize() (which calls ApplyBrakes internally)
+                // so we can override the symmetric front pressure when BTCM is live.
+                ApplyAbsFrontBrake(t, cmd.front_brake);
                 m_world->Advance(step);
             }
         }
@@ -447,11 +505,13 @@ int SimApp::RunWithVisualization() {
         // actual loaded terrain, including the rigid-plane fallback when
         // a requested level file was missing or invalid.
         auto mu = m_world->GetWheelFrictions();
+        const auto abs_phase = m_external_sim->GetAbsPhaseFront(kAbsFreshnessWindow);
         m_telemetry->DrawHUD(m_vis->GetDevice(),
                              m_world->GetState(),
                              m_camera->GetModeName(),
                              m_world->GetTerrainLabel(),
-                             mu.mu);
+                             mu.mu,
+                             &abs_phase);
         m_lights->DrawHUD(m_vis->GetDevice());
         m_panels->DrawHUD(m_vis->GetDevice());
         m_physical->DrawHUD(m_vis->GetDevice(),
@@ -625,6 +685,10 @@ int SimApp::RunHeadless() {
         for (int i = 0; i < steps_per_tick; ++i) {
             const double t = m_world->GetSimTime();
             m_world->Synchronize(t);
+            // Per-wheel BTCM ABS modulation (front axle).
+            // Must follow Synchronize() so we override the symmetric front
+            // pressure when BTCM is live.
+            ApplyAbsFrontBrake(t, cmd.front_brake);
             m_world->Advance(step);
         }
 

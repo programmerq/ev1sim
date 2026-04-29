@@ -67,13 +67,18 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   doesn't deserve a keybind.
 
 ## Bus-mediated physics
-- [ ] **Brake torque from BTCM actuator state.** Today the user's brake
-  input drives Chrono's brake torque directly.  Migrate to: BTCM publishes
-  per-wheel actuator state (solenoid iso/dump tuple, EMB motor command,
-  wheel cylinder pressures `kSigPressLF/RF`); ev1sim consumes and uses
-  these to drive Chrono's brake torque per wheel.  Local brake input
-  becomes the fallback when bus state is stale.  This is what makes
-  ABS modulation visible in the vehicle's dynamics.
+- [x] **Front-brake torque from BTCM ABS solenoid state (DONE).** ev1sim
+  subscribes to `kSigSolFL/FR_ISO/DMP` (5010-5013) on the main harness
+  segment.  Each tick, iso/dump tuples are decoded to APPLY/HOLD/DUMP phase
+  and applied per-wheel via `VehicleWorld::ApplyFrontBrakePerWheel()`.
+  Falls back to local brake when BTCM data is stale (>200 ms); one-time
+  INFO log on each freshness transition per wheel.  HUD shows
+  `ABS: FL=APPLY FR=APPLY` when BTCM is live.
+- [ ] **Rear-EMB clamp-position model needed for full rear-wheel modulation.**
+  BTCM publishes EMB motor commands (`kSigRearMotorLR/RR`, signed floats)
+  but nothing directly mappable to torque without a clamp-position model.
+  Until that model is added, rear brake = local `rear_brake` (no per-wheel
+  modulation).
 - [ ] Same pattern for **throttle** (BTCM/PIM), **steering assist** etc.
 
 ## Sim-time sync — ev1sim publisher side

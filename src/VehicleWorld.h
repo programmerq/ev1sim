@@ -29,6 +29,13 @@ public:
     void Synchronize(double time);
     void Advance(double step);
 
+    /// Override front-axle (axle 0) brake torque per wheel after Synchronize().
+    /// Used by BTCM ABS modulation in SimApp when fresh solenoid data is available.
+    /// Call AFTER Synchronize() and before Advance() so the per-wheel pressure
+    /// wins over ApplyBrakes()'s symmetric front_pressure.
+    ///   brake_fl, brake_fr — modulated brake ratio [0..1] for left/right wheels.
+    void ApplyFrontBrakePerWheel(double time, double brake_fl, double brake_fr);
+
     // Teleport vehicle back to spawn.  Resets velocities.
     void ResetVehicle();
 

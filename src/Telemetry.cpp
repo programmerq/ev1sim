@@ -5,6 +5,18 @@
 #include <iostream>
 #include <sstream>
 
+namespace {
+const char* AbsPhaseStr(ExternalSimConnector::AbsPhaseFront::Phase p) {
+    using Phase = ExternalSimConnector::AbsPhaseFront::Phase;
+    switch (p) {
+        case Phase::APPLY: return "APPLY";
+        case Phase::HOLD:  return "HOLD";
+        case Phase::DUMP:  return "DUMP";
+    }
+    return "?";
+}
+}  // namespace
+
 Telemetry::Telemetry(double log_rate_hz, bool log_to_file,
                      const std::string& log_file, bool show_hud)
     : m_log_interval(log_rate_hz > 0 ? 1.0 / log_rate_hz : 0.1),
@@ -76,7 +88,8 @@ void Telemetry::DrawHUD(irr::IrrlichtDevice* device,
                         const VehicleState& state,
                         const std::string& camera_mode,
                         const std::string& surface,
-                        const double* wheel_mu) {
+                        const double* wheel_mu,
+                        const ExternalSimConnector::AbsPhaseFront* abs_phase) {
     if (!m_show_hud || !device) return;
 
     auto* gui  = device->getGUIEnvironment();
@@ -103,6 +116,22 @@ void Telemetry::DrawHUD(irr::IrrlichtDevice* device,
                   state.applied_throttle * 100, state.applied_front_brake * 100,
                   state.applied_steering * 100);
     draw(buf, white);
+
+    // ABS phase line — shown only when BTCM data is available.
+    if (abs_phase) {
+        char abs_buf[128];
+        if (abs_phase->fl_fresh || abs_phase->fr_fresh) {
+            std::snprintf(abs_buf, sizeof(abs_buf),
+                          "ABS:  FL=%s%s  FR=%s%s",
+                          AbsPhaseStr(abs_phase->fl),
+                          abs_phase->fl_fresh ? "" : "(stale)",
+                          AbsPhaseStr(abs_phase->fr),
+                          abs_phase->fr_fresh ? "" : "(stale)");
+        } else {
+            std::snprintf(abs_buf, sizeof(abs_buf), "ABS:  FL=local  FR=local");
+        }
+        draw(abs_buf, yellow);
+    }
 
     draw("Camera: " + camera_mode, yellow);
     draw("Surface: " + surface, yellow);
