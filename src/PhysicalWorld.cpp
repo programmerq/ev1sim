@@ -93,4 +93,24 @@ bool PrndSelector::pin_d() const {
     return m_position == Position::R || m_position == Position::D;
 }
 
+// ---------------------------------------------------------------------------
+// TurnSignalStalk
+// ---------------------------------------------------------------------------
+
+void TurnSignalStalk::toggle_left() {
+    switch (m_position) {
+        case Position::OFF:   m_position = Position::LEFT;  break;
+        case Position::LEFT:  m_position = Position::OFF;   break;
+        case Position::RIGHT: m_position = Position::LEFT;  break;
+    }
+}
+
+void TurnSignalStalk::toggle_right() {
+    switch (m_position) {
+        case Position::OFF:   m_position = Position::RIGHT; break;
+        case Position::RIGHT: m_position = Position::OFF;   break;
+        case Position::LEFT:  m_position = Position::RIGHT; break;
+    }
+}
+
 }  // namespace ev1sim

@@ -116,8 +116,15 @@ constexpr std::uint32_t kSigDriverThrottleQ8      = 6903U;
 constexpr std::uint32_t kSigDriverBrakeSwitch     = 6904U;
 // Driver seatbelt buckle — locked in lockstep with kSigDriverSeatbeltBuckled = 6964.
 constexpr std::uint32_t kSigDriverSeatbeltBuckled = 6964U;
+// Turn signal stalk position — locked in lockstep with electricsim
+// ev1_driver_inputs.hpp kSigDriverTurnSignalLeft/Right = 6948/6949.
+constexpr std::uint32_t kSigDriverTurnSignalLeft  = 6948U;
+constexpr std::uint32_t kSigDriverTurnSignalRight = 6949U;
+// Hazard switch request — locked in lockstep with kSigDriverHazardRequest = 6944.
+constexpr std::uint32_t kSigDriverHazardRequest   = 6944U;
 // Number of driver-input endpoints on the main harness segment.
-constexpr int           kNumDriverInputs          = 6;
+// 6900, 6901, 6902, 6903, 6904, 6944, 6948, 6949, 6964 = 9 total.
+constexpr int           kNumDriverInputs          = 9;
 
 // Mapping from signal slot (kBulbCmdBase + slot) to LightID.  Order must stay
 // locked to the electric sim's LightIdx enum for the first 17 entries.
@@ -277,6 +284,12 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.driver.brake_switch", "driver_brake_switch", false};
     out[i++] = {kSigDriverSeatbeltBuckled,
                 "vehicle.driver.seatbelt_buckled", "driver_seatbelt_buckled", false};
+    out[i++] = {kSigDriverHazardRequest,
+                "vehicle.driver.hazard_request", "driver_hazard_request", false};
+    out[i++] = {kSigDriverTurnSignalLeft,
+                "vehicle.driver.turn_signal_left", "driver_turn_signal_left", false};
+    out[i++] = {kSigDriverTurnSignalRight,
+                "vehicle.driver.turn_signal_right", "driver_turn_signal_right", false};
     return out;
 }
 
@@ -346,6 +359,14 @@ struct ExternalSimConnector::State {
     // Published sentinels (use 0xFF-equivalent to force first publish).
     std::int8_t   driver_brake_switch_pub     = -1;  // -1 forces first publish
     std::int8_t   driver_seatbelt_buckled_pub = -1;  // -1 forces first publish
+
+    // Turn signal stalk and hazard switch (IDs 6948, 6949, 6944).
+    bool          driver_turn_left        = false;
+    bool          driver_turn_right       = false;
+    bool          driver_hazard           = false;
+    std::int8_t   driver_turn_left_pub    = -1;      // -1 forces first publish
+    std::int8_t   driver_turn_right_pub   = -1;
+    std::int8_t   driver_hazard_pub       = -1;
 
     // Charge coupler presence (ID 4060, chassis segment).
     // Stubbed false; future floating-UI panel or charge-door animation updates this.
@@ -515,6 +536,18 @@ void ExternalSimConnector::SetDriverBrakeSwitch(bool pressed) {
 
 void ExternalSimConnector::SetDriverSeatbeltBuckled(bool buckled) {
     m_state->driver_seatbelt_buckled = buckled;
+}
+
+void ExternalSimConnector::SetDriverTurnSignalLeft(bool active) {
+    m_state->driver_turn_left = active;
+}
+
+void ExternalSimConnector::SetDriverTurnSignalRight(bool active) {
+    m_state->driver_turn_right = active;
+}
+
+void ExternalSimConnector::SetDriverHazardRequest(bool on) {
+    m_state->driver_hazard = on;
 }
 
 void ExternalSimConnector::SetChargeCouplerPresent(bool present) {
@@ -809,6 +842,9 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             st.driver_throttle_pub         = 0xFF;
             st.driver_brake_switch_pub     = -1;
             st.driver_seatbelt_buckled_pub = -1;
+            st.driver_turn_left_pub        = -1;
+            st.driver_turn_right_pub       = -1;
+            st.driver_hazard_pub           = -1;
             std::cout << "[ExternalSim] connected to main harness bus '"
                       << m_opts.main_harness_bus_name << "'\n";
         }
@@ -839,6 +875,22 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         if (seatbelt_val != st.driver_seatbelt_buckled_pub) {
             drv.push_back(MakeBoolDelta(kSigDriverSeatbeltBuckled, st.driver_seatbelt_buckled));
             st.driver_seatbelt_buckled_pub = seatbelt_val;
+        }
+        // Turn signal stalk (6948, 6949) and hazard (6944) — publish on change.
+        const std::int8_t turn_left_val  = st.driver_turn_left  ? 1 : 0;
+        const std::int8_t turn_right_val = st.driver_turn_right ? 1 : 0;
+        const std::int8_t hazard_val     = st.driver_hazard     ? 1 : 0;
+        if (turn_left_val != st.driver_turn_left_pub) {
+            drv.push_back(MakeBoolDelta(kSigDriverTurnSignalLeft, st.driver_turn_left));
+            st.driver_turn_left_pub = turn_left_val;
+        }
+        if (turn_right_val != st.driver_turn_right_pub) {
+            drv.push_back(MakeBoolDelta(kSigDriverTurnSignalRight, st.driver_turn_right));
+            st.driver_turn_right_pub = turn_right_val;
+        }
+        if (hazard_val != st.driver_hazard_pub) {
+            drv.push_back(MakeBoolDelta(kSigDriverHazardRequest, st.driver_hazard));
+            st.driver_hazard_pub = hazard_val;
         }
         if (!drv.empty()) {
             Frame mf{};

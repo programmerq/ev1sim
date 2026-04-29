@@ -153,6 +153,19 @@ public:
     /// see docs/TODO.md for the floating-UI panel item.
     void SetDriverSeatbeltBuckled(bool buckled);
 
+    /// Outgoing turn-signal stalk position (IDs 6948, 6949).
+    /// Encoded as 1-byte uint8 boolean each (0=inactive, 1=active).
+    /// Published on the main harness segment in lockstep with
+    /// electricsim/src/io/ev1_driver_inputs.hpp kSigDriverTurnSignalLeft/Right.
+    void SetDriverTurnSignalLeft(bool active);
+    void SetDriverTurnSignalRight(bool active);
+
+    /// Outgoing hazard switch request (ID 6944).
+    /// Encoded as 1-byte uint8 boolean (0=off, 1=on).
+    /// Published on the main harness segment in lockstep with
+    /// electricsim/src/io/ev1_driver_inputs.hpp kSigDriverHazardRequest.
+    void SetDriverHazardRequest(bool on);
+
     /// Outgoing charge coupler presence — publishes delta on change on the
     /// chassis segment (ID 4060).  Stubbed false today; future floating-UI
     /// panel or charge-door animation will call set_present(true).

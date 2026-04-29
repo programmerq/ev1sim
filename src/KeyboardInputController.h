@@ -49,6 +49,19 @@ public:
     // True once after ',' was tapped — cycle PRND down (D→N→R→P, clamped at P).
     bool ConsumePrndDown();
 
+    // True once after Q was tapped — toggle turn signal LEFT.
+    // OFF→LEFT, LEFT→OFF, RIGHT→LEFT.
+    bool ConsumeTurnSignalLeft();
+
+    // True once after E was tapped — toggle turn signal RIGHT.
+    // OFF→RIGHT, RIGHT→OFF, LEFT→RIGHT.
+    bool ConsumeTurnSignalRight();
+
+    // True once after X was tapped — toggle hazard switch on/off.
+    // TODO: temporary keybinding; move to floating-UI panel when that lands
+    //       per docs/TODO.md.
+    bool ConsumeHazardToggle();
+
     // Momentary state of the U key — true while held.  Used for the
     // combination-switch flash-to-pass lever (not edge-detected; the lever
     // returns to neutral as soon as the driver releases it).
@@ -78,12 +91,18 @@ private:
     bool m_k_prev     = false;
     bool m_period_prev = false;
     bool m_comma_prev  = false;
-    bool m_camera_cycle    = false;
-    bool m_pause_toggle    = false;
-    bool m_headlight_toggle = false;
-    bool m_keyon_toggle    = false;
-    bool m_prnd_up         = false;
-    bool m_prnd_down       = false;
+    bool m_q_prev      = false;
+    bool m_e_prev      = false;
+    bool m_x_prev      = false;
+    bool m_camera_cycle       = false;
+    bool m_pause_toggle       = false;
+    bool m_headlight_toggle   = false;
+    bool m_keyon_toggle       = false;
+    bool m_prnd_up            = false;
+    bool m_prnd_down          = false;
+    bool m_turn_signal_left   = false;
+    bool m_turn_signal_right  = false;
+    bool m_hazard_toggle      = false;
 
     // Panel toggle keys: KEY_KEY_1 through KEY_KEY_4
     bool m_panel_prev[4]   = {};

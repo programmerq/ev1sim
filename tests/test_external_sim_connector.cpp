@@ -20,8 +20,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     // Driver inputs on the main harness segment (electricsim_ev1_bus), output
     // from ev1sim: brake_pedal_q8 (6900), steering_deg_q8 (6901),
     // gear_selector (6902), throttle_q8 (6903), brake_switch (6904),
+    // hazard_request (6944), turn_signal_left (6948), turn_signal_right (6949),
     // seatbelt_buckled (6964).
-    constexpr int kNumDriverInputs = 6;
+    constexpr int kNumDriverInputs = 9;
     const int expected = NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS +
                          kNumCombSw + kNumChargeCplr + kNumPrnd +
                          kNumDynamics + kNumDriverInputs;
@@ -71,10 +72,15 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
             CHECK_FALSE(e.input_to_sim);    // dynamics signals are outputs
             ++dynamics_count;
         } else if ((e.signal_id >= 6900 && e.signal_id <= 6904) ||
+                   e.signal_id == 6944 ||
+                   e.signal_id == 6948 ||
+                   e.signal_id == 6949 ||
                    e.signal_id == 6964) {
             // Driver inputs on the main harness segment — outputs from ev1sim.
             // 6900=brake_pedal_q8  6901=steering_deg_q8  6902=gear_selector
-            // 6903=throttle_q8     6904=brake_switch      6964=seatbelt_buckled
+            // 6903=throttle_q8     6904=brake_switch
+            // 6944=hazard_request  6948=turn_signal_left  6949=turn_signal_right
+            // 6964=seatbelt_buckled
             CHECK_FALSE(e.input_to_sim);
             ++driver_input_count;
         } else {

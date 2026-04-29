@@ -119,6 +119,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
         std::cout << "[SimApp] Ready.  Controls: WASD=drive  Space=park brake  "
                      "P=pause  R=respawn  C=camera  Scroll=zoom  B=horn  O=hi  L=lo  "
                      "H=headlights  K=key-on  .=PRND-up  ,=PRND-down  "
+                     "Q=turn-L  E=turn-R  X=hazard  "
                      "F=hood  T=trunk  [=doorL  ]=doorR  Esc=quit\n";
         if (m_paused)
             std::cout << "[SimApp] Started PAUSED — press P to begin simulation\n";
@@ -263,6 +264,26 @@ int SimApp::RunWithVisualization() {
             int idx = static_cast<int>(m_physical->prnd_selector().position());
             std::cout << "[SimApp] PRND -> " << prnd_names[idx] << "\n";
         }
+        // Q = turn signal LEFT; E = turn signal RIGHT; X = hazard toggle.
+        if (m_keyboard->ConsumeTurnSignalLeft()) {
+            m_physical->turn_signal_stalk().toggle_left();
+            const auto pos = m_physical->turn_signal_stalk().position();
+            using P = ev1sim::TurnSignalStalk::Position;
+            const char* ts_name = (pos == P::LEFT) ? "LEFT" : (pos == P::RIGHT) ? "RIGHT" : "OFF";
+            std::cout << "[SimApp] Turn signal: " << ts_name << "\n";
+        }
+        if (m_keyboard->ConsumeTurnSignalRight()) {
+            m_physical->turn_signal_stalk().toggle_right();
+            const auto pos = m_physical->turn_signal_stalk().position();
+            using P = ev1sim::TurnSignalStalk::Position;
+            const char* ts_name = (pos == P::LEFT) ? "LEFT" : (pos == P::RIGHT) ? "RIGHT" : "OFF";
+            std::cout << "[SimApp] Turn signal: " << ts_name << "\n";
+        }
+        if (m_keyboard->ConsumeHazardToggle()) {
+            m_physical->hazard_switch().toggle();
+            std::cout << "[SimApp] Hazard: "
+                      << (m_physical->hazard_switch().on() ? "ON" : "OFF") << "\n";
+        }
 
         // --- Physics sub-stepping (skipped when paused) ---
         if (!m_paused) {
@@ -349,6 +370,13 @@ int SimApp::RunWithVisualization() {
             // TODO: add a floating-UI toggle in docs/TODO.md panel item so
             // the user can unbuckle during development testing.
             m_external_sim->SetDriverSeatbeltBuckled(true);
+            // Turn signal stalk (6948, 6949) and hazard switch (6944).
+            m_external_sim->SetDriverTurnSignalLeft(
+                m_physical->turn_signal_stalk().active_left());
+            m_external_sim->SetDriverTurnSignalRight(
+                m_physical->turn_signal_stalk().active_right());
+            m_external_sim->SetDriverHazardRequest(
+                m_physical->hazard_switch().on());
         }
         m_external_sim->Tick(t);
 
@@ -554,6 +582,15 @@ int SimApp::RunHeadless() {
             // TODO: add a floating-UI toggle in docs/TODO.md panel item so
             // the user can unbuckle during development testing.
             m_external_sim->SetDriverSeatbeltBuckled(true);
+            // Turn signal stalk (6948, 6949) and hazard switch (6944).
+            // In headless mode no keyboard cycles them; publish stable defaults
+            // (both false) so LHJB sees a defined initial state.
+            m_external_sim->SetDriverTurnSignalLeft(
+                m_physical->turn_signal_stalk().active_left());
+            m_external_sim->SetDriverTurnSignalRight(
+                m_physical->turn_signal_stalk().active_right());
+            m_external_sim->SetDriverHazardRequest(
+                m_physical->hazard_switch().on());
         }
         m_external_sim->Tick(t);
 

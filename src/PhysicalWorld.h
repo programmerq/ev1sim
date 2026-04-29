@@ -135,8 +135,49 @@ private:
     bool m_present = false;  // future UI toggle
 };
 
+/// Turn-signal stalk (right column, left of steering wheel).
+///
+/// Three positions: OFF, LEFT, RIGHT.  Toggle semantics:
+///   toggle_left():  OFF → LEFT; LEFT → OFF; RIGHT → LEFT
+///   toggle_right(): OFF → RIGHT; RIGHT → OFF; LEFT → RIGHT
+///
+/// Auto-cancel (return-to-center after sufficient steering travel) is skipped
+/// for keyboard ergonomics — manual toggle is the simple model.
+/// TODO: add auto-cancel once a floating-UI panel lands per docs/TODO.md.
+class TurnSignalStalk {
+public:
+    enum class Position { OFF, LEFT, RIGHT };
+
+    /// Cycle the stalk toward LEFT.  OFF→LEFT, LEFT→OFF, RIGHT→LEFT.
+    void toggle_left();
+
+    /// Cycle the stalk toward RIGHT.  OFF→RIGHT, RIGHT→OFF, LEFT→RIGHT.
+    void toggle_right();
+
+    Position position()    const { return m_position; }
+    bool active_left()     const { return m_position == Position::LEFT;  }
+    bool active_right()    const { return m_position == Position::RIGHT; }
+
+private:
+    Position m_position = Position::OFF;
+};
+
+/// Hazard warning switch (dashboard pushbutton).
+///
+/// Simple latching toggle: on/off.  When on, ev1sim publishes
+/// kSigDriverHazardRequest (ID 6944) as true, which LHJB uses to override
+/// both turn-signal sides so all four corners blink in unison.
+class HazardSwitch {
+public:
+    void toggle() { m_on = !m_on; }
+    bool on() const { return m_on; }
+
+private:
+    bool m_on = false;
+};
+
 /// Container for all physical-world input components.
-/// Future additions (hazard switch, wiper stalk, RSA keypad, etc.) join here.
+/// Future additions (wiper stalk, RSA keypad, etc.) join here.
 class PhysicalWorld {
 public:
     CombinationSwitch&       combination_switch()       { return m_comb_sw; }
@@ -151,11 +192,19 @@ public:
     PrndSelector&       prnd_selector()       { return m_prnd_sel; }
     const PrndSelector& prnd_selector() const { return m_prnd_sel; }
 
+    TurnSignalStalk&       turn_signal_stalk()       { return m_turn_stalk; }
+    const TurnSignalStalk& turn_signal_stalk() const { return m_turn_stalk; }
+
+    HazardSwitch&       hazard_switch()       { return m_hazard_sw; }
+    const HazardSwitch& hazard_switch() const { return m_hazard_sw; }
+
 private:
     CombinationSwitch m_comb_sw;
     BrakeSwitch       m_brake_sw;
     ChargeCoupler     m_charge_coupler;
     PrndSelector      m_prnd_sel;
+    TurnSignalStalk   m_turn_stalk;
+    HazardSwitch      m_hazard_sw;
 };
 
 }  // namespace ev1sim

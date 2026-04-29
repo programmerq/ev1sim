@@ -98,6 +98,26 @@ DriverCommand KeyboardInputController::Update(double dt) {
         m_prnd_down = true;
     m_comma_prev = comma_now;
 
+    // --- Turn signal left (Q one-shot, consumed via ConsumeTurnSignalLeft) ---
+    bool q_now = m_keys[irr::KEY_KEY_Q];
+    if (q_now && !m_q_prev)
+        m_turn_signal_left = true;
+    m_q_prev = q_now;
+
+    // --- Turn signal right (E one-shot, consumed via ConsumeTurnSignalRight) ---
+    bool e_now = m_keys[irr::KEY_KEY_E];
+    if (e_now && !m_e_prev)
+        m_turn_signal_right = true;
+    m_e_prev = e_now;
+
+    // --- Hazard toggle (X one-shot, consumed via ConsumeHazardToggle) ---
+    // TODO: temporary keybinding; move to floating-UI panel when that lands
+    //       per docs/TODO.md.
+    bool x_now = m_keys[irr::KEY_KEY_X];
+    if (x_now && !m_x_prev)
+        m_hazard_toggle = true;
+    m_x_prev = x_now;
+
     // --- Panel toggles (F=hood, T=trunk, [=doorL, ]=doorR) ---
     {
         static const irr::EKEY_CODE panel_keys[4] = {
@@ -172,6 +192,24 @@ bool KeyboardInputController::ConsumePanelToggle(int index) {
     if (index < 0 || index >= 4) return false;
     bool v = m_panel_toggle[index];
     m_panel_toggle[index] = false;
+    return v;
+}
+
+bool KeyboardInputController::ConsumeTurnSignalLeft() {
+    bool v = m_turn_signal_left;
+    m_turn_signal_left = false;
+    return v;
+}
+
+bool KeyboardInputController::ConsumeTurnSignalRight() {
+    bool v = m_turn_signal_right;
+    m_turn_signal_right = false;
+    return v;
+}
+
+bool KeyboardInputController::ConsumeHazardToggle() {
+    bool v = m_hazard_toggle;
+    m_hazard_toggle = false;
     return v;
 }
 
