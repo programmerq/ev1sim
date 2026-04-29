@@ -39,6 +39,10 @@ public:
     // True once after H was tapped (consumed on read).
     bool ConsumeHeadlightToggle();
 
+    // True once after K was tapped (consumed on read).
+    // K = "Key on" — enables propulsion until RSA's vehicle-on signal is wired.
+    bool ConsumeKeyOnToggle();
+
     // Momentary state of the U key — true while held.  Used for the
     // combination-switch flash-to-pass lever (not edge-detected; the lever
     // returns to neutral as soon as the driver releases it).
@@ -65,9 +69,11 @@ private:
     bool m_c_prev     = false;
     bool m_p_prev     = false;
     bool m_h_prev     = false;
+    bool m_k_prev     = false;
     bool m_camera_cycle    = false;
     bool m_pause_toggle    = false;
     bool m_headlight_toggle = false;
+    bool m_keyon_toggle    = false;
 
     // Panel toggle keys: KEY_KEY_1 through KEY_KEY_4
     bool m_panel_prev[4]   = {};

@@ -103,6 +103,9 @@ SimApp::SimApp(const Config& config) : m_config(config) {
 
     m_paused = m_config.start_paused;
 
+    // Startup banner — always printed regardless of headless/interactive mode.
+    std::cout << "[SimApp] Vehicle: KEY OFF (press K to enable propulsion)\n";
+
     if (headless) {
         std::cout << "[SimApp] Headless mode — no window.  Exits ";
         if (m_scripted)
@@ -115,7 +118,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
     } else {
         std::cout << "[SimApp] Ready.  Controls: WASD=drive  Space=park brake  "
                      "P=pause  R=respawn  C=camera  Scroll=zoom  B=horn  O=hi  L=lo  "
-                     "H=headlights  F=hood  T=trunk  [=doorL  ]=doorR  Esc=quit\n";
+                     "H=headlights  K=key-on  F=hood  T=trunk  [=doorL  ]=doorR  Esc=quit\n";
         if (m_paused)
             std::cout << "[SimApp] Started PAUSED — press P to begin simulation\n";
     }
@@ -197,6 +200,16 @@ int SimApp::RunWithVisualization() {
         DriverCommand cmd = m_keyboard->Update(render_dt);
         if (m_scripted && !m_paused)
             cmd = m_scripted->Update(m_world->GetState());
+
+        // --- Propulsion enable gate (KEY OFF override) ---
+        // While m_propulsion_enabled is false, clamp brakes at full and zero
+        // throttle so Chrono reflects the vehicle's actual "key off" state.
+        if (!m_propulsion_enabled) {
+            cmd.throttle    = 0.0;
+            cmd.front_brake = 1.0;
+            cmd.rear_brake  = 1.0;
+        }
+
         m_world->GetDriver().SetCommand(cmd);
 
         // Handle one-shot actions.
@@ -210,6 +223,15 @@ int SimApp::RunWithVisualization() {
         }
         if (m_keyboard->QuitRequested())
             break;
+        // K = "Key on" toggle — temporary developer binding.
+        // TODO: wire to RSA's vehicle-on signal once pinned.
+        if (m_keyboard->ConsumeKeyOnToggle()) {
+            m_propulsion_enabled = !m_propulsion_enabled;
+            std::cout << "[SimApp] Vehicle: "
+                      << (m_propulsion_enabled ? "KEY ON  (propulsion enabled)"
+                                               : "KEY OFF (propulsion disabled)")
+                      << "\n";
+        }
         if (m_keyboard->ConsumeHeadlightToggle()) {
             // H cycles the combination switch through OFF → PARK → ON → HI.
             // The wire-level pin states are published on the chassis bus and
@@ -411,19 +433,37 @@ int SimApp::RunHeadless() {
     const double max_time = m_config.simulation.max_time_s;
 
     // Default driver command — zero throttle/brake/steering when no scripted
-    // driver is configured.
-    if (!m_scripted)
-        m_world->GetDriver().SetCommand(DriverCommand{});
+    // driver is configured.  Apply startup override (brakes clamped, throttle
+    // zeroed) so the initial SetCommand also reflects "key off".
+    {
+        DriverCommand init_cmd{};
+        if (!m_propulsion_enabled) {
+            init_cmd.front_brake = 1.0;
+            init_cmd.rear_brake  = 1.0;
+        }
+        m_world->GetDriver().SetCommand(init_cmd);
+    }
 
     const auto wall_start = std::chrono::steady_clock::now();
 
     while (!g_stop_requested.load(std::memory_order_relaxed)) {
         // --- Scripted driver (if any) — reads previous-tick state and
         //     emits a new command before we step physics.
+        DriverCommand cmd{};
         if (m_scripted) {
-            DriverCommand cmd = m_scripted->Update(m_world->GetState());
-            m_world->GetDriver().SetCommand(cmd);
+            cmd = m_scripted->Update(m_world->GetState());
         }
+
+        // --- Propulsion enable gate (KEY OFF override) ---
+        // In headless mode m_propulsion_enabled stays false unless RSA's
+        // vehicle-on signal is wired (TODO).
+        if (!m_propulsion_enabled) {
+            cmd.throttle    = 0.0;
+            cmd.front_brake = 1.0;
+            cmd.rear_brake  = 1.0;
+        }
+
+        m_world->GetDriver().SetCommand(cmd);
 
         // --- Physics sub-stepping (no pause control in headless) ---
         for (int i = 0; i < steps_per_tick; ++i) {
@@ -450,6 +490,19 @@ int SimApp::RunHeadless() {
             m_external_sim->SetCombSwOutputs(cs.pin_low_beam_out(),
                                              cs.pin_flash_to_pass_out(),
                                              cs.pin_park_headlamp_out());
+        }
+        // Driver inputs — publish the override-adjusted values so the bus
+        // reflects what the vehicle is actually doing (IDs 6900-6903).
+        {
+            auto clamp01_q8 = [](double v) -> std::uint8_t {
+                if (v < 0.0) v = 0.0;
+                if (v > 1.0) v = 1.0;
+                return static_cast<std::uint8_t>(v * 255.0 + 0.5);
+            };
+            m_external_sim->SetDriverBrakePedalQ8(clamp01_q8(cmd.front_brake));
+            m_external_sim->SetDriverThrottleQ8(clamp01_q8(cmd.throttle));
+            m_external_sim->SetDriverSteeringDegQ8(0);  // no keyboard in headless
+            m_external_sim->SetDriverGearSelector(3);    // D — TODO PRND cycling
         }
         m_external_sim->Tick(t);
 

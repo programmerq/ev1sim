@@ -80,6 +80,12 @@ DriverCommand KeyboardInputController::Update(double dt) {
         m_headlight_toggle = true;
     m_h_prev = h_now;
 
+    // --- Key-on toggle (K one-shot, consumed via ConsumeKeyOnToggle) ---
+    bool k_now = m_keys[irr::KEY_KEY_K];
+    if (k_now && !m_k_prev)
+        m_keyon_toggle = true;
+    m_k_prev = k_now;
+
     // --- Panel toggles (F=hood, T=trunk, [=doorL, ]=doorR) ---
     {
         static const irr::EKEY_CODE panel_keys[4] = {
@@ -129,6 +135,12 @@ bool KeyboardInputController::ConsumePauseToggle() {
 bool KeyboardInputController::ConsumeHeadlightToggle() {
     bool v = m_headlight_toggle;
     m_headlight_toggle = false;
+    return v;
+}
+
+bool KeyboardInputController::ConsumeKeyOnToggle() {
+    bool v = m_keyon_toggle;
+    m_keyon_toggle = false;
     return v;
 }
 

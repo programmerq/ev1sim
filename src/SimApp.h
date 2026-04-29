@@ -61,6 +61,12 @@ private:
     chrono::ChRealtimeStepTimer m_realtime_timer;
     bool m_paused = false;
 
+    // Propulsion enable gate — false at startup so Chrono doesn't behave like
+    // the vehicle is already running before the ECU pipeline is ready.
+    // Brakes are clamped to 1.0 and throttle is forced to 0 while false.
+    // TODO: wire to RSA's vehicle-on signal once pinned; for now press K.
+    bool m_propulsion_enabled = false;
+
     // Demo pattern for the bulbs — "off", "blink", or "chase".  Kept in the
     // codebase for diagnostics; defaults off now that the electrical sim
     // drives the lamps.
