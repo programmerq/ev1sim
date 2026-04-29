@@ -3,15 +3,6 @@
 Catch-all for physical-world / render / sim follow-ups deferred from focused
 work.  When you finish an item, delete it from here.
 
-## Project Chrono startup state
-- [ ] **Start with parking brake set, vehicle off.** Currently Chrono boots
-  with the vehicle in an "engine on" state, which doesn't match the EV1's
-  expected RSA startup sequence (RSA controls the OFF/ACC/RUN/START state
-  via internal logic, not a key cylinder).  Set Chrono's initial state so
-  brakes are clamped and propulsion is disabled until RSA tells us to go.
-  Symptom this might explain: vehicle behaves "engine running" before any
-  ECU pipeline is ready, masking real ECU control issues.
-
 ## Physical-world components (next batches)
 
 The `PhysicalWorld` pattern landed with `CombinationSwitch` as the first
