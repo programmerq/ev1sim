@@ -118,7 +118,8 @@ SimApp::SimApp(const Config& config) : m_config(config) {
     } else {
         std::cout << "[SimApp] Ready.  Controls: WASD=drive  Space=park brake  "
                      "P=pause  R=respawn  C=camera  Scroll=zoom  B=horn  O=hi  L=lo  "
-                     "H=headlights  K=key-on  F=hood  T=trunk  [=doorL  ]=doorR  Esc=quit\n";
+                     "H=headlights  K=key-on  .=PRND-up  ,=PRND-down  "
+                     "F=hood  T=trunk  [=doorL  ]=doorR  Esc=quit\n";
         if (m_paused)
             std::cout << "[SimApp] Started PAUSED — press P to begin simulation\n";
     }
@@ -249,6 +250,20 @@ int SimApp::RunWithVisualization() {
         m_physical->combination_switch().set_flash_to_pass(
             m_keyboard->IsFlashToPassHeld());
 
+        // '.' / ',' cycle PRND up/down (clamped at ends; no wraparound).
+        if (m_keyboard->ConsumePrndUp()) {
+            m_physical->prnd_selector().cycle_up();
+            const char* prnd_names[] = {"P", "R", "N", "D"};
+            int idx = static_cast<int>(m_physical->prnd_selector().position());
+            std::cout << "[SimApp] PRND -> " << prnd_names[idx] << "\n";
+        }
+        if (m_keyboard->ConsumePrndDown()) {
+            m_physical->prnd_selector().cycle_down();
+            const char* prnd_names[] = {"P", "R", "N", "D"};
+            int idx = static_cast<int>(m_physical->prnd_selector().position());
+            std::cout << "[SimApp] PRND -> " << prnd_names[idx] << "\n";
+        }
+
         // --- Physics sub-stepping (skipped when paused) ---
         if (!m_paused) {
             for (int i = 0; i < steps_per_frame; ++i) {
@@ -298,10 +313,13 @@ int SimApp::RunWithVisualization() {
         // a floating-UI panel or charge-door animation sets it.
         m_external_sim->SetChargeCouplerPresent(
             m_physical->charge_coupler().present());
-        // Driver inputs (main harness segment, IDs 6900-6903).  Local physics
-        // path keeps using `cmd` directly; this just makes the inputs visible
-        // to BTCM/LHJB/etc. on the bus.  PRND not modeled in DriverCommand
-        // yet — default to D (3) and TODO it.
+        // PRND selector wire-level pins (chassis bus, IDs 4050-4053).
+        {
+            const auto& prnd = m_physical->prnd_selector();
+            m_external_sim->SetPrndSelector(prnd.pin_a(), prnd.pin_b(),
+                                            prnd.pin_c(), prnd.pin_d());
+        }
+        // Driver inputs (main harness segment, IDs 6900-6903).
         {
             auto clamp01_q8 = [](double v) -> std::uint8_t {
                 if (v < 0.0) v = 0.0;
@@ -321,7 +339,9 @@ int SimApp::RunWithVisualization() {
             m_external_sim->SetDriverBrakePedalQ8(clamp01_q8(cmd.front_brake));
             m_external_sim->SetDriverThrottleQ8(clamp01_q8(cmd.throttle));
             m_external_sim->SetDriverSteeringDegQ8(steer_deg_q8(cmd.steering));
-            m_external_sim->SetDriverGearSelector(3);  // D — TODO PRND cycling
+            // Gear selector: map PrndSelector::Position to enum (P=0, R=1, N=2, D=3).
+            m_external_sim->SetDriverGearSelector(
+                static_cast<std::uint8_t>(m_physical->prnd_selector().position()));
             // Brake switch (6904): derive from brake travel with hysteresis.
             bool brake_sw = m_physical->brake_switch().update(cmd.front_brake);
             m_external_sim->SetDriverBrakeSwitch(brake_sw);
@@ -506,6 +526,13 @@ int SimApp::RunHeadless() {
         // a floating-UI panel or charge-door animation sets it.
         m_external_sim->SetChargeCouplerPresent(
             m_physical->charge_coupler().present());
+        // PRND selector wire-level pins (chassis bus, IDs 4050-4053).
+        // In headless mode stays at default Park; no keyboard cycling.
+        {
+            const auto& prnd = m_physical->prnd_selector();
+            m_external_sim->SetPrndSelector(prnd.pin_a(), prnd.pin_b(),
+                                            prnd.pin_c(), prnd.pin_d());
+        }
         // Driver inputs — publish the override-adjusted values so the bus
         // reflects what the vehicle is actually doing (IDs 6900-6903).
         {
@@ -517,7 +544,9 @@ int SimApp::RunHeadless() {
             m_external_sim->SetDriverBrakePedalQ8(clamp01_q8(cmd.front_brake));
             m_external_sim->SetDriverThrottleQ8(clamp01_q8(cmd.throttle));
             m_external_sim->SetDriverSteeringDegQ8(0);  // no keyboard in headless
-            m_external_sim->SetDriverGearSelector(3);    // D — TODO PRND cycling
+            // Gear selector: map PrndSelector::Position to enum (P=0, R=1, N=2, D=3).
+            m_external_sim->SetDriverGearSelector(
+                static_cast<std::uint8_t>(m_physical->prnd_selector().position()));
             // Brake switch (6904): derive from brake travel with hysteresis.
             bool brake_sw = m_physical->brake_switch().update(cmd.front_brake);
             m_external_sim->SetDriverBrakeSwitch(brake_sw);

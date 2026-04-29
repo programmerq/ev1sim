@@ -86,6 +86,18 @@ DriverCommand KeyboardInputController::Update(double dt) {
         m_keyon_toggle = true;
     m_k_prev = k_now;
 
+    // --- PRND up ('.' one-shot, consumed via ConsumePrndUp) ---
+    bool period_now = m_keys[irr::KEY_PERIOD];
+    if (period_now && !m_period_prev)
+        m_prnd_up = true;
+    m_period_prev = period_now;
+
+    // --- PRND down (',' one-shot, consumed via ConsumePrndDown) ---
+    bool comma_now = m_keys[irr::KEY_COMMA];
+    if (comma_now && !m_comma_prev)
+        m_prnd_down = true;
+    m_comma_prev = comma_now;
+
     // --- Panel toggles (F=hood, T=trunk, [=doorL, ]=doorR) ---
     {
         static const irr::EKEY_CODE panel_keys[4] = {
@@ -141,6 +153,18 @@ bool KeyboardInputController::ConsumeHeadlightToggle() {
 bool KeyboardInputController::ConsumeKeyOnToggle() {
     bool v = m_keyon_toggle;
     m_keyon_toggle = false;
+    return v;
+}
+
+bool KeyboardInputController::ConsumePrndUp() {
+    bool v = m_prnd_up;
+    m_prnd_up = false;
+    return v;
+}
+
+bool KeyboardInputController::ConsumePrndDown() {
+    bool v = m_prnd_down;
+    m_prnd_down = false;
     return v;
 }
 

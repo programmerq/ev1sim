@@ -43,6 +43,12 @@ public:
     // K = "Key on" — enables propulsion until RSA's vehicle-on signal is wired.
     bool ConsumeKeyOnToggle();
 
+    // True once after '.' was tapped — cycle PRND up (P→R→N→D, clamped at D).
+    bool ConsumePrndUp();
+
+    // True once after ',' was tapped — cycle PRND down (D→N→R→P, clamped at P).
+    bool ConsumePrndDown();
+
     // Momentary state of the U key — true while held.  Used for the
     // combination-switch flash-to-pass lever (not edge-detected; the lever
     // returns to neutral as soon as the driver releases it).
@@ -70,10 +76,14 @@ private:
     bool m_p_prev     = false;
     bool m_h_prev     = false;
     bool m_k_prev     = false;
+    bool m_period_prev = false;
+    bool m_comma_prev  = false;
     bool m_camera_cycle    = false;
     bool m_pause_toggle    = false;
     bool m_headlight_toggle = false;
     bool m_keyon_toggle    = false;
+    bool m_prnd_up         = false;
+    bool m_prnd_down       = false;
 
     // Panel toggle keys: KEY_KEY_1 through KEY_KEY_4
     bool m_panel_prev[4]   = {};
