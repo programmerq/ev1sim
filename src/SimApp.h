@@ -97,4 +97,10 @@ private:
     // codebase for diagnostics; defaults off now that the electrical sim
     // drives the lamps.
     std::string m_lights_demo = "off";
+
+    // Physical-world snapshot overlay — toggled by Z key.
+    bool m_show_snapshot = false;
+
+    // Running count of IPC trip-reset button presses (HUD display only; not on bus).
+    int m_trip_reset_count = 0;
 };

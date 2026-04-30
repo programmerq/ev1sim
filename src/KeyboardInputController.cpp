@@ -172,6 +172,12 @@ DriverCommand KeyboardInputController::Update(double dt) {
         m_wiper_wash = true;
     m_m_prev = m_now;
 
+    // --- Snapshot overlay toggle (Z one-shot, consumed via ConsumeSnapshotToggle) ---
+    bool z_now = m_keys[irr::KEY_KEY_Z];
+    if (z_now && !m_z_prev)
+        m_snapshot_toggle = true;
+    m_z_prev = z_now;
+
     // --- Panel toggles (F=hood, T=trunk, [=doorL, ]=doorR) ---
     {
         static const irr::EKEY_CODE panel_keys[4] = {
@@ -318,6 +324,12 @@ bool KeyboardInputController::ConsumeWiperCycle() {
 bool KeyboardInputController::ConsumeWiperWash() {
     bool v = m_wiper_wash;
     m_wiper_wash = false;
+    return v;
+}
+
+bool KeyboardInputController::ConsumeSnapshotToggle() {
+    bool v = m_snapshot_toggle;
+    m_snapshot_toggle = false;
     return v;
 }
 

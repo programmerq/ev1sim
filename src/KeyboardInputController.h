@@ -92,6 +92,11 @@ public:
     // True once after M was tapped — wiper wash momentary press.
     bool ConsumeWiperWash();
 
+    // True once after Z was tapped — toggle the physical-world snapshot overlay.
+    // Lock toggles (per-door) will land via the floating-UI panel per docs/TODO.md;
+    // the [ / ] door bindings nearby are ajar-only (open/close), not lock state.
+    bool ConsumeSnapshotToggle();
+
     // True if Esc was pressed.
     bool QuitRequested() const { return m_quit; }
 
@@ -125,6 +130,7 @@ private:
     bool m_minus_prev  = false;   // cruise SPEED DOWN
     bool m_v_prev      = false;   // wiper cycle
     bool m_m_prev      = false;   // wiper wash
+    bool m_z_prev      = false;   // snapshot overlay toggle
     bool m_camera_cycle       = false;
     bool m_pause_toggle       = false;
     bool m_headlight_toggle   = false;
@@ -143,6 +149,7 @@ private:
     bool m_cruise_speed_down  = false;
     bool m_wiper_cycle        = false;
     bool m_wiper_wash         = false;
+    bool m_snapshot_toggle    = false;
 
     // Panel toggle keys: KEY_KEY_1 through KEY_KEY_4
     bool m_panel_prev[4]   = {};

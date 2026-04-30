@@ -122,7 +122,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                      "P=pause  R=respawn  C=camera  Scroll=zoom  B=horn  O=hi  L=lo  "
                      "H=headlights  K=key-on  .=PRND-up  ,=PRND-down  "
                      "Q=turn-L  E=turn-R  X=hazard  "
-                     "F=hood  T=trunk  [=doorL  ]=doorR  Esc=quit\n";
+                     "F=hood  T=trunk  [=doorL  ]=doorR  Z=snapshot  Esc=quit\n";
         if (m_paused)
             std::cout << "[SimApp] Started PAUSED — press P to begin simulation\n";
     }
@@ -342,8 +342,13 @@ int SimApp::RunWithVisualization() {
         // I = IPC trip-reset (momentary).
         if (m_keyboard->ConsumeIpcTripReset()) {
             m_physical->ipc_trip_reset().press();
+            ++m_trip_reset_count;
             std::cout << "[SimApp] IPC trip-reset pressed\n";
         }
+
+        // Z = toggle physical-world snapshot overlay.
+        if (m_keyboard->ConsumeSnapshotToggle())
+            m_show_snapshot = !m_show_snapshot;
 
         // Cruise stalk: G=SET, Y=RESUME, N=CANCEL, +(=)=SPEED+, -=SPEED-.
         if (m_keyboard->ConsumeCruiseSet()) {
@@ -589,6 +594,11 @@ int SimApp::RunWithVisualization() {
         m_physical->DrawHUD(m_vis->GetDevice(),
                             m_external_sim->GetRsaRunMode(),
                             m_external_sim->HasReceivedRunMode());
+        m_physical->DrawSnapshotOverlay(m_vis->GetDevice(),
+                                        m_show_snapshot,
+                                        m_external_sim->GetRsaRunMode(),
+                                        m_external_sim->HasReceivedRunMode(),
+                                        m_trip_reset_count);
 
         // Draw PAUSED overlay.
         if (m_paused) {
@@ -624,7 +634,7 @@ int SimApp::RunWithVisualization() {
                 const int bx = dim.Width / 2 - 220;
                 const int by = 60;
                 const int bw = 440;
-                const int bh = 280;
+                const int bh = 296;
                 drv->draw2DRectangle(
                     irr::video::SColor(180, 20, 20, 30),
                     irr::core::recti(bx, by, bx + bw, by + bh));
@@ -656,6 +666,7 @@ int SimApp::RunWithVisualization() {
                 drawL(L"F            hood toggle",                         norm);
                 drawL(L"T            trunk toggle",                        norm);
                 drawL(L"[ / ]        door L / R toggle",                  norm);
+                drawL(L"Z            physical-world snapshot overlay",     norm);
                 drawL(L"C            camera mode cycle",                   norm);
                 drawL(L"P            pause",                               norm);
                 drawL(L"R            respawn",                             norm);
