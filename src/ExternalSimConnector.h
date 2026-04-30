@@ -183,19 +183,21 @@ public:
     void SetPrndSelector(bool a, bool b, bool c, bool d);
 
     /// Outgoing RSA per-digit keypad button signals (IDs 6975-6979, main harness).
-    /// Each is a momentary 1-tick pulse (true=pressed this tick, false=idle).
-    /// Encoded as 1-byte uint8 (0=idle, 1=pressed).
-    ///   Button1 (6975): "1/2" button, primary-tap = digit 1
-    ///   Button2 (6976): "3/4" button, primary-tap = digit 3
-    ///   Button3 (6977): "5/6" button, primary-tap = digit 5
-    ///   Button4 (6978): "7/8" button, primary-tap = digit 7
-    ///   Button5 (6979): "9/0" button, primary-tap = digit 9
+    /// Encoded as 1-byte uint8 with long-press support (Option A encoding):
+    ///   0 = idle (no press this tick)
+    ///   1 = tap  (enters the lower digit: 1, 3, 5, 7, 9 respectively)
+    ///   2 = long-press (enters the higher digit: 2, 4, 6, 8, 0 respectively)
+    ///   Button1 (6975): "1/2" button
+    ///   Button2 (6976): "3/4" button
+    ///   Button3 (6977): "5/6" button
+    ///   Button4 (6978): "7/8" button
+    ///   Button5 (6979): "9/0" button
     /// (Slot 6970 is reserved — was kSigDriverRsaKeypadCodeOk; do not reuse.)
-    void SetDriverRsaKeypadButton1(bool pressed);
-    void SetDriverRsaKeypadButton2(bool pressed);
-    void SetDriverRsaKeypadButton3(bool pressed);
-    void SetDriverRsaKeypadButton4(bool pressed);
-    void SetDriverRsaKeypadButton5(bool pressed);
+    void SetDriverRsaKeypadButton1(std::uint8_t value);
+    void SetDriverRsaKeypadButton2(std::uint8_t value);
+    void SetDriverRsaKeypadButton3(std::uint8_t value);
+    void SetDriverRsaKeypadButton4(std::uint8_t value);
+    void SetDriverRsaKeypadButton5(std::uint8_t value);
 
     /// Outgoing RSA mode-button press (ID 6971, main harness segment).
     /// Momentary 1-tick pulse indicating the user's button press.

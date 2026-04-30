@@ -220,25 +220,40 @@ private:
 ///   2. Press the RUN button on the RSA HMI (6971).
 ///
 /// The K key in ev1sim cycles a local "expected key state" through:
-///   OFF → RUN  (schedules 6 button-1 pulses spaced 100 ms apart, then RUN)
+///   OFF → RUN  (schedules the configured code digits spaced 100 ms apart, then RUN)
 ///   RUN → ACC  (immediate ACC mode-button pulse; no digit re-entry needed)
 ///   ACC → OFF  (immediate OFF mode-button pulse)
 ///   OFF → RUN  (wraps back to start)
 ///
+/// Long-press encoding (Option A):
+///   Each button signal (6975-6979) carries a uint8 payload:
+///     0 = idle (no press)
+///     1 = tap  (lower digit: 1, 3, 5, 7, 9)
+///     2 = long-press (higher digit: 2, 4, 6, 8, 0)
+///
 /// The digit sequence runs through a tick-driven scheduler.  Call update()
 /// once per render frame; consume_fires_now() to get the resulting signals.
 ///
-/// TODO: long-press for higher digits (2,4,6,8,0) — currently every button
-/// tap maps to the lower digit in its pair (1,3,5,7,9).
+/// TODO: hold-time threshold for distinguishing tap vs long in real UI (≥500 ms).
 class RsaKeypadDriver {
 public:
     enum class ExpectedState { OFF, RUN, ACC };
 
     /// Aggregate of signals to fire on this tick.
     struct KeypadFireSet {
-        bool    button_pulse[5] = {};  ///< index 0..4 (button signals 6975-6979)
+        /// Per-button value (index 0..4, signals 6975-6979).
+        /// 0 = idle, 1 = tap (lower digit), 2 = long-press (higher digit).
+        std::uint8_t button_value[5] = {};
         std::uint8_t mode_button = 0; ///< 0=none, 1=OFF, 2=ACC, 3=RUN
     };
+
+    /// Set the code that will be entered on the next OFF → RUN transition.
+    /// code_str must be exactly 6 digits (0-9) in EV1 community notation:
+    ///   tap digits (lower):        1, 3, 5, 7, 9
+    ///   long-press digits (higher): 2, 4, 6, 8, 0
+    /// Default if not called: "111111" (six taps of button 1).
+    /// Call before cycle_k() to take effect on the next K press.
+    void set_code_string(const char* code_str);
 
     /// Advance the cycle: OFF → RUN → ACC → OFF → …
     void cycle_k();
@@ -256,15 +271,30 @@ public:
     /// Name string for HUD/logging ("OFF", "RUN", "ACC").
     const char* expected_state_name() const;
 
+    /// Per-digit entry: button index (0..4) + whether it's a long-press.
+    struct DigitEntry {
+        std::uint8_t button_index = 0;
+        bool         long_press   = false;
+    };
+
 private:
     enum class CycleState { Idle, EmittingDigits, EmittingMode };
+
+    static constexpr int kMaxCodeLen = 6;
 
     ExpectedState m_expected     = ExpectedState::OFF;
     CycleState    m_sched_state  = CycleState::Idle;
     int           m_digits_sent  = 0;    ///< how many digit pulses have fired
     double        m_timer_s      = 0.0;  ///< seconds until next event fires
 
+    /// Sequence of digits to emit on next OFF→RUN cycle.
+    DigitEntry    m_code[kMaxCodeLen];
+    int           m_code_len     = kMaxCodeLen;  ///< always 6
+
     KeypadFireSet m_pending{};           ///< accumulated this tick; cleared by consume
+
+    /// Initialise m_code to default "111111" (six button-0 taps).
+    void init_default_code_();
 };
 
 /// Container for all physical-world input components.

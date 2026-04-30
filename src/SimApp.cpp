@@ -443,14 +443,15 @@ int SimApp::RunWithVisualization() {
                 m_physical->hazard_switch().on());
             // RSA keypad buttons (6975-6979) and mode button (6971) — tick the
             // scheduler and consume whatever it has ready for this frame.
+            // button_value encoding: 0=idle, 1=tap, 2=long-press.
             m_physical->rsa_keypad().update(render_dt);
             {
                 auto fires = m_physical->rsa_keypad().consume_fires_now();
-                m_external_sim->SetDriverRsaKeypadButton1(fires.button_pulse[0]);
-                m_external_sim->SetDriverRsaKeypadButton2(fires.button_pulse[1]);
-                m_external_sim->SetDriverRsaKeypadButton3(fires.button_pulse[2]);
-                m_external_sim->SetDriverRsaKeypadButton4(fires.button_pulse[3]);
-                m_external_sim->SetDriverRsaKeypadButton5(fires.button_pulse[4]);
+                m_external_sim->SetDriverRsaKeypadButton1(fires.button_value[0]);
+                m_external_sim->SetDriverRsaKeypadButton2(fires.button_value[1]);
+                m_external_sim->SetDriverRsaKeypadButton3(fires.button_value[2]);
+                m_external_sim->SetDriverRsaKeypadButton4(fires.button_value[3]);
+                m_external_sim->SetDriverRsaKeypadButton5(fires.button_value[4]);
                 m_external_sim->SetDriverRsaModeButton(fires.mode_button);
             }
         }
@@ -771,14 +772,15 @@ int SimApp::RunHeadless() {
                 m_physical->hazard_switch().on());
             // RSA keypad signals — headless: no key presses; tick scheduler
             // and publish whatever it has (likely idle zeros).
+            // button_value encoding: 0=idle, 1=tap, 2=long-press.
             m_physical->rsa_keypad().update(tick_dt);
             {
                 auto fires = m_physical->rsa_keypad().consume_fires_now();
-                m_external_sim->SetDriverRsaKeypadButton1(fires.button_pulse[0]);
-                m_external_sim->SetDriverRsaKeypadButton2(fires.button_pulse[1]);
-                m_external_sim->SetDriverRsaKeypadButton3(fires.button_pulse[2]);
-                m_external_sim->SetDriverRsaKeypadButton4(fires.button_pulse[3]);
-                m_external_sim->SetDriverRsaKeypadButton5(fires.button_pulse[4]);
+                m_external_sim->SetDriverRsaKeypadButton1(fires.button_value[0]);
+                m_external_sim->SetDriverRsaKeypadButton2(fires.button_value[1]);
+                m_external_sim->SetDriverRsaKeypadButton3(fires.button_value[2]);
+                m_external_sim->SetDriverRsaKeypadButton4(fires.button_value[3]);
+                m_external_sim->SetDriverRsaKeypadButton5(fires.button_value[4]);
                 m_external_sim->SetDriverRsaModeButton(fires.mode_button);
             }
         }

@@ -431,9 +431,9 @@ struct ExternalSimConnector::State {
     std::int8_t   driver_hazard_pub       = -1;
 
     // RSA per-digit keypad buttons (IDs 6975-6979) and mode button (ID 6971).
-    // All are momentary one-shot signals; buttons are true for one tick only.
-    // driver_rsa_buttons[0..4] correspond to kSigDriverRsaKeypadButton[1..5].
-    bool          driver_rsa_buttons[5]   = {};
+    // driver_rsa_buttons[0..4] encode Option A: 0=idle, 1=tap, 2=long-press.
+    // Corresponds to kSigDriverRsaKeypadButton[1..5].
+    std::uint8_t  driver_rsa_buttons[5]   = {};
     std::uint8_t  driver_rsa_mode_button  = 0;
     // Published sentinels: use -1 to force first publish.
     std::int8_t   driver_rsa_btn_pub[5]   = {-1,-1,-1,-1,-1};
@@ -655,24 +655,24 @@ void ExternalSimConnector::SetPrndSelector(bool a, bool b, bool c, bool d) {
     m_state->prnd_d = d;
 }
 
-void ExternalSimConnector::SetDriverRsaKeypadButton1(bool pressed) {
-    m_state->driver_rsa_buttons[0] = pressed;
+void ExternalSimConnector::SetDriverRsaKeypadButton1(std::uint8_t value) {
+    m_state->driver_rsa_buttons[0] = value;
 }
 
-void ExternalSimConnector::SetDriverRsaKeypadButton2(bool pressed) {
-    m_state->driver_rsa_buttons[1] = pressed;
+void ExternalSimConnector::SetDriverRsaKeypadButton2(std::uint8_t value) {
+    m_state->driver_rsa_buttons[1] = value;
 }
 
-void ExternalSimConnector::SetDriverRsaKeypadButton3(bool pressed) {
-    m_state->driver_rsa_buttons[2] = pressed;
+void ExternalSimConnector::SetDriverRsaKeypadButton3(std::uint8_t value) {
+    m_state->driver_rsa_buttons[2] = value;
 }
 
-void ExternalSimConnector::SetDriverRsaKeypadButton4(bool pressed) {
-    m_state->driver_rsa_buttons[3] = pressed;
+void ExternalSimConnector::SetDriverRsaKeypadButton4(std::uint8_t value) {
+    m_state->driver_rsa_buttons[3] = value;
 }
 
-void ExternalSimConnector::SetDriverRsaKeypadButton5(bool pressed) {
-    m_state->driver_rsa_buttons[4] = pressed;
+void ExternalSimConnector::SetDriverRsaKeypadButton5(std::uint8_t value) {
+    m_state->driver_rsa_buttons[4] = value;
 }
 
 void ExternalSimConnector::SetDriverRsaModeButton(std::uint8_t button_enum) {
@@ -1137,7 +1137,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             st.driver_hazard_pub = hazard_val;
         }
         // RSA per-digit keypad buttons (IDs 6975-6979) — one-shot: publish on
-        // change (true fires for one tick, then back to false).
+        // change.  Payload: 0=idle, 1=tap (lower digit), 2=long-press (higher digit).
         {
             constexpr std::uint32_t kBtnIds[5] = {
                 kSigDriverRsaKeypadButton1, kSigDriverRsaKeypadButton2,
@@ -1145,9 +1145,9 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                 kSigDriverRsaKeypadButton5,
             };
             for (int bi = 0; bi < 5; ++bi) {
-                const std::int8_t bval = st.driver_rsa_buttons[bi] ? 1 : 0;
+                const std::int8_t bval = static_cast<std::int8_t>(st.driver_rsa_buttons[bi]);
                 if (st.driver_rsa_btn_pub[bi] < 0 || bval != st.driver_rsa_btn_pub[bi]) {
-                    drv.push_back(MakeBoolDelta(kBtnIds[bi], st.driver_rsa_buttons[bi]));
+                    drv.push_back(MakeU8Delta(kBtnIds[bi], st.driver_rsa_buttons[bi]));
                     st.driver_rsa_btn_pub[bi] = bval;
                 }
             }

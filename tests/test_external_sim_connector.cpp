@@ -334,12 +334,22 @@ TEST_CASE("SetMotorRpm and SetMotorTorqueNm store without crashing", "[ExternalS
 
 TEST_CASE("SetDriverRsaKeypadButtons and SetDriverRsaModeButton store without crashing", "[ExternalSim]") {
     ExternalSimConnector c;
-    CHECK_NOTHROW(c.SetDriverRsaKeypadButton1(true));
-    CHECK_NOTHROW(c.SetDriverRsaKeypadButton2(false));
-    CHECK_NOTHROW(c.SetDriverRsaKeypadButton3(false));
-    CHECK_NOTHROW(c.SetDriverRsaKeypadButton4(false));
-    CHECK_NOTHROW(c.SetDriverRsaKeypadButton5(false));
-    CHECK_NOTHROW(c.SetDriverRsaModeButton(3));  // RUN
+    // 0=idle, 1=tap (lower digit), 2=long-press (higher digit).
+    CHECK_NOTHROW(c.SetDriverRsaKeypadButton1(1));  // tap button 1 -> digit '1'
+    CHECK_NOTHROW(c.SetDriverRsaKeypadButton2(2));  // long-press button 2 -> digit '4'
+    CHECK_NOTHROW(c.SetDriverRsaKeypadButton3(0));  // idle
+    CHECK_NOTHROW(c.SetDriverRsaKeypadButton4(0));  // idle
+    CHECK_NOTHROW(c.SetDriverRsaKeypadButton5(0));  // idle
+    CHECK_NOTHROW(c.SetDriverRsaModeButton(3));     // RUN
+    CHECK_NOTHROW(c.Tick(0.0));
+}
+
+TEST_CASE("SetDriverRsaKeypadButton long-press value 2 stores without crashing", "[ExternalSim]") {
+    ExternalSimConnector c;
+    // Exercise all three values for one button.
+    CHECK_NOTHROW(c.SetDriverRsaKeypadButton1(0));  // idle
+    CHECK_NOTHROW(c.SetDriverRsaKeypadButton1(1));  // tap
+    CHECK_NOTHROW(c.SetDriverRsaKeypadButton1(2));  // long-press
     CHECK_NOTHROW(c.Tick(0.0));
 }
 

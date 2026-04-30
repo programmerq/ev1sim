@@ -333,13 +333,58 @@ void PhysicalWorld::DrawHUD(irr::IrrlichtDevice* device,
 
 // Spacing between scheduled events (digit pulses and the final mode press).
 static constexpr double kKeypadIntervalS = 0.100;  // 100 ms between events
-// Number of digit-1 button presses for the default "111111" code.
-static constexpr int    kDefaultCodeLen  = 6;
+
+// Digit-to-button mapping for EV1 community notation:
+//   tap digits (lower):         1->btn0, 3->btn1, 5->btn2, 7->btn3, 9->btn4
+//   long-press digits (higher): 2->btn0, 4->btn1, 6->btn2, 8->btn3, 0->btn4
+static RsaKeypadDriver::DigitEntry digit_char_to_entry_(char c) {
+    RsaKeypadDriver::DigitEntry e{};
+    switch (c) {
+        case '1': e.button_index = 0; e.long_press = false; break;
+        case '2': e.button_index = 0; e.long_press = true;  break;
+        case '3': e.button_index = 1; e.long_press = false; break;
+        case '4': e.button_index = 1; e.long_press = true;  break;
+        case '5': e.button_index = 2; e.long_press = false; break;
+        case '6': e.button_index = 2; e.long_press = true;  break;
+        case '7': e.button_index = 3; e.long_press = false; break;
+        case '8': e.button_index = 3; e.long_press = true;  break;
+        case '9': e.button_index = 4; e.long_press = false; break;
+        case '0': e.button_index = 4; e.long_press = true;  break;
+        default:  e.button_index = 0; e.long_press = false; break; // fallback
+    }
+    return e;
+}
+
+void RsaKeypadDriver::init_default_code_() {
+    // Default: "111111" — six taps of button 0.
+    m_code_len = kMaxCodeLen;
+    for (int i = 0; i < kMaxCodeLen; ++i) {
+        m_code[i].button_index = 0;
+        m_code[i].long_press   = false;
+    }
+}
+
+void RsaKeypadDriver::set_code_string(const char* code_str) {
+    if (code_str == nullptr) { init_default_code_(); return; }
+    // Validate length == 6 and all digits 0-9.
+    int len = 0;
+    while (code_str[len] != '\0' && len <= kMaxCodeLen) ++len;
+    if (len != kMaxCodeLen) { init_default_code_(); return; }
+    for (int i = 0; i < kMaxCodeLen; ++i) {
+        if (code_str[i] < '0' || code_str[i] > '9') { init_default_code_(); return; }
+    }
+    m_code_len = kMaxCodeLen;
+    for (int i = 0; i < kMaxCodeLen; ++i) {
+        m_code[i] = digit_char_to_entry_(code_str[i]);
+    }
+}
 
 void RsaKeypadDriver::cycle_k() {
     switch (m_expected) {
         case ExpectedState::OFF:
-            // OFF → RUN: schedule 6 button-1 pulses then a RUN press.
+            // OFF → RUN: schedule code digits then a RUN press.
+            // Initialise default code on first cycle if not yet set.
+            if (m_code_len == 0) init_default_code_();
             m_expected    = ExpectedState::RUN;
             m_sched_state = CycleState::EmittingDigits;
             m_digits_sent = 0;
@@ -347,14 +392,14 @@ void RsaKeypadDriver::cycle_k() {
             break;
         case ExpectedState::RUN:
             // RUN → ACC: immediate ACC press; no digit entry needed.
-            m_expected       = ExpectedState::ACC;
-            m_sched_state    = CycleState::Idle;
+            m_expected            = ExpectedState::ACC;
+            m_sched_state         = CycleState::Idle;
             m_pending.mode_button = 2;  // ACC
             break;
         case ExpectedState::ACC:
             // ACC → OFF: immediate OFF press.
-            m_expected       = ExpectedState::OFF;
-            m_sched_state    = CycleState::Idle;
+            m_expected            = ExpectedState::OFF;
+            m_sched_state         = CycleState::Idle;
             m_pending.mode_button = 1;  // OFF
             break;
     }
@@ -368,12 +413,14 @@ void RsaKeypadDriver::update(double dt_s) {
 
     // Timer fired.
     if (m_sched_state == CycleState::EmittingDigits) {
-        if (m_digits_sent < kDefaultCodeLen) {
-            // Emit button-1 (index 0) pulse — "1/2" button, primary-tap = digit 1.
-            m_pending.button_pulse[0] = true;
+        if (m_digits_sent < m_code_len) {
+            const DigitEntry& e = m_code[m_digits_sent];
+            // Encode: 1 = tap (lower digit), 2 = long-press (higher digit).
+            m_pending.button_value[e.button_index] =
+                static_cast<std::uint8_t>(e.long_press ? 2u : 1u);
             ++m_digits_sent;
             m_timer_s = kKeypadIntervalS;
-            if (m_digits_sent >= kDefaultCodeLen) {
+            if (m_digits_sent >= m_code_len) {
                 // Last digit sent; schedule the mode press next.
                 m_sched_state = CycleState::EmittingMode;
             }
