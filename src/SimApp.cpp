@@ -339,6 +339,48 @@ int SimApp::RunWithVisualization() {
                       << (m_physical->hazard_switch().on() ? "ON" : "OFF") << "\n";
         }
 
+        // I = IPC trip-reset (momentary).
+        if (m_keyboard->ConsumeIpcTripReset()) {
+            m_physical->ipc_trip_reset().press();
+            std::cout << "[SimApp] IPC trip-reset pressed\n";
+        }
+
+        // Cruise stalk: G=SET, Y=RESUME, N=CANCEL, +(=)=SPEED+, -=SPEED-.
+        if (m_keyboard->ConsumeCruiseSet()) {
+            m_physical->cruise_stalk().press_set();
+            std::cout << "[SimApp] Cruise: SET\n";
+        }
+        if (m_keyboard->ConsumeCruiseResume()) {
+            m_physical->cruise_stalk().press_resume();
+            std::cout << "[SimApp] Cruise: RESUME\n";
+        }
+        if (m_keyboard->ConsumeCruiseCancel()) {
+            m_physical->cruise_stalk().press_cancel();
+            std::cout << "[SimApp] Cruise: CANCEL\n";
+        }
+        if (m_keyboard->ConsumeCruiseSpeedUp()) {
+            m_physical->cruise_stalk().press_speed_up();
+            std::cout << "[SimApp] Cruise: SPEED+\n";
+        }
+        if (m_keyboard->ConsumeCruiseSpeedDown()) {
+            m_physical->cruise_stalk().press_speed_down();
+            std::cout << "[SimApp] Cruise: SPEED-\n";
+        }
+
+        // V = wiper cycle (OFF → INT → LOW → HIGH → OFF).
+        if (m_keyboard->ConsumeWiperCycle()) {
+            m_physical->wiper_stalk().cycle_position();
+            const char* wiper_names[] = {"OFF", "INT", "LOW", "HIGH"};
+            int widx = static_cast<int>(m_physical->wiper_stalk().position());
+            std::cout << "[SimApp] Wiper: " << wiper_names[widx] << "\n";
+        }
+
+        // M = wiper wash (momentary).
+        if (m_keyboard->ConsumeWiperWash()) {
+            m_physical->wiper_stalk().press_wash();
+            std::cout << "[SimApp] Wiper wash\n";
+        }
+
         // Auto-cancel turn signal from steering travel.
         // run every frame regardless of pause so the state machine stays current.
         m_physical->turn_signal_stalk().update_for_steering(cmd.steering, render_dt);
@@ -454,6 +496,24 @@ int SimApp::RunWithVisualization() {
                 m_external_sim->SetDriverRsaKeypadButton5(fires.button_value[4]);
                 m_external_sim->SetDriverRsaModeButton(fires.mode_button);
             }
+            // IPC trip-reset (6952), cruise stalk (6953-6957), wiper (6958, 6959).
+            // Consume one-shot events and publish to the main harness segment.
+            m_external_sim->SetDriverIpcTripReset(
+                m_physical->ipc_trip_reset().consume_press_event());
+            m_external_sim->SetDriverCruiseSet(
+                m_physical->cruise_stalk().consume_set());
+            m_external_sim->SetDriverCruiseResume(
+                m_physical->cruise_stalk().consume_resume());
+            m_external_sim->SetDriverCruiseCancel(
+                m_physical->cruise_stalk().consume_cancel());
+            m_external_sim->SetDriverCruiseSpeedUp(
+                m_physical->cruise_stalk().consume_speed_up());
+            m_external_sim->SetDriverCruiseSpeedDown(
+                m_physical->cruise_stalk().consume_speed_down());
+            m_external_sim->SetDriverWiperSwitch(
+                static_cast<std::uint8_t>(m_physical->wiper_stalk().position()));
+            m_external_sim->SetDriverWiperWashRequest(
+                m_physical->wiper_stalk().consume_wash());
         }
         // Motor RPM and torque (chassis bus 4070-4071).
         {
@@ -783,6 +843,25 @@ int SimApp::RunHeadless() {
                 m_external_sim->SetDriverRsaKeypadButton5(fires.button_value[4]);
                 m_external_sim->SetDriverRsaModeButton(fires.mode_button);
             }
+            // IPC trip-reset (6952), cruise stalk (6953-6957), wiper (6958, 6959).
+            // Headless: no keyboard input; consume pending events (all idle in
+            // headless) and publish stable defaults so the bus sees defined state.
+            m_external_sim->SetDriverIpcTripReset(
+                m_physical->ipc_trip_reset().consume_press_event());
+            m_external_sim->SetDriverCruiseSet(
+                m_physical->cruise_stalk().consume_set());
+            m_external_sim->SetDriverCruiseResume(
+                m_physical->cruise_stalk().consume_resume());
+            m_external_sim->SetDriverCruiseCancel(
+                m_physical->cruise_stalk().consume_cancel());
+            m_external_sim->SetDriverCruiseSpeedUp(
+                m_physical->cruise_stalk().consume_speed_up());
+            m_external_sim->SetDriverCruiseSpeedDown(
+                m_physical->cruise_stalk().consume_speed_down());
+            m_external_sim->SetDriverWiperSwitch(
+                static_cast<std::uint8_t>(m_physical->wiper_stalk().position()));
+            m_external_sim->SetDriverWiperWashRequest(
+                m_physical->wiper_stalk().consume_wash());
         }
         // Motor RPM and torque (chassis bus 4070-4071).
         {

@@ -126,6 +126,52 @@ DriverCommand KeyboardInputController::Update(double dt) {
         m_help_toggle = true;
     m_slash_prev = slash_now;
 
+    // --- IPC trip-reset (I one-shot, consumed via ConsumeIpcTripReset) ---
+    bool i_now = m_keys[irr::KEY_KEY_I];
+    if (i_now && !m_i_prev)
+        m_ipc_trip_reset = true;
+    m_i_prev = i_now;
+
+    // --- Cruise stalk momentary presses ---
+    // G = SET, Y = RESUME, N = CANCEL, +/= = SPEED UP, - = SPEED DOWN.
+    bool g_now = m_keys[irr::KEY_KEY_G];
+    if (g_now && !m_g_prev)
+        m_cruise_set = true;
+    m_g_prev = g_now;
+
+    bool y_now = m_keys[irr::KEY_KEY_Y];
+    if (y_now && !m_y_prev)
+        m_cruise_resume = true;
+    m_y_prev = y_now;
+
+    bool n_now = m_keys[irr::KEY_KEY_N];
+    if (n_now && !m_n_prev)
+        m_cruise_cancel = true;
+    m_n_prev = n_now;
+
+    // KEY_PLUS is the '+'/= key on most layouts (numpad or main keyboard).
+    bool plus_now = m_keys[irr::KEY_PLUS];
+    if (plus_now && !m_plus_prev)
+        m_cruise_speed_up = true;
+    m_plus_prev = plus_now;
+
+    bool minus_now = m_keys[irr::KEY_MINUS];
+    if (minus_now && !m_minus_prev)
+        m_cruise_speed_down = true;
+    m_minus_prev = minus_now;
+
+    // --- Wiper stalk cycle (V one-shot, consumed via ConsumeWiperCycle) ---
+    bool v_now = m_keys[irr::KEY_KEY_V];
+    if (v_now && !m_v_prev)
+        m_wiper_cycle = true;
+    m_v_prev = v_now;
+
+    // --- Wiper wash (M one-shot, consumed via ConsumeWiperWash) ---
+    bool m_now = m_keys[irr::KEY_KEY_M];
+    if (m_now && !m_m_prev)
+        m_wiper_wash = true;
+    m_m_prev = m_now;
+
     // --- Panel toggles (F=hood, T=trunk, [=doorL, ]=doorR) ---
     {
         static const irr::EKEY_CODE panel_keys[4] = {
@@ -224,6 +270,54 @@ bool KeyboardInputController::ConsumeHazardToggle() {
 bool KeyboardInputController::ConsumeHelpToggle() {
     bool v = m_help_toggle;
     m_help_toggle = false;
+    return v;
+}
+
+bool KeyboardInputController::ConsumeIpcTripReset() {
+    bool v = m_ipc_trip_reset;
+    m_ipc_trip_reset = false;
+    return v;
+}
+
+bool KeyboardInputController::ConsumeCruiseSet() {
+    bool v = m_cruise_set;
+    m_cruise_set = false;
+    return v;
+}
+
+bool KeyboardInputController::ConsumeCruiseResume() {
+    bool v = m_cruise_resume;
+    m_cruise_resume = false;
+    return v;
+}
+
+bool KeyboardInputController::ConsumeCruiseCancel() {
+    bool v = m_cruise_cancel;
+    m_cruise_cancel = false;
+    return v;
+}
+
+bool KeyboardInputController::ConsumeCruiseSpeedUp() {
+    bool v = m_cruise_speed_up;
+    m_cruise_speed_up = false;
+    return v;
+}
+
+bool KeyboardInputController::ConsumeCruiseSpeedDown() {
+    bool v = m_cruise_speed_down;
+    m_cruise_speed_down = false;
+    return v;
+}
+
+bool KeyboardInputController::ConsumeWiperCycle() {
+    bool v = m_wiper_cycle;
+    m_wiper_cycle = false;
+    return v;
+}
+
+bool KeyboardInputController::ConsumeWiperWash() {
+    bool v = m_wiper_wash;
+    m_wiper_wash = false;
     return v;
 }
 

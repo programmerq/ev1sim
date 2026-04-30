@@ -24,9 +24,12 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     // hazard_request (6944), turn_signal_left (6948), turn_signal_right (6949),
     // seatbelt_buckled (6964), rsa_mode_button (6971),
     // rsa_keypad_button1 (6975), button2 (6976), button3 (6977),
-    // button4 (6978), button5 (6979).
+    // button4 (6978), button5 (6979),
+    // ipc_trip_reset (6952), cruise_set (6953), cruise_resume (6954),
+    // cruise_cancel (6955), cruise_speed_up (6956), cruise_speed_down (6957),
+    // wiper_switch (6958), wiper_wash_request (6959).
     // (6970 is reserved — not registered as an endpoint.)
-    constexpr int kNumDriverInputs = 15;
+    constexpr int kNumDriverInputs = 23;
     const int expected = NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS +
                          kNumCombSw + kNumChargeCplr + kNumPrnd + kNumMotor +
                          kNumDynamics + kNumDriverInputs;
@@ -84,11 +87,15 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
                    e.signal_id == 6949 ||
                    e.signal_id == 6964 ||
                    e.signal_id == 6971 ||
-                   (e.signal_id >= 6975 && e.signal_id <= 6979)) {
+                   (e.signal_id >= 6975 && e.signal_id <= 6979) ||
+                   (e.signal_id >= 6952 && e.signal_id <= 6959)) {
             // Driver inputs on the main harness segment — outputs from ev1sim.
             // 6900=brake_pedal_q8  6901=steering_deg_q8  6902=gear_selector
             // 6903=throttle_q8     6904=brake_switch
             // 6944=hazard_request  6948=turn_signal_left  6949=turn_signal_right
+            // 6952=ipc_trip_reset  6953=cruise_set  6954=cruise_resume
+            // 6955=cruise_cancel   6956=cruise_speed_up  6957=cruise_speed_down
+            // 6958=wiper_switch    6959=wiper_wash_request
             // 6964=seatbelt_buckled  6971=rsa_mode_button
             // 6975..6979=rsa_keypad_button[1..5]  (6970 reserved; not registered)
             CHECK_FALSE(e.input_to_sim);
@@ -323,6 +330,68 @@ TEST_CASE("RSA keypad endpoints have correct IDs and direction", "[ExternalSim]"
     REQUIRE(btn5 != nullptr);
     CHECK(std::string(btn5->qualified_name) == "vehicle.driver.rsa_keypad_button5");
     CHECK_FALSE(btn5->input_to_sim);
+}
+
+TEST_CASE("New driver-input endpoints (6952-6959) have correct IDs and direction", "[ExternalSim]") {
+    // IPC trip-reset (6952).
+    const auto* ipc = ExternalSimConnector::FindEndpoint(6952);
+    REQUIRE(ipc != nullptr);
+    CHECK(std::string(ipc->qualified_name) == "vehicle.driver.ipc_trip_reset_button");
+    CHECK_FALSE(ipc->input_to_sim);
+
+    // Cruise stalk: SET=6953, RESUME=6954, CANCEL=6955, SPEED_UP=6956, SPEED_DOWN=6957.
+    const auto* cset = ExternalSimConnector::FindEndpoint(6953);
+    REQUIRE(cset != nullptr);
+    CHECK(std::string(cset->qualified_name) == "vehicle.driver.cruise_set");
+    CHECK_FALSE(cset->input_to_sim);
+
+    const auto* cresume = ExternalSimConnector::FindEndpoint(6954);
+    REQUIRE(cresume != nullptr);
+    CHECK(std::string(cresume->qualified_name) == "vehicle.driver.cruise_resume");
+    CHECK_FALSE(cresume->input_to_sim);
+
+    const auto* ccancel = ExternalSimConnector::FindEndpoint(6955);
+    REQUIRE(ccancel != nullptr);
+    CHECK(std::string(ccancel->qualified_name) == "vehicle.driver.cruise_cancel");
+    CHECK_FALSE(ccancel->input_to_sim);
+
+    const auto* cup = ExternalSimConnector::FindEndpoint(6956);
+    REQUIRE(cup != nullptr);
+    CHECK(std::string(cup->qualified_name) == "vehicle.driver.cruise_speed_up");
+    CHECK_FALSE(cup->input_to_sim);
+
+    const auto* cdown = ExternalSimConnector::FindEndpoint(6957);
+    REQUIRE(cdown != nullptr);
+    CHECK(std::string(cdown->qualified_name) == "vehicle.driver.cruise_speed_down");
+    CHECK_FALSE(cdown->input_to_sim);
+
+    // Wiper: switch=6958, wash=6959.
+    const auto* wsw = ExternalSimConnector::FindEndpoint(6958);
+    REQUIRE(wsw != nullptr);
+    CHECK(std::string(wsw->qualified_name) == "vehicle.driver.wiper_switch");
+    CHECK_FALSE(wsw->input_to_sim);
+
+    const auto* wwash = ExternalSimConnector::FindEndpoint(6959);
+    REQUIRE(wwash != nullptr);
+    CHECK(std::string(wwash->qualified_name) == "vehicle.driver.wiper_wash_request");
+    CHECK_FALSE(wwash->input_to_sim);
+}
+
+TEST_CASE("New driver-input setters (6952-6959) store without crashing", "[ExternalSim]") {
+    ExternalSimConnector c;
+    CHECK_NOTHROW(c.SetDriverIpcTripReset(true));
+    CHECK_NOTHROW(c.SetDriverIpcTripReset(false));
+    CHECK_NOTHROW(c.SetDriverCruiseSet(true));
+    CHECK_NOTHROW(c.SetDriverCruiseResume(true));
+    CHECK_NOTHROW(c.SetDriverCruiseCancel(true));
+    CHECK_NOTHROW(c.SetDriverCruiseSpeedUp(true));
+    CHECK_NOTHROW(c.SetDriverCruiseSpeedDown(true));
+    CHECK_NOTHROW(c.SetDriverWiperSwitch(0));  // OFF
+    CHECK_NOTHROW(c.SetDriverWiperSwitch(1));  // INT
+    CHECK_NOTHROW(c.SetDriverWiperSwitch(2));  // LOW
+    CHECK_NOTHROW(c.SetDriverWiperSwitch(3));  // HIGH
+    CHECK_NOTHROW(c.SetDriverWiperWashRequest(true));
+    CHECK_NOTHROW(c.Tick(0.0));
 }
 
 TEST_CASE("SetMotorRpm and SetMotorTorqueNm store without crashing", "[ExternalSim]") {

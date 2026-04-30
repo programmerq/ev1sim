@@ -204,6 +204,30 @@ public:
     /// Encoded as 1-byte uint8: 0=NONE, 1=OFF, 2=ACC, 3=RUN, 4=START.
     void SetDriverRsaModeButton(std::uint8_t button_enum);
 
+    /// Outgoing IPC trip-reset button (ID 6952, main harness segment).
+    /// Momentary 1-byte uint8 bool (0=idle, 1=pressed this tick).
+    /// Published by ev1sim on the I key.
+    void SetDriverIpcTripReset(bool pressed);
+
+    /// Outgoing cruise-control stalk momentary buttons (IDs 6953-6957).
+    /// Each is a 1-byte uint8 bool (0=idle, 1=pressed this tick).
+    /// G=SET, Y=RESUME, N=CANCEL, +(=)=SPEED_UP, -=SPEED_DOWN in ev1sim.
+    void SetDriverCruiseSet(bool pressed);
+    void SetDriverCruiseResume(bool pressed);
+    void SetDriverCruiseCancel(bool pressed);
+    void SetDriverCruiseSpeedUp(bool pressed);
+    void SetDriverCruiseSpeedDown(bool pressed);
+
+    /// Outgoing wiper stalk position (ID 6958, main harness segment).
+    /// 1-byte uint8 enum: 0=OFF, 1=INT, 2=LOW, 3=HIGH.
+    /// V key in ev1sim cycles: OFF → INT → LOW → HIGH → OFF.
+    void SetDriverWiperSwitch(std::uint8_t position);
+
+    /// Outgoing wiper wash request (ID 6959, main harness segment).
+    /// Momentary 1-byte uint8 bool (0=idle, 1=pressed this tick).
+    /// M key in ev1sim.
+    void SetDriverWiperWashRequest(bool pressed);
+
     /// Outgoing motor RPM (ID 4070, chassis segment, float32 LE).
     /// Motor shaft speed in RPM (positive forward).
     void SetMotorRpm(float rpm);

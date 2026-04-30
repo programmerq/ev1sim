@@ -15,11 +15,17 @@ future-UI input on one side, chassis-segment signal publishing on the other.
 - [x] **Turn signal stalk** — left/right detents with return-to-center
   behavior (auto-cancel from steering travel implemented).  Shares the same
   physical column as the combination switch.
-- [ ] **Wiper switch** — off, intermittent, low, high (+ delay).  Right
-  column stalk.
-- [ ] **Cruise control stalk** — set, resume, cancel, +/-.  Left column
-  stalk on EV1.
-- [ ] **IPC trip-reset button** — single momentary on the cluster.
+- [x] **Wiper switch** — off, intermittent, low, high (+ delay).  Right
+  column stalk.  V key cycles OFF→INT→LOW→HIGH→OFF; M key = wash momentary.
+  Publishes kSigDriverWiperSwitch (6958) + kSigDriverWiperWashRequest (6959).
+  Consumer wiring (BPM/wiper relay) is a TODO on the electricsim side.
+- [x] **Cruise control stalk** — set, resume, cancel, +/-.  Left column
+  stalk on EV1.  G=SET, Y=RESUME, N=CANCEL, +(=)=SPEED_UP, -=SPEED_DOWN.
+  Publishes kSigDriverCruiseSet/Resume/Cancel/SpeedUp/SpeedDown (6953-6957).
+  Consumer wiring (RSA/PIM cruise logic) is a TODO on the electricsim side.
+- [x] **IPC trip-reset button** — single momentary on the cluster.  I key.
+  Publishes kSigDriverIpcTripResetButton (6952).  Consumer wiring (IPC
+  odometer reset) is a TODO on the electricsim side.
 - [ ] **RSA exterior keypad** — door-pillar 5-button (1/2, 3/4, 5/6, 7/8,
   9/0) for keyless entry.
 - [ ] **RSA interior buttons** — PRND select, EPB switch, power window

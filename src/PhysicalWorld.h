@@ -297,8 +297,92 @@ private:
     void init_default_code_();
 };
 
+/// IPC cluster trip-reset button (momentary dash button).
+///
+/// Single-shot press: press() marks a pending event; consume_press_event()
+/// returns true once and clears the flag.  SimApp drives the consume path
+/// each frame and publishes kSigDriverIpcTripResetButton (6952) when true.
+class IpcTripResetButton {
+public:
+    /// Signal a button press (user tapped the I key in ev1sim).
+    void press() { m_pending = true; }
+
+    /// Consume the pending press event — returns true once then clears.
+    bool consume_press_event() {
+        bool v = m_pending;
+        m_pending = false;
+        return v;
+    }
+
+private:
+    bool m_pending = false;
+};
+
+/// Cruise-control stalk (five momentary buttons: SET/RESUME/CANCEL/SPEED+/SPEED-).
+///
+/// Each press() method marks a pending one-shot event.  Each consume_*() method
+/// returns true once then clears.  SimApp drives the consume path each frame
+/// and publishes the corresponding 6953-6957 signals on the main harness.
+class CruiseStalk {
+public:
+    void press_set()       { m_set    = true; }
+    void press_resume()    { m_resume = true; }
+    void press_cancel()    { m_cancel = true; }
+    void press_speed_up()  { m_up     = true; }
+    void press_speed_down(){ m_down   = true; }
+
+    bool consume_set()       { bool v = m_set;    m_set    = false; return v; }
+    bool consume_resume()    { bool v = m_resume; m_resume = false; return v; }
+    bool consume_cancel()    { bool v = m_cancel; m_cancel = false; return v; }
+    bool consume_speed_up()  { bool v = m_up;     m_up     = false; return v; }
+    bool consume_speed_down(){ bool v = m_down;   m_down   = false; return v; }
+
+private:
+    bool m_set    = false;
+    bool m_resume = false;
+    bool m_cancel = false;
+    bool m_up     = false;
+    bool m_down   = false;
+};
+
+/// Wiper stalk (right column, four rotary positions + momentary wash button).
+///
+/// cycle_position() advances: OFF → INT → LOW → HIGH → OFF (wrapping).
+/// press_wash() marks a momentary wash event; consume_wash() reads and clears.
+/// position() reflects the current stalk setting (enum matches the wire encoding
+/// for kSigDriverWiperSwitch: OFF=0, INT=1, LOW=2, HIGH=3).
+class WiperStalk {
+public:
+    enum class Position { OFF = 0, INT = 1, LOW = 2, HIGH = 3 };
+
+    /// Advance the rotary position: OFF → INT → LOW → HIGH → OFF.
+    void cycle_position() {
+        switch (m_position) {
+            case Position::OFF:  m_position = Position::INT;  break;
+            case Position::INT:  m_position = Position::LOW;  break;
+            case Position::LOW:  m_position = Position::HIGH; break;
+            case Position::HIGH: m_position = Position::OFF;  break;
+        }
+    }
+
+    /// Mark a momentary wash-button press (M key in ev1sim).
+    void press_wash() { m_wash = true; }
+
+    /// Consume the pending wash press — returns true once then clears.
+    bool consume_wash() {
+        bool v = m_wash;
+        m_wash = false;
+        return v;
+    }
+
+    Position position() const { return m_position; }
+
+private:
+    Position m_position = Position::OFF;
+    bool     m_wash     = false;
+};
+
 /// Container for all physical-world input components.
-/// Future additions (wiper stalk, etc.) join here.
 class PhysicalWorld {
 public:
     CombinationSwitch&       combination_switch()       { return m_comb_sw; }
@@ -322,6 +406,15 @@ public:
     RsaKeypadDriver&       rsa_keypad()       { return m_rsa_keypad; }
     const RsaKeypadDriver& rsa_keypad() const { return m_rsa_keypad; }
 
+    IpcTripResetButton&       ipc_trip_reset()       { return m_ipc_trip_reset; }
+    const IpcTripResetButton& ipc_trip_reset() const { return m_ipc_trip_reset; }
+
+    CruiseStalk&       cruise_stalk()       { return m_cruise_stalk; }
+    const CruiseStalk& cruise_stalk() const { return m_cruise_stalk; }
+
+    WiperStalk&       wiper_stalk()       { return m_wiper_stalk; }
+    const WiperStalk& wiper_stalk() const { return m_wiper_stalk; }
+
     /// Draw HUD overlays for: key state, combination switch, PRND selector,
     /// and turn signals/hazard.  Call between BeginScene and EndScene.
     /// rsa_run_mode: most recently received RSA run mode (0=OFF,1=ACC,2=RUN;
@@ -330,13 +423,16 @@ public:
                  std::uint8_t rsa_run_mode, bool has_rsa_run_mode) const;
 
 private:
-    CombinationSwitch m_comb_sw;
-    BrakeSwitch       m_brake_sw;
-    ChargeCoupler     m_charge_coupler;
-    PrndSelector      m_prnd_sel;
-    TurnSignalStalk   m_turn_stalk;
-    HazardSwitch      m_hazard_sw;
-    RsaKeypadDriver   m_rsa_keypad;
+    CombinationSwitch  m_comb_sw;
+    BrakeSwitch        m_brake_sw;
+    ChargeCoupler      m_charge_coupler;
+    PrndSelector       m_prnd_sel;
+    TurnSignalStalk    m_turn_stalk;
+    HazardSwitch       m_hazard_sw;
+    RsaKeypadDriver    m_rsa_keypad;
+    IpcTripResetButton m_ipc_trip_reset;
+    CruiseStalk        m_cruise_stalk;
+    WiperStalk         m_wiper_stalk;
 };
 
 }  // namespace ev1sim

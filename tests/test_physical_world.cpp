@@ -303,6 +303,120 @@ TEST_CASE("TurnSignalStalk: consume_auto_cancel_event clears on first read",
 }
 
 // ---------------------------------------------------------------------------
+// IpcTripResetButton
+// ---------------------------------------------------------------------------
+
+TEST_CASE("IpcTripResetButton: consume returns false at construction", "[PhysicalWorld]") {
+    IpcTripResetButton btn;
+    CHECK_FALSE(btn.consume_press_event());
+}
+
+TEST_CASE("IpcTripResetButton: press then consume returns true once then false", "[PhysicalWorld]") {
+    IpcTripResetButton btn;
+    btn.press();
+    CHECK(btn.consume_press_event());   // first consume: event was pending
+    CHECK_FALSE(btn.consume_press_event()); // second: flag was cleared
+}
+
+TEST_CASE("IpcTripResetButton: multiple press calls accumulate into a single event", "[PhysicalWorld]") {
+    IpcTripResetButton btn;
+    btn.press();
+    btn.press();
+    CHECK(btn.consume_press_event());
+    CHECK_FALSE(btn.consume_press_event());
+}
+
+// ---------------------------------------------------------------------------
+// CruiseStalk
+// ---------------------------------------------------------------------------
+
+TEST_CASE("CruiseStalk: all consume methods return false at construction", "[PhysicalWorld]") {
+    CruiseStalk stalk;
+    CHECK_FALSE(stalk.consume_set());
+    CHECK_FALSE(stalk.consume_resume());
+    CHECK_FALSE(stalk.consume_cancel());
+    CHECK_FALSE(stalk.consume_speed_up());
+    CHECK_FALSE(stalk.consume_speed_down());
+}
+
+TEST_CASE("CruiseStalk: press_set → consume_set returns true once", "[PhysicalWorld]") {
+    CruiseStalk stalk;
+    stalk.press_set();
+    CHECK(stalk.consume_set());
+    CHECK_FALSE(stalk.consume_set());
+}
+
+TEST_CASE("CruiseStalk: each button is independent", "[PhysicalWorld]") {
+    CruiseStalk stalk;
+    stalk.press_resume();
+    stalk.press_cancel();
+
+    // Only the pressed buttons return true.
+    CHECK_FALSE(stalk.consume_set());
+    CHECK(stalk.consume_resume());
+    CHECK(stalk.consume_cancel());
+    CHECK_FALSE(stalk.consume_speed_up());
+    CHECK_FALSE(stalk.consume_speed_down());
+
+    // All cleared after first consume.
+    CHECK_FALSE(stalk.consume_resume());
+    CHECK_FALSE(stalk.consume_cancel());
+}
+
+TEST_CASE("CruiseStalk: speed_up and speed_down are independent", "[PhysicalWorld]") {
+    CruiseStalk stalk;
+    stalk.press_speed_up();
+    CHECK(stalk.consume_speed_up());
+    CHECK_FALSE(stalk.consume_speed_up());
+    CHECK_FALSE(stalk.consume_speed_down()); // never pressed
+
+    stalk.press_speed_down();
+    CHECK(stalk.consume_speed_down());
+    CHECK_FALSE(stalk.consume_speed_down());
+}
+
+// ---------------------------------------------------------------------------
+// WiperStalk
+// ---------------------------------------------------------------------------
+
+TEST_CASE("WiperStalk: default position is OFF", "[PhysicalWorld]") {
+    WiperStalk ws;
+    CHECK(ws.position() == WiperStalk::Position::OFF);
+    CHECK_FALSE(ws.consume_wash());
+}
+
+TEST_CASE("WiperStalk: cycle_position cycles OFF → INT → LOW → HIGH → OFF", "[PhysicalWorld]") {
+    WiperStalk ws;
+    using P = WiperStalk::Position;
+
+    CHECK(ws.position() == P::OFF);
+    ws.cycle_position();
+    CHECK(ws.position() == P::INT);
+    ws.cycle_position();
+    CHECK(ws.position() == P::LOW);
+    ws.cycle_position();
+    CHECK(ws.position() == P::HIGH);
+    ws.cycle_position();
+    CHECK(ws.position() == P::OFF);   // wraps back
+}
+
+TEST_CASE("WiperStalk: wash press → consume_wash one-shot", "[PhysicalWorld]") {
+    WiperStalk ws;
+    ws.press_wash();
+    CHECK(ws.consume_wash());
+    CHECK_FALSE(ws.consume_wash());   // cleared on first consume
+}
+
+TEST_CASE("WiperStalk: position unaffected by wash press", "[PhysicalWorld]") {
+    WiperStalk ws;
+    ws.cycle_position(); // OFF → INT
+    ws.press_wash();
+    CHECK(ws.position() == WiperStalk::Position::INT);
+    CHECK(ws.consume_wash());
+    CHECK(ws.position() == WiperStalk::Position::INT); // unchanged
+}
+
+// ---------------------------------------------------------------------------
 // BrakeSwitch basic tests (already in PhysicalWorld.h/.cpp, verify compile)
 // ---------------------------------------------------------------------------
 

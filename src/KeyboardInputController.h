@@ -73,6 +73,25 @@ public:
     // Panel toggles: F=hood, T=trunk, [=left door, ]=right door.
     bool ConsumePanelToggle(int index);
 
+    // True once after I was tapped — IPC trip-reset momentary press.
+    bool ConsumeIpcTripReset();
+
+    // Cruise stalk momentary presses:
+    //   G = SET, Y = RESUME, N = CANCEL
+    //   + (KEY_PLUS / KEY_OEM_PLUS, i.e. '='/'+'key) = SPEED UP
+    //   - (KEY_MINUS / KEY_OEM_MINUS) = SPEED DOWN
+    bool ConsumeCruiseSet();
+    bool ConsumeCruiseResume();
+    bool ConsumeCruiseCancel();
+    bool ConsumeCruiseSpeedUp();
+    bool ConsumeCruiseSpeedDown();
+
+    // True once after V was tapped — cycle wiper stalk position.
+    bool ConsumeWiperCycle();
+
+    // True once after M was tapped — wiper wash momentary press.
+    bool ConsumeWiperWash();
+
     // True if Esc was pressed.
     bool QuitRequested() const { return m_quit; }
 
@@ -98,6 +117,14 @@ private:
     bool m_e_prev      = false;
     bool m_x_prev      = false;
     bool m_slash_prev  = false;   // for '?' (Shift+/)
+    bool m_i_prev      = false;   // IPC trip-reset
+    bool m_g_prev      = false;   // cruise SET
+    bool m_y_prev      = false;   // cruise RESUME
+    bool m_n_prev      = false;   // cruise CANCEL
+    bool m_plus_prev   = false;   // cruise SPEED UP (= / + key)
+    bool m_minus_prev  = false;   // cruise SPEED DOWN
+    bool m_v_prev      = false;   // wiper cycle
+    bool m_m_prev      = false;   // wiper wash
     bool m_camera_cycle       = false;
     bool m_pause_toggle       = false;
     bool m_headlight_toggle   = false;
@@ -108,6 +135,14 @@ private:
     bool m_turn_signal_right  = false;
     bool m_hazard_toggle      = false;
     bool m_help_toggle        = false;
+    bool m_ipc_trip_reset     = false;
+    bool m_cruise_set         = false;
+    bool m_cruise_resume      = false;
+    bool m_cruise_cancel      = false;
+    bool m_cruise_speed_up    = false;
+    bool m_cruise_speed_down  = false;
+    bool m_wiper_cycle        = false;
+    bool m_wiper_wash         = false;
 
     // Panel toggle keys: KEY_KEY_1 through KEY_KEY_4
     bool m_panel_prev[4]   = {};

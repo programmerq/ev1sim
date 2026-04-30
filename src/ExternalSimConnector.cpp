@@ -134,11 +134,26 @@ constexpr std::uint32_t kSigDriverRsaKeypadButton5 = 6979U;  // "9/0" button (ta
 // 0=NONE, 1=OFF, 2=ACC, 3=RUN, 4=START.
 // Locked in lockstep with electricsim kSigDriverRsaModeButton = 6971.
 constexpr std::uint32_t kSigDriverRsaModeButton    = 6971U;
+// IPC trip-reset + cruise stalk + wiper stalk signals (IDs 6952-6959).
+// Locked in lockstep with electricsim kSigDriverIpcTripResetButton = 6952,
+// kSigDriverCruiseSet/Resume/Cancel/SpeedUp/SpeedDown = 6953-6957,
+// kSigDriverWiperSwitch = 6958, kSigDriverWiperWashRequest = 6959.
+constexpr std::uint32_t kSigDriverIpcTripResetButton = 6952U;
+constexpr std::uint32_t kSigDriverCruiseSet           = 6953U;
+constexpr std::uint32_t kSigDriverCruiseResume        = 6954U;
+constexpr std::uint32_t kSigDriverCruiseCancel        = 6955U;
+constexpr std::uint32_t kSigDriverCruiseSpeedUp       = 6956U;
+constexpr std::uint32_t kSigDriverCruiseSpeedDown     = 6957U;
+constexpr std::uint32_t kSigDriverWiperSwitch         = 6958U;
+constexpr std::uint32_t kSigDriverWiperWashRequest    = 6959U;
+constexpr int           kNumNewDriverInputs           = 8;
+
 // Number of driver-input endpoints on the main harness segment.
 // 6900, 6901, 6902, 6903, 6904, 6944, 6948, 6949, 6964,
-// 6971, 6975, 6976, 6977, 6978, 6979 = 15 total.
+// 6971, 6975, 6976, 6977, 6978, 6979,
+// 6952, 6953, 6954, 6955, 6956, 6957, 6958, 6959 = 23 total.
 // (6970 is reserved; not registered as an endpoint.)
-constexpr int           kNumDriverInputs           = 15;
+constexpr int           kNumDriverInputs           = 15 + kNumNewDriverInputs;
 
 // Motor state signals on the chassis segment (ev1sim → electricsim, float32 LE).
 //   4070  vehicle.dynamics.motor_rpm        motor shaft RPM
@@ -350,6 +365,24 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.driver.rsa_keypad_button4", "driver_rsa_keypad_button4", false};
     out[i++] = {kSigDriverRsaKeypadButton5,
                 "vehicle.driver.rsa_keypad_button5", "driver_rsa_keypad_button5", false};
+    // New driver inputs: IPC trip-reset (6952), cruise stalk (6953-6957),
+    // wiper stalk position (6958), wiper wash (6959).
+    out[i++] = {kSigDriverIpcTripResetButton,
+                "vehicle.driver.ipc_trip_reset_button", "driver_ipc_trip_reset", false};
+    out[i++] = {kSigDriverCruiseSet,
+                "vehicle.driver.cruise_set", "driver_cruise_set", false};
+    out[i++] = {kSigDriverCruiseResume,
+                "vehicle.driver.cruise_resume", "driver_cruise_resume", false};
+    out[i++] = {kSigDriverCruiseCancel,
+                "vehicle.driver.cruise_cancel", "driver_cruise_cancel", false};
+    out[i++] = {kSigDriverCruiseSpeedUp,
+                "vehicle.driver.cruise_speed_up", "driver_cruise_speed_up", false};
+    out[i++] = {kSigDriverCruiseSpeedDown,
+                "vehicle.driver.cruise_speed_down", "driver_cruise_speed_down", false};
+    out[i++] = {kSigDriverWiperSwitch,
+                "vehicle.driver.wiper_switch", "driver_wiper_switch", false};
+    out[i++] = {kSigDriverWiperWashRequest,
+                "vehicle.driver.wiper_wash_request", "driver_wiper_wash_request", false};
     return out;
 }
 
@@ -438,6 +471,27 @@ struct ExternalSimConnector::State {
     // Published sentinels: use -1 to force first publish.
     std::int8_t   driver_rsa_btn_pub[5]   = {-1,-1,-1,-1,-1};
     std::int8_t   driver_rsa_mode_btn_pub = -1;
+
+    // New driver inputs: IPC trip-reset (6952), cruise stalk (6953-6957),
+    // wiper stalk position (6958), wiper wash (6959).
+    // Momentary bools (0=idle, 1=pressed this tick); wiper_switch is uint8 enum.
+    bool          driver_ipc_trip_reset   = false;
+    bool          driver_cruise_set       = false;
+    bool          driver_cruise_resume    = false;
+    bool          driver_cruise_cancel    = false;
+    bool          driver_cruise_speed_up  = false;
+    bool          driver_cruise_speed_down= false;
+    std::uint8_t  driver_wiper_switch     = 0;   // 0=OFF, 1=INT, 2=LOW, 3=HIGH
+    bool          driver_wiper_wash       = false;
+    // Published sentinels (-1 forces first publish for bool signals).
+    std::int8_t   driver_ipc_trip_reset_pub    = -1;
+    std::int8_t   driver_cruise_set_pub        = -1;
+    std::int8_t   driver_cruise_resume_pub     = -1;
+    std::int8_t   driver_cruise_cancel_pub     = -1;
+    std::int8_t   driver_cruise_speed_up_pub   = -1;
+    std::int8_t   driver_cruise_speed_down_pub = -1;
+    std::int8_t   driver_wiper_switch_pub      = -1;
+    std::int8_t   driver_wiper_wash_pub        = -1;
 
     // Motor state (IDs 4070-4071, chassis segment).
     // Publish-on-change with small epsilon thresholds.
@@ -677,6 +731,38 @@ void ExternalSimConnector::SetDriverRsaKeypadButton5(std::uint8_t value) {
 
 void ExternalSimConnector::SetDriverRsaModeButton(std::uint8_t button_enum) {
     m_state->driver_rsa_mode_button = button_enum;
+}
+
+void ExternalSimConnector::SetDriverIpcTripReset(bool pressed) {
+    m_state->driver_ipc_trip_reset = pressed;
+}
+
+void ExternalSimConnector::SetDriverCruiseSet(bool pressed) {
+    m_state->driver_cruise_set = pressed;
+}
+
+void ExternalSimConnector::SetDriverCruiseResume(bool pressed) {
+    m_state->driver_cruise_resume = pressed;
+}
+
+void ExternalSimConnector::SetDriverCruiseCancel(bool pressed) {
+    m_state->driver_cruise_cancel = pressed;
+}
+
+void ExternalSimConnector::SetDriverCruiseSpeedUp(bool pressed) {
+    m_state->driver_cruise_speed_up = pressed;
+}
+
+void ExternalSimConnector::SetDriverCruiseSpeedDown(bool pressed) {
+    m_state->driver_cruise_speed_down = pressed;
+}
+
+void ExternalSimConnector::SetDriverWiperSwitch(std::uint8_t position) {
+    m_state->driver_wiper_switch = position;
+}
+
+void ExternalSimConnector::SetDriverWiperWashRequest(bool pressed) {
+    m_state->driver_wiper_wash = pressed;
 }
 
 void ExternalSimConnector::SetMotorRpm(float rpm) {
@@ -1160,6 +1246,37 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                 st.driver_rsa_mode_btn_pub = mode_val;
             }
         }
+        // IPC trip-reset (6952), cruise stalk (6953-6957), wiper (6958, 6959).
+        // Momentary bools: publish on change only (sentinel -1 forces first publish).
+        auto publish_bool_change = [&](std::uint32_t sig_id, bool cur_val, std::int8_t& pub) {
+            const std::int8_t v = cur_val ? 1 : 0;
+            if (pub < 0 || v != pub) {
+                drv.push_back(MakeBoolDelta(sig_id, cur_val));
+                pub = v;
+            }
+        };
+        publish_bool_change(kSigDriverIpcTripResetButton, st.driver_ipc_trip_reset,
+                            st.driver_ipc_trip_reset_pub);
+        publish_bool_change(kSigDriverCruiseSet,       st.driver_cruise_set,
+                            st.driver_cruise_set_pub);
+        publish_bool_change(kSigDriverCruiseResume,    st.driver_cruise_resume,
+                            st.driver_cruise_resume_pub);
+        publish_bool_change(kSigDriverCruiseCancel,    st.driver_cruise_cancel,
+                            st.driver_cruise_cancel_pub);
+        publish_bool_change(kSigDriverCruiseSpeedUp,   st.driver_cruise_speed_up,
+                            st.driver_cruise_speed_up_pub);
+        publish_bool_change(kSigDriverCruiseSpeedDown, st.driver_cruise_speed_down,
+                            st.driver_cruise_speed_down_pub);
+        // Wiper switch — uint8 enum (0=OFF, 1=INT, 2=LOW, 3=HIGH).
+        {
+            const std::int8_t wsw_val = static_cast<std::int8_t>(st.driver_wiper_switch);
+            if (st.driver_wiper_switch_pub < 0 || wsw_val != st.driver_wiper_switch_pub) {
+                drv.push_back(MakeU8Delta(kSigDriverWiperSwitch, st.driver_wiper_switch));
+                st.driver_wiper_switch_pub = wsw_val;
+            }
+        }
+        publish_bool_change(kSigDriverWiperWashRequest, st.driver_wiper_wash,
+                            st.driver_wiper_wash_pub);
         if (!drv.empty()) {
             Frame mf{};
             mf.header.type              = FrameType::DeltaBatch;
