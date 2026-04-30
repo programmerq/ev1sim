@@ -417,6 +417,109 @@ TEST_CASE("WiperStalk: position unaffected by wash press", "[PhysicalWorld]") {
 }
 
 // ---------------------------------------------------------------------------
+// DoorLocks
+// ---------------------------------------------------------------------------
+
+TEST_CASE("DoorLocks: default state is all unlocked", "[PhysicalWorld][DoorLocks]") {
+    DoorLocks locks;
+    using S = DoorLocks::State;
+    CHECK(locks.driver()    == S::UNLOCKED);
+    CHECK(locks.passenger() == S::UNLOCKED);
+    CHECK(locks.trunk()     == S::UNLOCKED);
+    CHECK_FALSE(locks.any_locked());
+}
+
+TEST_CASE("DoorLocks: lock_all sets all three to LOCKED", "[PhysicalWorld][DoorLocks]") {
+    DoorLocks locks;
+    using S = DoorLocks::State;
+    locks.lock_all();
+    CHECK(locks.driver()    == S::LOCKED);
+    CHECK(locks.passenger() == S::LOCKED);
+    CHECK(locks.trunk()     == S::LOCKED);
+    CHECK(locks.any_locked());
+}
+
+TEST_CASE("DoorLocks: unlock_all resets all three to UNLOCKED", "[PhysicalWorld][DoorLocks]") {
+    DoorLocks locks;
+    using S = DoorLocks::State;
+    locks.lock_all();
+    locks.unlock_all();
+    CHECK(locks.driver()    == S::UNLOCKED);
+    CHECK(locks.passenger() == S::UNLOCKED);
+    CHECK(locks.trunk()     == S::UNLOCKED);
+    CHECK_FALSE(locks.any_locked());
+}
+
+TEST_CASE("DoorLocks: any_locked is true if exactly one door is locked", "[PhysicalWorld][DoorLocks]") {
+    {
+        DoorLocks locks;
+        locks.toggle_driver();
+        CHECK(locks.any_locked());
+        CHECK(locks.driver() == DoorLocks::State::LOCKED);
+        CHECK(locks.passenger() == DoorLocks::State::UNLOCKED);
+        CHECK(locks.trunk()     == DoorLocks::State::UNLOCKED);
+    }
+    {
+        DoorLocks locks;
+        locks.toggle_passenger();
+        CHECK(locks.any_locked());
+        CHECK(locks.driver()    == DoorLocks::State::UNLOCKED);
+        CHECK(locks.passenger() == DoorLocks::State::LOCKED);
+        CHECK(locks.trunk()     == DoorLocks::State::UNLOCKED);
+    }
+    {
+        DoorLocks locks;
+        locks.toggle_trunk();
+        CHECK(locks.any_locked());
+        CHECK(locks.driver()    == DoorLocks::State::UNLOCKED);
+        CHECK(locks.passenger() == DoorLocks::State::UNLOCKED);
+        CHECK(locks.trunk()     == DoorLocks::State::LOCKED);
+    }
+}
+
+TEST_CASE("DoorLocks: independent toggle — only the toggled door changes", "[PhysicalWorld][DoorLocks]") {
+    DoorLocks locks;
+    using S = DoorLocks::State;
+
+    // Toggle driver twice: UNLOCKED → LOCKED → UNLOCKED.
+    locks.toggle_driver();
+    CHECK(locks.driver()    == S::LOCKED);
+    CHECK(locks.passenger() == S::UNLOCKED);  // unchanged
+    CHECK(locks.trunk()     == S::UNLOCKED);  // unchanged
+
+    locks.toggle_driver();
+    CHECK(locks.driver()    == S::UNLOCKED);  // back to unlocked
+    CHECK_FALSE(locks.any_locked());
+}
+
+TEST_CASE("DoorLocks: toggle_passenger leaves other doors unaffected", "[PhysicalWorld][DoorLocks]") {
+    DoorLocks locks;
+    using S = DoorLocks::State;
+
+    locks.lock_all();
+    locks.toggle_passenger();  // LOCKED → UNLOCKED
+    CHECK(locks.driver()    == S::LOCKED);   // unchanged
+    CHECK(locks.passenger() == S::UNLOCKED); // toggled
+    CHECK(locks.trunk()     == S::LOCKED);   // unchanged
+    CHECK(locks.any_locked());  // driver and trunk still locked
+}
+
+TEST_CASE("DoorLocks: toggle_trunk leaves other doors unaffected", "[PhysicalWorld][DoorLocks]") {
+    DoorLocks locks;
+    using S = DoorLocks::State;
+
+    locks.toggle_trunk();
+    CHECK(locks.driver()    == S::UNLOCKED);
+    CHECK(locks.passenger() == S::UNLOCKED);
+    CHECK(locks.trunk()     == S::LOCKED);
+    CHECK(locks.any_locked());
+
+    locks.toggle_trunk();
+    CHECK(locks.trunk() == S::UNLOCKED);
+    CHECK_FALSE(locks.any_locked());
+}
+
+// ---------------------------------------------------------------------------
 // BrakeSwitch basic tests (already in PhysicalWorld.h/.cpp, verify compile)
 // ---------------------------------------------------------------------------
 
