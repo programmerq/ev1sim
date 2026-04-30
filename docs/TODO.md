@@ -58,6 +58,16 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   Needs investigation of how to compute I from torque + motor characteristics.
   A placeholder TODO: add `vehicle.dynamics.motor_current_a` (chassis ID 4072)
   once the Chrono API path is confirmed.
+- [ ] **EV1 powertrain model fidelity audit.** The current Chrono powertrain
+  doesn't necessarily match the real EV1 motor characteristics — peak/cont.
+  torque, power-vs-rpm curve, regen behavior, transaxle gearing, etc.
+  Steady-state cruise behavior in the electronics-driven scenarios is
+  suspicious (cruise-hold experiments show the plant doesn't track the
+  setpoint cleanly), which may be a controller issue OR a plant issue.
+  Validate the powertrain map against published EV1 specs (~102 kW peak,
+  150 N·m, single-speed reduction ~10.946:1, regen up to ~25 kW) before
+  tuning the cruise-control gains in `ev1/pim/pim_throttle.{h,c}`.  Until
+  then, leave the conservative P-only controller alone.
 
 ## Outputs ev1sim could render (defer all)
 - [ ] Wiper motor visual sweep (model update needed).
@@ -87,7 +97,14 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   but nothing directly mappable to torque without a clamp-position model.
   Until that model is added, rear brake = local `rear_brake` (no per-wheel
   modulation).
-- [ ] Same pattern for **throttle** (BTCM/PIM), **steering assist** etc.
+- [x] **Throttle bus path (PIM)** — `kSigChassisThrottleCmdQ8` (4073) is
+  published by PIM each tick (passthrough or cruise-controlled).  ev1sim
+  subscribes via `ExternalSimConnector::GetThrottleCmd(window)`,
+  `SimApp::ApplyElectronicsThrottle` overrides `cmd.throttle` when fresh,
+  falls back to local pedal at 200 ms staleness.  Selected via
+  `vehicle_dynamics.driver = "electronics"`.  Cruise demo exercises the
+  full loop end-to-end (`config/scenarios/cruise_demo_electronics.json`).
+- [ ] Same pattern for **steering assist** etc.
 
 ## Sim-time sync — ev1sim publisher side
 
