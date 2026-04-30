@@ -39,9 +39,11 @@ TEST_CASE("ExternalSimConnector: throttle command goes stale outside freshness w
     ExternalSimConnector c;
     c.DebugInjectU8(4073, 64);
 
-    // A 0 ms window forces "always stale" — wall-clock advances during the
-    // call so any non-zero delta from inject-to-query exceeds it.
-    auto stale = c.GetThrottleCmd(std::chrono::milliseconds(0));
+    // Sleep a hair so the freshness delta exceeds the 1 ms window even if
+    // the test scheduler has us pinned and the wall clock barely advances.
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+
+    auto stale = c.GetThrottleCmd(std::chrono::milliseconds(1));
     CHECK(stale.ever_received);
     CHECK_FALSE(stale.fresh);
     CHECK(stale.q8 == 64u);  // value preserved across stale-ness

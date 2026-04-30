@@ -46,6 +46,14 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                   << m_config.vehicle_dynamics.throttle_freshness_window_ms
                   << " ms)\n";
     }
+    // Bypass the RSA propulsion gate when explicitly opted in (scenario
+    // smoke tests / standalone runs without electricsim).  Default behavior
+    // requires RSA to broadcast RUN before propulsion engages.
+    if (m_config.vehicle_dynamics.start_propulsion_enabled) {
+        m_propulsion_enabled = true;
+        std::cout << "[SimApp] Propulsion gate bypassed at startup "
+                     "(vehicle_dynamics.start_propulsion_enabled=true)\n";
+    }
 
     // 1. Physics world.
     m_world = std::make_unique<VehicleWorld>(m_config);

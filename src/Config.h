@@ -104,6 +104,15 @@ struct Config {
     struct VehicleDynamics {
         std::string driver = "local";
         double      throttle_freshness_window_ms = 200.0;
+
+        // Standalone-test escape hatch: skip the RSA-broadcast propulsion
+        // gate and start with propulsion enabled.  When false (default),
+        // ev1sim waits for kSigRunModeBroadcast == RUN before unclamping
+        // brakes / allowing throttle — required when running paired with
+        // electricsim.  When true, the brakes/throttle clamp is lifted at
+        // startup so a scenario can drive the car without the controller
+        // suite running.  Recommended only with external_sim.enabled=false.
+        bool        start_propulsion_enabled = false;
     } vehicle_dynamics;
 
     // Built-in accel-hold-brake scripted scenario.  Only active when

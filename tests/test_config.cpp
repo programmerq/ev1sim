@@ -5,13 +5,18 @@
 
 #include <fstream>
 #include <nlohmann/json.hpp>
+#include <unistd.h>
 
 using Catch::Matchers::WithinAbs;
 
-// Write a temporary JSON file and return its path.
+// Write a temporary JSON file and return its path.  Includes the PID so
+// parallel ctest workers (each is its own process) don't collide on the
+// same /tmp filename — that race used to flake the JSON-loading tests.
 static std::string WriteTempJson(const std::string& content) {
     static int counter = 0;
-    std::string path = "/tmp/ev1sim_test_config_" + std::to_string(counter++) + ".json";
+    std::string path = "/tmp/ev1sim_test_config_" +
+                       std::to_string(getpid()) + "_" +
+                       std::to_string(counter++) + ".json";
     std::ofstream f(path);
     f << content;
     return path;

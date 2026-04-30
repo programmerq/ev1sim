@@ -50,6 +50,10 @@ std::optional<Scenario> Scenario::LoadFromFile(const std::string& path) {
             if (ev.contains("at_time_s")) e.at_time_s = ev["at_time_s"].get<double>();
             if (ev.contains("action"))    e.action    = ev["action"].get<std::string>();
             if (ev.contains("value"))     e.value     = ev["value"].get<double>();
+            // Comment-only entries (e.g. {"//": "explanation"}) carry no
+            // action — skip them.  This lets scenario authors interleave
+            // free-form notes with real events.
+            if (e.action.empty()) continue;
             s.m_events.push_back(std::move(e));
         }
     }

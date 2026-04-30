@@ -1,0 +1,56 @@
+{
+  "//": "Cruise-control end-to-end demo on the electronics-driven path.",
+  "//1": "Requires PIM controller running on the chassis bus to publish",
+  "//2": "kSigChassisThrottleCmdQ8 (4073).  Without it, electronics mode",
+  "//3": "falls back to the local pedal (which this scenario does not set).",
+  "//4": "",
+  "//5": "Recommended invocation (two terminals):",
+  "//6": "    # Terminal 1 — start the chassis bus + PIM:",
+  "//7": "    cd ../electricsim && ./build/pim_controller \\",
+  "//8": "        --chassis electricsim_chassis_bus \\",
+  "//9": "        --main electricsim_ev1_bus",
+  "//10": "    # Terminal 2 — run the scenario:",
+  "//11": "    ./build/ev1sim --headless --max-time 60 \\",
+  "//12": "        --external-sim on \\",
+  "//13": "        --scenario config/scenarios/cruise_demo_electronics.json",
+  "//14": "",
+  "//15": "Cruise gating (per pim_supervisor): vehicle must be ≥ 25 mph",
+  "//16": "(11.176 m/s) before SET engages, so we accelerate past that first.",
+
+  "name": "cruise_demo_electronics",
+  "driver_mode": "electronics",
+  "max_time_s": 50.0,
+  "events": [
+    {"at_time_s": 0.50, "action": "key_on_cycle"},
+    {"at_time_s": 0.80, "action": "key_on_cycle"},
+    {"at_time_s": 1.00, "action": "prnd_up"},
+    {"at_time_s": 1.10, "action": "prnd_up"},
+    {"at_time_s": 1.20, "action": "prnd_up"},
+
+    {"//": "Accelerate (driver pedal → bus → PIM passthrough → ev1sim)."},
+    {"at_time_s": 1.50, "action": "set_throttle", "value": 0.6},
+
+    {"//": "Engage cruise once we're well above the 25 mph threshold."},
+    {"at_time_s": 15.0, "action": "set_throttle", "value": 0.0},
+    {"at_time_s": 15.5, "action": "cruise_set"},
+
+    {"//": "Cruise should hold speed.  Bump up twice, then cancel."},
+    {"at_time_s": 25.0, "action": "cruise_speed_up"},
+    {"at_time_s": 27.0, "action": "cruise_speed_up"},
+    {"at_time_s": 40.0, "action": "cruise_cancel"},
+
+    {"at_time_s": 45.0, "action": "set_brake", "value": 0.5}
+  ],
+  "stats": {
+    "output_csv": "scenario_cruise_demo_electronics.csv",
+    "sample_period_s": 0.10,
+    "fields": [
+      "sim_time_s",
+      "speed_mps",
+      "applied_throttle",
+      "applied_front_brake",
+      "throttle_cmd_q8",
+      "throttle_cmd_fresh"
+    ]
+  }
+}

@@ -237,6 +237,38 @@ TEST_CASE("Scenario: LoadFromFile sorts events by at_time_s",
     std::filesystem::remove(tmp);
 }
 
+TEST_CASE("Scenario: shipped scenario JSON files parse cleanly",
+          "[Scenario][Smoke]") {
+    // EV1SIM_SOURCE_DIR is set by CMake at build time (already used by the
+    // level-file test).  Resolve relative to that so this test runs from
+    // any cwd.
+    const std::filesystem::path source_root(EV1SIM_SOURCE_DIR);
+
+    struct Expected {
+        const char* path;
+        const char* driver_mode;
+        std::size_t min_events;
+    };
+
+    // min_events counts only real events — comment-only entries
+    // (action == "") are dropped during load.
+    const Expected shipped[] = {
+        {"config/scenarios/accel_brake_local.json",       "local",       8},
+        {"config/scenarios/cruise_demo_electronics.json", "electronics", 9},
+    };
+
+    for (const auto& exp : shipped) {
+        const auto full = source_root / exp.path;
+        INFO("loading " << full.string());
+        auto loaded = ev1sim::Scenario::LoadFromFile(full.string());
+        REQUIRE(loaded.has_value());
+        CHECK(loaded->driver_mode() == exp.driver_mode);
+        CHECK(loaded->event_count() >= exp.min_events);
+        CHECK(loaded->max_time_s() > 0.0);
+        CHECK(loaded->has_stats());
+    }
+}
+
 TEST_CASE("Scenario: stats CSV writes header + sampled rows at the configured period",
           "[Scenario]") {
     using ev1sim::Scenario;

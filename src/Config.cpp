@@ -146,6 +146,7 @@ Config Config::LoadFromFile(const std::string& path) {
         auto& v = j["vehicle_dynamics"];
         read_if(v, "driver",                       cfg.vehicle_dynamics.driver);
         read_if(v, "throttle_freshness_window_ms", cfg.vehicle_dynamics.throttle_freshness_window_ms);
+        read_if(v, "start_propulsion_enabled",     cfg.vehicle_dynamics.start_propulsion_enabled);
     }
 
     if (j.contains("scripted")) {
@@ -262,6 +263,9 @@ void Config::ApplyCliOverrides(int argc, char* argv[]) {
         } else if (arg == "--scenario") {
             auto v = next();
             if (!v.empty()) scenario.path = v;
+        } else if (arg == "--start-propulsion-enabled") {
+            // No value — presence of the flag turns it on.
+            vehicle_dynamics.start_propulsion_enabled = true;
         } else if (arg == "--lights-demo") {
             auto v = next();
             if (v == "true" || v == "1" || v == "on")      lights.demo_mode = "blink";
