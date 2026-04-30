@@ -267,3 +267,52 @@ known plant-fidelity limitation captured here.  Cruise-control gain
 tuning should still wait until F_rr is closer to spec — otherwise we'd
 be tuning around the wrong plant.  See [docs/TODO.md](TODO.md) for the
 follow-up task.
+
+## 12. Calibration attempt — what didn't work
+
+After the audit fixes landed, an explicit calibration attempt
+(2026-04-30) tried to bring F_rr and CdA closer to spec.  Tooling:
+[scripts/fit_coastdown.py](../scripts/fit_coastdown.py) does
+weighted-OLS on bin centroids to recover F_rr and CdA from a coastdown
+CSV.  Tested values:
+
+| config                                        | F_rr (N) | CdA (m²) |
+|---|---|---|
+| baseline (engine -5..-25, Crr=0.008)          | 301      | 1.21     |
+| engine zeroed (engine 0, Crr=0.008)           | -126*    | 2.01     |
+| engine halved (engine -2.5..-12.5, Crr=0.008) | 220      | 1.98     |
+| Crr lowered (engine -5..-25, Crr=0.005)       | 185      | 1.75     |
+| Crr near-zero (engine -5..-25, Crr=0.001)     | unstable | unstable |
+
+\* negative F_rr is a fit artifact — pure-v² shape doesn't decompose
+cleanly.  The "F_avg" at v≈22 m/s is actually a better single-number
+summary than the F_rr/CdA decomposition.
+
+| config                                        | F_avg @ 22 m/s | F_avg @ 27 m/s |
+|---|---|---|
+| baseline                                      | 667 N          | 845 N          |
+| engine zeroed                                 | 528 N (-21%)   | 780 N (-8%)    |
+| engine halved                                 | 815 N (+22%)   | 1180 N (+40%)  |
+| Crr lowered                                   | 723 N          | ~1000 N        |
+
+Engine-zero gave the cleanest reduction (~10-20%).  But "engine halved"
+gave WORSE total drag than baseline — the trajectory diverged because
+small dynamics changes accumulate over a 30 s coastdown.
+
+**Conclusion**: the simple knobs exposed in the JSON (engine coast map,
+tire Crr) can each shave 10-20 % off total drag, but cannot get within
+2× of spec.  The remaining ~70-80 % of excess dissipation lives in
+TMeasy's internal slip dynamics — `Vehicle Type: "Passenger"` preset
+sets longitudinal/lateral slip stiffness defaults that aren't exposed
+in the JSON.
+
+**Reverted to baseline config.**  Calibration deferred until either:
+(a) Chrono exposes more TMeasy parameters via JSON, (b) we switch to
+a different tire model with explicit dissipation knobs (e.g.
+Pacejka-style with rolling-resistance map), or (c) we accept the 3×
+factor as a known plant limitation and tune the controller around it.
+
+**What the tooling enables for future work**:
+- `config/scenarios/coastdown.json` is the standardized validation run.
+- `scripts/fit_coastdown.py scenario_coastdown.csv` reports F_rr and CdA.
+- Both should converge toward 100 N and 0.36 m² as the plant model improves.

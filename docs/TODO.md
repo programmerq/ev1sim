@@ -65,12 +65,19 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   Coastdown experiment (`config/scenarios/coastdown.json`) shows
   ~2× excess rolling resistance and ~2× excess v² dissipation
   remain — captured in audit §11.  See follow-up tasks below.
-- [ ] **Drivetrain dissipation calibration.**  Coastdown shows
-  F_rr ≈ 198 N (vs spec ~100 N) and CdA ≈ 0.76 m² (vs spec ~0.36 m²).
-  Most likely fixable by halving the engine `Map Zero Throttle`
-  values (currently fires during coastdown), then tuning TMeasy
-  slip-curve parameters.  Re-run `scenario_coastdown.csv` after each
-  change to track convergence toward published EV1 numbers.
+- [ ] **Drivetrain dissipation calibration (deferred).**  Coastdown shows
+  F_rr ≈ 301 N (vs spec ~100 N) and CdA ≈ 1.21 m² (vs spec ~0.36 m²) —
+  both ~3× spec.  Calibration attempt 2026-04-30 (audit §12) tried
+  halving + zeroing the engine zero-throttle map and lowering tire
+  Crr from 0.008 → 0.005 → 0.001.  Engine-coast tweaks shaved 8-20 %
+  off total drag; tire Crr changes traded F_rr for CdA without
+  reducing total dissipation.  The remaining ~70-80 % excess lives
+  in TMeasy's internal slip dynamics, which aren't exposed in the
+  JSON template.  Reverted to baseline config; deferred until
+  Chrono exposes more TMeasy params or we switch tire models.
+  Tooling: [scripts/fit_coastdown.py](../scripts/fit_coastdown.py)
+  reports F_rr and CdA from a coastdown CSV; re-run after any plant
+  change to track convergence.
 - [ ] **Front MacPherson strut + rear trailing-arm templates.**
   Current Chrono setup uses `DoubleWishbone` for both axles; real EV1
   is MacPherson front / trailing-arm (twist-beam) rear.  Substantial
