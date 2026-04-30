@@ -252,9 +252,13 @@ void SimApp::ApplyAbsFrontBrake(double time, double local_front_brake) {
         m_abs_fr_was_fresh = abs_phase.fr_fresh;
     }
 
-    // If neither wheel has fresh BTCM data, the symmetric front_pressure from
-    // CommandDriver::ApplyBrakes() (called inside VehicleWorld::Synchronize) is
-    // already in effect — nothing to do.
+    // BTCM-off / stale path: the EV1's front brake hydraulic line bypasses
+    // the BTCM modulator when the controller is unpowered — the iso/dump
+    // solenoids are normally-open / normally-closed so without current the
+    // master cylinder pressure flows directly to the front calipers.  We
+    // model that here by leaving the symmetric front_pressure from
+    // CommandDriver::ApplyBrakes() (set inside VehicleWorld::Synchronize)
+    // in effect.  Nothing to do.
     if (!abs_phase.fl_fresh && !abs_phase.fr_fresh) {
         // Keep prev values in sync with local so HOLD doesn't freeze at stale values.
         m_abs_fl_prev = local_front_brake;
@@ -284,31 +288,34 @@ void SimApp::ApplyAbsFrontBrake(double time, double local_front_brake) {
 }
 
 // ---------------------------------------------------------------------------
-void SimApp::ApplyRearEmbBrake(double time, double local_rear_brake) {
+void SimApp::ApplyRearEmbBrake(double time, double /*local_rear_brake*/) {
+    // BTCM-failure model: real EV1 rear brakes are PURELY electromechanical.
+    // There's no hydraulic backup line from the master cylinder, unlike the
+    // front calipers.  When the BTCM is not commanding the rear motors —
+    // either powered down or signals stale — the rear shoes free-roll and
+    // contribute zero brake force.  This is the safety design we model
+    // here, even though it's an unexpected operating state.  The unused
+    // `local_rear_brake` arg is intentional; we never fall back to it.
+
     const auto cmd = m_external_sim->GetRearEmbCmd(kAbsFreshnessWindow);
 
     if (cmd.lr_fresh != m_rear_lr_was_fresh) {
         std::cout << (cmd.lr_fresh
                           ? "[SimApp] rear-brake from BTCM (live) wheel=RL\n"
-                          : "[SimApp] rear-brake fallback (BTCM stale) wheel=RL\n");
+                          : "[SimApp] rear-brake INACTIVE (BTCM stale) wheel=RL — "
+                            "no hydraulic backup\n");
         m_rear_lr_was_fresh = cmd.lr_fresh;
     }
     if (cmd.rr_fresh != m_rear_rr_was_fresh) {
         std::cout << (cmd.rr_fresh
                           ? "[SimApp] rear-brake from BTCM (live) wheel=RR\n"
-                          : "[SimApp] rear-brake fallback (BTCM stale) wheel=RR\n");
+                          : "[SimApp] rear-brake INACTIVE (BTCM stale) wheel=RR — "
+                            "no hydraulic backup\n");
         m_rear_rr_was_fresh = cmd.rr_fresh;
     }
 
-    // Stale-fallback: if BTCM isn't talking, leave the symmetric rear_pressure
-    // from CommandDriver::ApplyBrakes() in effect.  No work to do.
-    if (!cmd.lr_fresh && !cmd.rr_fresh) return;
-
     // Convert the [-1, +1] motor command to a clamping force.  +1 = full apply
     // (max shoe force), 0 or negative = no force (motor idling or retracting).
-    // A more faithful model would integrate the motor's position over time;
-    // this proportional approximation is adequate while BTCM holds cmd=+1
-    // through a sustained brake event.
     const ev1sim::BrakeDrum::Params drum;
     auto cmd_to_force = [&drum](float c) {
         const double clipped = c < 0.0f ? 0.0 : (c > 1.0f ? 1.0 : double{c});
@@ -326,17 +333,18 @@ void SimApp::ApplyRearEmbBrake(double time, double local_rear_brake) {
         return ratio < 0.0 ? 0.0 : (ratio > 1.0 ? 1.0 : ratio);
     };
 
-    // Compute per-wheel ratio: use BTCM-derived torque if fresh, else fall
-    // back to the local pedal value.  ApplyRearBrakePerWheel sets both
-    // sides at once, so we always compute both and call once.
+    // Per-wheel: BTCM command if fresh, else 0 (rear has no hydraulic
+    // fallback path).  Always call ApplyRearBrakePerWheel so we actively
+    // zero the rear when BTCM is off — otherwise Chrono would carry the
+    // last value forever.
     const double rl_ratio = cmd.lr_fresh
         ? torque_to_ratio(ev1sim::BrakeDrum::torque_magnitude_nm(
               cmd_to_force(cmd.lr), omega_rl, drum))
-        : local_rear_brake;
+        : 0.0;
     const double rr_ratio = cmd.rr_fresh
         ? torque_to_ratio(ev1sim::BrakeDrum::torque_magnitude_nm(
               cmd_to_force(cmd.rr), omega_rr, drum))
-        : local_rear_brake;
+        : 0.0;
     m_world->ApplyRearBrakePerWheel(time, rl_ratio, rr_ratio);
 }
 
