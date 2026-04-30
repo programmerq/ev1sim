@@ -103,6 +103,7 @@ add_executable(ev1sim
     src/KeyboardInputController.cpp
     src/CameraManager.cpp
     src/Config.cpp
+    src/Scenario.cpp
     src/ScriptedDriver.cpp
     src/Telemetry.cpp
     src/HornAudio.cpp
@@ -170,9 +171,11 @@ if(BUILD_TESTS)
         tests/test_physical_world.cpp
         tests/test_wiper_renderer.cpp
         tests/test_throttle_bus.cpp
+        tests/test_scenario.cpp
         src/Config.cpp
         src/KeyboardInputController.cpp
         src/ExternalSimConnector.cpp
+        src/Scenario.cpp
         src/ScriptedDriver.cpp
         src/VehicleLights.cpp
         src/WiperRenderer.cpp

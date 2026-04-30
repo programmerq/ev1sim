@@ -115,6 +115,16 @@ struct Config {
         double stop_threshold_mps = 0.1;
     } scripted;
 
+    // Data-driven scenario harness — load timed events + stats capture
+    // from a JSON file.  When `path` is non-empty SimApp loads the file at
+    // construction, applies driver_mode + max_time_s overrides, and runs
+    // the scenario in place of (or alongside) the built-in scripted driver.
+    // Mutually exclusive with `scripted.enabled` — if both are set the
+    // scenario file wins and a warning is logged.
+    struct Scenario {
+        std::string path;
+    } scenario;
+
     bool start_paused = false;
 
     // Load from JSON file.  Missing keys keep their defaults.

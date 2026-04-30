@@ -156,6 +156,11 @@ Config Config::LoadFromFile(const std::string& path) {
         read_if(sc, "stop_threshold_mps", cfg.scripted.stop_threshold_mps);
     }
 
+    if (j.contains("scenario")) {
+        auto& sc = j["scenario"];
+        read_if(sc, "path", cfg.scenario.path);
+    }
+
     return cfg;
 }
 
@@ -254,6 +259,9 @@ void Config::ApplyCliOverrides(int argc, char* argv[]) {
                 std::cerr << "[Config] Unknown --driver-mode: " << v
                           << " (expected: local | electronics)\n";
             }
+        } else if (arg == "--scenario") {
+            auto v = next();
+            if (!v.empty()) scenario.path = v;
         } else if (arg == "--lights-demo") {
             auto v = next();
             if (v == "true" || v == "1" || v == "on")      lights.demo_mode = "blink";

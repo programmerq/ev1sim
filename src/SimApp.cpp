@@ -113,6 +113,36 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                   << m_external_sim->StatusString() << ")\n";
     }
 
+    // Data-driven scenario harness — JSON file with timed events + stats
+    // capture.  Wins over the built-in ScriptedDriver if both are configured.
+    if (!m_config.scenario.path.empty()) {
+        auto loaded = ev1sim::Scenario::LoadFromFile(m_config.scenario.path);
+        if (loaded) {
+            m_scenario = std::make_unique<ev1sim::Scenario>(std::move(*loaded));
+            // Scenario file's driver_mode + max_time_s override config defaults
+            // unless the config field is non-trivial (already set by the user).
+            if (!m_scenario->driver_mode().empty() &&
+                m_config.vehicle_dynamics.driver == "local") {
+                m_driver_mode = m_scenario->driver_mode();
+                if (m_driver_mode != "local" && m_driver_mode != "electronics") {
+                    std::cerr << "[SimApp] scenario driver_mode='"
+                              << m_driver_mode << "' invalid — using 'local'\n";
+                    m_driver_mode = "local";
+                }
+            }
+            if (m_scenario->max_time_s() > 0.0 &&
+                m_config.simulation.max_time_s == 0.0) {
+                m_config.simulation.max_time_s = m_scenario->max_time_s();
+            }
+            m_scenario->OpenStats();
+            if (m_config.scripted.enabled) {
+                std::cerr << "[SimApp] scenario file overrides scripted "
+                             "driver — disabling scripted\n";
+                m_config.scripted.enabled = false;
+            }
+        }
+    }
+
     // Scripted driver (optional).  Currently one built-in scenario:
     // accel → hold → brake → done.
     if (m_config.scripted.enabled) {
@@ -274,11 +304,12 @@ int SimApp::Run() {
         // default for CI.  Require at least one way to exit automatically.
         const bool has_max_time = m_config.simulation.max_time_s > 0.0;
         const bool has_scripted = m_config.scripted.enabled;
-        if (!has_max_time && !has_scripted) {
+        const bool has_scenario = m_scenario != nullptr;
+        if (!has_max_time && !has_scripted && !has_scenario) {
             std::cerr << "[SimApp] --headless requires at least one of "
-                         "--max-time <s> or a scripted scenario "
-                         "(e.g. --scripted-accel-brake).  Otherwise the "
-                         "run can only be ended by SIGINT.\n";
+                         "--max-time <s>, --scenario <file>, or a scripted "
+                         "scenario (e.g. --scripted-accel-brake).  Otherwise "
+                         "the run can only be ended by SIGINT.\n";
             return kExitUsage;
         }
         return RunHeadless();
@@ -301,6 +332,13 @@ int SimApp::RunWithVisualization() {
         DriverCommand cmd = m_keyboard->Update(render_dt);
         if (m_scripted && !m_paused)
             cmd = m_scripted->Update(m_world->GetState());
+
+        // Scenario harness — fires timed events + holds set_throttle/brake
+        // overrides.  Runs before the bus-throttle override so the bus
+        // value (PIM-computed) wins when in electronics mode.
+        if (m_scenario && !m_paused) {
+            m_scenario->Tick(m_world->GetSimTime(), *this, cmd);
+        }
 
         // --- Bus-mediated throttle override (electronics drive mode) ---
         // No-op in "local" mode.  Must run before the propulsion gate so
@@ -749,6 +787,13 @@ int SimApp::RunWithVisualization() {
         // --- Telemetry logging ---
         m_telemetry->Record(m_world->GetState(), render_dt);
 
+        // --- Scenario stats sampling ---
+        if (m_scenario) {
+            m_scenario->MaybeSampleStats(m_world->GetSimTime(),
+                                          m_world->GetState(),
+                                          *m_external_sim, cmd);
+        }
+
         // --- Realtime pacing ---
         if (m_config.simulation.realtime)
             m_realtime_timer.Spin(step * steps_per_frame);
@@ -757,6 +802,15 @@ int SimApp::RunWithVisualization() {
         if (m_scripted && m_scripted->IsDone()) {
             std::cout << "[SimApp] Scripted scenario complete at t="
                       << m_world->GetSimTime() << "s — exiting.\n";
+            if (m_scenario) m_scenario->Close();
+            return kExitSuccess;
+        }
+
+        // --- Scenario complete (data-driven) ---
+        if (m_scenario && m_scenario->IsDone(m_world->GetSimTime())) {
+            std::cout << "[SimApp] Scenario complete at t="
+                      << m_world->GetSimTime() << "s — exiting.\n";
+            m_scenario->Close();
             return kExitSuccess;
         }
 
@@ -770,10 +824,12 @@ int SimApp::RunWithVisualization() {
                 return kExitTimeout;
             }
             std::cout << "[SimApp] max_time_s reached — exiting.\n";
+            if (m_scenario) m_scenario->Close();
             return kExitSuccess;
         }
     }
     // Window closed / Esc pressed — normal exit.
+    if (m_scenario) m_scenario->Close();
     return kExitSuccess;
 }
 
@@ -812,6 +868,12 @@ int SimApp::RunHeadless() {
         DriverCommand cmd{};
         if (m_scripted) {
             cmd = m_scripted->Update(m_world->GetState());
+        }
+
+        // Scenario harness — fires timed events + holds set_throttle/brake
+        // overrides.  Headless paths don't pause, so always tick.
+        if (m_scenario) {
+            m_scenario->Tick(m_world->GetSimTime(), *this, cmd);
         }
 
         // --- Bus-mediated throttle override (electronics drive mode) ---
@@ -995,10 +1057,26 @@ int SimApp::RunHeadless() {
             std::this_thread::sleep_until(target);
         }
 
+        // --- Scenario stats sampling ---
+        if (m_scenario) {
+            m_scenario->MaybeSampleStats(t, m_world->GetState(),
+                                          *m_external_sim, cmd);
+        }
+
         // --- Scripted-scenario complete ---
         if (m_scripted && m_scripted->IsDone()) {
             std::cout << "[SimApp] Scripted scenario complete at t="
                       << t << "s — exiting.\n";
+            if (m_scenario) m_scenario->Close();
+            sigaction(SIGINT, &old_sa, nullptr);
+            return kExitSuccess;
+        }
+
+        // --- Scenario complete (data-driven) ---
+        if (m_scenario && m_scenario->IsDone(t)) {
+            std::cout << "[SimApp] Scenario complete at t="
+                      << t << "s — exiting.\n";
+            m_scenario->Close();
             sigaction(SIGINT, &old_sa, nullptr);
             return kExitSuccess;
         }
@@ -1014,6 +1092,7 @@ int SimApp::RunHeadless() {
                 return kExitTimeout;
             }
             std::cout << "[SimApp] max_time_s reached — exiting.\n";
+            if (m_scenario) m_scenario->Close();
             sigaction(SIGINT, &old_sa, nullptr);
             return kExitSuccess;
         }
@@ -1021,6 +1100,53 @@ int SimApp::RunHeadless() {
 
     // Fell out of the loop -> SIGINT was the only possible cause.
     std::cout << "[SimApp] SIGINT — exiting.\n";
+    if (m_scenario) m_scenario->Close();
     sigaction(SIGINT, &old_sa, nullptr);
     return kExitInterrupted;
+}
+
+// ---------------------------------------------------------------------------
+// Scenario hooks — dispatch physical-world events from a loaded Scenario.
+// All hooks are no-ops when m_physical is null (shouldn't happen — SimApp
+// always constructs PhysicalWorld), but defensive null-checks make these
+// safe in tests that mock SimApp.
+// ---------------------------------------------------------------------------
+void SimApp::KeyOnCycle() {
+    if (m_physical) m_physical->rsa_keypad().cycle_k();
+}
+void SimApp::HeadlightCycle() {
+    if (m_physical) m_physical->combination_switch().cycle_h();
+}
+void SimApp::PrndUp() {
+    if (m_physical) m_physical->prnd_selector().cycle_up();
+}
+void SimApp::PrndDown() {
+    if (m_physical) m_physical->prnd_selector().cycle_down();
+}
+void SimApp::TurnSignalLeft() {
+    if (m_physical) m_physical->turn_signal_stalk().toggle_left();
+}
+void SimApp::TurnSignalRight() {
+    if (m_physical) m_physical->turn_signal_stalk().toggle_right();
+}
+void SimApp::HazardToggle() {
+    if (m_physical) m_physical->hazard_switch().toggle();
+}
+void SimApp::IpcTripResetPress() {
+    if (m_physical) m_physical->ipc_trip_reset().press();
+}
+void SimApp::CruiseSet() {
+    if (m_physical) m_physical->cruise_stalk().press_set();
+}
+void SimApp::CruiseResume() {
+    if (m_physical) m_physical->cruise_stalk().press_resume();
+}
+void SimApp::CruiseCancel() {
+    if (m_physical) m_physical->cruise_stalk().press_cancel();
+}
+void SimApp::CruiseSpeedUp() {
+    if (m_physical) m_physical->cruise_stalk().press_speed_up();
+}
+void SimApp::CruiseSpeedDown() {
+    if (m_physical) m_physical->cruise_stalk().press_speed_down();
 }

@@ -6,6 +6,7 @@
 #include "HornAudio.h"
 #include "KeyboardInputController.h"
 #include "PhysicalWorld.h"
+#include "Scenario.h"
 #include "ScriptedDriver.h"
 #include "Telemetry.h"
 #include "VehicleLights.h"
@@ -18,10 +19,26 @@
 
 #include <memory>
 
-class SimApp {
+class SimApp : public ev1sim::ScenarioHooks {
 public:
     explicit SimApp(const Config& config);
     ~SimApp();
+
+    // ScenarioHooks (public so the Scenario can invoke them; SimApp owns
+    // both objects so the lifetime is fine).
+    void KeyOnCycle()        override;
+    void HeadlightCycle()    override;
+    void PrndUp()            override;
+    void PrndDown()          override;
+    void TurnSignalLeft()    override;
+    void TurnSignalRight()   override;
+    void HazardToggle()      override;
+    void IpcTripResetPress() override;
+    void CruiseSet()         override;
+    void CruiseResume()      override;
+    void CruiseCancel()      override;
+    void CruiseSpeedUp()     override;
+    void CruiseSpeedDown()   override;
 
     // Exit codes returned from Run().  Chosen to be CI-friendly:
     //   0   — successful completion (scripted Done, user-closed window, or
@@ -71,6 +88,7 @@ private:
     std::unique_ptr<ev1sim::PhysicalWorld>  m_physical;
     std::unique_ptr<ExternalSimConnector>   m_external_sim;
     std::unique_ptr<ScriptedDriver>         m_scripted;
+    std::unique_ptr<ev1sim::Scenario>       m_scenario;
     std::unique_ptr<WiperRenderer>          m_wiper;
 
     std::shared_ptr<chrono::vehicle::ChWheeledVehicleVisualSystemIrrlicht> m_vis;
