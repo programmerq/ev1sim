@@ -331,30 +331,64 @@ void PhysicalWorld::DrawHUD(irr::IrrlichtDevice* device,
 // RsaKeypadDriver
 // ---------------------------------------------------------------------------
 
+// Spacing between scheduled events (digit pulses and the final mode press).
+static constexpr double kKeypadIntervalS = 0.100;  // 100 ms between events
+// Number of digit-1 button presses for the default "111111" code.
+static constexpr int    kDefaultCodeLen  = 6;
+
 void RsaKeypadDriver::cycle_k() {
-    // Advance state and arm the appropriate one-shot outputs.
-    // Mode button enum values per the prompt:
-    //   0=NONE, 1=OFF, 2=ACC, 3=RUN, 4=START
     switch (m_expected) {
         case ExpectedState::OFF:
-            // OFF → RUN: user enters code (code_ok=1) then presses RUN.
-            m_code_ok_oneshot     = true;
-            m_mode_button_oneshot = 3;   // RUN
-            m_expected = ExpectedState::RUN;
+            // OFF → RUN: schedule 6 button-1 pulses then a RUN press.
+            m_expected    = ExpectedState::RUN;
+            m_sched_state = CycleState::EmittingDigits;
+            m_digits_sent = 0;
+            m_timer_s     = 0.0;  // first digit fires on next update() call
             break;
         case ExpectedState::RUN:
-            // RUN → ACC: no code needed, just press ACC.
-            m_code_ok_oneshot     = false;
-            m_mode_button_oneshot = 2;   // ACC
-            m_expected = ExpectedState::ACC;
+            // RUN → ACC: immediate ACC press; no digit entry needed.
+            m_expected       = ExpectedState::ACC;
+            m_sched_state    = CycleState::Idle;
+            m_pending.mode_button = 2;  // ACC
             break;
         case ExpectedState::ACC:
-            // ACC → OFF: press OFF.
-            m_code_ok_oneshot     = false;
-            m_mode_button_oneshot = 1;   // OFF
-            m_expected = ExpectedState::OFF;
+            // ACC → OFF: immediate OFF press.
+            m_expected       = ExpectedState::OFF;
+            m_sched_state    = CycleState::Idle;
+            m_pending.mode_button = 1;  // OFF
             break;
     }
+}
+
+void RsaKeypadDriver::update(double dt_s) {
+    if (m_sched_state == CycleState::Idle) return;
+
+    m_timer_s -= dt_s;
+    if (m_timer_s > 0.0) return;
+
+    // Timer fired.
+    if (m_sched_state == CycleState::EmittingDigits) {
+        if (m_digits_sent < kDefaultCodeLen) {
+            // Emit button-1 (index 0) pulse — "1/2" button, primary-tap = digit 1.
+            m_pending.button_pulse[0] = true;
+            ++m_digits_sent;
+            m_timer_s = kKeypadIntervalS;
+            if (m_digits_sent >= kDefaultCodeLen) {
+                // Last digit sent; schedule the mode press next.
+                m_sched_state = CycleState::EmittingMode;
+            }
+        }
+    } else if (m_sched_state == CycleState::EmittingMode) {
+        m_pending.mode_button = 3;  // RUN
+        m_sched_state         = CycleState::Idle;
+        m_timer_s             = 0.0;
+    }
+}
+
+RsaKeypadDriver::KeypadFireSet RsaKeypadDriver::consume_fires_now() {
+    KeypadFireSet fires = m_pending;
+    m_pending = KeypadFireSet{};
+    return fires;
 }
 
 const char* RsaKeypadDriver::expected_state_name() const {
@@ -364,11 +398,6 @@ const char* RsaKeypadDriver::expected_state_name() const {
         case ExpectedState::ACC: return "ACC";
     }
     return "OFF";
-}
-
-void RsaKeypadDriver::clear_oneshots() {
-    m_code_ok_oneshot     = false;
-    m_mode_button_oneshot = 0;
 }
 
 }  // namespace ev1sim

@@ -182,10 +182,20 @@ public:
     /// SimApp calls this each tick with the PrndSelector's current pin outputs.
     void SetPrndSelector(bool a, bool b, bool c, bool d);
 
-    /// Outgoing RSA keypad code-ok signal (ID 6970, main harness segment).
-    /// Momentary 1-tick pulse when the user "enters the correct code".
-    /// Encoded as 1-byte uint8 (0=no, 1=yes).
-    void SetDriverRsaKeypadCodeOk(bool ok);
+    /// Outgoing RSA per-digit keypad button signals (IDs 6975-6979, main harness).
+    /// Each is a momentary 1-tick pulse (true=pressed this tick, false=idle).
+    /// Encoded as 1-byte uint8 (0=idle, 1=pressed).
+    ///   Button1 (6975): "1/2" button, primary-tap = digit 1
+    ///   Button2 (6976): "3/4" button, primary-tap = digit 3
+    ///   Button3 (6977): "5/6" button, primary-tap = digit 5
+    ///   Button4 (6978): "7/8" button, primary-tap = digit 7
+    ///   Button5 (6979): "9/0" button, primary-tap = digit 9
+    /// (Slot 6970 is reserved — was kSigDriverRsaKeypadCodeOk; do not reuse.)
+    void SetDriverRsaKeypadButton1(bool pressed);
+    void SetDriverRsaKeypadButton2(bool pressed);
+    void SetDriverRsaKeypadButton3(bool pressed);
+    void SetDriverRsaKeypadButton4(bool pressed);
+    void SetDriverRsaKeypadButton5(bool pressed);
 
     /// Outgoing RSA mode-button press (ID 6971, main harness segment).
     /// Momentary 1-tick pulse indicating the user's button press.

@@ -211,32 +211,44 @@ private:
     bool m_on = false;
 };
 
-/// RSA exterior keypad + mode-button simulator.
+/// RSA interior keypad + mode-button simulator.
 ///
 /// The EV1 RSA (Remote Security Access) module controls the vehicle's run
 /// mode.  To start the vehicle the user must:
-///   1. Enter the correct 5-digit code on the door-pillar keypad
-///      (ev1sim simulates this via kSigDriverRsaKeypadCodeOk = 6970)
-///   2. Press the RUN button on the RSA HMI
-///      (ev1sim simulates this via kSigDriverRsaModeButton = 6971)
+///   1. Enter the correct 6-digit interior code on the RSA keypad by
+///      pressing the per-digit button signals (6975-6979).
+///   2. Press the RUN button on the RSA HMI (6971).
 ///
 /// The K key in ev1sim cycles a local "expected key state" through:
-///   OFF → RUN  (publishes code_ok=1 for one tick, then mode_button=RUN)
-///   RUN → ACC  (publishes mode_button=ACC; no code_ok needed)
-///   ACC → OFF  (publishes mode_button=OFF)
+///   OFF → RUN  (schedules 6 button-1 pulses spaced 100 ms apart, then RUN)
+///   RUN → ACC  (immediate ACC mode-button pulse; no digit re-entry needed)
+///   ACC → OFF  (immediate OFF mode-button pulse)
 ///   OFF → RUN  (wraps back to start)
 ///
-/// Both outputs are momentary one-shots lasting exactly one tick; the next
-/// tick they return to zero.  RSA latches the mode internally.
+/// The digit sequence runs through a tick-driven scheduler.  Call update()
+/// once per render frame; consume_fires_now() to get the resulting signals.
 ///
-/// TODO: per-digit keypad fidelity (digit-by-digit entry) is deferred —
-///       ev1sim currently sends the aggregate "code_ok" shortcut signal.
+/// TODO: long-press for higher digits (2,4,6,8,0) — currently every button
+/// tap maps to the lower digit in its pair (1,3,5,7,9).
 class RsaKeypadDriver {
 public:
     enum class ExpectedState { OFF, RUN, ACC };
 
+    /// Aggregate of signals to fire on this tick.
+    struct KeypadFireSet {
+        bool    button_pulse[5] = {};  ///< index 0..4 (button signals 6975-6979)
+        std::uint8_t mode_button = 0; ///< 0=none, 1=OFF, 2=ACC, 3=RUN
+    };
+
     /// Advance the cycle: OFF → RUN → ACC → OFF → …
     void cycle_k();
+
+    /// Tick the internal scheduler by dt_s seconds.  Should be called once
+    /// per render/headless loop frame before consume_fires_now().
+    void update(double dt_s);
+
+    /// Consume the fires for the current tick (returns and clears in one go).
+    KeypadFireSet consume_fires_now();
 
     /// Current locally-expected RSA state (for HUD display).
     ExpectedState expected_state() const { return m_expected; }
@@ -244,21 +256,15 @@ public:
     /// Name string for HUD/logging ("OFF", "RUN", "ACC").
     const char* expected_state_name() const;
 
-    /// One-shot momentary output for this tick.
-    /// Returns true for exactly one tick after the OFF→RUN transition.
-    bool code_ok_press_now() const { return m_code_ok_oneshot; }
-
-    /// One-shot momentary output for this tick.
-    /// Returns 0=NONE, 2=ACC, 3=RUN, 1=OFF per the enum in the prompt.
-    uint8_t mode_button_press_now() const { return m_mode_button_oneshot; }
-
-    /// Clear the one-shot outputs.  Call once per tick after consuming.
-    void clear_oneshots();
-
 private:
-    ExpectedState m_expected        = ExpectedState::OFF;
-    bool          m_code_ok_oneshot = false;
-    uint8_t       m_mode_button_oneshot = 0;
+    enum class CycleState { Idle, EmittingDigits, EmittingMode };
+
+    ExpectedState m_expected     = ExpectedState::OFF;
+    CycleState    m_sched_state  = CycleState::Idle;
+    int           m_digits_sent  = 0;    ///< how many digit pulses have fired
+    double        m_timer_s      = 0.0;  ///< seconds until next event fires
+
+    KeypadFireSet m_pending{};           ///< accumulated this tick; cleared by consume
 };
 
 /// Container for all physical-world input components.

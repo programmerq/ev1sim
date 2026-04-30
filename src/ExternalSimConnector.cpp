@@ -122,16 +122,23 @@ constexpr std::uint32_t kSigDriverTurnSignalLeft  = 6948U;
 constexpr std::uint32_t kSigDriverTurnSignalRight = 6949U;
 // Hazard switch request — locked in lockstep with kSigDriverHazardRequest = 6944.
 constexpr std::uint32_t kSigDriverHazardRequest   = 6944U;
-// RSA keypad code-ok — momentary 1-tick bool when ev1sim asserts correct code.
-// Locked in lockstep with electricsim kSigDriverRsaKeypadCodeOk = 6970.
-constexpr std::uint32_t kSigDriverRsaKeypadCodeOk = 6970U;
+// RSA per-digit keypad button signals (momentary 1-tick bool, 0=idle, 1=pressed).
+// Locked in lockstep with electricsim kSigDriverRsaKeypadButton[1..5] = 6975-6979.
+// (Slot 6970 was kSigDriverRsaKeypadCodeOk — now reserved, not published here.)
+constexpr std::uint32_t kSigDriverRsaKeypadButton1 = 6975U;  // "1/2" button (tap=1)
+constexpr std::uint32_t kSigDriverRsaKeypadButton2 = 6976U;  // "3/4" button (tap=3)
+constexpr std::uint32_t kSigDriverRsaKeypadButton3 = 6977U;  // "5/6" button (tap=5)
+constexpr std::uint32_t kSigDriverRsaKeypadButton4 = 6978U;  // "7/8" button (tap=7)
+constexpr std::uint32_t kSigDriverRsaKeypadButton5 = 6979U;  // "9/0" button (tap=9)
 // RSA mode button press — momentary 1-tick uint8 enum.
 // 0=NONE, 1=OFF, 2=ACC, 3=RUN, 4=START.
 // Locked in lockstep with electricsim kSigDriverRsaModeButton = 6971.
-constexpr std::uint32_t kSigDriverRsaModeButton   = 6971U;
+constexpr std::uint32_t kSigDriverRsaModeButton    = 6971U;
 // Number of driver-input endpoints on the main harness segment.
-// 6900, 6901, 6902, 6903, 6904, 6944, 6948, 6949, 6964, 6970, 6971 = 11 total.
-constexpr int           kNumDriverInputs          = 11;
+// 6900, 6901, 6902, 6903, 6904, 6944, 6948, 6949, 6964,
+// 6971, 6975, 6976, 6977, 6978, 6979 = 15 total.
+// (6970 is reserved; not registered as an endpoint.)
+constexpr int           kNumDriverInputs           = 15;
 
 // Motor state signals on the chassis segment (ev1sim → electricsim, float32 LE).
 //   4070  vehicle.dynamics.motor_rpm        motor shaft RPM
@@ -256,7 +263,9 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 //   6900 brake_pedal_q8, 6901 steering_deg_q8, 6902 gear_selector,
 //   6903 throttle_q8, 6904 brake_switch, 6944 hazard_request,
 //   6948 turn_signal_left, 6949 turn_signal_right, 6964 seatbelt_buckled,
-//   6970 rsa_keypad_code_ok, 6971 rsa_mode_button  (11 total).
+//   6971 rsa_mode_button,
+//   6975 rsa_keypad_button1, 6976..6979 (buttons 2-5)  (15 total).
+// (Slot 6970 is reserved; not registered.)
 // +1 for the charge coupler presence (ID 4060, chassis segment).
 // +kNumPrndSelector for the 4 PRND selector lines (IDs 4050-4053, chassis segment).
 // +kNumMotorSignals for motor RPM + torque (IDs 4070-4071, chassis segment).
@@ -329,10 +338,18 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.driver.turn_signal_left", "driver_turn_signal_left", false};
     out[i++] = {kSigDriverTurnSignalRight,
                 "vehicle.driver.turn_signal_right", "driver_turn_signal_right", false};
-    out[i++] = {kSigDriverRsaKeypadCodeOk,
-                "vehicle.driver.rsa_keypad_code_ok", "driver_rsa_keypad_code_ok", false};
     out[i++] = {kSigDriverRsaModeButton,
                 "vehicle.driver.rsa_mode_button", "driver_rsa_mode_button", false};
+    out[i++] = {kSigDriverRsaKeypadButton1,
+                "vehicle.driver.rsa_keypad_button1", "driver_rsa_keypad_button1", false};
+    out[i++] = {kSigDriverRsaKeypadButton2,
+                "vehicle.driver.rsa_keypad_button2", "driver_rsa_keypad_button2", false};
+    out[i++] = {kSigDriverRsaKeypadButton3,
+                "vehicle.driver.rsa_keypad_button3", "driver_rsa_keypad_button3", false};
+    out[i++] = {kSigDriverRsaKeypadButton4,
+                "vehicle.driver.rsa_keypad_button4", "driver_rsa_keypad_button4", false};
+    out[i++] = {kSigDriverRsaKeypadButton5,
+                "vehicle.driver.rsa_keypad_button5", "driver_rsa_keypad_button5", false};
     return out;
 }
 
@@ -413,13 +430,13 @@ struct ExternalSimConnector::State {
     std::int8_t   driver_turn_right_pub   = -1;
     std::int8_t   driver_hazard_pub       = -1;
 
-    // RSA keypad code-ok (ID 6970) and mode button (ID 6971).
-    // Both are momentary one-shot signals; they are cleared to 0 after publish.
-    bool          driver_rsa_code_ok      = false;
+    // RSA per-digit keypad buttons (IDs 6975-6979) and mode button (ID 6971).
+    // All are momentary one-shot signals; buttons are true for one tick only.
+    // driver_rsa_buttons[0..4] correspond to kSigDriverRsaKeypadButton[1..5].
+    bool          driver_rsa_buttons[5]   = {};
     std::uint8_t  driver_rsa_mode_button  = 0;
-    // Published sentinels: use -1 to force first publish; after that only
-    // publish when the value is non-zero (one-shot semantics).
-    std::int8_t   driver_rsa_code_ok_pub  = -1;
+    // Published sentinels: use -1 to force first publish.
+    std::int8_t   driver_rsa_btn_pub[5]   = {-1,-1,-1,-1,-1};
     std::int8_t   driver_rsa_mode_btn_pub = -1;
 
     // Motor state (IDs 4070-4071, chassis segment).
@@ -638,8 +655,24 @@ void ExternalSimConnector::SetPrndSelector(bool a, bool b, bool c, bool d) {
     m_state->prnd_d = d;
 }
 
-void ExternalSimConnector::SetDriverRsaKeypadCodeOk(bool ok) {
-    m_state->driver_rsa_code_ok = ok;
+void ExternalSimConnector::SetDriverRsaKeypadButton1(bool pressed) {
+    m_state->driver_rsa_buttons[0] = pressed;
+}
+
+void ExternalSimConnector::SetDriverRsaKeypadButton2(bool pressed) {
+    m_state->driver_rsa_buttons[1] = pressed;
+}
+
+void ExternalSimConnector::SetDriverRsaKeypadButton3(bool pressed) {
+    m_state->driver_rsa_buttons[2] = pressed;
+}
+
+void ExternalSimConnector::SetDriverRsaKeypadButton4(bool pressed) {
+    m_state->driver_rsa_buttons[3] = pressed;
+}
+
+void ExternalSimConnector::SetDriverRsaKeypadButton5(bool pressed) {
+    m_state->driver_rsa_buttons[4] = pressed;
 }
 
 void ExternalSimConnector::SetDriverRsaModeButton(std::uint8_t button_enum) {
@@ -1010,6 +1043,8 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             st.driver_turn_left_pub        = -1;
             st.driver_turn_right_pub       = -1;
             st.driver_hazard_pub           = -1;
+            for (int bi = 0; bi < 5; ++bi) st.driver_rsa_btn_pub[bi] = -1;
+            st.driver_rsa_mode_btn_pub     = -1;
             std::cout << "[ExternalSim] connected to main harness bus '"
                       << m_opts.main_harness_bus_name << "'\n";
         }
@@ -1101,13 +1136,20 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             drv.push_back(MakeBoolDelta(kSigDriverHazardRequest, st.driver_hazard));
             st.driver_hazard_pub = hazard_val;
         }
-        // RSA keypad code-ok (ID 6970) — one-shot: publish whenever true,
-        // then publish a zero to clear it on the next tick.
+        // RSA per-digit keypad buttons (IDs 6975-6979) — one-shot: publish on
+        // change (true fires for one tick, then back to false).
         {
-            const std::int8_t code_ok_val = st.driver_rsa_code_ok ? 1 : 0;
-            if (st.driver_rsa_code_ok_pub < 0 || code_ok_val != st.driver_rsa_code_ok_pub) {
-                drv.push_back(MakeBoolDelta(kSigDriverRsaKeypadCodeOk, st.driver_rsa_code_ok));
-                st.driver_rsa_code_ok_pub = code_ok_val;
+            constexpr std::uint32_t kBtnIds[5] = {
+                kSigDriverRsaKeypadButton1, kSigDriverRsaKeypadButton2,
+                kSigDriverRsaKeypadButton3, kSigDriverRsaKeypadButton4,
+                kSigDriverRsaKeypadButton5,
+            };
+            for (int bi = 0; bi < 5; ++bi) {
+                const std::int8_t bval = st.driver_rsa_buttons[bi] ? 1 : 0;
+                if (st.driver_rsa_btn_pub[bi] < 0 || bval != st.driver_rsa_btn_pub[bi]) {
+                    drv.push_back(MakeBoolDelta(kBtnIds[bi], st.driver_rsa_buttons[bi]));
+                    st.driver_rsa_btn_pub[bi] = bval;
+                }
             }
         }
         // RSA mode button (ID 6971) — one-shot: publish current value.

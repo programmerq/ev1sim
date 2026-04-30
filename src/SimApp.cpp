@@ -441,11 +441,18 @@ int SimApp::RunWithVisualization() {
                 m_physical->turn_signal_stalk().active_right());
             m_external_sim->SetDriverHazardRequest(
                 m_physical->hazard_switch().on());
-            // RSA keypad code-ok (6970) and mode button (6971) — one-shot.
-            m_external_sim->SetDriverRsaKeypadCodeOk(
-                m_physical->rsa_keypad().code_ok_press_now());
-            m_external_sim->SetDriverRsaModeButton(
-                m_physical->rsa_keypad().mode_button_press_now());
+            // RSA keypad buttons (6975-6979) and mode button (6971) — tick the
+            // scheduler and consume whatever it has ready for this frame.
+            m_physical->rsa_keypad().update(render_dt);
+            {
+                auto fires = m_physical->rsa_keypad().consume_fires_now();
+                m_external_sim->SetDriverRsaKeypadButton1(fires.button_pulse[0]);
+                m_external_sim->SetDriverRsaKeypadButton2(fires.button_pulse[1]);
+                m_external_sim->SetDriverRsaKeypadButton3(fires.button_pulse[2]);
+                m_external_sim->SetDriverRsaKeypadButton4(fires.button_pulse[3]);
+                m_external_sim->SetDriverRsaKeypadButton5(fires.button_pulse[4]);
+                m_external_sim->SetDriverRsaModeButton(fires.mode_button);
+            }
         }
         // Motor RPM and torque (chassis bus 4070-4071).
         {
@@ -474,8 +481,6 @@ int SimApp::RunWithVisualization() {
                 std::cout << "[SimApp] Run mode (from RSA): " << mode_str << "\n";
             }
         }
-        // Clear RSA keypad one-shots after Tick() has published them.
-        m_physical->rsa_keypad().clear_oneshots();
 
         const bool ext_driving_bulbs =
             m_external_sim->IsConnected() && m_external_sim->HasReceivedBulbData();
@@ -764,9 +769,18 @@ int SimApp::RunHeadless() {
                 m_physical->turn_signal_stalk().active_right());
             m_external_sim->SetDriverHazardRequest(
                 m_physical->hazard_switch().on());
-            // RSA keypad signals — headless: no key presses, publish zeros.
-            m_external_sim->SetDriverRsaKeypadCodeOk(false);
-            m_external_sim->SetDriverRsaModeButton(0);
+            // RSA keypad signals — headless: no key presses; tick scheduler
+            // and publish whatever it has (likely idle zeros).
+            m_physical->rsa_keypad().update(tick_dt);
+            {
+                auto fires = m_physical->rsa_keypad().consume_fires_now();
+                m_external_sim->SetDriverRsaKeypadButton1(fires.button_pulse[0]);
+                m_external_sim->SetDriverRsaKeypadButton2(fires.button_pulse[1]);
+                m_external_sim->SetDriverRsaKeypadButton3(fires.button_pulse[2]);
+                m_external_sim->SetDriverRsaKeypadButton4(fires.button_pulse[3]);
+                m_external_sim->SetDriverRsaKeypadButton5(fires.button_pulse[4]);
+                m_external_sim->SetDriverRsaModeButton(fires.mode_button);
+            }
         }
         // Motor RPM and torque (chassis bus 4070-4071).
         {

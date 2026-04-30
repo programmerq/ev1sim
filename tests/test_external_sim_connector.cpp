@@ -22,8 +22,11 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     // from ev1sim: brake_pedal_q8 (6900), steering_deg_q8 (6901),
     // gear_selector (6902), throttle_q8 (6903), brake_switch (6904),
     // hazard_request (6944), turn_signal_left (6948), turn_signal_right (6949),
-    // seatbelt_buckled (6964), rsa_keypad_code_ok (6970), rsa_mode_button (6971).
-    constexpr int kNumDriverInputs = 11;
+    // seatbelt_buckled (6964), rsa_mode_button (6971),
+    // rsa_keypad_button1 (6975), button2 (6976), button3 (6977),
+    // button4 (6978), button5 (6979).
+    // (6970 is reserved — not registered as an endpoint.)
+    constexpr int kNumDriverInputs = 15;
     const int expected = NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS +
                          kNumCombSw + kNumChargeCplr + kNumPrnd + kNumMotor +
                          kNumDynamics + kNumDriverInputs;
@@ -80,14 +83,14 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
                    e.signal_id == 6948 ||
                    e.signal_id == 6949 ||
                    e.signal_id == 6964 ||
-                   e.signal_id == 6970 ||
-                   e.signal_id == 6971) {
+                   e.signal_id == 6971 ||
+                   (e.signal_id >= 6975 && e.signal_id <= 6979)) {
             // Driver inputs on the main harness segment — outputs from ev1sim.
             // 6900=brake_pedal_q8  6901=steering_deg_q8  6902=gear_selector
             // 6903=throttle_q8     6904=brake_switch
             // 6944=hazard_request  6948=turn_signal_left  6949=turn_signal_right
-            // 6964=seatbelt_buckled
-            // 6970=rsa_keypad_code_ok  6971=rsa_mode_button
+            // 6964=seatbelt_buckled  6971=rsa_mode_button
+            // 6975..6979=rsa_keypad_button[1..5]  (6970 reserved; not registered)
             CHECK_FALSE(e.input_to_sim);
             ++driver_input_count;
         } else {
@@ -302,15 +305,24 @@ TEST_CASE("Motor RPM and torque endpoints have correct IDs and direction", "[Ext
 }
 
 TEST_CASE("RSA keypad endpoints have correct IDs and direction", "[ExternalSim]") {
-    const auto* code_ok = ExternalSimConnector::FindEndpoint(6970);
-    REQUIRE(code_ok != nullptr);
-    CHECK(std::string(code_ok->qualified_name) == "vehicle.driver.rsa_keypad_code_ok");
-    CHECK_FALSE(code_ok->input_to_sim);   // output from ev1sim
+    // Slot 6970 is reserved — must NOT be registered.
+    CHECK(ExternalSimConnector::FindEndpoint(6970) == nullptr);
 
     const auto* mode_btn = ExternalSimConnector::FindEndpoint(6971);
     REQUIRE(mode_btn != nullptr);
     CHECK(std::string(mode_btn->qualified_name) == "vehicle.driver.rsa_mode_button");
     CHECK_FALSE(mode_btn->input_to_sim);  // output from ev1sim
+
+    // Per-digit keypad buttons 6975-6979.
+    const auto* btn1 = ExternalSimConnector::FindEndpoint(6975);
+    REQUIRE(btn1 != nullptr);
+    CHECK(std::string(btn1->qualified_name) == "vehicle.driver.rsa_keypad_button1");
+    CHECK_FALSE(btn1->input_to_sim);
+
+    const auto* btn5 = ExternalSimConnector::FindEndpoint(6979);
+    REQUIRE(btn5 != nullptr);
+    CHECK(std::string(btn5->qualified_name) == "vehicle.driver.rsa_keypad_button5");
+    CHECK_FALSE(btn5->input_to_sim);
 }
 
 TEST_CASE("SetMotorRpm and SetMotorTorqueNm store without crashing", "[ExternalSim]") {
@@ -320,9 +332,13 @@ TEST_CASE("SetMotorRpm and SetMotorTorqueNm store without crashing", "[ExternalS
     CHECK_NOTHROW(c.Tick(0.0));
 }
 
-TEST_CASE("SetDriverRsaKeypadCodeOk and SetDriverRsaModeButton store without crashing", "[ExternalSim]") {
+TEST_CASE("SetDriverRsaKeypadButtons and SetDriverRsaModeButton store without crashing", "[ExternalSim]") {
     ExternalSimConnector c;
-    CHECK_NOTHROW(c.SetDriverRsaKeypadCodeOk(true));
+    CHECK_NOTHROW(c.SetDriverRsaKeypadButton1(true));
+    CHECK_NOTHROW(c.SetDriverRsaKeypadButton2(false));
+    CHECK_NOTHROW(c.SetDriverRsaKeypadButton3(false));
+    CHECK_NOTHROW(c.SetDriverRsaKeypadButton4(false));
+    CHECK_NOTHROW(c.SetDriverRsaKeypadButton5(false));
     CHECK_NOTHROW(c.SetDriverRsaModeButton(3));  // RUN
     CHECK_NOTHROW(c.Tick(0.0));
 }
