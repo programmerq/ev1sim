@@ -18,6 +18,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     constexpr int kNumChargeCplr  = 1;   // charge coupler present (4060, stub)
     constexpr int kNumPrnd        = 4;   // PRND selector lines (4050-4053)
     constexpr int kNumMotor       = 2;   // motor_rpm (4070), motor_torque_nm (4071)
+    constexpr int kNumThrottleCmd = 1;   // throttle_cmd_q8 (4073) — PIM → ev1sim
     constexpr int kNumWiper       = 2;   // wiper_motor_command (4080), washer_pump_command (4081)
     // Driver inputs on the main harness segment (electricsim_ev1_bus), output
     // from ev1sim: brake_pedal_q8 (6900), steering_deg_q8 (6901),
@@ -33,7 +34,8 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     constexpr int kNumDriverInputs = 23;
     const int expected = NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS +
                          kNumCombSw + kNumChargeCplr + kNumPrnd + kNumMotor +
-                         kNumWiper + kNumDynamics + kNumDriverInputs;
+                         kNumThrottleCmd + kNumWiper + kNumDynamics +
+                         kNumDriverInputs;
     REQUIRE(ExternalSimConnector::EndpointCount() == expected);
 
     // Unique signal IDs and names.
@@ -77,6 +79,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
         } else if (e.signal_id == 4070 || e.signal_id == 4071) {
             CHECK_FALSE(e.input_to_sim);    // motor RPM + torque are outputs
             ++dynamics_count;
+        } else if (e.signal_id == 4073) {
+            CHECK(e.input_to_sim);          // PIM throttle command flows into ev1sim
+            ++dynamics_count;
         } else if (e.signal_id == 4080 || e.signal_id == 4081) {
             CHECK(e.input_to_sim);          // wiper motor + washer pump cmds flow into ev1sim
             ++dynamics_count;
@@ -115,8 +120,8 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     CHECK(prnd_count           == kNumPrnd);
     CHECK(charge_coupler_count == kNumChargeCplr);
     // dynamics_count includes the 18 original dynamics + 2 motor signals (4070-4071)
-    // + 2 wiper signals (4080-4081).
-    CHECK(dynamics_count       == kNumDynamics + kNumMotor + kNumWiper);
+    // + throttle command (4073) + 2 wiper signals (4080-4081).
+    CHECK(dynamics_count       == kNumDynamics + kNumMotor + kNumThrottleCmd + kNumWiper);
     CHECK(driver_input_count   == kNumDriverInputs);
 }
 

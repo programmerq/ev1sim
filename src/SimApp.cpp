@@ -28,6 +28,25 @@ extern "C" void HeadlessSigintHandler(int) {
 SimApp::SimApp(const Config& config) : m_config(config) {
     const bool headless = m_config.simulation.headless;
 
+    // Vehicle dynamics authority (config knob).  Validated already in
+    // Config::ApplyCliOverrides; defensively normalize unknown values to
+    // "local" so a typo never wedges the car.
+    m_driver_mode = m_config.vehicle_dynamics.driver;
+    if (m_driver_mode != "local" && m_driver_mode != "electronics") {
+        std::cerr << "[SimApp] unknown vehicle_dynamics.driver='"
+                  << m_driver_mode << "' — falling back to 'local'\n";
+        m_driver_mode = "local";
+    }
+    m_throttle_freshness_window = std::chrono::milliseconds(
+        static_cast<int>(m_config.vehicle_dynamics.throttle_freshness_window_ms));
+    if (m_driver_mode == "electronics") {
+        std::cout << "[SimApp] Vehicle driver = electronics "
+                     "(throttle from PIM via kSigChassisThrottleCmdQ8 4073, "
+                     "fallback window "
+                  << m_config.vehicle_dynamics.throttle_freshness_window_ms
+                  << " ms)\n";
+    }
+
     // 1. Physics world.
     m_world = std::make_unique<VehicleWorld>(m_config);
 
@@ -227,6 +246,27 @@ void SimApp::ApplyAbsFrontBrake(double time, double local_front_brake) {
 }
 
 // ---------------------------------------------------------------------------
+void SimApp::ApplyElectronicsThrottle(DriverCommand& cmd) {
+    if (m_driver_mode != "electronics") return;
+
+    const auto bus = m_external_sim->GetThrottleCmd(m_throttle_freshness_window);
+
+    if (bus.fresh != m_throttle_bus_was_fresh) {
+        if (bus.fresh) {
+            std::cout << "[SimApp] throttle from PIM (live) q8="
+                      << static_cast<int>(bus.q8) << "\n";
+        } else {
+            std::cout << "[SimApp] throttle fallback (PIM stale) — "
+                         "using local pedal\n";
+        }
+        m_throttle_bus_was_fresh = bus.fresh;
+    }
+
+    if (!bus.fresh) return;
+    cmd.throttle = static_cast<double>(bus.q8) / 255.0;
+}
+
+// ---------------------------------------------------------------------------
 int SimApp::Run() {
     if (m_config.simulation.headless) {
         // Guard against the hang-forever foot-gun: headless with no terminator
@@ -261,6 +301,11 @@ int SimApp::RunWithVisualization() {
         DriverCommand cmd = m_keyboard->Update(render_dt);
         if (m_scripted && !m_paused)
             cmd = m_scripted->Update(m_world->GetState());
+
+        // --- Bus-mediated throttle override (electronics drive mode) ---
+        // No-op in "local" mode.  Must run before the propulsion gate so
+        // a stale-fallback to the local pedal still respects KEY OFF.
+        ApplyElectronicsThrottle(cmd);
 
         // --- Propulsion enable gate (KEY OFF override) ---
         // While m_propulsion_enabled is false, clamp brakes at full and zero
@@ -768,6 +813,12 @@ int SimApp::RunHeadless() {
         if (m_scripted) {
             cmd = m_scripted->Update(m_world->GetState());
         }
+
+        // --- Bus-mediated throttle override (electronics drive mode) ---
+        // In headless mode there is no keyboard pedal, so the local
+        // fallback is the scripted driver (or zero throttle).  When the
+        // bus is fresh, PIM's commanded throttle replaces the local value.
+        ApplyElectronicsThrottle(cmd);
 
         // --- Propulsion enable gate (KEY OFF override) ---
         // In headless mode no keyboard presses cycle the RSA state.

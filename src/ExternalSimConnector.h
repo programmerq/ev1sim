@@ -280,6 +280,20 @@ public:
     std::uint8_t GetWiperMotorCommand() const;
     bool         HasReceivedWiperMotorCommand() const;
 
+    /// Throttle command from PIM (ID 4073, chassis segment) — q8 throttle.
+    /// q8=0 → zero throttle, q8=255 → full throttle.
+    /// fresh = true when the last update arrived within freshness_window.
+    /// ever_received = true after the first message; false on a cold start.
+    /// Used by SimApp::ApplyElectronicsThrottle() to decide whether to
+    /// override the local pedal in "electronics" drive mode.
+    struct ThrottleCmd {
+        std::uint8_t q8            = 0xFFu;
+        bool         fresh         = false;
+        bool         ever_received = false;
+    };
+    ThrottleCmd GetThrottleCmd(
+        std::chrono::milliseconds freshness_window) const;
+
     /// Incoming washer pump command (ID 4081, chassis segment).
     /// Received from RHJB. true = pump active, false = idle.
     bool GetWasherPumpCommand() const;

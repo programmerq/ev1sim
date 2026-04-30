@@ -169,6 +169,7 @@ if(BUILD_TESTS)
         tests/test_vehicle_lights.cpp
         tests/test_physical_world.cpp
         tests/test_wiper_renderer.cpp
+        tests/test_throttle_bus.cpp
         src/Config.cpp
         src/KeyboardInputController.cpp
         src/ExternalSimConnector.cpp

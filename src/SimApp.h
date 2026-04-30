@@ -53,6 +53,12 @@ private:
     /// @param local_front_brake  the local (driver-commanded) front brake ratio [0..1]
     void ApplyAbsFrontBrake(double time, double local_front_brake);
 
+    // Override cmd.throttle in place with the bus throttle command from
+    // PIM when m_driver_mode == "electronics" and the bus value is fresh.
+    // No-op in "local" mode or when the bus is stale / never received.
+    // Logs freshness transitions on tick boundaries.
+    void ApplyElectronicsThrottle(DriverCommand& cmd);
+
     Config m_config;
 
     std::unique_ptr<VehicleWorld>           m_world;
@@ -89,6 +95,15 @@ private:
 
     // Freshness window for BTCM solenoid signals.
     static constexpr std::chrono::milliseconds kAbsFreshnessWindow{200};
+
+    // Throttle authority — when m_driver_mode == "electronics", subscribe
+    // to PIM's commanded throttle (kSigChassisThrottleCmdQ8 = 4073) and
+    // override cmd.throttle when the bus value is fresh.  Falls back to
+    // the local pedal when stale or never received.  Logs freshness
+    // transitions on tick boundaries.
+    std::string m_driver_mode = "local";          ///< "local" | "electronics"
+    bool        m_throttle_bus_was_fresh = false; ///< was bus fresh last tick?
+    std::chrono::milliseconds m_throttle_freshness_window{200};
 
     // Help overlay — show keyboard controls in a translucent box.
     // Auto-show for the first 5 seconds, then toggle with '?'.

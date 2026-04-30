@@ -162,6 +162,14 @@ constexpr std::uint32_t kSigMotorRpm      = 4070U;
 constexpr std::uint32_t kSigMotorTorqueNm = 4071U;
 constexpr int           kNumMotorSignals  = 2;
 
+// Throttle command (electricsim/PIM → ev1sim, chassis segment).
+//   4073  vehicle.dynamics.throttle_cmd_q8   uint8 q8: 0=zero, 255=full
+// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// kSigChassisThrottleCmdQ8 = 4073.  Subscribed when running in
+// "electronics" drive mode; ignored in "local" mode.
+constexpr std::uint32_t kSigThrottleCmdQ8     = 4073U;
+constexpr int           kNumThrottleCmdSignals = 1;
+
 // Wiper motor command (electricsim/RHJB → ev1sim, chassis segment).
 //   4080  vehicle.body.wiper_motor.command  uint8 enum: 0=OFF, 1=INT, 2=LOW, 3=HIGH
 //   4081  vehicle.body.washer_pump.command  uint8 bool: 0=idle, 1=pump active
@@ -296,7 +304,8 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // +kNumWiperSignals for wiper motor command (4080) + washer pump command (4081).
 constexpr int kNumEndpoints =
     NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumCombSw + 1 /*charge_coupler*/ +
-    kNumPrndSelector + kNumMotorSignals + kNumWiperSignals + kNumDynamics + kNumDriverInputs;
+    kNumPrndSelector + kNumMotorSignals + kNumThrottleCmdSignals +
+    kNumWiperSignals + kNumDynamics + kNumDriverInputs;
 
 std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     std::array<ExternalSimConnector::Endpoint, kNumEndpoints> out{};
@@ -338,6 +347,9 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.dynamics.motor_rpm", "motor_rpm", false};
     out[i++] = {kSigMotorTorqueNm,
                 "vehicle.dynamics.motor_torque_nm", "motor_torque_nm", false};
+    // Throttle command (PIM → ev1sim, chassis segment).
+    out[i++] = {kSigThrottleCmdQ8,
+                "vehicle.dynamics.throttle_cmd_q8", "throttle_cmd_q8", true};
     // Wiper motor command + washer pump command (RHJB → ev1sim, chassis segment).
     out[i++] = {kSigWiperMotorCommand,
                 "vehicle.body.wiper_motor.command", "wiper_motor_command", true};
@@ -515,6 +527,13 @@ struct ExternalSimConnector::State {
     float         motor_rpm_pub           = -9999.0f;   // sentinel: always publish first
     float         motor_torque_pub        = -9999.0f;
 
+    // Throttle command (ID 4073, chassis segment) — received from PIM.
+    // 0xFF = never received; valid values 0..255 q8.  last_update_ns tracks
+    // freshness for the stale-fallback path in SimApp::ApplyElectronicsThrottle.
+    std::uint8_t  throttle_cmd_q8         = 0xFFu;
+    bool          has_throttle_cmd        = false;
+    std::uint64_t throttle_cmd_ns         = 0;
+
     // Wiper motor command (ID 4080, chassis segment) — received from RHJB.
     // 0xFF = never received; valid values 0=OFF, 1=INT, 2=LOW, 3=HIGH.
     std::uint8_t  wiper_motor_cmd         = 0xFFu;
@@ -661,6 +680,24 @@ bool ExternalSimConnector::GetHornHighCmd() const { return m_state->horn_high; }
 
 bool ExternalSimConnector::HasReceivedBulbData() const {
     return m_state->received_any_bulb;
+}
+
+ExternalSimConnector::ThrottleCmd ExternalSimConnector::GetThrottleCmd(
+    std::chrono::milliseconds freshness_window) const {
+    ThrottleCmd r{};
+    r.q8            = m_state->throttle_cmd_q8;
+    r.ever_received = m_state->has_throttle_cmd;
+    if (!r.ever_received) {
+        r.fresh = false;
+        return r;
+    }
+    const auto now_ns = static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
+    const auto window_ns = static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(freshness_window).count());
+    r.fresh = (now_ns - m_state->throttle_cmd_ns) <= window_ns;
+    return r;
 }
 
 std::uint8_t ExternalSimConnector::GetWiperMotorCommand() const {
@@ -905,7 +942,13 @@ void ExternalSimConnector::DebugInjectDelta(std::uint32_t signal_id, bool value)
 
 void ExternalSimConnector::DebugInjectU8(std::uint32_t signal_id,
                                           std::uint8_t value) {
-    if (signal_id == kSigWiperMotorCommand) {
+    if (signal_id == kSigThrottleCmdQ8) {
+        m_state->throttle_cmd_q8 = value;
+        m_state->has_throttle_cmd = true;
+        m_state->throttle_cmd_ns = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count());
+    } else if (signal_id == kSigWiperMotorCommand) {
         m_state->wiper_motor_cmd     = value;
         m_state->has_wiper_motor_cmd = true;
     } else if (signal_id == kSigWasherPumpCommand) {
@@ -1050,8 +1093,11 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             const Endpoint* ep = FindEndpoint(d.signal_id);
             if (!ep || !ep->input_to_sim) continue;
             if (d.payload.empty()) continue;
-            // The wiper motor command (4080) is a uint8 enum — decode as raw byte.
-            if (d.signal_id == kSigWiperMotorCommand) {
+            // uint8 chassis-bus signals — decode as raw byte:
+            //   4073 throttle command (q8), 4080 wiper motor, 4081 washer pump.
+            if (d.signal_id == kSigThrottleCmdQ8 ||
+                d.signal_id == kSigWiperMotorCommand ||
+                d.signal_id == kSigWasherPumpCommand) {
                 DebugInjectU8(d.signal_id, d.payload[0]);
             } else {
                 // All other inbound signals are boolean (bool) — decode LSB.

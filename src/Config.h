@@ -89,6 +89,23 @@ struct Config {
         double      reconnect_period_s = 1.0;
     } external_sim;
 
+    // Vehicle dynamics authority — selects whether Chrono's powertrain is
+    // driven from the local pedal (default; legacy behavior) or from the
+    // electronics-side commanded throttle on the chassis bus.
+    //
+    //   "local"        — direct keyboard / scripted-driver pedal input.
+    //   "electronics"  — subscribe to kSigChassisThrottleCmdQ8 (4073) from PIM
+    //                    and override the local pedal when the bus value is
+    //                    fresh (within throttle_freshness_window_ms).
+    //
+    // The freshness fallback is critical: when ev1sim runs in "electronics"
+    // mode but PIM is not running (e.g. no controller spawned, or it crashes
+    // mid-run), the local pedal still drives the car so the user can recover.
+    struct VehicleDynamics {
+        std::string driver = "local";
+        double      throttle_freshness_window_ms = 200.0;
+    } vehicle_dynamics;
+
     // Built-in accel-hold-brake scripted scenario.  Only active when
     // enabled == true (usually paired with --headless for CI use).
     struct Scripted {
