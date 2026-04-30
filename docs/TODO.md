@@ -65,19 +65,39 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   Coastdown experiment (`config/scenarios/coastdown.json`) shows
   ~2× excess rolling resistance and ~2× excess v² dissipation
   remain — captured in audit §11.  See follow-up tasks below.
-- [ ] **Drivetrain dissipation calibration (deferred).**  Coastdown shows
-  F_rr ≈ 301 N (vs spec ~100 N) and CdA ≈ 1.21 m² (vs spec ~0.36 m²) —
-  both ~3× spec.  Calibration attempt 2026-04-30 (audit §12) tried
-  halving + zeroing the engine zero-throttle map and lowering tire
-  Crr from 0.008 → 0.005 → 0.001.  Engine-coast tweaks shaved 8-20 %
-  off total drag; tire Crr changes traded F_rr for CdA without
-  reducing total dissipation.  The remaining ~70-80 % excess lives
-  in TMeasy's internal slip dynamics, which aren't exposed in the
-  JSON template.  Reverted to baseline config; deferred until
-  Chrono exposes more TMeasy params or we switch tire models.
-  Tooling: [scripts/fit_coastdown.py](../scripts/fit_coastdown.py)
-  reports F_rr and CdA from a coastdown CSV; re-run after any plant
-  change to track convergence.
+- [x] **TMeasy full-parameterization migration (audit §13, 2026-04-30).**
+  Switched the tire JSON from "Maximum Bearing Capacity" shortcut to
+  the full `Parameters` block to (a) sidestep a Chrono quirk that was
+  silently shrinking the tire to ~7" effective radius via an
+  argument-mismatch in `GuessPassCar70Par`, and (b) expose
+  longitudinal slip stiffness for direct tuning.  After migration
+  F_rr dropped from 3.0× → 1.34× spec; CdA went the other way
+  (3.4× → 6.5×) because the corrected geometry surfaced TMeasy slip
+  dynamics that were previously masked by the wrong scale.
+- [ ] **Slip-dynamics drag calibration (deferred).**  CdA still 6.5× spec
+  in coastdown after the geometry fix.  The remaining excess lives in
+  TMeasy's internal slip-curve shape; the exposed `Initial Slopes
+  dFx/dsx` knob doesn't usefully reduce it (lowering trades F_rr for
+  CdA, raising past 2× hits numerical instability).  Defer until we
+  have measured EV1 slip-curve data or migrate to a Pacejka tire model.
+- [ ] **Rear EMB brake actuator + self-energizing drum model (proposed).**
+  Design notes in audit §14.  BTCM already publishes
+  `kSigRearMotorLR/RR`; ev1sim needs to consume them, model the
+  self-energizing drum (`T = μ·F·R·(1 + α·sign(ω))`), and apply
+  per-wheel rear torque to Chrono — mirroring the existing
+  `ApplyFrontBrakePerWheel` path.  Required actuator force rises as
+  wheel slows (less self-energizing assist at low |ω|).
+- [ ] **Brake pedal-feel / master-cylinder pressure model (proposed).**
+  Design notes in audit §14.  New `BrakePedal` PhysicalWorld component
+  in ev1sim with two-stage position→pressure curve; publishes
+  `kSigChassisBrakeMasterPressureKpa` (suggested 4074); BTCM consumes
+  it as primary brake-effort input.  Pairs with the user's hardware
+  spring on a sim-racing rig.
+- [ ] **Suspension spring/damper rate verification.**  Front and rear
+  share the same 143000 N/m spring rate, which is suspicious for a
+  FWD car with front-bias mass.  Add a `bounce_test.json` scenario
+  (drop-from-height + measure ride frequency) to back out the
+  effective wheel rates, then split front/rear properly.
 - [ ] **Front MacPherson strut + rear trailing-arm templates.**
   Current Chrono setup uses `DoubleWishbone` for both axles; real EV1
   is MacPherson front / trailing-arm (twist-beam) rear.  Substantial

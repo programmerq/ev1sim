@@ -316,3 +316,149 @@ factor as a known plant limitation and tune the controller around it.
 - `config/scenarios/coastdown.json` is the standardized validation run.
 - `scripts/fit_coastdown.py scenario_coastdown.csv` reports F_rr and CdA.
 - Both should converge toward 100 N and 0.36 m² as the plant model improves.
+
+## 13. TMeasy full-parameterization migration (2026-04-30)
+
+The bearing-capacity shortcut in `data/vehicle/ev1/tire/EV1_TMeasyTire.json`
+turned out to be **silently overwriting the tire radius**.  Chrono's
+`TMeasyTire::Create()` (TMeasyTire.cpp:178) calls
+`GuessPassCar70Par(bearing_capacity, m_width, ratio, m_rim_radius, ...)`,
+but the function expects `rimDia` (diameter) in the 4th slot, and inside
+it sets `m_rim_radius = 0.5 * rimDia` and
+`m_unloaded_radius = secth + rimDia / 2.0`.  Net result: a 14" tire
+(spec'd 0.2915 m radius) silently became a 7"-equivalent (~0.20 m) at
+runtime.
+
+Switched the JSON to the **full parameterization** path so the Design
+block radii stay authoritative and every slip parameter is explicit.
+Numerical defaults equal what `GuessPassCar70Par(load=2375 N)` would
+have computed, so the only change is the radius bug fix.
+
+Coastdown comparison after the migration:
+
+| config              | F_rr (N) | CdA (m²) | F_avg @ 22 m/s | F_avg @ 27 m/s |
+|---|---|---|---|---|
+| baseline (buggy 7" tire)         | 301 (3.0×) | 1.21 (3.4×) |  667 N | 845 N |
+| full-param defaults (true 14")   | 134 (1.34×) | 2.34 (6.5×) |  835 N | 1305 N |
+| full-param 0.5× dfx0             | 622 | 0.85 |  902 N | 1006 N |
+| full-param 2× dfx0               | -75* | 2.40 |  909 N |  919 N |
+| full-param 4× dfx0               | unstable | unstable | — | — |
+
+\* negative F_rr is fit artifact when the fit is dominated by curvature.
+
+**The geometric correction is the bigger story.**  F_rr is now within
+35 % of spec instead of 3× — that part of the model was not "broken,"
+it was just operating at the wrong scale.  The remaining ~6.5× CdA is
+TMeasy slip dynamics scaled to higher tire force at speed, which the
+exposed slip-stiffness knob doesn't usefully reduce: lowering it traded
+F_rr for CdA, raising it produced numerical instability around 2-4×.
+
+**Locked in**: full-param defaults.  Tire radius is now correct;
+slip-stiffness tuning deferred until either (a) we have measured EV1
+slip-curve data, (b) we switch to a Pacejka/Magic-Formula tire with
+explicit rolling-resistance map, or (c) we accept the high-speed drag
+overshoot as a known plant limitation.
+
+## 14. Rear brake actuator + pedal-feel design (proposed)
+
+### Rear brake — self-energizing drum with electric actuator
+
+EV1 service manuals describe the rear brakes as drums driven by an
+electric motor at each wheel (kSigRearMotorLR/RR are already published
+by BTCM).  No hydraulic line, no shoe-return spring assist — the motor
+drives a leadscrew-like mechanism that pushes the shoes outward.
+
+Self-energizing drum behavior summary:
+
+```
+T_brake(F_shoe, omega, mu) =
+    mu × F_shoe × R_drum × (1 + alpha × sign(omega))
+```
+
+where `alpha` is the self-energizing coefficient:
+- **Leading shoe**: `alpha ≈ 1-3` (friction torque pulls shoe harder onto drum)
+- **Trailing shoe**: `alpha ≈ 0` (friction torque pulls shoe away from drum)
+- **Duo-servo / double-leading**: `alpha ≈ 2-3` average
+
+As wheel speed `|omega| → 0`:
+- Dynamic friction limit unchanged, but the self-energizing assist
+  collapses (no rotation, no friction torque to amplify the shoe force).
+- **Required actuator force to hold a given brake torque rises as the
+  wheel slows.**  At standstill the EMB needs ~3× the force it needed
+  at speed for the same wheel torque.
+- This is exactly opposite to a hydraulic system where pedal pressure
+  is constant once applied.
+
+**Where it should live**:
+- `electricsim/ev1/btcm/`: model the **commanded shoe force** based on
+  motor current and travel.  Already publishing `kSigRearMotorLR/RR`;
+  needs a force-vs-current curve.  Real EV1 fuse ratings + steady-state
+  motor current limits are the spec inputs (manual hints).
+- `ev1sim/src/`: model the **physics of the drum** (T_brake formula
+  above) and apply per-wheel torque to Chrono.  Reads
+  `kSigRearMotorLR/RR` for force command, reads `wheel_omega_rl/rr`
+  from physics for the self-energizing factor.  Mirrors the existing
+  front-brake bus-mediated path (`ApplyAbsFrontBrake` / `ApplyFrontBrakePerWheel`).
+
+**Estimated parameter ranges (educated guesses)**:
+- R_drum ≈ 0.10 m (8" drum)
+- mu (drum-on-shoe) ≈ 0.35-0.40 (typical phenolic resin lining)
+- alpha ≈ 2.0 (double-leading shoe, conservative)
+- F_shoe_max ≈ 4000 N (matches typical caliper clamping force)
+- Required motor torque to maintain F_shoe at standstill: ~10-15 N·m
+  (back-calculated from fuse-rated current × motor torque constant).
+
+This becomes a calibration target the same way the coastdown is —
+add a "rear-brake-only stop" scenario that engages just the EMB
+actuators and measures stopping distance vs speed.
+
+### Pedal feel — physical spring, virtual hydraulics
+
+The user's sim rig has a real spring (possibly two-stage) on the brake
+pedal.  The pedal **position** is what crosses into the simulator; the
+**force feel** is hardware-side.  What ev1sim/electricsim need to do:
+
+1. **Read pedal travel** (already done — `kSigDriverBrakePedalQ8` 6900).
+2. **Convert position → master cylinder pressure** with a simplified
+   model.  Two-stage suggests two linear segments:
+   ```
+   pressure(travel_q8) =
+       0                                    if travel_q8 < dead_band
+       k1 × (travel_q8 - dead_band)         if travel_q8 < transition
+       k1 × transition + k2 × (travel_q8 - transition)
+                                            otherwise
+   ```
+   `dead_band` matches the pedal's free-travel before the master
+   cylinder cup engages.  `k1` is the soft (initial fluid takeup)
+   stage; `k2` is the firmer (full fluid pressure) stage.
+3. **Publish master cylinder pressure** as a new chassis-bus signal
+   (`kSigChassisBrakeMasterPressureKpa`?).  BTCM consumes this as the
+   real brake-effort input — replacing or augmenting the current
+   simple `brake_switch` boolean.
+4. **ABS isolation feedback** — when BTCM isolates a wheel, the line
+   pressure feedback isn't returned to the master cylinder (in real
+   cars the pump cycles fluid, kicking back at the pedal).  Active
+   force feedback to the rig could simulate this; out of scope for
+   this design unless the rig has a force-feedback motor.
+
+**Where it should live**:
+- `ev1sim/src/PhysicalWorld.h`: new `BrakePedal` component owning the
+  position-to-pressure calibration table.  Publishes pressure as a new
+  driver-input bus signal.  Sits alongside `CombinationSwitch`,
+  `WiperStalk`, etc.
+- `electricsim/ev1/btcm/`: subscribe to the pressure signal, use as the
+  primary brake-effort input.  Brake-switch (6904) stays as the ABS
+  pump-prime threshold (boolean: any meaningful pedal application).
+
+**Estimated parameter ranges (educated guesses)**:
+- `dead_band` ≈ 5-10 % travel (q8 13-25)
+- `transition` ≈ 30-40 % travel (q8 76-102)
+- `k1` ≈ 100 kPa per 1 % travel (initial takeup)
+- `k2` ≈ 250 kPa per 1 % travel (full fluid stage)
+- Max pressure at full pedal ≈ 12-15 MPa (typical passenger-car spec)
+
+These are starting points; tune against real EV1 manual data when
+available, or to match the user's preferred sim-rig pedal feel.
+
+Both features are deferred — captured in [docs/TODO.md](TODO.md) so
+they're not lost when we pivot back to integration work.
