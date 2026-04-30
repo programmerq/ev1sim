@@ -162,6 +162,15 @@ constexpr std::uint32_t kSigMotorRpm      = 4070U;
 constexpr std::uint32_t kSigMotorTorqueNm = 4071U;
 constexpr int           kNumMotorSignals  = 2;
 
+// Wiper motor command (electricsim/RHJB → ev1sim, chassis segment).
+//   4080  vehicle.body.wiper_motor.command  uint8 enum: 0=OFF, 1=INT, 2=LOW, 3=HIGH
+//   4081  vehicle.body.washer_pump.command  uint8 bool: 0=idle, 1=pump active
+// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// kSigChassisWiperMotorCommand = 4080, kSigChassisWasherPumpCommand = 4081.
+constexpr std::uint32_t kSigWiperMotorCommand  = 4080U;
+constexpr std::uint32_t kSigWasherPumpCommand  = 4081U;
+constexpr int           kNumWiperSignals       = 2;
+
 // RSA run-mode broadcast — published by RSA on the main harness segment.
 // ev1sim subscribes to this (input_to_sim = true for subscription, but we
 // don't register it as an endpoint we publish — only receive).
@@ -284,9 +293,10 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // +1 for the charge coupler presence (ID 4060, chassis segment).
 // +kNumPrndSelector for the 4 PRND selector lines (IDs 4050-4053, chassis segment).
 // +kNumMotorSignals for motor RPM + torque (IDs 4070-4071, chassis segment).
+// +kNumWiperSignals for wiper motor command (4080) + washer pump command (4081).
 constexpr int kNumEndpoints =
     NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumCombSw + 1 /*charge_coupler*/ +
-    kNumPrndSelector + kNumMotorSignals + kNumDynamics + kNumDriverInputs;
+    kNumPrndSelector + kNumMotorSignals + kNumWiperSignals + kNumDynamics + kNumDriverInputs;
 
 std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     std::array<ExternalSimConnector::Endpoint, kNumEndpoints> out{};
@@ -328,6 +338,11 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.dynamics.motor_rpm", "motor_rpm", false};
     out[i++] = {kSigMotorTorqueNm,
                 "vehicle.dynamics.motor_torque_nm", "motor_torque_nm", false};
+    // Wiper motor command + washer pump command (RHJB → ev1sim, chassis segment).
+    out[i++] = {kSigWiperMotorCommand,
+                "vehicle.body.wiper_motor.command", "wiper_motor_command", true};
+    out[i++] = {kSigWasherPumpCommand,
+                "vehicle.body.washer_pump.command", "washer_pump_command", true};
     for (int d = 0; d < kNumDynamics; ++d, ++i) {
         out[i] = {kDynamicsBase + kDynamicsNames[d].offset,
                   kDynamicsNames[d].qualified, kDynamicsNames[d].shortname,
@@ -500,6 +515,15 @@ struct ExternalSimConnector::State {
     float         motor_rpm_pub           = -9999.0f;   // sentinel: always publish first
     float         motor_torque_pub        = -9999.0f;
 
+    // Wiper motor command (ID 4080, chassis segment) — received from RHJB.
+    // 0xFF = never received; valid values 0=OFF, 1=INT, 2=LOW, 3=HIGH.
+    std::uint8_t  wiper_motor_cmd         = 0xFFu;
+    bool          has_wiper_motor_cmd     = false;
+    // Washer pump command (ID 4081, chassis segment) — received from RHJB.
+    // 0=idle, 1=pump active.
+    bool          washer_pump_cmd         = false;
+    bool          has_washer_pump_cmd     = false;
+
     // RSA run-mode broadcast (ID 5711, main harness segment).
     // Subscribed from RSA; 0xFF = never received.
     std::uint8_t  rsa_run_mode            = 0xFFu;
@@ -637,6 +661,19 @@ bool ExternalSimConnector::GetHornHighCmd() const { return m_state->horn_high; }
 
 bool ExternalSimConnector::HasReceivedBulbData() const {
     return m_state->received_any_bulb;
+}
+
+std::uint8_t ExternalSimConnector::GetWiperMotorCommand() const {
+    return m_state->wiper_motor_cmd;
+}
+bool ExternalSimConnector::HasReceivedWiperMotorCommand() const {
+    return m_state->has_wiper_motor_cmd;
+}
+bool ExternalSimConnector::GetWasherPumpCommand() const {
+    return m_state->washer_pump_cmd;
+}
+bool ExternalSimConnector::HasReceivedWasherPumpCommand() const {
+    return m_state->has_washer_pump_cmd;
 }
 
 void ExternalSimConnector::SetPanelSensor(PanelID panel, bool ajar) {
@@ -839,6 +876,9 @@ void ExternalSimConnector::DebugInjectDelta(std::uint32_t signal_id, bool value)
         m_state->horn_low = value;
     } else if (signal_id == kHornHighCmd) {
         m_state->horn_high = value;
+    } else if (signal_id == kSigWasherPumpCommand) {
+        m_state->washer_pump_cmd     = value;
+        m_state->has_washer_pump_cmd = true;
     } else if (signal_id == kSigSolFL_ISO) {
         m_state->sol_fl_iso    = value;
         m_state->sol_fl_iso_ns = static_cast<std::uint64_t>(
@@ -861,6 +901,18 @@ void ExternalSimConnector::DebugInjectDelta(std::uint32_t signal_id, bool value)
                 std::chrono::steady_clock::now().time_since_epoch()).count());
     }
     // Panel-sensor signals are outputs — ignore inbound.
+}
+
+void ExternalSimConnector::DebugInjectU8(std::uint32_t signal_id,
+                                          std::uint8_t value) {
+    if (signal_id == kSigWiperMotorCommand) {
+        m_state->wiper_motor_cmd     = value;
+        m_state->has_wiper_motor_cmd = true;
+    } else if (signal_id == kSigWasherPumpCommand) {
+        m_state->washer_pump_cmd     = (value != 0u);
+        m_state->has_washer_pump_cmd = true;
+    }
+    // All other uint8 signals are not currently subscribed as inputs.
 }
 
 // ---------------------------------------------------------------------------
@@ -997,8 +1049,15 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         for (const auto& d : polled.frame.deltas) {
             const Endpoint* ep = FindEndpoint(d.signal_id);
             if (!ep || !ep->input_to_sim) continue;
-            const bool v = !d.payload.empty() && (d.payload[0] & 1u);
-            DebugInjectDelta(d.signal_id, v);
+            if (d.payload.empty()) continue;
+            // The wiper motor command (4080) is a uint8 enum — decode as raw byte.
+            if (d.signal_id == kSigWiperMotorCommand) {
+                DebugInjectU8(d.signal_id, d.payload[0]);
+            } else {
+                // All other inbound signals are boolean (bool) — decode LSB.
+                const bool v = (d.payload[0] & 1u) != 0u;
+                DebugInjectDelta(d.signal_id, v);
+            }
         }
     }
 

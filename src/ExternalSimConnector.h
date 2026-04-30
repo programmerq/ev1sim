@@ -274,11 +274,26 @@ public:
     static int             EndpointCount();
     static const Endpoint* FindEndpoint(std::uint32_t signal_id);
 
+    /// Incoming wiper motor command (ID 4080, chassis segment).
+    /// Received from RHJB. uint8 enum: 0=OFF, 1=INT, 2=LOW, 3=HIGH.
+    /// Returns 0xFF if never received.
+    std::uint8_t GetWiperMotorCommand() const;
+    bool         HasReceivedWiperMotorCommand() const;
+
+    /// Incoming washer pump command (ID 4081, chassis segment).
+    /// Received from RHJB. true = pump active, false = idle.
+    bool GetWasherPumpCommand() const;
+    bool HasReceivedWasherPumpCommand() const;
+
     // ---------------------------------------------------------------------
     // Test hooks — feed the connector synthetic delta records as though they
     // arrived over the bus.  Used by unit tests; not part of the runtime path.
     // ---------------------------------------------------------------------
     void DebugInjectDelta(std::uint32_t signal_id, bool value);
+
+    /// Inject a uint8 signal value (e.g. wiper motor command).
+    /// Used by unit tests; not part of the runtime path.
+    void DebugInjectU8(std::uint32_t signal_id, std::uint8_t value);
 
 private:
     Options m_opts;
