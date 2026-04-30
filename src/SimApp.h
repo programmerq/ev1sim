@@ -71,6 +71,14 @@ private:
     /// @param local_front_brake  the local (driver-commanded) front brake ratio [0..1]
     void ApplyAbsFrontBrake(double time, double local_front_brake);
 
+    // Consume BTCM rear-motor commands (kSigRearMotorLR/RR), compute
+    // self-energizing drum torque per wheel using the current wheel omega,
+    // and apply the resulting brake ratio to Chrono's rear axle.  When
+    // BTCM data is stale or missing, falls back to the local rear-brake
+    // pedal value (passed in the same way ApplyAbsFrontBrake takes it).
+    // Logs freshness transitions on tick boundaries.
+    void ApplyRearEmbBrake(double time, double local_rear_brake);
+
     // Override cmd.throttle in place with the bus throttle command from
     // PIM when m_driver_mode == "electronics" and the bus value is fresh.
     // No-op in "local" mode or when the bus is stale / never received.
@@ -114,6 +122,18 @@ private:
 
     // Freshness window for BTCM solenoid signals.
     static constexpr std::chrono::milliseconds kAbsFreshnessWindow{200};
+
+    // Rear EMB drum brake state (BTCM rear-motor integration).
+    // The ApplyRearEmbBrake helper consumes kSigRearMotorLR/RR (5014/5015),
+    // converts the float command to a shoe force, computes torque via the
+    // BrakeDrum self-energizing model, and applies per-wheel rear brake
+    // ratio against the BrakeSimple max torque.
+    bool m_rear_lr_was_fresh = false;
+    bool m_rear_rr_was_fresh = false;
+    /// Per-axle BrakeSimple "Maximum Torque" — used to convert physical
+    /// drum torque into the [0,1] brake ratio Chrono's brake takes.
+    /// Sync with data/vehicle/ev1/brake/EV1_BrakeSimple.json.
+    static constexpr double kBrakeSimpleMaxTorqueNm = 800.0;
 
     // Throttle authority — when m_driver_mode == "electronics", subscribe
     // to PIM's commanded throttle (kSigChassisThrottleCmdQ8 = 4073) and

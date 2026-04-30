@@ -80,24 +80,42 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   dFx/dsx` knob doesn't usefully reduce it (lowering trades F_rr for
   CdA, raising past 2× hits numerical instability).  Defer until we
   have measured EV1 slip-curve data or migrate to a Pacejka tire model.
-- [ ] **Rear EMB brake actuator + self-energizing drum model (proposed).**
-  Design notes in audit §14.  BTCM already publishes
-  `kSigRearMotorLR/RR`; ev1sim needs to consume them, model the
-  self-energizing drum (`T = μ·F·R·(1 + α·sign(ω))`), and apply
-  per-wheel rear torque to Chrono — mirroring the existing
-  `ApplyFrontBrakePerWheel` path.  Required actuator force rises as
-  wheel slows (less self-energizing assist at low |ω|).
-- [ ] **Brake pedal-feel / master-cylinder pressure model (proposed).**
-  Design notes in audit §14.  New `BrakePedal` PhysicalWorld component
-  in ev1sim with two-stage position→pressure curve; publishes
-  `kSigChassisBrakeMasterPressureKpa` (suggested 4074); BTCM consumes
-  it as primary brake-effort input.  Pairs with the user's hardware
-  spring on a sim-racing rig.
+- [x] **Rear EMB brake actuator + self-energizing drum model.**
+  `src/BrakeDrum.h` implements the self-energizing torque model
+  (`T = μ·F·R·(1 + α·smooth_sign(ω))`) with a smooth ramp through
+  ω=0 so the simulator stays well-behaved at standstill.  ev1sim's
+  `ExternalSimConnector` subscribes to `kSigRearMotorLR/RR` (5014/5015);
+  `SimApp::ApplyRearEmbBrake` converts cmd → shoe force → drum torque
+  per wheel and applies via `VehicleWorld::ApplyRearBrakePerWheel`.
+  Stale-fallback to local pedal mirrors the front ABS pattern.
+- [ ] **EMB shoe-force integrator (refinement).**  Current model
+  treats the BTCM cmd (-1 / 0 / +1) as a proportional force command.
+  More faithful: integrate cmd × motor_speed × dt to track shoe
+  position, then derive force from spring-like compliance.  Defer
+  until measured EV1 EMB response data lands.
+- [x] **Brake pedal-feel / master-cylinder pressure model.**
+  `BrakePedal` PhysicalWorld component with two-stage position→pressure
+  curve.  Publishes `kSigChassisBrakeMasterPressureKpa` (4074) on the
+  chassis bus.  BTCM consumer wiring is the next step.
+- [ ] **BTCM consume master-cylinder pressure (4074).**  BTCM currently
+  reads `kSigDriverBrakePedalQ8` (6900) — q8 travel.  Switch the
+  primary brake-effort input to the new pressure signal so BTCM has
+  a physically meaningful input that already accounts for the dead-
+  band and two-stage curve.  Keep `kSigDriverBrakeSwitch` (6904) as
+  the ABS pump-prime threshold.
+- [ ] **ABS rumble feedback for force-feedback rigs (deferred).**
+  When ABS engages, the BTCM sol_*_iso/sol_*_dmp signals cycle.
+  Surfacing this as a `kSigChassisAbsActive` boolean would let a
+  game-controller adapter drive a rumble motor for tactile feedback.
+  Out of scope until game-controller input/FFB lands.
 - [ ] **Suspension spring/damper rate verification.**  Front and rear
-  share the same 143000 N/m spring rate, which is suspicious for a
-  FWD car with front-bias mass.  Add a `bounce_test.json` scenario
-  (drop-from-height + measure ride frequency) to back out the
-  effective wheel rates, then split front/rear properly.
+  share the same 143000 N/m spring rate.  EV1's weight distribution
+  is reported ~50/50, so identical rates are *less* suspicious than
+  initially thought, but they should still be verified with a
+  `bounce_test.json` scenario (drop-from-height + measure ride
+  frequency) — Olley's rule typically wants rear slightly stiffer to
+  control pitch, even with even weight distribution.  Keep until
+  measured.
 - [ ] **Front MacPherson strut + rear trailing-arm templates.**
   Current Chrono setup uses `DoubleWishbone` for both axles; real EV1
   is MacPherson front / trailing-arm (twist-beam) rear.  Substantial

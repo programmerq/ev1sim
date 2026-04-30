@@ -1,4 +1,5 @@
 #include "SimApp.h"
+#include "BrakeDrum.h"
 #include "MacOSPlatform.h"
 
 #include "chrono_vehicle/ChEngine.h"
@@ -279,8 +280,64 @@ void SimApp::ApplyAbsFrontBrake(double time, double local_front_brake) {
 
     // Apply per-wheel front brakes via Chrono API, overriding the symmetric
     // front_pressure CommandDriver::ApplyBrakes() already set in Synchronize().
-    // TODO: rear EMB clamp-position model needed for full rear-wheel modulation.
     m_world->ApplyFrontBrakePerWheel(time, fl, fr);
+}
+
+// ---------------------------------------------------------------------------
+void SimApp::ApplyRearEmbBrake(double time, double local_rear_brake) {
+    const auto cmd = m_external_sim->GetRearEmbCmd(kAbsFreshnessWindow);
+
+    if (cmd.lr_fresh != m_rear_lr_was_fresh) {
+        std::cout << (cmd.lr_fresh
+                          ? "[SimApp] rear-brake from BTCM (live) wheel=RL\n"
+                          : "[SimApp] rear-brake fallback (BTCM stale) wheel=RL\n");
+        m_rear_lr_was_fresh = cmd.lr_fresh;
+    }
+    if (cmd.rr_fresh != m_rear_rr_was_fresh) {
+        std::cout << (cmd.rr_fresh
+                          ? "[SimApp] rear-brake from BTCM (live) wheel=RR\n"
+                          : "[SimApp] rear-brake fallback (BTCM stale) wheel=RR\n");
+        m_rear_rr_was_fresh = cmd.rr_fresh;
+    }
+
+    // Stale-fallback: if BTCM isn't talking, leave the symmetric rear_pressure
+    // from CommandDriver::ApplyBrakes() in effect.  No work to do.
+    if (!cmd.lr_fresh && !cmd.rr_fresh) return;
+
+    // Convert the [-1, +1] motor command to a clamping force.  +1 = full apply
+    // (max shoe force), 0 or negative = no force (motor idling or retracting).
+    // A more faithful model would integrate the motor's position over time;
+    // this proportional approximation is adequate while BTCM holds cmd=+1
+    // through a sustained brake event.
+    const ev1sim::BrakeDrum::Params drum;
+    auto cmd_to_force = [&drum](float c) {
+        const double clipped = c < 0.0f ? 0.0 : (c > 1.0f ? 1.0 : double{c});
+        return clipped * drum.max_shoe_force_n;
+    };
+
+    // Wheel angular velocity needed for the self-energizing factor.
+    // VehicleState.wheel_omega is indexed FL, FR, RL, RR.
+    const auto state = m_world->GetState();
+    const double omega_rl = state.wheel_omega[2];
+    const double omega_rr = state.wheel_omega[3];
+
+    auto torque_to_ratio = [&](double torque_nm) {
+        const double ratio = torque_nm / kBrakeSimpleMaxTorqueNm;
+        return ratio < 0.0 ? 0.0 : (ratio > 1.0 ? 1.0 : ratio);
+    };
+
+    // Compute per-wheel ratio: use BTCM-derived torque if fresh, else fall
+    // back to the local pedal value.  ApplyRearBrakePerWheel sets both
+    // sides at once, so we always compute both and call once.
+    const double rl_ratio = cmd.lr_fresh
+        ? torque_to_ratio(ev1sim::BrakeDrum::torque_magnitude_nm(
+              cmd_to_force(cmd.lr), omega_rl, drum))
+        : local_rear_brake;
+    const double rr_ratio = cmd.rr_fresh
+        ? torque_to_ratio(ev1sim::BrakeDrum::torque_magnitude_nm(
+              cmd_to_force(cmd.rr), omega_rr, drum))
+        : local_rear_brake;
+    m_world->ApplyRearBrakePerWheel(time, rl_ratio, rr_ratio);
 }
 
 // ---------------------------------------------------------------------------
@@ -496,6 +553,10 @@ int SimApp::RunWithVisualization() {
                 // Must follow Synchronize() (which calls ApplyBrakes internally)
                 // so we can override the symmetric front pressure when BTCM is live.
                 ApplyAbsFrontBrake(t, cmd.front_brake);
+                // Per-wheel BTCM rear EMB integration.  Mirror pattern;
+                // converts motor cmd → shoe force → drum torque per wheel
+                // and applies to axle 1 via VehicleWorld::ApplyRearBrakePerWheel.
+                ApplyRearEmbBrake(t, cmd.rear_brake);
                 m_world->Advance(step);
             }
         }
@@ -927,6 +988,8 @@ int SimApp::RunHeadless() {
             // Must follow Synchronize() so we override the symmetric front
             // pressure when BTCM is live.
             ApplyAbsFrontBrake(t, cmd.front_brake);
+            // Per-wheel BTCM rear EMB integration.
+            ApplyRearEmbBrake(t, cmd.rear_brake);
             m_world->Advance(step);
         }
 

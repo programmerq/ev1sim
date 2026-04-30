@@ -36,6 +36,13 @@ public:
     ///   brake_fl, brake_fr — modulated brake ratio [0..1] for left/right wheels.
     void ApplyFrontBrakePerWheel(double time, double brake_fl, double brake_fr);
 
+    /// Override rear-axle (axle 1) brake torque per wheel after Synchronize().
+    /// Used by BTCM EMB integration: SimApp converts rear motor commands into
+    /// per-wheel torques via the BrakeDrum self-energizing model and passes
+    /// them in as ratios of the BrakeSimple max torque.
+    ///   brake_rl, brake_rr — brake ratio [0..1] for left/right rear wheels.
+    void ApplyRearBrakePerWheel(double time, double brake_rl, double brake_rr);
+
     // Teleport vehicle back to spawn.  Resets velocities.
     void ResetVehicle();
 

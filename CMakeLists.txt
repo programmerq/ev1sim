@@ -173,6 +173,7 @@ if(BUILD_TESTS)
         tests/test_throttle_bus.cpp
         tests/test_scenario.cpp
         tests/test_brake_pedal.cpp
+        tests/test_brake_drum.cpp
         src/Config.cpp
         src/KeyboardInputController.cpp
         src/ExternalSimConnector.cpp

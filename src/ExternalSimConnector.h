@@ -272,6 +272,19 @@ public:
     AbsPhaseFront GetAbsPhaseFront(
         std::chrono::milliseconds freshness_window) const;
 
+    /// Rear EMB motor commands from BTCM (kSigRearMotorLR/RR = 5014/5015,
+    /// main harness segment).  Float in [-1, +1]: +1=apply, 0=idle, -1=release.
+    /// fresh = true when the last update arrived within freshness_window.
+    /// Stale-fallback in SimApp::ApplyRearEmbBrake when BTCM is not connected.
+    struct RearEmbCmd {
+        float lr        = 0.0f;
+        float rr        = 0.0f;
+        bool  lr_fresh  = false;
+        bool  rr_fresh  = false;
+    };
+    RearEmbCmd GetRearEmbCmd(
+        std::chrono::milliseconds freshness_window) const;
+
     // ---------------------------------------------------------------------
     // Endpoint registry (static — stable across instances)
     // ---------------------------------------------------------------------
@@ -313,6 +326,11 @@ public:
     /// Inject a uint8 signal value (e.g. wiper motor command).
     /// Used by unit tests; not part of the runtime path.
     void DebugInjectU8(std::uint32_t signal_id, std::uint8_t value);
+
+    /// Inject a float signal value (rear EMB motor commands, etc.).
+    /// Updates the corresponding state field + timestamp so the
+    /// freshness-window logic in GetRearEmbCmd works.  Used by unit tests.
+    void DebugInjectFloat(std::uint32_t signal_id, float value);
 
 private:
     Options m_opts;

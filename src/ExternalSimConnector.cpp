@@ -203,6 +203,14 @@ constexpr std::uint32_t kSigSolFL_DMP = 5011U;
 constexpr std::uint32_t kSigSolFR_ISO = 5012U;
 constexpr std::uint32_t kSigSolFR_DMP = 5013U;
 
+// BTCM rear EMB motor commands — published by BTCM on the main harness segment.
+// Float in [-1, +1]: +1=apply, 0=hold/idle, -1=release.  ev1sim consumes
+// these to drive the BrakeDrum self-energizing model and apply per-wheel
+// rear brake torque to Chrono.  Not registered as a published endpoint.
+//   kSigRearMotorLR = 5014, kSigRearMotorRR = 5015
+constexpr std::uint32_t kSigRearMotorLR = 5014U;
+constexpr std::uint32_t kSigRearMotorRR = 5015U;
+
 // Mapping from signal slot (kBulbCmdBase + slot) to LightID.  Order must stay
 // locked to the electric sim's LightIdx enum for the first 17 entries.
 constexpr LightID kBulbOrder[NUM_LIGHTS] = {
@@ -576,6 +584,15 @@ struct ExternalSimConnector::State {
     std::uint64_t sol_fr_iso_ns          = 0;
     std::uint64_t sol_fr_dmp_ns          = 0;
 
+    // Rear EMB motor commands (IDs 5014-5015, main harness segment).
+    // Float in [-1, +1]: +1=apply, 0=idle, -1=release.  Freshness tracked
+    // via last-update timestamps so the consumer can fall back if BTCM is
+    // not connected (mirrors the front ABS pattern).
+    float         rear_motor_lr           = 0.0f;
+    float         rear_motor_rr           = 0.0f;
+    std::uint64_t rear_motor_lr_ns        = 0;
+    std::uint64_t rear_motor_rr_ns        = 0;
+
     // Charge coupler presence (ID 4060, chassis segment).
     // Stubbed false; future floating-UI panel or charge-door animation updates this.
     bool          charge_coupler_present     = false;
@@ -922,6 +939,27 @@ ExternalSimConnector::AbsPhaseFront ExternalSimConnector::GetAbsPhaseFront(
     return result;
 }
 
+ExternalSimConnector::RearEmbCmd ExternalSimConnector::GetRearEmbCmd(
+    std::chrono::milliseconds freshness_window) const {
+    RearEmbCmd r{};
+    const auto& st = *m_state;
+    const std::uint64_t window_ns =
+        static_cast<std::uint64_t>(freshness_window.count()) * 1'000'000ULL;
+    const std::uint64_t now_ns = NowNs();
+
+    auto is_fresh_single = [&](std::uint64_t ts) -> bool {
+        if (ts == 0) return false;
+        if (now_ns < ts) return false;  // clock wrap guard
+        return (now_ns - ts) < window_ns;
+    };
+
+    r.lr        = st.rear_motor_lr;
+    r.rr        = st.rear_motor_rr;
+    r.lr_fresh  = is_fresh_single(st.rear_motor_lr_ns);
+    r.rr_fresh  = is_fresh_single(st.rear_motor_rr_ns);
+    return r;
+}
+
 // ---------------------------------------------------------------------------
 // Test / internal: apply an inbound signal value (as if decoded from a frame).
 // ---------------------------------------------------------------------------
@@ -959,6 +997,20 @@ void ExternalSimConnector::DebugInjectDelta(std::uint32_t signal_id, bool value)
                 std::chrono::steady_clock::now().time_since_epoch()).count());
     }
     // Panel-sensor signals are outputs — ignore inbound.
+}
+
+void ExternalSimConnector::DebugInjectFloat(std::uint32_t signal_id, float value) {
+    const std::uint64_t now_ns = static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
+    if (signal_id == kSigRearMotorLR) {
+        m_state->rear_motor_lr    = value;
+        m_state->rear_motor_lr_ns = now_ns;
+    } else if (signal_id == kSigRearMotorRR) {
+        m_state->rear_motor_rr    = value;
+        m_state->rear_motor_rr_ns = now_ns;
+    }
+    // Other float signals are not currently subscribed as inputs.
 }
 
 void ExternalSimConnector::DebugInjectU8(std::uint32_t signal_id,
@@ -1305,6 +1357,26 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                     st.sol_fr_dmp_ns  = polled.frame.header.monotonic_time_ns
                                         ? polled.frame.header.monotonic_time_ns
                                         : NowNs();
+                } else if ((d.signal_id == kSigRearMotorLR ||
+                            d.signal_id == kSigRearMotorRR) &&
+                           d.payload.size() >= 4) {
+                    // Float32 LE in [-1, +1].
+                    std::uint32_t bits = 0;
+                    for (int b = 0; b < 4; ++b)
+                        bits |= static_cast<std::uint32_t>(d.payload[b]) << (b * 8);
+                    float v;
+                    std::memcpy(&v, &bits, 4);
+                    const std::uint64_t now_ns =
+                        polled.frame.header.monotonic_time_ns
+                            ? polled.frame.header.monotonic_time_ns
+                            : NowNs();
+                    if (d.signal_id == kSigRearMotorLR) {
+                        st.rear_motor_lr    = v;
+                        st.rear_motor_lr_ns = now_ns;
+                    } else {
+                        st.rear_motor_rr    = v;
+                        st.rear_motor_rr_ns = now_ns;
+                    }
                 }
             }
         }
