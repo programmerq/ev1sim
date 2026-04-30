@@ -1,0 +1,57 @@
+{
+  "//": "ABS validation scenario.  Drive to 30 m/s, then slam the brakes.",
+  "//1": "Same scenario file used for both BTCM-on and BTCM-off comparison runs;",
+  "//2": "the difference is whether the BTCM controller is spawned alongside",
+  "//3": "ev1sim.  See scripts/run_abs_compare.sh for the orchestrator.",
+  "//4": "",
+  "//5": "Per-wheel slip + omega columns are the headline diagnostic — watch",
+  "//6": "the four wheels during the brake event.  With ABS engaged you should",
+  "//7": "see slip held below ~0.15 across all four; without ABS the wheels",
+  "//8": "slip-ratio saturates at 1.0 (locked).",
+  "//9": "",
+  "//10": "Stopping distance: integrate sqrt((pos_x - x0)^2 + (pos_y - y0)^2)",
+  "//11": "from brake-on to speed=0.  scripts/compare_abs_runs.py does this.",
+
+  "name": "abs_hard_brake",
+  "driver_mode": "local",
+  "max_time_s": 30.0,
+  "events": [
+    {"//": "Boot RSA + drop into D."},
+    {"at_time_s": 0.30, "action": "key_on_cycle"},
+    {"at_time_s": 0.60, "action": "key_on_cycle"},
+    {"at_time_s": 0.90, "action": "prnd_up"},
+    {"at_time_s": 1.10, "action": "prnd_up"},
+    {"at_time_s": 1.30, "action": "prnd_up"},
+
+    {"//": "Floor it until ~30 m/s, then release pedal."},
+    {"at_time_s": 1.50, "action": "set_throttle", "value": 1.0},
+    {"at_time_s": 5.00, "action": "wait_for_speed", "value": 30.0},
+    {"at_time_s": 5.00, "action": "set_throttle", "value": 0.0},
+
+    {"//": "Brief coast to settle dynamics, then SLAM the brake to 100 %.",
+     "//1": "Hard enough that without ABS modulation the wheels lock up."},
+    {"at_time_s": 7.00, "action": "set_brake",   "value": 1.0},
+
+    {"//": "Hold full brake until vehicle stops or scenario ends."},
+    {"at_time_s": 25.0, "action": "set_brake",   "value": 0.0}
+  ],
+  "stats": {
+    "output_csv": "scenario_abs_hard_brake.csv",
+    "sample_period_s": 0.02,
+    "fields": [
+      "sim_time_s",
+      "speed_mps",
+      "pos_x",
+      "applied_front_brake",
+      "applied_rear_brake",
+      "wheel_omega_fl",
+      "wheel_omega_fr",
+      "wheel_omega_rl",
+      "wheel_omega_rr",
+      "slip_ratio_fl",
+      "slip_ratio_fr",
+      "slip_ratio_rl",
+      "slip_ratio_rr"
+    ]
+  }
+}

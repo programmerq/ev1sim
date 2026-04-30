@@ -214,6 +214,22 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
         else if (f == "rear_brake_position")  m_csv << state.rear_brake_position;
         else if (f == "throttle_cmd_q8")      m_csv << static_cast<int>(bus_throttle.q8);
         else if (f == "throttle_cmd_fresh")   m_csv << (bus_throttle.fresh ? 1 : 0);
+        // Vehicle pose — useful for stopping-distance computations.
+        else if (f == "pos_x")                m_csv << state.pos_x;
+        else if (f == "pos_y")                m_csv << state.pos_y;
+        // Per-wheel angular speed (rad/s).  VehicleState array order is
+        // FL, FR, RL, RR.  For ABS validation, watching these chatter
+        // during a hard brake is the key diagnostic.
+        else if (f == "wheel_omega_fl")       m_csv << state.wheel_omega[0];
+        else if (f == "wheel_omega_fr")       m_csv << state.wheel_omega[1];
+        else if (f == "wheel_omega_rl")       m_csv << state.wheel_omega[2];
+        else if (f == "wheel_omega_rr")       m_csv << state.wheel_omega[3];
+        // Per-wheel longitudinal slip ratio: 0 = free rolling, +1 = locked,
+        // -1 = spinning.  Same FL/FR/RL/RR order as wheel_omega.
+        else if (f == "slip_ratio_fl")        m_csv << state.slip_ratio[0];
+        else if (f == "slip_ratio_fr")        m_csv << state.slip_ratio[1];
+        else if (f == "slip_ratio_rl")        m_csv << state.slip_ratio[2];
+        else if (f == "slip_ratio_rr")        m_csv << state.slip_ratio[3];
         else                                  m_csv << "";  // unknown field
     };
 

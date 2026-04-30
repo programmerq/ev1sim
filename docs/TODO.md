@@ -97,12 +97,36 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   `BrakePedal` PhysicalWorld component with two-stage position→pressure
   curve.  Publishes `kSigChassisBrakeMasterPressureKpa` (4074) on the
   chassis bus.  BTCM consumer wiring is the next step.
-- [ ] **BTCM consume master-cylinder pressure (4074).**  BTCM currently
-  reads `kSigDriverBrakePedalQ8` (6900) — q8 travel.  Switch the
-  primary brake-effort input to the new pressure signal so BTCM has
-  a physically meaningful input that already accounts for the dead-
-  band and two-stage curve.  Keep `kSigDriverBrakeSwitch` (6904) as
-  the ABS pump-prime threshold.
+- [x] **BTCM consume master-cylinder pressure (4074).**  Done in
+  `electricsim/ev1/btcm/controller.cpp` — chassis-bus subscriber
+  prefers pressure (200 kPa threshold = ~10 % travel into the soft
+  fluid stage) and falls back to Q8 deadband when pressure is stale
+  or never received.  Pressure consumer has a defensive bounds check
+  ([0, 50000] kPa) to ignore corrupted frames; see `SHM transport
+  intermittency` below.
+- [ ] **SHM transport intermittent float corruption (infrastructure).**
+  Multi-process runs (ev1sim + PIM + RSA + BTCM all attached to the
+  same chassis bus) occasionally deliver corrupted float values to
+  late-attached readers.  Symptom: BTCM reads kSigChassisBrakeMaster-
+  PressureKpa as values like 1.7e25 instead of 13940.  The wire bytes
+  appear to mismatch what `MakeFloatDelta()` wrote.  Workaround for
+  now: `SharedMemoryTransport` create=false on the controller side +
+  `scripts/run_abs_compare.sh` waits for ev1sim's "connected to main
+  harness bus" log + cleans `/electricsim_*_bus` segments via
+  `shm_unlink` before each scenario.  Some intermittency remains.
+  Deeper fix would be to add a checksum byte to `MakeFloatDelta` /
+  read-side validation in `f32_from_payload`, or audit the ring
+  buffer's writer/reader synchronization for races.
+- [ ] **BTCM ABS algorithm doesn't reliably engage in headless runs.**
+  Even with the full controller stack (PIM + RSA + BTCM) and ev1sim
+  driving wheel-omega + brake-pressure, the BTCM firmware's ABS
+  state machine doesn't transition out of POST defaults during a
+  hard-brake event.  Front wheels lock to slip=1.0; the BTCM-on vs
+  BTCM-off comparison runs (via `scripts/run_abs_compare.sh`) end
+  up nearly identical.  Likely root cause is firmware-side: the AVR
+  ABS algorithm needs more inputs than just brake_pedal + tone-ring
+  pulses (probably run_1 stable, accel signal, etc.) before it'll
+  engage.  Worth a focused firmware diagnostic batch.
 - [ ] **ABS rumble feedback for force-feedback rigs (deferred).**
   When ABS engages, the BTCM sol_*_iso/sol_*_dmp signals cycle.
   Surfacing this as a `kSigChassisAbsActive` boolean would let a
