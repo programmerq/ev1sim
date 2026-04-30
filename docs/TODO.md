@@ -58,16 +58,32 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   Needs investigation of how to compute I from torque + motor characteristics.
   A placeholder TODO: add `vehicle.dynamics.motor_current_a` (chassis ID 4072)
   once the Chrono API path is confirmed.
-- [ ] **EV1 powertrain model fidelity audit.** The current Chrono powertrain
-  doesn't necessarily match the real EV1 motor characteristics — peak/cont.
-  torque, power-vs-rpm curve, regen behavior, transaxle gearing, etc.
-  Steady-state cruise behavior in the electronics-driven scenarios is
-  suspicious (cruise-hold experiments show the plant doesn't track the
-  setpoint cleanly), which may be a controller issue OR a plant issue.
-  Validate the powertrain map against published EV1 specs (~102 kW peak,
-  150 N·m, single-speed reduction ~10.946:1, regen up to ~25 kW) before
-  tuning the cruise-control gains in `ev1/pim/pim_throttle.{h,c}`.  Until
-  then, leave the conservative P-only controller alone.
+- [x] **EV1 powertrain model fidelity audit (initial pass).**  Done in
+  [docs/ev1_chrono_audit.md](ev1_chrono_audit.md).  Fixed final drive
+  10.0 → 10.946:1, brake torque 1800 → 800 N·m/wheel, chassis mass
+  1217 → 1199 kg (Gen 2 NiMH target), and front/rear track widths.
+  Coastdown experiment (`config/scenarios/coastdown.json`) shows
+  ~2× excess rolling resistance and ~2× excess v² dissipation
+  remain — captured in audit §11.  See follow-up tasks below.
+- [ ] **Drivetrain dissipation calibration.**  Coastdown shows
+  F_rr ≈ 198 N (vs spec ~100 N) and CdA ≈ 0.76 m² (vs spec ~0.36 m²).
+  Most likely fixable by halving the engine `Map Zero Throttle`
+  values (currently fires during coastdown), then tuning TMeasy
+  slip-curve parameters.  Re-run `scenario_coastdown.csv` after each
+  change to track convergence toward published EV1 numbers.
+- [ ] **Front MacPherson strut + rear trailing-arm templates.**
+  Current Chrono setup uses `DoubleWishbone` for both axles; real EV1
+  is MacPherson front / trailing-arm (twist-beam) rear.  Substantial
+  rebuild; deferred until either (a) Chrono `MacPhersonStrut` JSON
+  sample available, or (b) we have measured EV1 hardpoints.
+- [ ] **Body aerodynamics.**  No `ChAerodynamicLoad` on the chassis;
+  the EV1's signature 0.19 Cd is currently lumped into tire dissipation.
+  Add explicit drag once the rolling/slip dissipation is calibrated.
+- [ ] **Brake bias front/rear.**  Currently both axles share
+  `EV1_BrakeSimple.json` at 800 N·m/wheel.  Real EV1 has front discs
+  + rear drums with stronger front bias.  Split into
+  `EV1_BrakeSimple_Front.json` (800) and `_Rear.json` (500) when
+  tuning braking dynamics matters.
 
 ## Outputs ev1sim could render (defer all)
 - [ ] Wiper motor visual sweep (model update needed).

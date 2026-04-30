@@ -322,6 +322,7 @@ TEST_CASE("Scenario: shipped scenario JSON files parse cleanly",
     const Expected shipped[] = {
         {"config/scenarios/accel_brake_local.json",       "local",       8},
         {"config/scenarios/cruise_demo_electronics.json", "electronics", 9},
+        {"config/scenarios/coastdown.json",               "local",       7},
     };
 
     for (const auto& exp : shipped) {

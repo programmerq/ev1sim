@@ -1,0 +1,45 @@
+{
+  "//": "Coastdown experiment for plant validation.",
+  "//1": "Floor the throttle until the car reaches 30 m/s, release, then",
+  "//2": "log speed-vs-time as the vehicle coasts.  Fit",
+  "//3": "  m·dv/dt = -F_rr - 0.5·ρ·v²·CdA",
+  "//4": "to recover effective rolling resistance and aero CdA.  Compare",
+  "//5": "against real-EV1 published values (Crr≈0.008, CdA≈0.36 m²) to",
+  "//6": "quantify how much excess drag the simulator carries.",
+  "//7": "",
+  "//8": "Run with:",
+  "//9": "  ./build/ev1sim --headless --start-propulsion-enabled \\",
+  "//10": "      --scenario config/scenarios/coastdown.json",
+  "//11": "",
+  "//12": "Output: scenario_coastdown.csv (sim_time_s, speed_mps).",
+  "//13": "Use a separate analysis script to fit the drag model.",
+
+  "name": "coastdown",
+  "driver_mode": "local",
+  "max_time_s": 90.0,
+  "events": [
+    {"//": "Boot RSA + drop into D."},
+    {"at_time_s": 0.30, "action": "key_on_cycle"},
+    {"at_time_s": 0.60, "action": "key_on_cycle"},
+    {"at_time_s": 0.90, "action": "prnd_up"},
+    {"at_time_s": 1.10, "action": "prnd_up"},
+    {"at_time_s": 1.30, "action": "prnd_up"},
+
+    {"//": "Floor it until we hit 30 m/s (~67 mph), then release.",
+     "//1": "EV1 0-60 mph (26.8 m/s) was ~9 s; reaching 30 m/s should take ~12-15 s",
+     "//2": "in the sim.  max_time_s of 90 leaves ~75 s of coast time."},
+    {"at_time_s": 1.50, "action": "set_throttle", "value": 1.0},
+    {"at_time_s": 5.00, "action": "wait_for_speed", "value": 30.0},
+    {"at_time_s": 5.00, "action": "set_throttle", "value": 0.0}
+  ],
+  "stats": {
+    "output_csv": "scenario_coastdown.csv",
+    "sample_period_s": 0.05,
+    "fields": [
+      "sim_time_s",
+      "speed_mps",
+      "applied_throttle",
+      "applied_front_brake"
+    ]
+  }
+}

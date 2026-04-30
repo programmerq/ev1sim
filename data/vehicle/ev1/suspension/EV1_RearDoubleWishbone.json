@@ -6,10 +6,14 @@
   "Camber Angle (deg)":         -0.50,
   "Toe Angle (deg)":            0.00,
 
+  "//track":                    "Real EV1 rear track 1.281 m (narrower than front for aero) →",
+  "//track1":                   "spindle Y = 0.6405 (was 0.622, +18.5 mm).  Wheel-side hard points",
+  "//track2":                   "(spindle / upright / arm-to-upright / tierod-to-upright) bump by",
+  "//track3":                   "+18.5 mm; chassis-side mounts unchanged.",
   "Spindle":
   {
     "Mass":                     1.0,
-    "COM":                      [0, 0.622, -0.08],
+    "COM":                      [0, 0.6405, -0.08],
     "Inertia":                  [0.0004, 0.0004, 0.0004],
     "Radius":                   0.1,
     "Width":                    0.02
@@ -18,7 +22,7 @@
   "Upright":
   {
     "Mass":                     1.2,
-    "COM":                      [-0.018, 0.582, -0.07],
+    "COM":                      [-0.018, 0.6005, -0.07],
     "Moments of Inertia":       [0.010, 0.010, 0.002],
     "Products of Inertia":      [0, 0, 0],
     "Radius":                   0.025
@@ -33,7 +37,7 @@
     "Radius":                   0.02,
     "Location Chassis Front":   [-0.076, 0.366, 0.080],
     "Location Chassis Back":    [-0.195, 0.397, 0.085],
-    "Location Upright":         [-0.031, 0.541, 0.080]
+    "Location Upright":         [-0.031, 0.5595, 0.080]
   },
 
   "Lower Control Arm":
@@ -45,13 +49,13 @@
     "Radius":                   0.03,
     "Location Chassis Front":   [0.156, 0.327, -0.210],
     "Location Chassis Back":    [-0.156, 0.366, -0.206],
-    "Location Upright":         [0.0, 0.600, -0.250]
+    "Location Upright":         [0.0, 0.6185, -0.250]
   },
 
   "Tierod":
   {
     "Location Chassis":         [-0.156, 0.327, -0.090],
-    "Location Upright":         [-0.117, 0.600, -0.090]
+    "Location Upright":         [-0.117, 0.6185, -0.090]
   },
 
   "Spring":
