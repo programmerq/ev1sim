@@ -800,7 +800,10 @@ ExternalSimConnector::AbsPhaseFront ExternalSimConnector::GetAbsPhaseFront(
         if (now_ns < ts_iso || now_ns < ts_dmp) return false; // clock wrap guard
         const std::uint64_t age_iso = now_ns - ts_iso;
         const std::uint64_t age_dmp = now_ns - ts_dmp;
-        return age_iso <= window_ns && age_dmp <= window_ns;
+        // Strict-less-than so a zero-length window means "must be from the
+        // past" — i.e. always stale.  Otherwise an inject + check that
+        // happen within the same nanosecond would erroneously pass as fresh.
+        return age_iso < window_ns && age_dmp < window_ns;
     };
 
     auto decode_phase = [](bool iso, bool dmp) -> AbsPhaseFront::Phase {
