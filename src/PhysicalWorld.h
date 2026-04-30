@@ -85,6 +85,64 @@ private:
     bool   m_pressed = false;
 };
 
+/// Brake pedal master-cylinder pressure model.
+///
+/// Converts pedal travel (normalized 0..1) into a master-cylinder pressure
+/// in kPa using a two-stage linear curve that approximates the feel of a
+/// physical brake pedal with a two-stage hardware spring:
+///
+///   travel < dead_band                -> 0 kPa             (free play, no fluid takeup)
+///   travel < transition               -> k1 × (t - dead_band)
+///   travel ≥ transition               -> k1×(transition - dead_band) + k2×(t - transition)
+///
+/// The simulator-side model is intentionally simple: no fluid compressibility,
+/// no caliper-vs-master volume tracking, no temperature effects.  The two-
+/// segment shape captures the dominant feel: an initially soft segment as
+/// the master cylinder cup engages, then a much firmer segment once the
+/// fluid has nowhere to go.
+///
+/// Default values are educated guesses tuned to land at ~12 MPa near full
+/// travel — typical for a passenger-car master cylinder under hard braking.
+/// Real EV1 manual data would refine these; tune to match the user's sim-rig
+/// pedal feel until then.
+///
+/// Published on the chassis bus as kSigChassisBrakeMasterPressureKpa (4074)
+/// every tick on change.  BTCM consumes it as the primary brake-effort
+/// input; the existing kSigDriverBrakeSwitch (6904) keeps its role as the
+/// ABS pump-prime threshold.
+class BrakePedal {
+public:
+    struct Calibration {
+        double dead_band  = 0.07;   ///< travel below this → 0 pressure
+        double transition = 0.35;   ///< travel above this → use k2 slope
+        double k1_kpa_per_unit = 8000.0;   ///< soft initial takeup stage
+        double k2_kpa_per_unit = 18000.0;  ///< firm fluid-pressure stage
+        double max_pressure_kpa = 15000.0; ///< cap (saturation)
+    };
+
+    BrakePedal() = default;
+    explicit BrakePedal(const Calibration& cal) : m_cal(cal) {}
+
+    /// Update from normalized pedal travel (0..1).  Stores the most recent
+    /// pressure on the component for accessor + bus-publish use.
+    /// Returns the computed pressure in kPa.
+    double update(double travel);
+
+    /// Most-recently-computed master cylinder pressure (kPa).
+    double pressure_kpa() const { return m_pressure_kpa; }
+
+    /// Stateless conversion — exposed for unit tests and other callers
+    /// that want to compute a pressure without owning a BrakePedal.
+    static double pressure_for_travel(double travel, const Calibration& cal);
+
+    const Calibration& calibration() const { return m_cal; }
+    void set_calibration(const Calibration& cal) { m_cal = cal; }
+
+private:
+    Calibration m_cal;
+    double m_pressure_kpa = 0.0;
+};
+
 /// PRND floor selector lever.
 ///
 /// Models the physical floor-mounted PRND selector lever on the EV1.
@@ -448,6 +506,9 @@ public:
     BrakeSwitch&       brake_switch()       { return m_brake_sw; }
     const BrakeSwitch& brake_switch() const { return m_brake_sw; }
 
+    BrakePedal&       brake_pedal()       { return m_brake_pedal; }
+    const BrakePedal& brake_pedal() const { return m_brake_pedal; }
+
     ChargeCoupler&       charge_coupler()       { return m_charge_coupler; }
     const ChargeCoupler& charge_coupler() const { return m_charge_coupler; }
 
@@ -499,6 +560,7 @@ public:
 private:
     CombinationSwitch  m_comb_sw;
     BrakeSwitch        m_brake_sw;
+    BrakePedal         m_brake_pedal;
     ChargeCoupler      m_charge_coupler;
     PrndSelector       m_prnd_sel;
     TurnSignalStalk    m_turn_stalk;

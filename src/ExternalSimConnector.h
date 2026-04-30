@@ -236,6 +236,11 @@ public:
     /// Motor shaft torque in Nm (signed; positive = driving torque).
     void SetMotorTorqueNm(float torque_nm);
 
+    /// Outgoing brake master cylinder pressure (ID 4074, chassis segment, float32 LE).
+    /// Computed by BrakePedal from pedal travel; consumed by BTCM as the
+    /// primary brake-effort input.  Units: kPa.
+    void SetBrakeMasterPressureKpa(float pressure_kpa);
+
     /// Incoming RSA run-mode broadcast (ID 5711, main harness segment).
     /// uint8 enum: 0=OFF, 1=ACC, 2=RUN.  RSA publishes this on every tick.
     /// Returns the most recently received value, or 0xFF if never received.

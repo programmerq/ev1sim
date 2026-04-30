@@ -162,6 +162,14 @@ constexpr std::uint32_t kSigMotorRpm      = 4070U;
 constexpr std::uint32_t kSigMotorTorqueNm = 4071U;
 constexpr int           kNumMotorSignals  = 2;
 
+// Brake master cylinder pressure (ev1sim → electricsim, chassis segment).
+//   4074  vehicle.brake.master_cylinder_pressure_kpa   float32 LE, kPa
+// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// kSigChassisBrakeMasterPressureKpa = 4074.  Computed by BrakePedal's
+// two-stage curve from normalized pedal travel each tick.
+constexpr std::uint32_t kSigBrakeMasterPressureKpa = 4074U;
+constexpr int           kNumBrakeSignals           = 1;
+
 // Throttle command (electricsim/PIM → ev1sim, chassis segment).
 //   4073  vehicle.dynamics.throttle_cmd_q8   uint8 q8: 0=zero, 255=full
 // Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
@@ -305,7 +313,7 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 constexpr int kNumEndpoints =
     NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumCombSw + 1 /*charge_coupler*/ +
     kNumPrndSelector + kNumMotorSignals + kNumThrottleCmdSignals +
-    kNumWiperSignals + kNumDynamics + kNumDriverInputs;
+    kNumBrakeSignals + kNumWiperSignals + kNumDynamics + kNumDriverInputs;
 
 std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     std::array<ExternalSimConnector::Endpoint, kNumEndpoints> out{};
@@ -350,6 +358,10 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     // Throttle command (PIM → ev1sim, chassis segment).
     out[i++] = {kSigThrottleCmdQ8,
                 "vehicle.dynamics.throttle_cmd_q8", "throttle_cmd_q8", true};
+    // Brake master cylinder pressure (ev1sim → electricsim, chassis segment).
+    out[i++] = {kSigBrakeMasterPressureKpa,
+                "vehicle.brake.master_cylinder_pressure_kpa",
+                "brake_master_pressure_kpa", false};
     // Wiper motor command + washer pump command (RHJB → ev1sim, chassis segment).
     out[i++] = {kSigWiperMotorCommand,
                 "vehicle.body.wiper_motor.command", "wiper_motor_command", true};
@@ -526,6 +538,11 @@ struct ExternalSimConnector::State {
     float         motor_torque_nm         = 0.0f;
     float         motor_rpm_pub           = -9999.0f;   // sentinel: always publish first
     float         motor_torque_pub        = -9999.0f;
+
+    // Brake master cylinder pressure (ID 4074, chassis segment, kPa).
+    // Computed by BrakePedal from pedal travel.  Publish-on-change.
+    float         brake_master_pressure_kpa     = 0.0f;
+    float         brake_master_pressure_pub_kpa = -9999.0f;  // sentinel
 
     // Throttle command (ID 4073, chassis segment) — received from PIM.
     // 0xFF = never received; valid values 0..255 q8.  last_update_ns tracks
@@ -845,6 +862,10 @@ void ExternalSimConnector::SetMotorRpm(float rpm) {
 
 void ExternalSimConnector::SetMotorTorqueNm(float torque_nm) {
     m_state->motor_torque_nm = torque_nm;
+}
+
+void ExternalSimConnector::SetBrakeMasterPressureKpa(float pressure_kpa) {
+    m_state->brake_master_pressure_kpa = pressure_kpa;
 }
 
 std::uint8_t ExternalSimConnector::GetRsaRunMode() const {
@@ -1426,6 +1447,33 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             mf.deltas                   = std::move(mdyn);
             if (!st.transport->publish_frame(mf)) {
                 std::cerr << "[ExternalSim] publish_frame (motor state) failed — reconnecting\n";
+                st.transport.reset();
+                st.status = Status::Connecting;
+                st.next_reconnect_time = sim_time_s + m_opts.reconnect_period_s;
+                return;
+            }
+        }
+    }
+
+    // 5c. Publish brake master cylinder pressure (chassis segment).
+    {
+        constexpr float kPressureEps = 1.0f;  // 1 kPa quantum is plenty
+        if (std::abs(st.brake_master_pressure_kpa -
+                     st.brake_master_pressure_pub_kpa) > kPressureEps) {
+            std::vector<DeltaRecord> bdyn;
+            bdyn.push_back(MakeFloatDelta(kSigBrakeMasterPressureKpa,
+                                          st.brake_master_pressure_kpa));
+            st.brake_master_pressure_pub_kpa = st.brake_master_pressure_kpa;
+
+            Frame bf{};
+            bf.header.type              = FrameType::DeltaBatch;
+            bf.header.stream_id         = kStreamEv1Sim;
+            bf.header.sequence          = st.sequence++;
+            bf.header.monotonic_time_ns = NowNs();
+            bf.deltas                   = std::move(bdyn);
+            if (!st.transport->publish_frame(bf)) {
+                std::cerr << "[ExternalSim] publish_frame (brake pressure) "
+                             "failed — reconnecting\n";
                 st.transport.reset();
                 st.status = Status::Connecting;
                 st.next_reconnect_time = sim_time_s + m_opts.reconnect_period_s;

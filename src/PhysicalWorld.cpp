@@ -52,6 +52,34 @@ bool BrakeSwitch::update(double brake_travel) {
 }
 
 // ---------------------------------------------------------------------------
+// BrakePedal
+// ---------------------------------------------------------------------------
+
+double BrakePedal::pressure_for_travel(double travel, const Calibration& cal) {
+    if (travel < 0.0) travel = 0.0;
+    if (travel > 1.0) travel = 1.0;
+
+    double p_kpa;
+    if (travel < cal.dead_band) {
+        p_kpa = 0.0;
+    } else if (travel < cal.transition) {
+        p_kpa = cal.k1_kpa_per_unit * (travel - cal.dead_band);
+    } else {
+        const double soft_segment =
+            cal.k1_kpa_per_unit * (cal.transition - cal.dead_band);
+        p_kpa = soft_segment +
+                cal.k2_kpa_per_unit * (travel - cal.transition);
+    }
+    if (p_kpa > cal.max_pressure_kpa) p_kpa = cal.max_pressure_kpa;
+    return p_kpa;
+}
+
+double BrakePedal::update(double travel) {
+    m_pressure_kpa = pressure_for_travel(travel, m_cal);
+    return m_pressure_kpa;
+}
+
+// ---------------------------------------------------------------------------
 // PrndSelector
 // ---------------------------------------------------------------------------
 

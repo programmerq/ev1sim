@@ -572,6 +572,12 @@ int SimApp::RunWithVisualization() {
             // Brake switch (6904): derive from brake travel with hysteresis.
             bool brake_sw = m_physical->brake_switch().update(cmd.front_brake);
             m_external_sim->SetDriverBrakeSwitch(brake_sw);
+            // Master cylinder pressure (4074): two-stage curve from pedal travel.
+            // Drives BTCM brake-effort + the new rear EMB consumer.
+            const double pressure_kpa =
+                m_physical->brake_pedal().update(cmd.front_brake);
+            m_external_sim->SetBrakeMasterPressureKpa(
+                static_cast<float>(pressure_kpa));
             // Seatbelt (6964): default true — driver always buckled.
             // TODO: add a floating-UI toggle in docs/TODO.md panel item so
             // the user can unbuckle during development testing.
@@ -971,6 +977,12 @@ int SimApp::RunHeadless() {
             // Brake switch (6904): derive from brake travel with hysteresis.
             bool brake_sw = m_physical->brake_switch().update(cmd.front_brake);
             m_external_sim->SetDriverBrakeSwitch(brake_sw);
+            // Master cylinder pressure (4074): two-stage curve from pedal travel.
+            // Drives BTCM brake-effort + the new rear EMB consumer.
+            const double pressure_kpa =
+                m_physical->brake_pedal().update(cmd.front_brake);
+            m_external_sim->SetBrakeMasterPressureKpa(
+                static_cast<float>(pressure_kpa));
             // Seatbelt (6964): default true — driver always buckled.
             // TODO: add a floating-UI toggle in docs/TODO.md panel item so
             // the user can unbuckle during development testing.
