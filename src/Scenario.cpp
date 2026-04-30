@@ -50,6 +50,7 @@ std::optional<Scenario> Scenario::LoadFromFile(const std::string& path) {
             if (ev.contains("at_time_s")) e.at_time_s = ev["at_time_s"].get<double>();
             if (ev.contains("action"))    e.action    = ev["action"].get<std::string>();
             if (ev.contains("value"))     e.value     = ev["value"].get<double>();
+            if (ev.contains("value2"))    e.value2    = ev["value2"].get<double>();
             // Comment-only entries (e.g. {"//": "explanation"}) carry no
             // action — skip them.  This lets scenario authors interleave
             // free-form notes with real events.
@@ -90,14 +91,34 @@ std::optional<Scenario> Scenario::LoadFromFile(const std::string& path) {
     return s;
 }
 
-void Scenario::Tick(double sim_time, ScenarioHooks& hooks, DriverCommand& cmd) {
+void Scenario::Tick(double sim_time, const VehicleState& state,
+                    ScenarioHooks& hooks, DriverCommand& cmd) {
     while (m_next_event < m_events.size() &&
            m_events[m_next_event].at_time_s <= sim_time) {
         const auto& e = m_events[m_next_event];
+
+        // Conditional barrier: wait_for_speed blocks subsequent events
+        // until vehicle speed reaches the threshold.  Don't advance the
+        // index; just bail out of the dispatch loop.
+        if (e.action == "wait_for_speed") {
+            if (state.speed_mps >= e.value) {
+                std::cout << "[Scenario] t=" << sim_time
+                          << " wait_for_speed released "
+                          << "(speed=" << state.speed_mps
+                          << " >= " << e.value << " m/s)\n";
+                ++m_next_event;
+                continue;  // try next event on the same tick
+            }
+            // Still waiting — leave the index where it is.
+            break;
+        }
+
         ++m_next_event;
         std::cout << "[Scenario] t=" << sim_time
                   << " action=" << e.action;
-        if (e.action.rfind("set_", 0) == 0) std::cout << " value=" << e.value;
+        if (e.action.rfind("set_", 0) == 0)        std::cout << " value=" << e.value;
+        if (e.action == "assert_speed_within")     std::cout << " target=" << e.value
+                                                              << " tol=" << e.value2;
         std::cout << "\n";
 
         if (e.action == "set_throttle") {
@@ -106,6 +127,22 @@ void Scenario::Tick(double sim_time, ScenarioHooks& hooks, DriverCommand& cmd) {
             m_held_brake = e.value;
         } else if (e.action == "set_steering") {
             m_held_steering = e.value;
+        } else if (e.action == "assert_speed_within") {
+            const double err = state.speed_mps - e.value;
+            const double abs_err = err < 0.0 ? -err : err;
+            if (abs_err <= e.value2) {
+                ++m_passed_assertions;
+                std::cout << "[Scenario] ASSERT PASS: speed "
+                          << state.speed_mps << " ≈ " << e.value
+                          << " (|err|=" << abs_err
+                          << " <= " << e.value2 << ")\n";
+            } else {
+                ++m_failed_assertions;
+                std::cerr << "[Scenario] ASSERT FAIL: speed "
+                          << state.speed_mps << " not within "
+                          << e.value2 << " of " << e.value
+                          << " (|err|=" << abs_err << ")\n";
+            }
         } else if (e.action == "key_on_cycle")        { hooks.KeyOnCycle();
         } else if (e.action == "headlight_cycle")     { hooks.HeadlightCycle();
         } else if (e.action == "prnd_up")             { hooks.PrndUp();

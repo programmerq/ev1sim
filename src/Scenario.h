@@ -30,12 +30,27 @@ namespace ev1sim {
 //   cruise_set / cruise_resume / cruise_cancel / cruise_speed_up / cruise_speed_down:
 //       press the corresponding cruise stalk button (momentary).
 //
+// Conditional events (gate event-list progression):
+//   wait_for_speed:  block subsequent events until speed_mps >= value.
+//       Once the threshold is reached the gate releases and the next
+//       event fires on the same tick.  Acts as a barrier — useful when
+//       a follow-on action (cruise_set) requires the car to first reach
+//       a minimum speed.  No timeout — pair with the scenario's
+//       max_time_s if a runaway is possible.
+//
+// Assertions:
+//   assert_speed_within:  at this scheduled time, check |speed_mps - value|
+//       <= value2.  Result is logged; if it fails, IsScenarioFailed()
+//       returns true and the run reports a non-zero exit code.  Useful
+//       for verifying cruise-control hold, brake-stopping distance, etc.
+//
 // Unknown actions log a warning and are skipped — keeps a typo from
 // killing the run.
 struct ScenarioEvent {
     double      at_time_s = 0.0;
     std::string action;
-    double      value = 0.0;     // optional, used by set_throttle / set_brake / set_steering
+    double      value = 0.0;     // primary value (set_throttle target, wait_for_speed threshold, etc.)
+    double      value2 = 0.0;    // secondary value (assert_speed_within tolerance, etc.)
 };
 
 // What to record at the configured sample period.  Fields recognised by
@@ -82,8 +97,18 @@ public:
 
     // Apply pending events for the current sim time.  Holds for any
     // set_throttle / set_brake / set_steering values.  Calls hooks for
-    // physical-world events.
-    void Tick(double sim_time, ScenarioHooks& hooks, DriverCommand& cmd);
+    // physical-world events.  state.speed_mps is read by wait_for_speed
+    // / assert_speed_within actions; pass the physics state from the
+    // previous substep.
+    void Tick(double sim_time, const VehicleState& state,
+              ScenarioHooks& hooks, DriverCommand& cmd);
+
+    // True if any assert_* action has failed during the run.  Surfaces
+    // the failure to the SimApp run loop so it can return a non-zero
+    // exit code.
+    bool IsScenarioFailed() const { return m_failed_assertions > 0; }
+    int  FailedAssertions() const { return m_failed_assertions; }
+    int  PassedAssertions() const { return m_passed_assertions; }
 
     // Write the CSV header (idempotent — only the first call does work).
     void OpenStats();
@@ -132,6 +157,9 @@ private:
     std::ofstream              m_csv;
     bool                       m_csv_opened = false;
     double                     m_last_stats_sim_time = -1.0;
+
+    int                        m_passed_assertions = 0;
+    int                        m_failed_assertions = 0;
 };
 
 }  // namespace ev1sim

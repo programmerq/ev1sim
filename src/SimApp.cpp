@@ -345,7 +345,8 @@ int SimApp::RunWithVisualization() {
         // overrides.  Runs before the bus-throttle override so the bus
         // value (PIM-computed) wins when in electronics mode.
         if (m_scenario && !m_paused) {
-            m_scenario->Tick(m_world->GetSimTime(), *this, cmd);
+            m_scenario->Tick(m_world->GetSimTime(),
+                              m_world->GetState(), *this, cmd);
         }
 
         // --- Bus-mediated throttle override (electronics drive mode) ---
@@ -816,10 +817,14 @@ int SimApp::RunWithVisualization() {
 
         // --- Scenario complete (data-driven) ---
         if (m_scenario && m_scenario->IsDone(m_world->GetSimTime())) {
+            const bool failed = m_scenario->IsScenarioFailed();
             std::cout << "[SimApp] Scenario complete at t="
-                      << m_world->GetSimTime() << "s — exiting.\n";
+                      << m_world->GetSimTime() << "s "
+                      << "(asserts: " << m_scenario->PassedAssertions()
+                      << " passed, "  << m_scenario->FailedAssertions()
+                      << " failed) — exiting.\n";
             m_scenario->Close();
-            return kExitSuccess;
+            return failed ? kExitScenarioAssertion : kExitSuccess;
         }
 
         // --- Max-time exit (shared with headless) ---
@@ -881,7 +886,8 @@ int SimApp::RunHeadless() {
         // Scenario harness — fires timed events + holds set_throttle/brake
         // overrides.  Headless paths don't pause, so always tick.
         if (m_scenario) {
-            m_scenario->Tick(m_world->GetSimTime(), *this, cmd);
+            m_scenario->Tick(m_world->GetSimTime(),
+                              m_world->GetState(), *this, cmd);
         }
 
         // --- Bus-mediated throttle override (electronics drive mode) ---
@@ -1082,11 +1088,15 @@ int SimApp::RunHeadless() {
 
         // --- Scenario complete (data-driven) ---
         if (m_scenario && m_scenario->IsDone(t)) {
+            const bool failed = m_scenario->IsScenarioFailed();
             std::cout << "[SimApp] Scenario complete at t="
-                      << t << "s — exiting.\n";
+                      << t << "s "
+                      << "(asserts: " << m_scenario->PassedAssertions()
+                      << " passed, "  << m_scenario->FailedAssertions()
+                      << " failed) — exiting.\n";
             m_scenario->Close();
             sigaction(SIGINT, &old_sa, nullptr);
-            return kExitSuccess;
+            return failed ? kExitScenarioAssertion : kExitSuccess;
         }
 
         // --- Max-time exit ---

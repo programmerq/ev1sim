@@ -65,20 +65,20 @@ TEST_CASE("Scenario: events fire at scheduled times in order",
     DriverCommand cmd{};
 
     // No events have fired before t=0.05.
-    s.Tick(0.05, hooks, cmd);
+    s.Tick(0.05, VehicleState{}, hooks, cmd);
     CHECK(hooks.key_on_cycle == 0);
     CHECK(cmd.throttle == 0.0);
 
     // Tick at t=0.30 — the two key_on_cycle events both fire (cumulative).
-    s.Tick(0.30, hooks, cmd);
+    s.Tick(0.30, VehicleState{}, hooks, cmd);
     CHECK(hooks.key_on_cycle == 2);
 
     // Tick at t=0.55 — set_throttle fires; cmd is overridden.
-    s.Tick(0.55, hooks, cmd);
+    s.Tick(0.55, VehicleState{}, hooks, cmd);
     CHECK(cmd.throttle == 0.5);
 
     // Tick at t=1.30 — both cruise events fire.
-    s.Tick(1.30, hooks, cmd);
+    s.Tick(1.30, VehicleState{}, hooks, cmd);
     CHECK(hooks.cruise_set == 1);
     CHECK(hooks.cruise_speed_up == 1);
 }
@@ -95,12 +95,12 @@ TEST_CASE("Scenario: set_throttle holds the override on subsequent ticks",
     DriverCommand cmd{};
     cmd.throttle = 0.0;
 
-    s.Tick(0.20, hooks, cmd);
+    s.Tick(0.20, VehicleState{}, hooks, cmd);
     CHECK(cmd.throttle == 0.7);
 
     // Even with an external mutation, the next Tick re-applies the held value.
     cmd.throttle = 0.0;
-    s.Tick(0.30, hooks, cmd);
+    s.Tick(0.30, VehicleState{}, hooks, cmd);
     CHECK(cmd.throttle == 0.7);
 
     // A later set_throttle replaces the held value.
@@ -110,9 +110,9 @@ TEST_CASE("Scenario: set_throttle holds the override on subsequent ticks",
         {0.30, "set_throttle", 0.0},
     });
     DriverCommand cmd2{};
-    s2.Tick(0.20, hooks, cmd2);
+    s2.Tick(0.20, VehicleState{}, hooks, cmd2);
     CHECK(cmd2.throttle == 0.7);
-    s2.Tick(0.40, hooks, cmd2);
+    s2.Tick(0.40, VehicleState{}, hooks, cmd2);
     CHECK(cmd2.throttle == 0.0);
 }
 
@@ -125,7 +125,7 @@ TEST_CASE("Scenario: set_brake overrides front + rear together",
     });
     CountingHooks hooks;
     DriverCommand cmd{};
-    s.Tick(0.20, hooks, cmd);
+    s.Tick(0.20, VehicleState{}, hooks, cmd);
     CHECK(cmd.front_brake == 0.3);
     CHECK(cmd.rear_brake  == 0.3);
 }
@@ -140,9 +140,76 @@ TEST_CASE("Scenario: unknown action logs warning, doesn't crash",
     });
     CountingHooks hooks;
     DriverCommand cmd{};
-    s.Tick(0.30, hooks, cmd);
+    s.Tick(0.30, VehicleState{}, hooks, cmd);
     // Unknown action skipped; subsequent valid action still fires.
     CHECK(hooks.key_on_cycle == 1);
+}
+
+TEST_CASE("Scenario: wait_for_speed blocks subsequent events until threshold reached",
+          "[Scenario]") {
+    using ev1sim::Scenario;
+    Scenario s;
+    s.set_events({
+        {0.10, "set_throttle",   0.5,  0.0},
+        {1.00, "wait_for_speed", 10.0, 0.0},
+        {1.00, "cruise_set",     0.0,  0.0},
+    });
+
+    CountingHooks hooks;
+    DriverCommand cmd{};
+    VehicleState slow{};
+    slow.speed_mps = 5.0;
+
+    // At t=1.5 the wait_for_speed barrier is reached but speed is below
+    // threshold — cruise_set must NOT fire yet.
+    s.Tick(1.5, slow, hooks, cmd);
+    CHECK(cmd.throttle == 0.5);    // set_throttle did fire
+    CHECK(hooks.cruise_set == 0);  // cruise_set blocked
+
+    // Speed crosses the threshold — cruise_set fires on the next Tick
+    // even though sim_time hasn't moved.
+    VehicleState fast = slow;
+    fast.speed_mps = 12.0;
+    s.Tick(1.5, fast, hooks, cmd);
+    CHECK(hooks.cruise_set == 1);
+}
+
+TEST_CASE("Scenario: assert_speed_within passes when within tolerance",
+          "[Scenario]") {
+    using ev1sim::Scenario;
+    Scenario s;
+    s.set_events({
+        {0.10, "assert_speed_within", 25.0, 1.0},
+    });
+
+    CountingHooks hooks;
+    DriverCommand cmd{};
+    VehicleState st{};
+    st.speed_mps = 25.4;  // |err|=0.4, tol=1.0 → pass
+
+    CHECK_FALSE(s.IsScenarioFailed());
+    s.Tick(0.20, st, hooks, cmd);
+    CHECK(s.PassedAssertions() == 1);
+    CHECK(s.FailedAssertions() == 0);
+    CHECK_FALSE(s.IsScenarioFailed());
+}
+
+TEST_CASE("Scenario: assert_speed_within fails when outside tolerance",
+          "[Scenario]") {
+    using ev1sim::Scenario;
+    Scenario s;
+    s.set_events({
+        {0.10, "assert_speed_within", 25.0, 0.5},
+    });
+
+    CountingHooks hooks;
+    DriverCommand cmd{};
+    VehicleState st{};
+    st.speed_mps = 23.0;  // |err|=2.0, tol=0.5 → fail
+
+    s.Tick(0.20, st, hooks, cmd);
+    CHECK(s.FailedAssertions() == 1);
+    CHECK(s.IsScenarioFailed());
 }
 
 TEST_CASE("Scenario: IsDone() respects max_time_s",
@@ -220,18 +287,18 @@ TEST_CASE("Scenario: LoadFromFile sorts events by at_time_s",
     DriverCommand cmd{};
     // At t=0.6, only the first event (set_throttle, originally listed second)
     // should have fired.
-    loaded->Tick(0.6, hooks, cmd);
+    loaded->Tick(0.6, VehicleState{}, hooks, cmd);
     CHECK(cmd.throttle == 0.5);
     CHECK(hooks.key_on_cycle == 0);
     CHECK(hooks.cruise_set == 0);
 
     // At t=1.5, key_on_cycle has fired.
-    loaded->Tick(1.5, hooks, cmd);
+    loaded->Tick(1.5, VehicleState{}, hooks, cmd);
     CHECK(hooks.key_on_cycle == 1);
     CHECK(hooks.cruise_set == 0);
 
     // At t=2.5, cruise_set has fired.
-    loaded->Tick(2.5, hooks, cmd);
+    loaded->Tick(2.5, VehicleState{}, hooks, cmd);
     CHECK(hooks.cruise_set == 1);
 
     std::filesystem::remove(tmp);

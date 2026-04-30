@@ -46,10 +46,11 @@ public:
     //   2   — max_time_s expired while a scripted scenario was still running
     //   130 — SIGINT (conventional 128+SIGINT_number)
     //   64  — usage/config error (EX_USAGE)
-    static constexpr int kExitSuccess     = 0;
-    static constexpr int kExitTimeout     = 2;
-    static constexpr int kExitInterrupted = 130;
-    static constexpr int kExitUsage       = 64;
+    static constexpr int kExitSuccess           = 0;
+    static constexpr int kExitTimeout           = 2;
+    static constexpr int kExitScenarioAssertion = 3;  ///< scenario assert_* failed
+    static constexpr int kExitInterrupted       = 130;
+    static constexpr int kExitUsage             = 64;
 
     // Blocking.  In interactive mode, runs until the user closes the window,
     // presses Esc, or simulation.max_time_s elapses.  In headless mode, runs
