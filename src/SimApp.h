@@ -11,6 +11,7 @@
 #include "VehicleLights.h"
 #include "VehiclePanels.h"
 #include "VehicleWorld.h"
+#include "WiperRenderer.h"
 
 #include "chrono/core/ChRealtimeStep.h"
 #include "chrono_vehicle/wheeled_vehicle/ChWheeledVehicleVisualSystemIrrlicht.h"
@@ -64,6 +65,7 @@ private:
     std::unique_ptr<ev1sim::PhysicalWorld>  m_physical;
     std::unique_ptr<ExternalSimConnector>   m_external_sim;
     std::unique_ptr<ScriptedDriver>         m_scripted;
+    std::unique_ptr<WiperRenderer>          m_wiper;
 
     std::shared_ptr<chrono::vehicle::ChWheeledVehicleVisualSystemIrrlicht> m_vis;
     chrono::ChRealtimeStepTimer m_realtime_timer;

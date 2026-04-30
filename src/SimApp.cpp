@@ -77,6 +77,9 @@ SimApp::SimApp(const Config& config) : m_config(config) {
     //     whose state is published wire-level on the chassis bus.
     m_physical = std::make_unique<ev1sim::PhysicalWorld>();
 
+    // 8c. Wiper renderer — phase-based sweep animation driven by RHJB motor command.
+    m_wiper = std::make_unique<WiperRenderer>();
+
     // 9. External electrical-simulator connector.  Non-blocking — if the
     //    electric sim isn't running yet, the connector retries each Tick().
     ExternalSimConnector::Options ext_opts;
@@ -574,6 +577,18 @@ int SimApp::RunWithVisualization() {
 
         m_lights->ApplyToScene();
 
+        // --- Wiper renderer tick ---
+        // Pull the latest motor command from RHJB (0xFF if never received →
+        // Tick() treats it as OFF since no valid enum matches).
+        {
+            const std::uint8_t wiper_cmd =
+                m_external_sim->HasReceivedWiperMotorCommand()
+                    ? m_external_sim->GetWiperMotorCommand()
+                    : 0u;  // default OFF when no RHJB command yet
+            m_wiper->Tick(render_dt, wiper_cmd);
+        }
+        m_wiper->ApplyToScene();
+
         // --- Render ---
         m_vis->BeginScene();
         macos_apply_viewport();   // override glViewport for Retina / resize
@@ -591,6 +606,7 @@ int SimApp::RunWithVisualization() {
                              &abs_phase);
         m_lights->DrawHUD(m_vis->GetDevice());
         m_panels->DrawHUD(m_vis->GetDevice());
+        m_wiper->DrawHUD(m_vis->GetDevice());
         m_physical->DrawHUD(m_vis->GetDevice(),
                             m_external_sim->GetRsaRunMode(),
                             m_external_sim->HasReceivedRunMode());
@@ -898,6 +914,15 @@ int SimApp::RunHeadless() {
                 const char* mode_str = (run_mode < 3) ? mode_names[run_mode] : "UNKNOWN";
                 std::cout << "[SimApp] Run mode (from RSA): " << mode_str << "\n";
             }
+        }
+
+        // --- Wiper renderer tick (headless — no DrawHUD, just phase tracking) ---
+        {
+            const std::uint8_t wiper_cmd =
+                m_external_sim->HasReceivedWiperMotorCommand()
+                    ? m_external_sim->GetWiperMotorCommand()
+                    : 0u;
+            m_wiper->Tick(tick_dt, wiper_cmd);
         }
 
         // --- Horn audio (external-sim-driven only in headless) ---
