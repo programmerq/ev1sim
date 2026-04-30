@@ -382,6 +382,63 @@ private:
     bool     m_wash     = false;
 };
 
+/// Door lock state model.
+///
+/// Tracks the lock/unlock state of driver door, passenger door, and trunk.
+/// All doors default to UNLOCKED (vehicle starts unlocked per docs/TODO.md).
+///
+/// No keyboard binding for now — lock toggles will land via the floating-UI
+/// panel (see docs/TODO.md "Floating UI panel" item).
+///
+/// No bus signal pinning for now — wait until an electricsim consumer wants it.
+/// TODO: when an RSA central locking consumer exists in electricsim, add a
+///       chassis bus signal (e.g. a per-door lock state signal) and publish it
+///       from SimApp alongside the other PhysicalWorld signals.
+class DoorLocks {
+public:
+    enum class State { LOCKED, UNLOCKED };
+
+    State driver()    const { return m_driver; }
+    State passenger() const { return m_passenger; }
+    State trunk()     const { return m_trunk; }
+
+    void lock_all() {
+        m_driver    = State::LOCKED;
+        m_passenger = State::LOCKED;
+        m_trunk     = State::LOCKED;
+    }
+
+    void unlock_all() {
+        m_driver    = State::UNLOCKED;
+        m_passenger = State::UNLOCKED;
+        m_trunk     = State::UNLOCKED;
+    }
+
+    void toggle_driver() {
+        m_driver = (m_driver == State::LOCKED) ? State::UNLOCKED : State::LOCKED;
+    }
+
+    void toggle_passenger() {
+        m_passenger = (m_passenger == State::LOCKED) ? State::UNLOCKED : State::LOCKED;
+    }
+
+    void toggle_trunk() {
+        m_trunk = (m_trunk == State::LOCKED) ? State::UNLOCKED : State::LOCKED;
+    }
+
+    /// True if any door is locked (e.g. for "central lock state" telltale).
+    bool any_locked() const {
+        return m_driver    == State::LOCKED ||
+               m_passenger == State::LOCKED ||
+               m_trunk     == State::LOCKED;
+    }
+
+private:
+    State m_driver    = State::UNLOCKED;  // doors default unlocked per docs/TODO.md
+    State m_passenger = State::UNLOCKED;
+    State m_trunk     = State::UNLOCKED;
+};
+
 /// Container for all physical-world input components.
 class PhysicalWorld {
 public:
@@ -415,12 +472,29 @@ public:
     WiperStalk&       wiper_stalk()       { return m_wiper_stalk; }
     const WiperStalk& wiper_stalk() const { return m_wiper_stalk; }
 
+    DoorLocks&       door_locks()       { return m_door_locks; }
+    const DoorLocks& door_locks() const { return m_door_locks; }
+
     /// Draw HUD overlays for: key state, combination switch, PRND selector,
     /// and turn signals/hazard.  Call between BeginScene and EndScene.
     /// rsa_run_mode: most recently received RSA run mode (0=OFF,1=ACC,2=RUN;
     ///               pass 0xFF if not yet received).
     void DrawHUD(irr::IrrlichtDevice* device,
                  std::uint8_t rsa_run_mode, bool has_rsa_run_mode) const;
+
+    /// Draw the physical-world snapshot overlay panel.
+    /// Lists all PhysicalWorld component states; default hidden.
+    /// Toggle with Z key via ConsumeSnapshotToggle().
+    /// @param device    Irrlicht device (null-safe; skips draw if null)
+    /// @param show      true = panel visible, false = hidden
+    /// @param rsa_run_mode  most recently received RSA run mode
+    /// @param has_rsa_run_mode  true if run mode has been received
+    /// @param trip_reset_count  number of IPC trip-reset presses so far
+    void DrawSnapshotOverlay(irr::IrrlichtDevice* device,
+                             bool show,
+                             std::uint8_t rsa_run_mode,
+                             bool has_rsa_run_mode,
+                             int trip_reset_count) const;
 
 private:
     CombinationSwitch  m_comb_sw;
@@ -433,6 +507,7 @@ private:
     IpcTripResetButton m_ipc_trip_reset;
     CruiseStalk        m_cruise_stalk;
     WiperStalk         m_wiper_stalk;
+    DoorLocks          m_door_locks;
 };
 
 }  // namespace ev1sim

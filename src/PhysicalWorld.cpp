@@ -328,6 +328,168 @@ void PhysicalWorld::DrawHUD(irr::IrrlichtDevice* device,
 }
 
 // ---------------------------------------------------------------------------
+// PhysicalWorld::DrawSnapshotOverlay
+// ---------------------------------------------------------------------------
+
+void PhysicalWorld::DrawSnapshotOverlay(irr::IrrlichtDevice* device,
+                                         bool show,
+                                         std::uint8_t rsa_run_mode,
+                                         bool has_rsa_run_mode,
+                                         int trip_reset_count) const {
+    if (!device || !show) return;
+    auto* drv  = device->getVideoDriver();
+    auto* gui  = device->getGUIEnvironment();
+    auto* font = gui->getBuiltInFont();
+    if (!drv || !font) return;
+
+    using irr::video::SColor;
+    using irr::core::rect;
+    using irr::core::stringw;
+
+    // Panel geometry: right side, below the lights/panels HUD.
+    const int panel_w = 360;
+    const int panel_h = 210;
+    const int margin  = 12;
+    auto screen = drv->getScreenSize();
+    const int px = screen.Width - panel_w - margin;
+    const int py = margin;  // top of screen, right column
+
+    // Translucent dark background.
+    drv->draw2DRectangle(SColor(190, 15, 15, 25),
+        irr::core::recti(px, py, px + panel_w, py + panel_h));
+
+    const int tx = px + 6;
+    int ty = py + 4;
+    const int line_h = 18;
+    const int col_w  = panel_w - 12;
+
+    SColor hdr(255, 255, 220, 80);
+    SColor sep(255, 100, 100, 120);
+    SColor grey(255, 160, 160, 160);
+    SColor grn(255,  80, 220,  80);
+    SColor amber(255, 255, 180,  0);
+    SColor red(255, 255, 100, 100);
+    SColor white(255, 220, 220, 220);
+
+    auto draw = [&](const char* text, SColor col) {
+        stringw ws(text);
+        font->draw(ws, rect<irr::s32>(tx, ty, tx + col_w, ty + line_h), col);
+        ty += line_h;
+    };
+
+    // Header.
+    draw("PHYSICAL WORLD                [Z to toggle]", hdr);
+    draw("------------------------------------------", sep);
+
+    // KEY: actual RSA run mode.
+    {
+        const char* actual_str = "---";
+        SColor actual_col = grey;
+        if (has_rsa_run_mode) {
+            switch (rsa_run_mode) {
+                case 0: actual_str = "OFF"; actual_col = grey;  break;
+                case 1: actual_str = "ACC"; actual_col = amber; break;
+                case 2: actual_str = "RUN"; actual_col = grn;   break;
+                default: actual_str = "?";  break;
+            }
+        }
+        char buf[64];
+        std::snprintf(buf, sizeof(buf), "KEY:        %s", actual_str);
+        draw(buf, actual_col);
+    }
+
+    // HEADLAMPS + flash-to-pass.
+    {
+        const char* cs_names[] = {"OFF", "PARK", "ON", "HI"};
+        int cs_idx = static_cast<int>(m_comb_sw.position());
+        const char* ftp_str = m_comb_sw.flash_to_pass_held() ? "ON" : "-";
+        char buf[80];
+        std::snprintf(buf, sizeof(buf), "HEADLAMPS:  %-4s FTP: %s",
+                      cs_names[cs_idx], ftp_str);
+        SColor cs_col = (cs_idx > 0) ? amber : grey;
+        draw(buf, cs_col);
+    }
+
+    // GEAR.
+    {
+        const char* prnd_names[] = {"P", "R", "N", "D"};
+        int prnd_idx = static_cast<int>(m_prnd_sel.position());
+        char buf[40];
+        std::snprintf(buf, sizeof(buf), "GEAR:       %s", prnd_names[prnd_idx]);
+        SColor prnd_col = (prnd_idx == 3) ? grn
+                        : (prnd_idx == 1) ? red
+                        :                   white;
+        draw(buf, prnd_col);
+    }
+
+    // TURN + HAZARD.
+    {
+        using P = TurnSignalStalk::Position;
+        const auto ts_pos = m_turn_stalk.position();
+        const char* turn_str =
+            (ts_pos == P::LEFT)  ? "LEFT" :
+            (ts_pos == P::RIGHT) ? "RIGHT" : "OFF";
+        const char* hz_str = m_hazard_sw.on() ? "ON" : "-";
+        char buf[80];
+        std::snprintf(buf, sizeof(buf), "TURN:       %-5s    HAZARD: %s",
+                      turn_str, hz_str);
+        bool active = (ts_pos != P::OFF) || m_hazard_sw.on();
+        draw(buf, active ? amber : grey);
+    }
+
+    // WIPER + WASH.
+    {
+        const char* wiper_names[] = {"OFF", "INT", "LOW", "HIGH"};
+        int widx = static_cast<int>(m_wiper_stalk.position());
+        char buf[80];
+        std::snprintf(buf, sizeof(buf), "WIPER:      %-4s     WASH:  -",
+                      wiper_names[widx]);
+        SColor wiper_col = (widx > 0) ? white : grey;
+        draw(buf, wiper_col);
+    }
+
+    // CRUISE SET point (show requested state).
+    {
+        const char* req_str = m_rsa_keypad.expected_state_name();
+        // Cruise stalk has no readable "engaged" state without a controller;
+        // show the RSA-requested key state as the cruise readout is in DrawHUD.
+        (void)req_str;
+        // Just show a static placeholder — cruise ECU drives the real state.
+        draw("CRUISE:     -        SET:    -", grey);
+    }
+
+    // DOORS: lock + ajar.
+    {
+        auto lock_str = [](DoorLocks::State s) -> const char* {
+            return (s == DoorLocks::State::LOCKED) ? "LOCKED" : "unlocked";
+        };
+        // "central lock" summary.
+        const char* central = m_door_locks.any_locked() ? "LOCKED" : "unlocked";
+        char buf[100];
+        std::snprintf(buf, sizeof(buf), "DOORS:     [%s]", central);
+        SColor door_col = m_door_locks.any_locked() ? amber : grey;
+        draw(buf, door_col);
+
+        // Per-door detail line.
+        char buf2[100];
+        std::snprintf(buf2, sizeof(buf2), "  D=%-8s P=%-8s Tk=%-8s",
+                      lock_str(m_door_locks.driver()),
+                      lock_str(m_door_locks.passenger()),
+                      lock_str(m_door_locks.trunk()));
+        draw(buf2, grey);
+    }
+
+    // TRIP RST count.
+    {
+        char buf[64];
+        std::snprintf(buf, sizeof(buf), "TRIP RST:   pressed %d time%s",
+                      trip_reset_count,
+                      trip_reset_count == 1 ? "" : "s");
+        draw(buf, trip_reset_count > 0 ? white : grey);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // RsaKeypadDriver
 // ---------------------------------------------------------------------------
 

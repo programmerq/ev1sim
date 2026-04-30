@@ -47,9 +47,12 @@ future-UI input on one side, chassis-segment signal publishing on the other.
 
 ## Door / lock state
 
-- [ ] **Door lock state** not yet modeled; vehicle starts unlocked by default.
-  A locking model (lock/unlock transitions, RSA command subscriber, per-door
-  state) is deferred — see intent comment in `src/VehiclePanels.cpp`.
+- [x] **Door lock state** modeled in `PhysicalWorld::DoorLocks` (driver,
+  passenger, trunk; defaults UNLOCKED).  No keyboard binding — toggles will
+  land via the floating-UI panel.
+- [ ] **Door lock bus signal pinning** — `DoorLocks` state is not yet published
+  on the chassis bus.  Add per-door lock state signals when an electricsim
+  consumer (RSA central locking, key fob) wants to read them.
 - [ ] **Motor current calculation** — motor current (Amps) is not published;
   Chrono's `ChEngineSimpleMap` does not expose a current output directly.
   Needs investigation of how to compute I from torque + motor characteristics.
