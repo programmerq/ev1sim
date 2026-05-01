@@ -472,6 +472,143 @@ def chart_abs_phase_timeline(rows: list[dict], brake_idx: int, end_idx: int,
     return svg.render()
 
 
+def chart_rear_modulation(rows: list[dict], brake_idx: int, end_idx: int,
+                            title: str) -> str:
+    """Rear axle ABS modulation, shown as the actual EMB motor command.
+
+    Unlike the front axle (discrete APPLY/HOLD/DUMP solenoid phases),
+    the rear EMB has a continuous motor-current command in [-1, +1]:
+        +1 = full apply (motor pushing the shoes outward)
+         0 = idle / hold position
+        -1 = full release (motor retracting the shoes)
+    The btcm_rear module translates the same ABS phase decisions the
+    front axle uses into this signed command, so this chart shows
+    "what the BTCM is telling the rear axle to do" — the analog of
+    the front phase Gantt.
+    """
+    svg = Svg(w=720, h=220, title=title)
+    if brake_idx < 0:
+        svg.axes(0, 1, -1.1, 1.1, "t [s]", "EMB cmd")
+        return svg.render()
+    sub = rows[brake_idx:end_idx+1]
+    lr = [(r["sim_time_s"], r["emb_cmd_lr"]) for r in sub]
+    rr = [(r["sim_time_s"], r["emb_cmd_rr"]) for r in sub]
+    xs = [p[0] for p in lr]
+    ax = svg.axes(min(xs), max(xs), -1.1, 1.1,
+                  x_label="t [s]", y_label="EMB cmd [-1..+1]")
+    svg.hline(ax, 0, color="#aaa", dash="1 0")
+    svg.hline(ax, 0.05,  color="#9bda9b", label="apply deadband")
+    svg.hline(ax, -0.05, color="#f08a8a", label="release deadband")
+    svg.polyline(ax, lr, color="#2980b9", width=1.2)
+    svg.polyline(ax, rr, color="#8e44ad", width=1.2)
+    svg.legend(ax, [
+        ("RL motor cmd", "#2980b9"),
+        ("RR motor cmd", "#8e44ad"),
+    ])
+    return svg.render()
+
+
+def chart_brake_outputs(on_rows: list[dict], off_rows: list[dict],
+                         on_brake: int, on_end: int,
+                         off_brake: int, off_end: int,
+                         title: str) -> str:
+    """Effective per-axle brake force ratio applied to Chrono.
+
+    Front: applied_front_brake field directly — that's the post-ABS
+    ratio fed to the Chrono caliper after the host modulator's
+    finite-rate τ model.
+
+    Rear: derived from emb_cmd_*.  We *cannot* use applied_rear_brake
+    directly because that field stores the *symmetric* command (the
+    driver pedal, ≈ 1.0 throughout the brake event) rather than the
+    per-wheel override that ApplyRearEmbBrake feeds into Chrono via
+    ApplyRearBrakePerWheel().  For each rear wheel, the effective
+    apply-force ratio is max(0, emb_cmd) — positive cmd = apply,
+    negative cmd = motor releasing the shoes (no brake force), 0 =
+    hold position (also no incremental force).  We average LR and RR
+    here for a single per-axle line.
+
+    BTCM-off path: rear ratio is forced to 0 (the EV1's rear EMB
+    has no hydraulic backup — when BTCM is stale the host's
+    ApplyRearEmbBrake passes 0/0 to Chrono regardless of pedal).
+    """
+    svg = Svg(w=720, h=240, title=title)
+
+    def rear_eff(rows: list[dict], a: int, b: int,
+                 zero_when_btcm_off: bool) -> list[tuple[float, float]]:
+        out: list[tuple[float, float]] = []
+        if a < 0:
+            return out
+        for r in rows[a:b+1]:
+            if zero_when_btcm_off:
+                out.append((r["sim_time_s"], 0.0))
+                continue
+            lr = max(0.0, r.get("emb_cmd_lr", 0.0))
+            rr = max(0.0, r.get("emb_cmd_rr", 0.0))
+            out.append((r["sim_time_s"], 0.5 * (lr + rr)))
+        return out
+
+    on_pts_f = [(r["sim_time_s"], r["applied_front_brake"])
+                for r in on_rows[on_brake:on_end+1]] if on_brake >= 0 else []
+    on_pts_r = rear_eff(on_rows, on_brake, on_end, zero_when_btcm_off=False)
+    off_pts_f = [(r["sim_time_s"], r["applied_front_brake"])
+                 for r in off_rows[off_brake:off_end+1]] if off_brake >= 0 else []
+    off_pts_r = rear_eff(off_rows, off_brake, off_end, zero_when_btcm_off=True)
+
+    if not on_pts_f and not off_pts_f:
+        svg.axes(0, 1, 0, 1, "t [s]", "brake ratio")
+        return svg.render()
+    xs = [p[0] for p in on_pts_f] + [p[0] for p in off_pts_f]
+    ax = svg.axes(min(xs), max(xs), 0, 1.1,
+                  x_label="t [s]", y_label="effective brake ratio [0..1]")
+    svg.polyline(ax, off_pts_r, color="#e08a3c", width=1.2, dash="3 3")
+    svg.polyline(ax, off_pts_f, color="#e08a3c", width=1.4)
+    svg.polyline(ax, on_pts_r,  color="#3470c0", width=1.2, dash="3 3")
+    svg.polyline(ax, on_pts_f,  color="#3470c0", width=1.4)
+    svg.legend(ax, [
+        ("BTCM-on  front (caliper)",  "#3470c0"),
+        ("BTCM-on  rear  (EMB apply force)",  "#3470c0"),
+        ("BTCM-off front (caliper)",  "#e08a3c"),
+        ("BTCM-off rear  (forced to 0)", "#e08a3c"),
+    ])
+    return svg.render()
+
+
+def chart_actuator_lag(rows: list[dict], brake_idx: int, end_idx: int,
+                        title: str) -> str:
+    """Show the modeled hardware lag between command and actuator.
+
+    Plots applied_front_brake (command sent to Chrono), the modeled
+    front_brake_pressure (caliper pressure after τ ≈ 50/80 ms first-
+    order lag), the applied_rear_brake (rear command), and
+    rear_brake_position (drum shoe position after rate-limited
+    actuator at ~3.33/s — full stroke ~300 ms).
+    """
+    svg = Svg(w=720, h=220, title=title)
+    if brake_idx < 0:
+        svg.axes(0, 1, 0, 1, "t [s]", "ratio")
+        return svg.render()
+    sub = rows[brake_idx:end_idx+1]
+    cmd_f  = [(r["sim_time_s"], r["applied_front_brake"])  for r in sub]
+    pres_f = [(r["sim_time_s"], r.get("front_brake_pressure", 0)) for r in sub]
+    cmd_r  = [(r["sim_time_s"], r["applied_rear_brake"])   for r in sub]
+    pos_r  = [(r["sim_time_s"], r.get("rear_brake_position", 0)) for r in sub]
+    xs = [p[0] for p in cmd_f]
+    ax = svg.axes(min(xs), max(xs), 0, 1.1,
+                  x_label="t [s]", y_label="ratio [0..1]")
+    svg.polyline(ax, cmd_f,  color="#3470c0", width=1.4)
+    svg.polyline(ax, pres_f, color="#3470c0", width=1.0, dash="2 3")
+    svg.polyline(ax, cmd_r,  color="#c0392b", width=1.4)
+    svg.polyline(ax, pos_r,  color="#c0392b", width=1.0, dash="2 3")
+    svg.legend(ax, [
+        ("front cmd",         "#3470c0"),
+        ("front caliper (post-τ ≈ 50 ms)", "#3470c0"),  # dashed
+        ("rear cmd",          "#c0392b"),
+        ("rear shoe (post-rate-limit)",     "#c0392b"),  # dashed
+    ])
+    return svg.render()
+
+
 def chart_yaw_rate(rows: list[dict], brake_idx: int, end_idx: int,
                     title: str) -> str:
     svg = Svg(w=720, h=200, title=title)
@@ -605,15 +742,26 @@ def write_scenario_section(t: str, d: dict,
                                                    on_brake, on_end,
                                                    off_brake, off_end,
                                                    f"{t} — vehicle speed during brake event"))
+    brakeout_svg  = write_svg("brake_outputs",
+                              chart_brake_outputs(on_rows, off_rows,
+                                                   on_brake, on_end,
+                                                   off_brake, off_end,
+                                                   f"{t} — brake commands at chrono (front solid, rear dashed)"))
     wheel_svg     = write_svg("wheel_speed",
                               chart_per_wheel_speed(on_rows, on_brake, on_end,
                                                      f"{t} — chassis vs per-wheel ground speed (BTCM-on)"))
     slip_svg      = write_svg("slip",
                               chart_slip_ratios(on_rows, on_brake, on_end,
-                                                 f"{t} — slip ratios (BTCM-on)"))
+                                                 f"{t} — slip ratios (BTCM-on, raw chassis tire-contact data)"))
     phase_svg     = write_svg("phase",
                               chart_abs_phase_timeline(on_rows, on_brake, on_end,
-                                                        f"{t} — front ABS phase timeline (BTCM-on)"))
+                                                        f"{t} — front ABS phase timeline (BTCM-on, hydraulic)"))
+    rear_svg      = write_svg("rear_emb",
+                              chart_rear_modulation(on_rows, on_brake, on_end,
+                                                     f"{t} — rear EMB motor command (BTCM-on)"))
+    actlag_svg    = write_svg("actuator_lag",
+                              chart_actuator_lag(on_rows, on_brake, on_end,
+                                                  f"{t} — command vs actual actuator state (BTCM-on)"))
     yaw_svg       = write_svg("yaw",
                               chart_yaw_rate(on_rows, on_brake, on_end,
                                               f"{t} — yaw rate during brake event (BTCM-on)"))
@@ -669,13 +817,67 @@ def write_scenario_section(t: str, d: dict,
 
     lines.append("### Charts")
     lines.append("")
+    lines.append("**Vehicle speed**")
+    lines.append("")
     lines.append(f"![speed compare]({speed_svg})")
+    lines.append("")
+    lines.append("**Effective brake force at each axle.**  Front solid,")
+    lines.append("rear dashed.  Front line is `applied_front_brake` directly")
+    lines.append("(the post-ABS-modulation ratio fed to Chrono).  Rear line")
+    lines.append("is *derived* from `emb_cmd_lr/rr`: max(0, cmd) averaged")
+    lines.append("across L and R, because the CSV's `applied_rear_brake`")
+    lines.append("captures the *symmetric* driver-pedal command rather than")
+    lines.append("the per-wheel override that `ApplyRearEmbBrake` feeds into")
+    lines.append("Chrono.  BTCM-off rear is forced to 0 here — the EV1's")
+    lines.append("rear EMB has no hydraulic backup line, so when the")
+    lines.append("controller is out of the loop the rear free-rolls.")
+    lines.append("")
+    lines.append(f"![brake outputs]({brakeout_svg})")
+    lines.append("")
+    lines.append("**Front ABS phase timeline (hydraulic axle).**  Discrete")
+    lines.append("APPLY/HOLD/DUMP solenoid bands.  See the rear EMB chart")
+    lines.append("just below for the *equivalent* rear-axle modulation —")
+    lines.append("same algorithm decisions, different actuator (continuous")
+    lines.append("motor command in [-1, +1] instead of solenoid phases).")
+    lines.append("")
+    lines.append(f"![ABS phase timeline]({phase_svg})")
+    lines.append("")
+    lines.append("**Rear EMB motor command (electromechanical axle).** "
+                 "Continuous-valued analog of the front Gantt above. "
+                 "`+1` = motor pushing apply, `-1` = motor releasing the "
+                 "shoes, `~0` = hold position.")
+    lines.append("")
+    lines.append(f"![rear EMB cmd]({rear_svg})")
+    lines.append("")
+    lines.append("**Command vs actual actuator state.**  Solid lines are")
+    lines.append("commands sent to Chrono; dashed lines are the modeled")
+    lines.append("post-actuator-lag values (caliper hydraulic τ ≈ 50 ms")
+    lines.append("apply / 80 ms release; rear shoe rate-limited at ~3.33/s).")
+    lines.append("Useful for understanding why ABS modulation looks blunt")
+    lines.append("on the speed chart — the actuator lag smooths the rapid")
+    lines.append("HOLD↔DUMP cycling into a slower-changing pressure curve.")
+    lines.append("")
+    lines.append(f"![actuator lag]({actlag_svg})")
+    lines.append("")
+    lines.append("**Per-wheel ground speed** (chassis line + 4 wheel lines)."
+                 "  Gap = slip.")
     lines.append("")
     lines.append(f"![per-wheel speeds]({wheel_svg})")
     lines.append("")
+    lines.append("**Slip ratios.**  Threshold reference lines at 0.05 and")
+    lines.append("0.15 mark the algorithm's exit / enter slip thresholds.")
+    lines.append("Note the chassis-side slip values are *raw tire-contact*")
+    lines.append("data from Chrono's TMeasy model and look noisier than a")
+    lines.append("real ABS would see — production ABS heavily filters this")
+    lines.append("(typically a 10–30 ms low-pass), and our firmware's own")
+    lines.append("perception of slip (derived from tone-ring counts over")
+    lines.append("50 ms windows) is naturally smoother.  The peaks here")
+    lines.append("show what the *tire* is actually doing instant-to-")
+    lines.append("instant; the firmware's view is a window-average.")
+    lines.append("")
     lines.append(f"![slip ratios]({slip_svg})")
     lines.append("")
-    lines.append(f"![ABS phase timeline]({phase_svg})")
+    lines.append("**Yaw rate.**  Positive = counter-clockwise rotation.")
     lines.append("")
     lines.append(f"![yaw rate]({yaw_svg})")
     lines.append("")
@@ -686,6 +888,8 @@ def write_scenario_section(t: str, d: dict,
                                                 on_brake, on_end,
                                                 off_brake, off_end,
                                                 f"{t} — vehicle trajectory (pos_x vs pos_y)"))
+        lines.append("**Trajectory.**  pos_x vs pos_y over the brake event.")
+        lines.append("")
         lines.append(f"![trajectory]({traj_svg})")
         lines.append("")
 

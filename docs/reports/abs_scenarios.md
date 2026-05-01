@@ -1,6 +1,6 @@
 # EV1 ABS validation — engineering report
 
-_Generated 2026-05-01 13:24 by `scripts/abs_report.py`._
+_Generated 2026-05-01 14:05 by `scripts/abs_report.py`._
 
 This report aggregates the four standard ABS validation
 scenarios.  Each scenario gets its own section with setup,
@@ -17,10 +17,10 @@ script.
 
 | Test | BTCM-on stop | BTCM-off stop | Δ stop dist | ABS events FL/FR | yaw drift (on / off) |
 |---|---|---|---:|---:|---|
-| high_mu | 152.03 m / 9.98 s | 148.52 m / 9.47 s | +3.5 m | 35 / 35 | +3.22° / +0.07° |
-| low_mu | didn't stop, v\_f = 31.64 m/s | didn't stop, v\_f = 1.57 m/s | — | 151 / 143 | -3.67° / +3.54° |
-| mu_jump | didn't stop, v\_f = 23.54 m/s | didn't stop, v\_f = 18.60 m/s | — | 38 / 55 | -0.84° / +0.24° |
-| split_mu | 91.96 m / 7.87 s | 72.49 m / 6.53 s | +19.5 m | 17 / 21 | -0.11° / +0.09° |
+| high_mu | 152.13 m / 9.98 s | 148.52 m / 9.47 s | +3.6 m | 34 / 38 | +1.50° / +0.07° |
+| low_mu | didn't stop, v\_f = 31.68 m/s | didn't stop, v\_f = 1.57 m/s | — | 138 / 146 | +1.01° / +3.54° |
+| mu_jump | didn't stop, v\_f = 23.04 m/s | didn't stop, v\_f = 18.60 m/s | — | 51 / 44 | -2.29° / +0.24° |
+| split_mu | 87.11 m / 7.81 s | 72.49 m / 6.53 s | +14.6 m | 21 / 27 | +0.29° / +0.09° |
 
 Δ stop dist > 0 means BTCM-on took *longer* than BTCM-off.
 Yaw drift > 0 = car rotated counter-clockwise (toward driver
@@ -43,36 +43,86 @@ left).  On `split_mu` the car drifts toward the asphalt side
 | Metric | BTCM-on | BTCM-off |
 |---|---|---|
 | Brake-on at | t = 14.10 s, v = 30.06 m/s | t = 14.10 s, v = 30.06 m/s |
-| Stop result | 152.03 m / 9.98 s | 148.52 m / 9.47 s |
-| FL events | 35 | 0 |
-| FR events | 35 | 0 |
-| Yaw drift over brake | +3.22° | +0.07° |
+| Stop result | 152.13 m / 9.98 s | 148.52 m / 9.47 s |
+| FL events | 34 | 0 |
+| FR events | 38 | 0 |
+| Yaw drift over brake | +1.50° | +0.07° |
 
 ### Per-wheel slip statistics (BTCM-on)
 
 | Wheel | peak | mean | time-locked |
 |---|---:|---:|---:|
-| FL | 0.562 | 0.065 | 0.0% |
-| FR | 0.597 | 0.059 | 0.0% |
-| RL | 0.594 | 0.065 | 0.0% |
-| RR | 0.658 | 0.067 | 0.0% |
+| FL | 0.767 | 0.068 | 0.0% |
+| FR | 0.824 | 0.068 | 0.0% |
+| RL | 0.941 | 0.073 | 0.0% |
+| RR | 0.645 | 0.070 | 0.0% |
 
 ### Front ABS phase distribution during brake event (BTCM-on)
 
 | Wheel | APPLY | HOLD | DUMP | stale | phase transitions |
 |---|---:|---:|---:|---:|---:|
-| FL | 67.0% | 12.6% | 7.3% | 13.2% | 38 |
-| FR | 74.3% | 11.4% | 7.9% | 6.4% | 37 |
+| FL | 74.6% | 10.8% | 7.9% | 6.7% | 37 |
+| FR | 71.9% | 11.7% | 7.6% | 8.8% | 41 |
 
 ### Charts
 
+**Vehicle speed**
+
 ![speed compare](abs_scenarios.charts/high_mu_speed.svg)
+
+**Effective brake force at each axle.**  Front solid,
+rear dashed.  Front line is `applied_front_brake` directly
+(the post-ABS-modulation ratio fed to Chrono).  Rear line
+is *derived* from `emb_cmd_lr/rr`: max(0, cmd) averaged
+across L and R, because the CSV's `applied_rear_brake`
+captures the *symmetric* driver-pedal command rather than
+the per-wheel override that `ApplyRearEmbBrake` feeds into
+Chrono.  BTCM-off rear is forced to 0 here — the EV1's
+rear EMB has no hydraulic backup line, so when the
+controller is out of the loop the rear free-rolls.
+
+![brake outputs](abs_scenarios.charts/high_mu_brake_outputs.svg)
+
+**Front ABS phase timeline (hydraulic axle).**  Discrete
+APPLY/HOLD/DUMP solenoid bands.  See the rear EMB chart
+just below for the *equivalent* rear-axle modulation —
+same algorithm decisions, different actuator (continuous
+motor command in [-1, +1] instead of solenoid phases).
+
+![ABS phase timeline](abs_scenarios.charts/high_mu_phase.svg)
+
+**Rear EMB motor command (electromechanical axle).** Continuous-valued analog of the front Gantt above. `+1` = motor pushing apply, `-1` = motor releasing the shoes, `~0` = hold position.
+
+![rear EMB cmd](abs_scenarios.charts/high_mu_rear_emb.svg)
+
+**Command vs actual actuator state.**  Solid lines are
+commands sent to Chrono; dashed lines are the modeled
+post-actuator-lag values (caliper hydraulic τ ≈ 50 ms
+apply / 80 ms release; rear shoe rate-limited at ~3.33/s).
+Useful for understanding why ABS modulation looks blunt
+on the speed chart — the actuator lag smooths the rapid
+HOLD↔DUMP cycling into a slower-changing pressure curve.
+
+![actuator lag](abs_scenarios.charts/high_mu_actuator_lag.svg)
+
+**Per-wheel ground speed** (chassis line + 4 wheel lines).  Gap = slip.
 
 ![per-wheel speeds](abs_scenarios.charts/high_mu_wheel_speed.svg)
 
+**Slip ratios.**  Threshold reference lines at 0.05 and
+0.15 mark the algorithm's exit / enter slip thresholds.
+Note the chassis-side slip values are *raw tire-contact*
+data from Chrono's TMeasy model and look noisier than a
+real ABS would see — production ABS heavily filters this
+(typically a 10–30 ms low-pass), and our firmware's own
+perception of slip (derived from tone-ring counts over
+50 ms windows) is naturally smoother.  The peaks here
+show what the *tire* is actually doing instant-to-
+instant; the firmware's view is a window-average.
+
 ![slip ratios](abs_scenarios.charts/high_mu_slip.svg)
 
-![ABS phase timeline](abs_scenarios.charts/high_mu_phase.svg)
+**Yaw rate.**  Positive = counter-clockwise rotation.
 
 ![yaw rate](abs_scenarios.charts/high_mu_yaw.svg)
 
@@ -92,17 +142,17 @@ left).  On `split_mu` the car drifts toward the asphalt side
 | Metric | BTCM-on | BTCM-off |
 |---|---|---|
 | Brake-on at | t = 38.29 s, v = 15.01 m/s | t = 38.29 s, v = 15.01 m/s |
-| Stop result | didn't stop, v\_f = 31.64 m/s | didn't stop, v\_f = 1.57 m/s |
-| FL events | 151 | 0 |
-| FR events | 143 | 0 |
-| Yaw drift over brake | -3.67° | +3.54° |
+| Stop result | didn't stop, v\_f = 31.68 m/s | didn't stop, v\_f = 1.57 m/s |
+| FL events | 138 | 0 |
+| FR events | 146 | 0 |
+| Yaw drift over brake | +1.01° | +3.54° |
 
 ### Per-wheel slip statistics (BTCM-on)
 
 | Wheel | peak | mean | time-locked |
 |---|---:|---:|---:|
-| FL | 1.000 | 0.549 | 50.6% |
-| FR | 1.000 | 0.471 | 44.0% |
+| FL | 1.000 | 0.502 | 44.0% |
+| FR | 1.000 | 0.537 | 47.5% |
 | RL | 0.028 | 0.013 | 0.0% |
 | RR | 0.028 | 0.012 | 0.0% |
 
@@ -110,18 +160,68 @@ left).  On `split_mu` the car drifts toward the asphalt side
 
 | Wheel | APPLY | HOLD | DUMP | stale | phase transitions |
 |---|---:|---:|---:|---:|---:|
-| FL | 15.7% | 30.0% | 50.7% | 3.6% | 149 |
-| FR | 16.4% | 27.7% | 52.2% | 3.6% | 141 |
+| FL | 16.6% | 26.8% | 53.9% | 2.7% | 137 |
+| FR | 17.2% | 28.3% | 51.8% | 2.7% | 145 |
 
 ### Charts
 
+**Vehicle speed**
+
 ![speed compare](abs_scenarios.charts/low_mu_speed.svg)
+
+**Effective brake force at each axle.**  Front solid,
+rear dashed.  Front line is `applied_front_brake` directly
+(the post-ABS-modulation ratio fed to Chrono).  Rear line
+is *derived* from `emb_cmd_lr/rr`: max(0, cmd) averaged
+across L and R, because the CSV's `applied_rear_brake`
+captures the *symmetric* driver-pedal command rather than
+the per-wheel override that `ApplyRearEmbBrake` feeds into
+Chrono.  BTCM-off rear is forced to 0 here — the EV1's
+rear EMB has no hydraulic backup line, so when the
+controller is out of the loop the rear free-rolls.
+
+![brake outputs](abs_scenarios.charts/low_mu_brake_outputs.svg)
+
+**Front ABS phase timeline (hydraulic axle).**  Discrete
+APPLY/HOLD/DUMP solenoid bands.  See the rear EMB chart
+just below for the *equivalent* rear-axle modulation —
+same algorithm decisions, different actuator (continuous
+motor command in [-1, +1] instead of solenoid phases).
+
+![ABS phase timeline](abs_scenarios.charts/low_mu_phase.svg)
+
+**Rear EMB motor command (electromechanical axle).** Continuous-valued analog of the front Gantt above. `+1` = motor pushing apply, `-1` = motor releasing the shoes, `~0` = hold position.
+
+![rear EMB cmd](abs_scenarios.charts/low_mu_rear_emb.svg)
+
+**Command vs actual actuator state.**  Solid lines are
+commands sent to Chrono; dashed lines are the modeled
+post-actuator-lag values (caliper hydraulic τ ≈ 50 ms
+apply / 80 ms release; rear shoe rate-limited at ~3.33/s).
+Useful for understanding why ABS modulation looks blunt
+on the speed chart — the actuator lag smooths the rapid
+HOLD↔DUMP cycling into a slower-changing pressure curve.
+
+![actuator lag](abs_scenarios.charts/low_mu_actuator_lag.svg)
+
+**Per-wheel ground speed** (chassis line + 4 wheel lines).  Gap = slip.
 
 ![per-wheel speeds](abs_scenarios.charts/low_mu_wheel_speed.svg)
 
+**Slip ratios.**  Threshold reference lines at 0.05 and
+0.15 mark the algorithm's exit / enter slip thresholds.
+Note the chassis-side slip values are *raw tire-contact*
+data from Chrono's TMeasy model and look noisier than a
+real ABS would see — production ABS heavily filters this
+(typically a 10–30 ms low-pass), and our firmware's own
+perception of slip (derived from tone-ring counts over
+50 ms windows) is naturally smoother.  The peaks here
+show what the *tire* is actually doing instant-to-
+instant; the firmware's view is a window-average.
+
 ![slip ratios](abs_scenarios.charts/low_mu_slip.svg)
 
-![ABS phase timeline](abs_scenarios.charts/low_mu_phase.svg)
+**Yaw rate.**  Positive = counter-clockwise rotation.
 
 ![yaw rate](abs_scenarios.charts/low_mu_yaw.svg)
 
@@ -141,36 +241,86 @@ left).  On `split_mu` the car drifts toward the asphalt side
 | Metric | BTCM-on | BTCM-off |
 |---|---|---|
 | Brake-on at | t = 19.95 s, v = 20.01 m/s | t = 19.95 s, v = 20.01 m/s |
-| Stop result | didn't stop, v\_f = 23.54 m/s | didn't stop, v\_f = 18.60 m/s |
-| FL events | 38 | 0 |
-| FR events | 55 | 0 |
-| Yaw drift over brake | -0.84° | +0.24° |
+| Stop result | didn't stop, v\_f = 23.04 m/s | didn't stop, v\_f = 18.60 m/s |
+| FL events | 51 | 0 |
+| FR events | 44 | 0 |
+| Yaw drift over brake | -2.29° | +0.24° |
 
 ### Per-wheel slip statistics (BTCM-on)
 
 | Wheel | peak | mean | time-locked |
 |---|---:|---:|---:|
-| FL | 1.000 | 0.367 | 17.8% |
-| FR | 1.000 | 0.948 | 80.3% |
-| RL | 0.992 | 0.065 | 0.6% |
-| RR | 0.993 | 0.066 | 0.6% |
+| FL | 1.000 | 0.804 | 58.9% |
+| FR | 1.000 | 0.426 | 30.9% |
+| RL | 0.996 | 0.064 | 0.6% |
+| RR | 0.994 | 0.068 | 0.6% |
 
 ### Front ABS phase distribution during brake event (BTCM-on)
 
 | Wheel | APPLY | HOLD | DUMP | stale | phase transitions |
 |---|---:|---:|---:|---:|---:|
-| FL | 11.3% | 23.3% | 57.2% | 8.2% | 37 |
-| FR | 11.9% | 33.3% | 46.5% | 8.2% | 54 |
+| FL | 16.4% | 32.1% | 38.4% | 13.2% | 50 |
+| FR | 16.4% | 27.7% | 42.8% | 13.2% | 43 |
 
 ### Charts
 
+**Vehicle speed**
+
 ![speed compare](abs_scenarios.charts/mu_jump_speed.svg)
+
+**Effective brake force at each axle.**  Front solid,
+rear dashed.  Front line is `applied_front_brake` directly
+(the post-ABS-modulation ratio fed to Chrono).  Rear line
+is *derived* from `emb_cmd_lr/rr`: max(0, cmd) averaged
+across L and R, because the CSV's `applied_rear_brake`
+captures the *symmetric* driver-pedal command rather than
+the per-wheel override that `ApplyRearEmbBrake` feeds into
+Chrono.  BTCM-off rear is forced to 0 here — the EV1's
+rear EMB has no hydraulic backup line, so when the
+controller is out of the loop the rear free-rolls.
+
+![brake outputs](abs_scenarios.charts/mu_jump_brake_outputs.svg)
+
+**Front ABS phase timeline (hydraulic axle).**  Discrete
+APPLY/HOLD/DUMP solenoid bands.  See the rear EMB chart
+just below for the *equivalent* rear-axle modulation —
+same algorithm decisions, different actuator (continuous
+motor command in [-1, +1] instead of solenoid phases).
+
+![ABS phase timeline](abs_scenarios.charts/mu_jump_phase.svg)
+
+**Rear EMB motor command (electromechanical axle).** Continuous-valued analog of the front Gantt above. `+1` = motor pushing apply, `-1` = motor releasing the shoes, `~0` = hold position.
+
+![rear EMB cmd](abs_scenarios.charts/mu_jump_rear_emb.svg)
+
+**Command vs actual actuator state.**  Solid lines are
+commands sent to Chrono; dashed lines are the modeled
+post-actuator-lag values (caliper hydraulic τ ≈ 50 ms
+apply / 80 ms release; rear shoe rate-limited at ~3.33/s).
+Useful for understanding why ABS modulation looks blunt
+on the speed chart — the actuator lag smooths the rapid
+HOLD↔DUMP cycling into a slower-changing pressure curve.
+
+![actuator lag](abs_scenarios.charts/mu_jump_actuator_lag.svg)
+
+**Per-wheel ground speed** (chassis line + 4 wheel lines).  Gap = slip.
 
 ![per-wheel speeds](abs_scenarios.charts/mu_jump_wheel_speed.svg)
 
+**Slip ratios.**  Threshold reference lines at 0.05 and
+0.15 mark the algorithm's exit / enter slip thresholds.
+Note the chassis-side slip values are *raw tire-contact*
+data from Chrono's TMeasy model and look noisier than a
+real ABS would see — production ABS heavily filters this
+(typically a 10–30 ms low-pass), and our firmware's own
+perception of slip (derived from tone-ring counts over
+50 ms windows) is naturally smoother.  The peaks here
+show what the *tire* is actually doing instant-to-
+instant; the firmware's view is a window-average.
+
 ![slip ratios](abs_scenarios.charts/mu_jump_slip.svg)
 
-![ABS phase timeline](abs_scenarios.charts/mu_jump_phase.svg)
+**Yaw rate.**  Positive = counter-clockwise rotation.
 
 ![yaw rate](abs_scenarios.charts/mu_jump_yaw.svg)
 
@@ -190,38 +340,90 @@ left).  On `split_mu` the car drifts toward the asphalt side
 | Metric | BTCM-on | BTCM-off |
 |---|---|---|
 | Brake-on at | t = 12.02 s, v = 20.86 m/s | t = 12.02 s, v = 20.86 m/s |
-| Stop result | 91.96 m / 7.87 s | 72.49 m / 6.53 s |
-| FL events | 17 | 0 |
-| FR events | 21 | 0 |
-| Yaw drift over brake | -0.11° | +0.09° |
+| Stop result | 87.11 m / 7.81 s | 72.49 m / 6.53 s |
+| FL events | 21 | 0 |
+| FR events | 27 | 0 |
+| Yaw drift over brake | +0.29° | +0.09° |
 
 ### Per-wheel slip statistics (BTCM-on)
 
 | Wheel | peak | mean | time-locked |
 |---|---:|---:|---:|
-| FL | 0.650 | 0.064 | 0.0% |
-| FR | 0.521 | 0.070 | 0.0% |
-| RL | 0.692 | 0.083 | 0.0% |
-| RR | 0.607 | 0.080 | 0.0% |
+| FL | 0.570 | 0.084 | 0.0% |
+| FR | 0.689 | 0.085 | 0.0% |
+| RL | 0.753 | 0.094 | 0.0% |
+| RR | 0.811 | 0.090 | 0.0% |
 
 ### Front ABS phase distribution during brake event (BTCM-on)
 
 | Wheel | APPLY | HOLD | DUMP | stale | phase transitions |
 |---|---:|---:|---:|---:|---:|
-| FL | 49.4% | 2.2% | 33.9% | 14.5% | 36 |
-| FR | 41.8% | 4.9% | 31.4% | 21.9% | 39 |
+| FL | 58.5% | 3.4% | 27.5% | 10.6% | 39 |
+| FR | 61.9% | 4.2% | 27.8% | 6.1% | 47 |
 
 ### Charts
 
+**Vehicle speed**
+
 ![speed compare](abs_scenarios.charts/split_mu_speed.svg)
 
-![per-wheel speeds](abs_scenarios.charts/split_mu_wheel_speed.svg)
+**Effective brake force at each axle.**  Front solid,
+rear dashed.  Front line is `applied_front_brake` directly
+(the post-ABS-modulation ratio fed to Chrono).  Rear line
+is *derived* from `emb_cmd_lr/rr`: max(0, cmd) averaged
+across L and R, because the CSV's `applied_rear_brake`
+captures the *symmetric* driver-pedal command rather than
+the per-wheel override that `ApplyRearEmbBrake` feeds into
+Chrono.  BTCM-off rear is forced to 0 here — the EV1's
+rear EMB has no hydraulic backup line, so when the
+controller is out of the loop the rear free-rolls.
 
-![slip ratios](abs_scenarios.charts/split_mu_slip.svg)
+![brake outputs](abs_scenarios.charts/split_mu_brake_outputs.svg)
+
+**Front ABS phase timeline (hydraulic axle).**  Discrete
+APPLY/HOLD/DUMP solenoid bands.  See the rear EMB chart
+just below for the *equivalent* rear-axle modulation —
+same algorithm decisions, different actuator (continuous
+motor command in [-1, +1] instead of solenoid phases).
 
 ![ABS phase timeline](abs_scenarios.charts/split_mu_phase.svg)
 
+**Rear EMB motor command (electromechanical axle).** Continuous-valued analog of the front Gantt above. `+1` = motor pushing apply, `-1` = motor releasing the shoes, `~0` = hold position.
+
+![rear EMB cmd](abs_scenarios.charts/split_mu_rear_emb.svg)
+
+**Command vs actual actuator state.**  Solid lines are
+commands sent to Chrono; dashed lines are the modeled
+post-actuator-lag values (caliper hydraulic τ ≈ 50 ms
+apply / 80 ms release; rear shoe rate-limited at ~3.33/s).
+Useful for understanding why ABS modulation looks blunt
+on the speed chart — the actuator lag smooths the rapid
+HOLD↔DUMP cycling into a slower-changing pressure curve.
+
+![actuator lag](abs_scenarios.charts/split_mu_actuator_lag.svg)
+
+**Per-wheel ground speed** (chassis line + 4 wheel lines).  Gap = slip.
+
+![per-wheel speeds](abs_scenarios.charts/split_mu_wheel_speed.svg)
+
+**Slip ratios.**  Threshold reference lines at 0.05 and
+0.15 mark the algorithm's exit / enter slip thresholds.
+Note the chassis-side slip values are *raw tire-contact*
+data from Chrono's TMeasy model and look noisier than a
+real ABS would see — production ABS heavily filters this
+(typically a 10–30 ms low-pass), and our firmware's own
+perception of slip (derived from tone-ring counts over
+50 ms windows) is naturally smoother.  The peaks here
+show what the *tire* is actually doing instant-to-
+instant; the firmware's view is a window-average.
+
+![slip ratios](abs_scenarios.charts/split_mu_slip.svg)
+
+**Yaw rate.**  Positive = counter-clockwise rotation.
+
 ![yaw rate](abs_scenarios.charts/split_mu_yaw.svg)
+
+**Trajectory.**  pos_x vs pos_y over the brake event.
 
 ![trajectory](abs_scenarios.charts/split_mu_trajectory.svg)
 
