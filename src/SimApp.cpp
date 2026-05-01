@@ -231,7 +231,8 @@ void SimApp::SetupVisualization() {
 }
 
 // ---------------------------------------------------------------------------
-void SimApp::ApplyAbsFrontBrake(double time, double local_front_brake) {
+void SimApp::ApplyAbsFrontBrake(double time, double dt_s,
+                                double local_front_brake) {
     using Phase = ExternalSimConnector::AbsPhaseFront::Phase;
 
     const auto abs_phase = m_external_sim->GetAbsPhaseFront(kAbsFreshnessWindow);
@@ -266,12 +267,30 @@ void SimApp::ApplyAbsFrontBrake(double time, double local_front_brake) {
         return;
     }
 
-    // Compute per-wheel modulated brake ratio.
+    // Finite-rate hydraulic model.  Real ABS valves are flow-limited: a
+    // single dump pulse takes ~30 ms to bleed pressure to a third, not
+    // an instantaneous step to zero.  Modeling APPLY as exponential
+    // rise toward MC pressure and DUMP as exponential decay toward 0
+    // matches the published service-bay numbers and avoids the
+    // pathological behavior of the old step-function model (which
+    // dropped pressure to 0.2 × MC every dump tick — effectively
+    // "open-circuit" braking through the ABS unit during long DUMP
+    // sequences).
+    //
+    // Time constants are first-pass estimates — refined in future
+    // tuning passes once we have GM EV1 hardware reference data.
+    const double tau_apply = 0.005;  // s, caliper-fill time constant
+    const double tau_dump  = 0.060;  // s, dump-valve release time constant
+    const double alpha_apply =
+        dt_s >= tau_apply ? 1.0 : (1.0 - std::exp(-dt_s / tau_apply));
+    const double alpha_dump  =
+        dt_s >= tau_dump  ? 1.0 : (1.0 - std::exp(-dt_s / tau_dump));
+
     auto modulate = [&](Phase phase, double prev, double local) -> double {
         switch (phase) {
-            case Phase::APPLY: return local;
+            case Phase::APPLY: return prev + alpha_apply * (local - prev);
             case Phase::HOLD:  return prev;
-            case Phase::DUMP:  return 0.2 * local;
+            case Phase::DUMP:  return prev * (1.0 - alpha_dump);
         }
         return local;  // unreachable
     };
@@ -560,7 +579,7 @@ int SimApp::RunWithVisualization() {
                 // Per-wheel BTCM ABS modulation (front axle).
                 // Must follow Synchronize() (which calls ApplyBrakes internally)
                 // so we can override the symmetric front pressure when BTCM is live.
-                ApplyAbsFrontBrake(t, cmd.front_brake);
+                ApplyAbsFrontBrake(t, step, cmd.front_brake);
                 // Per-wheel BTCM rear EMB integration.  Mirror pattern;
                 // converts motor cmd → shoe force → drum torque per wheel
                 // and applies to axle 1 via VehicleWorld::ApplyRearBrakePerWheel.
@@ -995,7 +1014,7 @@ int SimApp::RunHeadless() {
             // Per-wheel BTCM ABS modulation (front axle).
             // Must follow Synchronize() so we override the symmetric front
             // pressure when BTCM is live.
-            ApplyAbsFrontBrake(t, cmd.front_brake);
+            ApplyAbsFrontBrake(t, step, cmd.front_brake);
             // Per-wheel BTCM rear EMB integration.
             ApplyRearEmbBrake(t, cmd.rear_brake);
             m_world->Advance(step);

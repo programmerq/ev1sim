@@ -68,8 +68,11 @@ private:
     /// per-wheel values, and (if fresh) calls ApplyFrontBrakePerWheel().
     /// Also emits one INFO line per wheel on freshness transitions.
     /// @param time       current sim time (seconds), forwarded to Chrono brake API
+    /// @param dt_s       physics step size in seconds — used by the
+    ///                   finite-rate hydraulic model to integrate
+    ///                   APPLY/HOLD/DUMP pressure changes.
     /// @param local_front_brake  the local (driver-commanded) front brake ratio [0..1]
-    void ApplyAbsFrontBrake(double time, double local_front_brake);
+    void ApplyAbsFrontBrake(double time, double dt_s, double local_front_brake);
 
     // Consume BTCM rear-motor commands (kSigRearMotorLR/RR), compute
     // self-energizing drum torque per wheel using the current wheel omega,

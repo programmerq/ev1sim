@@ -613,6 +613,14 @@ struct ExternalSimConnector::State {
     // Timers (sim_time_s based).
     double next_presence_time  = 0.0;
     double next_reconnect_time = 0.0;
+    // Heartbeat re-publish for brake-state signals.  ev1sim publishes
+    // these on change only — so a controller that connects to the bus
+    // *after* the brake-pedal edge (e.g. BTCM startup hits the chassis
+    // bus 100 ms after the driver presses the pedal) never sees the
+    // transition and runs as if the pedal stays at 0 forever.
+    // Re-emitting every 200 ms guarantees a late-joining consumer
+    // picks up the current state within one heartbeat interval.
+    double next_brake_heartbeat = 0.0;
 
 #if EV1SIM_HAVE_EXTERNAL_SIM
     std::unique_ptr<electricsim::io::SharedMemoryTransport> transport;
@@ -1115,6 +1123,20 @@ void ExternalSimConnector::Tick(double sim_time_s) {
     if (!m_opts.enabled) return;
     auto& st = *m_state;
 
+    // Brake-state heartbeat: every 200 ms, force a re-publish of the
+    // brake-pedal Q8 (main bus) and master-cylinder pressure (chassis
+    // bus) signals even if their values haven't changed.  ev1sim
+    // normally publishes both on-change-only — so a controller that
+    // connects to the bus *after* a brake transition fires never sees
+    // it, and behaves as if the pedal were still at zero.  Re-emitting
+    // periodically guarantees a late-joining consumer picks up the
+    // current state within one heartbeat interval.  Declared here at
+    // outer Tick scope so both publish paths (in two different inner
+    // scopes below) can consult the same flag and the timer advances
+    // exactly once per heartbeat.
+    constexpr double kBrakeHeartbeatPeriodS = 0.200;
+    const bool brake_heartbeat_due = sim_time_s >= st.next_brake_heartbeat;
+
     // 1. Open transport if we don't have one (reconnect logic).
     //    SharedMemoryTransport's ctor silently no-ops on failure, so we
     //    verify by round-tripping a heartbeat frame and fall back into
@@ -1389,7 +1411,11 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         }
 
         std::vector<DeltaRecord> drv;
-        if (st.driver_brake_q8    != st.driver_brake_pub ||
+        // Heartbeat-due flag: see Tick() outer-scope decl for rationale.
+        // When true, force-publish driver-input + chassis brake pressure
+        // even though the change-detection thresholds wouldn't fire.
+        if (brake_heartbeat_due ||
+            st.driver_brake_q8    != st.driver_brake_pub ||
             st.driver_steering_q8 != st.driver_steering_pub ||
             st.driver_gear        != st.driver_gear_pub ||
             st.driver_throttle_q8 != st.driver_throttle_pub) {
@@ -1535,9 +1561,14 @@ void ExternalSimConnector::Tick(double sim_time_s) {
     }
 
     // 5c. Publish brake master cylinder pressure (chassis segment).
+    // Same heartbeat rationale as kSigDriverBrakePedalQ8 — BTCM uses
+    // this signal as its primary brake-effort input.  Without periodic
+    // re-publish a late-joining consumer never learns the pedal is
+    // pressed.
     {
         constexpr float kPressureEps = 1.0f;  // 1 kPa quantum is plenty
-        if (std::abs(st.brake_master_pressure_kpa -
+        if (brake_heartbeat_due ||
+            std::abs(st.brake_master_pressure_kpa -
                      st.brake_master_pressure_pub_kpa) > kPressureEps) {
             std::vector<DeltaRecord> bdyn;
             bdyn.push_back(MakeFloatDelta(kSigBrakeMasterPressureKpa,
@@ -1559,6 +1590,15 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                 return;
             }
         }
+    }
+
+    // Now that both brake-state heartbeat consumers have evaluated, roll
+    // the timer forward.  Doing this here (rather than inside either
+    // branch) guarantees both paths fire on the same tick when the
+    // heartbeat is due, instead of one consuming the slot and the other
+    // missing it.
+    if (brake_heartbeat_due) {
+        st.next_brake_heartbeat = sim_time_s + kBrakeHeartbeatPeriodS;
     }
 
     // 6. Announce our endpoints periodically so other bus peers can discover us.

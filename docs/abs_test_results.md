@@ -19,20 +19,20 @@ self-explanatory: μ ("mu") is the friction coefficient between tire
 and road, "split" means the left and right wheels see different
 surfaces, and "jump" means the surface changes mid-stop.
 
-## Headline results (post tone-ring sign + interleave fixes, 2026-04-30)
+## Headline results (post heartbeat + finite-rate-hydraulic + HOLD→APPLY, 2026-04-30)
 
 | Test     | BTCM-on stop      | BTCM-off stop    | Front locked time | ABS phase changes |
 |---|---|---|---|---|
-| high_mu  | did NOT stop, vf≈18 m/s            | 148.52 m / 9.47 s | 0 % / 0 %         | 86 / 88 |
-| low_mu   | did NOT stop in 60 s, vf≈30.8 m/s  | vf=1.57 m/s       | 49-55 % / 36-41 % | 154 / 126 |
-| mu_jump  | did NOT stop in 30 s, vf≈23.3 m/s  | vf=18.60 m/s      | 56 % / 17 % FL/FR | 53 / 32 |
-| split_mu | 93.6 m / 7.6 s (when ABS quiet); doesn't stop when ABS engages | 77.7 m / 6.78 s | 0 % / 0 %         | 0 / 96 (flaky) |
+| high_mu  | did NOT stop, vf≈19 m/s            | 148.52 m / 9.47 s | 0 % / 0 %         | 145 / 146 |
+| low_mu   | did NOT stop in 60 s, vf≈35 m/s    | vf=1.57 m/s       | 50-57 % / 36-41 % | 148 / 136 |
+| mu_jump  | did NOT stop in 30 s, vf≈23.7 m/s  | vf=18.60 m/s      | 43 % / 52 % FL/FR | 56 / 64 |
+| split_mu | did NOT stop, vf≈13.7 m/s          | 72.5 m / 6.5 s    | 0 % / 0 %         | 164–178 (stable) |
 
-The firmware ABS algorithm now engages on three of four scenarios.
-The fourth (`split_mu`) is sensitive to startup timing — see below.
-Engagement is the *good* news; the *bad* news is that the algorithm
-over-dumps and makes braking worse than the no-ABS baseline on every
-test where it engages.
+ABS engages reliably on all four scenarios.  The remaining headline
+problem is that whenever the algorithm engages it over-modulates and
+makes braking worse than the no-ABS baseline.  This is a tuning gap
+that calls for a separate, focused investigation against published
+EV1 hardware data.
 
 ### Fixed: bus-side ABS phase freshness (consumer)
 
@@ -62,30 +62,62 @@ Two upstream bugs prevented the firmware from seeing wheel rotation:
 These two together restored 4-wheel speed visibility to the firmware
 and unblocked the slip / decel branches of the ABS state machine.
 
-### Outstanding: ABS over-dumps (firmware tuning)
+### Fixed: split_mu engagement flakiness (publish-on-change race)
+
+`kSigDriverBrakePedalQ8` and `kSigChassisBrakeMasterPressureKpa`
+were publish-on-change-only in ev1sim — if BTCM connected to the bus
+*after* a brake transition fired, it never saw the change and ran as
+if the pedal were still at zero.  Fixed by adding a 200 ms heartbeat
+in `ExternalSimConnector::Tick`: both signals re-publish on the
+heartbeat slot even when the value hasn't changed, so a late-joining
+consumer picks up the current state within one heartbeat interval.
+Verified by re-running `split_mu` 4 times — engagement counts now
+range 164–178 phase events per wheel, stable.
+
+### Improved (still imperfect): finite-rate hydraulic model
+
+The previous brake-modulation model snapped pressure between 1.0 ×
+local on APPLY and 0.2 × local on DUMP, with HOLD freezing the
+current output.  Real ABS valves are flow-limited: a 12 ms DUMP
+pulse bleeds ~20 % of pressure, not the 80 % the step model
+implied.  The new finite-rate model ramps pressure exponentially:
+APPLY rises with τ = 5 ms (caliper fill), DUMP decays with
+τ = 60 ms (orifice-limited release), HOLD freezes.
+
+This is more physically accurate but doesn't on its own fix the
+over-modulation — the firmware-side algorithm is still the bigger
+contributor to the issue.
+
+### Outstanding: ABS over-modulates and reduces braking effort
 
 Once engaged, the algorithm releases too much pressure.  On
-`high_mu`, BTCM-on holds front slip at 0.03 — essentially free-rolling
+`high_mu`, BTCM-on holds front slip at 0.04 — essentially free-rolling
 — and never accumulates enough deceleration to stop within scenario
 time.  On `low_mu`, `mu_jump`, and `split_mu` it does the same and
-ends up worse than the no-ABS case.  Likely candidates: the
-`dump_duration_ms` is too long for the simulated valve dynamics; the
-exit-DUMP slip threshold (0.05) is too low (real ABS targets ~0.10);
-and the rear axle's longer DUMP (18 ms) compounds the issue on the
-self-energizing drum.
+ends up worse than the no-ABS case.
 
-### Outstanding: split_mu engagement is flaky
+Three threads of investigation tracked:
 
-In repeated runs `split_mu` reports either 0 / 0 phase events (and
-stops normally) or ~96 / 96 phase events (and over-dumps).  Root
-cause: `kSigDriverBrakePedalQ8` and `kSigChassisBrakeMasterPressureKpa`
-are both publish-on-change in ev1sim — if BTCM connects to the bus
-*after* the brake transition fires, it never sees the change and
-runs as if brake is never pressed.  The scenario's brake event was
-moved out to `t=12s` (was `t=7s`) to give BTCM more startup time, but
-the underlying issue is producer-side: ev1sim should publish
-brake-state heartbeats so late-joining consumers can pick up the
-current value.
+1. **Firmware tone-ring undercount.**  Even after the tone-ring
+   sign + sub-step fixes, the firmware's reported wheel rps reads
+   ~50 % of the chassis's actual omega.  Hypothesis: simavr's
+   any-change INT0/INT1 fires reliably on each pin transition but
+   `IRQ_FLAG_FILTERED` in `avr_raise_irq_float` may collapse some
+   tight back-to-back sequences.  Needs a focused reproduction in
+   isolation (drive a known-frequency square wave and count what
+   the firmware sees over a long window).
+
+2. **Vehicle-speed estimator drift on light decel.**  When the
+   modulator over-releases, chassis decel becomes small.  The
+   firmware's accelerometer-projected `vehicle_speed_mps` then
+   stays high, slip looks high, the algorithm dumps more — death
+   spiral.  Could be addressed by setting
+   `accel_trust_decay_per_s > 0` so the projection eases toward
+   the max-wheel reference over time.
+
+3. **Modulator hydraulic τ tuning.**  τ_apply = 5 ms / τ_dump =
+   60 ms are first-pass values.  Real GM EV1 service-bay numbers
+   would let us calibrate these properly.
 
 ### Fixed: AbsPhaseFront bus-side freshness (consumer side)
 
