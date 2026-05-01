@@ -35,12 +35,34 @@ def find_brake_event(rows: list[dict]) -> int:
     return -1
 
 
-def find_stop(rows: list[dict], start_idx: int, threshold: float = 0.3) -> int:
-    """First row at/after start_idx where speed_mps drops below threshold."""
+def find_stop(rows: list[dict], start_idx: int, threshold: float = 1.0) -> int:
+    """First row at/after start_idx where speed_mps drops below threshold.
+
+    Defaults to 1.0 m/s — the EV1 sim has measurable rolling resistance
+    drag that slows the final crawl beneath this asymptotically; locking
+    the threshold higher keeps the comparison fair across runs.
+    """
     for i in range(start_idx, len(rows)):
         if rows[i]["speed_mps"] < threshold:
             return i
     return -1
+
+
+def slip_stats(rows: list[dict], start_idx: int, stop_idx: int, wheel: str) -> dict:
+    """Mean and locked-fraction (slip > 0.95) for one wheel during the brake event."""
+    key = f"slip_ratio_{wheel}"
+    if key not in rows[0]:
+        return {"peak": float("nan"), "mean": float("nan"), "locked_pct": float("nan")}
+    end = stop_idx if stop_idx > 0 else len(rows)
+    slips = [abs(r[key]) for r in rows[start_idx:end]]
+    if not slips:
+        return {"peak": float("nan"), "mean": float("nan"), "locked_pct": float("nan")}
+    locked = sum(1 for s in slips if s > 0.95)
+    return {
+        "peak": max(slips),
+        "mean": sum(slips) / len(slips),
+        "locked_pct": 100.0 * locked / len(slips),
+    }
 
 
 def stopping_distance(rows: list[dict], start_idx: int, stop_idx: int) -> float:
@@ -149,12 +171,14 @@ def summarize(label: str, rows: list[dict]) -> tuple[int, int]:
         v_final = rows[-1]["speed_mps"]
         print(f"  did NOT stop within scenario.  Final speed: {v_final:.2f} m/s")
 
-    print("  peak |slip| during brake event:")
+    end = stop_idx if stop_idx > 0 else len(rows) - 1
+    print("  per-wheel slip during brake event   (peak / mean / time-locked):")
     for wheel in ("fl", "fr", "rl", "rr"):
-        peak = peak_slip(rows, brake_idx, stop_idx if stop_idx > 0 else len(rows) - 1,
-                         wheel)
-        flag = "  ← LOCKED" if not math.isnan(peak) and peak >= 0.95 else ""
-        print(f"    {wheel.upper()}: {fmt(peak, 3)}{flag}")
+        s = slip_stats(rows, brake_idx, end, wheel)
+        flag = "  ← MOSTLY LOCKED" if s["locked_pct"] > 50 else ""
+        print(f"    {wheel.upper()}: peak={fmt(s['peak'], 3)}  "
+              f"mean={fmt(s['mean'], 3)}  "
+              f"locked={s['locked_pct']:5.1f}%{flag}")
     print()
     return brake_idx, stop_idx
 

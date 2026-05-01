@@ -104,29 +104,39 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   or never received.  Pressure consumer has a defensive bounds check
   ([0, 50000] kPa) to ignore corrupted frames; see `SHM transport
   intermittency` below.
-- [ ] **SHM transport intermittent float corruption (infrastructure).**
-  Multi-process runs (ev1sim + PIM + RSA + BTCM all attached to the
-  same chassis bus) occasionally deliver corrupted float values to
-  late-attached readers.  Symptom: BTCM reads kSigChassisBrakeMaster-
-  PressureKpa as values like 1.7e25 instead of 13940.  The wire bytes
-  appear to mismatch what `MakeFloatDelta()` wrote.  Workaround for
-  now: `SharedMemoryTransport` create=false on the controller side +
-  `scripts/run_abs_compare.sh` waits for ev1sim's "connected to main
-  harness bus" log + cleans `/electricsim_*_bus` segments via
-  `shm_unlink` before each scenario.  Some intermittency remains.
-  Deeper fix would be to add a checksum byte to `MakeFloatDelta` /
-  read-side validation in `f32_from_payload`, or audit the ring
-  buffer's writer/reader synchronization for races.
-- [ ] **BTCM ABS algorithm doesn't reliably engage in headless runs.**
-  Even with the full controller stack (PIM + RSA + BTCM) and ev1sim
-  driving wheel-omega + brake-pressure, the BTCM firmware's ABS
-  state machine doesn't transition out of POST defaults during a
-  hard-brake event.  Front wheels lock to slip=1.0; the BTCM-on vs
-  BTCM-off comparison runs (via `scripts/run_abs_compare.sh`) end
-  up nearly identical.  Likely root cause is firmware-side: the AVR
-  ABS algorithm needs more inputs than just brake_pedal + tone-ring
-  pulses (probably run_1 stable, accel signal, etc.) before it'll
-  engage.  Worth a focused firmware diagnostic batch.
+- [x] **SHM transport "intermittent float corruption" — root-caused.**
+  Was NOT a transport bug.  Controllers' bus-drain loops did not
+  filter `FrameType::SignalDefine` frames, which carry an ASCII
+  signal-name payload sharing the same `signal_id` as the data
+  frames they describe.  Reading the first 4 bytes of
+  `"vehicle.brake.master_cylinder_pressure_kpa..."` as a float
+  produced 1.756e25 every time — looked like corruption, was actually
+  a missing typecheck.  Fix landed in BTCM/PIM/IPC/APM/RSA/RHJB/LHJB
+  controller drains: skip non-`DeltaBatch` frames before typed
+  decode (matches the existing ev1sim + scan_tool + BPM + scripted
+  pattern).  Defensive single-creator SHM init also landed
+  (`O_CREAT|O_EXCL` + wait-for-magic) so the multi-creator init race
+  can't corrupt the mutex/cond state, even though it wasn't the
+  actual bug here.
+- [x] **BTCM ABS algorithm engages — confirmed working.**  After the
+  SignalDefine filter fix, the BTCM AVR firmware's ABS state machine
+  cycles through HOLD/DUMP phases ~720 times during the
+  `abs_hard_brake.json` brake event.  The
+  `scripts/run_abs_compare.sh + compare_abs_runs.py` output now
+  shows clear differences between BTCM-on and BTCM-off:
+    - BTCM-on rear EMB peak slip ≈ 0.66 vs free-rolling 0.43 (rear
+      brakes engage and contribute to deceleration)
+    - Stopping distance BTCM-on 19.16 m vs BTCM-off 19.29 m
+      (marginal on dry asphalt — expected; ABS shines on low-mu)
+    - Front time-locked drops slightly with ABS but not dramatically
+      because dry asphalt's high friction limit barely benefits from
+      modulation.
+- [ ] **Low-mu ABS scenario.**  The dry-asphalt scenario shows ABS
+  engaging but only marginal stopping-distance improvement.  Add
+  a low-mu (icy / wet) variant where the friction-limited
+  deceleration is significantly less than the locked deceleration —
+  there ABS should give a much bigger stopping-distance reduction
+  and the comparison plot becomes more dramatic.
 - [ ] **ABS rumble feedback for force-feedback rigs (deferred).**
   When ABS engages, the BTCM sol_*_iso/sol_*_dmp signals cycle.
   Surfacing this as a `kSigChassisAbsActive` boolean would let a
