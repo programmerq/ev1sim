@@ -3,8 +3,10 @@
 
 #include "ExternalSimConnector.h"
 
+#include <chrono>
 #include <set>
 #include <string>
+#include <thread>
 
 using Catch::Matchers::WithinAbs;
 
@@ -620,6 +622,42 @@ TEST_CASE("GetAbsPhaseFront marks stale after zero-length freshness window",
     auto phase = c.GetAbsPhaseFront(std::chrono::milliseconds(0));
     CHECK_FALSE(phase.fl_fresh);
     CHECK_FALSE(phase.fr_fresh);
+}
+
+TEST_CASE("GetAbsPhaseFront stays fresh through HOLD↔DUMP cycling",
+          "[ExternalSim][ABS]") {
+    // BTCM publishes solenoid state on change only.  During HOLD↔DUMP
+    // cycling iso stays at 1 the whole time, so its timestamp never
+    // refreshes — only dump toggles.  Freshness must not require *both*
+    // ages to be within the window, or every long ABS event would
+    // appear stale.  As long as at least one signal updates within the
+    // window, the producer is alive and the last-known values of both
+    // signals are valid.
+    ExternalSimConnector c;
+    // Initial APPLY sample, then transition to HOLD → DUMP → HOLD → ...
+    c.DebugInjectDelta(5010, false);  // FL_ISO = 0 (APPLY)
+    c.DebugInjectDelta(5011, false);  // FL_DMP = 0
+    c.DebugInjectDelta(5012, false);
+    c.DebugInjectDelta(5013, false);
+
+    // Now ABS engages: iso goes high once and stays high.
+    c.DebugInjectDelta(5010, true);
+    c.DebugInjectDelta(5012, true);
+
+    // Sleep past the freshness window for iso (300 ms > 200 ms).
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+    // Cycle dump 0 → 1 → 0 (HOLD → DUMP → HOLD) — only dump's timestamp
+    // refreshes.  Iso's timestamp is now ~300 ms old.
+    c.DebugInjectDelta(5011, true);
+    c.DebugInjectDelta(5013, true);
+
+    auto phase = c.GetAbsPhaseFront(std::chrono::milliseconds(200));
+    using Phase = ExternalSimConnector::AbsPhaseFront::Phase;
+    CHECK(phase.fl_fresh);
+    CHECK(phase.fr_fresh);
+    CHECK(phase.fl == Phase::DUMP);
+    CHECK(phase.fr == Phase::DUMP);
 }
 
 TEST_CASE("GetAbsPhaseFront can mix fresh and stale per wheel",

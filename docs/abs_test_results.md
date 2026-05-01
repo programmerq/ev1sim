@@ -19,38 +19,81 @@ self-explanatory: μ ("mu") is the friction coefficient between tire
 and road, "split" means the left and right wheels see different
 surfaces, and "jump" means the surface changes mid-stop.
 
-## Headline results (post-SignalDefine fix, 2026-04-30)
+## Headline results (post AbsPhaseFront freshness fix, 2026-04-30)
 
 | Test     | BTCM-on stop      | BTCM-off stop    | Front locked time | ABS phase changes |
 |---|---|---|---|---|
-| high_mu  | 148.55 m / 9.50 s | 148.52 m / 9.47 s | 0 % / 0 %          | 0 |
-| low_mu   | did NOT stop in 60 s, vf=1.16 m/s | vf=1.57 m/s | 37-41 % / 37-41 % | 0 |
-| mu_jump  | did NOT stop in 30 s, vf=18.16 m/s | vf=18.60 m/s | 21-24 % / 21-24 % | 0 |
-| split_mu | 94.00 m / 7.81 s  | 77.68 m / 6.78 s | 0 % / 0 %          | 0 |
+| high_mu  | 148.52 m / 9.47 s  | 148.52 m / 9.47 s | 0 % / 0 %          | 0 / 0 |
+| low_mu   | did NOT stop in 60 s, vf≈22.85 m/s | vf=1.57 m/s | 39-46 % / 36-41 % | 79 / 79 |
+| mu_jump  | did NOT stop in 30 s, vf=18.16 m/s | vf=18.60 m/s | 20-24 % / 20-24 % | 0 / 0 |
+| split_mu | 92.92 m / 7.87 s  | 77.68 m / 6.78 s | 0 % / 0 %          | 0 / 0 |
 
-**ABS phase transitions during the brake event: zero across all four
-tests.**  The BTCM AVR firmware's ABS state machine settles into
-`APPLY` (no modulation) at startup and never transitions to `HOLD` /
-`DUMP` even when wheels are clearly locked (37-41 % time-locked on
-ice).  This is the dominant outstanding finding.
+**Mixed picture:** the bus-side reporting bug is fixed (`low_mu` now
+shows 79 phase events per front wheel during the brake), but two
+scenarios still report zero engagement despite obvious wheel lock.
+Two distinct issues are at play.
+
+### Fixed: AbsPhaseFront bus-side freshness (consumer side)
+
+The `low_mu` run was producing ~130 firmware ABS phase events but the
+ev1sim CSV showed 0.  Root cause: solenoid signals publish *on
+change*, but the firmware's ABS algorithm enters HOLD↔DUMP cycling
+during a long lock event — and *both* phases hold `iso=1`.  Only the
+dump pin toggles, so `kSigSolFL_ISO` was published once at HOLD entry
+and never refreshed for the remainder of the brake event.
+`ExternalSimConnector::GetAbsPhaseFront`'s freshness check required
+*both* `ts_iso` and `ts_dmp` ages within the 200 ms window, which
+went stale ~200 ms after the first HOLD entry.  Fix: OR the ages
+instead of AND.  As long as either pin updated recently, the producer
+is alive and the last-known values of both pins are valid.
+
+### Outstanding: firmware ABS algorithm doesn't engage on mu-jump
+and split-mu
+
+`mu_jump` has fronts 20-24 % time-locked and `split_mu` has rears
+exhibiting 0.7+ peak slip on the ice side, yet the firmware logs
+*zero* phase events during either brake (only the boot POST + a
+release-edge artifact).  The firmware genuinely doesn't see these as
+slip events worth modulating.
+
+Likely candidates for the firmware tuning gap, ranked by suspicion:
+
+1. **Reference speed estimator collapses with the wheels.**  When all
+   four wheels lock together (mu_jump second half), the
+   `max_ref_decel_mps2 = 11.0` clamp prevents instant collapse but
+   only buys ~2 s before slip estimates approach zero.
+2. **Tone-ring sample window vs. locked-wheel detection.**  The
+   firmware integrates wheel pulses over a 50 ms window.  For a
+   fully-locked wheel emitting zero pulses, the firmware reads
+   `wheel_rps = 0` correctly — but the *deceleration estimate* (used
+   for early HOLD via `decel_threshold_rps2`) requires several
+   consecutive samples before `wheel_accel_rps2` exceeds threshold,
+   by which time slip has already saturated.
+3. **Asymmetric grip on split-mu doesn't lock either side enough.**
+   Ice-side wheels skid freely (slip ≈ 0.7) but never time-lock
+   because they're free-rolling, not stopped — and the
+   `slip_threshold_enter = 0.15` *should* trigger HOLD here, so this
+   one is the most surprising and worth focused diagnosis.
+
+Next focused batch on the firmware: trace what `vehicle_speed_mps`
+and per-wheel `slip_ratio` look like *inside* the ATmega328P during
+a `split_mu` brake event.  Add a debug log (perhaps gated on a
+`-DABS_TRACE` flag) emitting the algorithm's view of slip + accel
+each tick.
 
 ## What the data shows about the ABS chain
 
 - **Hardware-modeling chain works correctly.**  Rear EMB peak slip
-  is consistently ~0.7 with BTCM-on vs ~0.05 with BTCM-off — proves
+  is consistently ~0.7 with BTCM-on vs ~0.05 with BTCM-off (visible
+  on `mu_jump` rear data: 0.99 BTCM-on vs 0.014 BTCM-off) — proves
   the BTCM rear-motor commands are reaching ev1sim and the
   `BrakeDrum` self-energizing model is producing torque per-wheel.
-- **Front ABS modulator wiring works correctly.**  When the firmware
-  briefly toggles solenoid pins at startup (POST self-test), the
-  phase transitions appear in `abs_phase_fl/fr` columns of the CSV
-  with the correct freshness behavior.
-- **The AVR firmware ABS algorithm doesn't engage.**  Zero phase
-  transitions during any brake event, even when wheels lock for
-  20-41 % of the time on ice.  Either the firmware needs more
-  inputs than it currently has (run_1, accel, etc.), or the slip
-  detection threshold is set so high it never trips, or the
-  tone-ring pulse rate isn't reaching the AVR fast enough for the
-  algorithm to compute wheel speed deltas at the relevant cadence.
+- **Front ABS modulator wiring works correctly end-to-end.**  Now
+  visible in the `low_mu` annotation lane: `DDDDDDDDDD____` showing
+  the ~16 s sustained DUMP that the firmware actually commands.
+- **The firmware-side algorithm tuning still has gaps.**  Wheels
+  visibly lock on `mu_jump` and `split_mu` without provoking
+  modulation.  See the breakdown in the section above.
 
 ## Anti-result on split-mu (worth noting)
 
@@ -91,14 +134,17 @@ Each comparison prints two ASCII overlays: vehicle speed
 (BTCM-on vs BTCM-off) and chassis vs per-wheel "ground-equivalent
 speed" (the gap is slip).  The BTCM-on plot has an annotation lane
 showing front-left ABS phase: `_` for APPLY, `H` for HOLD,
-`D` for DUMP (currently all `_` because the firmware doesn't
-modulate).
+`D` for DUMP.  The `low_mu` run shows sustained `DDDDDD...` as
+the firmware aggressively dumps front pressure on ice.
 
 ## Next concrete step
 
-A focused firmware diagnostic on `electricsim/ev1/btcm/firmware/`:
-trace what the ABS state machine actually evaluates each loop, and
-why it never leaves APPLY.  Likely candidates: missing `run_1`
-input, slip threshold mis-tuned for our wheel-pulse rate, or the
-algorithm waiting on a peer signal (peer-comm UART frame from RSA
-or PIM) that the simulator doesn't drive.
+A focused diagnostic on the firmware-side ABS algorithm, since the
+bus-side reporting is now trustworthy.  Specifically: instrument
+`abs_algo.c` (gated on a build-time flag so we don't bloat the
+production firmware) to emit per-tick records of
+`vehicle_speed_mps`, per-wheel `wheel_speed_rps`,
+`wheel_accel_rps2`, and the resulting `slip` value during a
+`split_mu` run.  Compare against ev1sim's per-wheel slip ratios in
+the CSV — that gap is the firmware's perception error, and it
+should point at the specific tuning parameter that's wrong.

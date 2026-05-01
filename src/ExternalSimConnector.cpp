@@ -905,8 +905,15 @@ ExternalSimConnector::AbsPhaseFront ExternalSimConnector::GetAbsPhaseFront(
     // guard) so freshness works correctly in both real and stub builds.
     const std::uint64_t now_ns = NowNs();
 
-    // A wheel's data is fresh when *both* iso and dump have been received
-    // recently.  If either timestamp is 0 (never received), fresh = false.
+    // A wheel's data is fresh when we know each pin's value (both
+    // timestamps non-zero) AND we've heard from at least one of them
+    // recently.  Solenoid signals publish on change only — during a long
+    // HOLD↔DUMP cycle the iso pin doesn't toggle (stays at 1), so its
+    // timestamp doesn't refresh.  Requiring *both* ages within the window
+    // would mark such cycles stale even though BTCM is actively
+    // modulating.  ORing the ages is correct: any recent activity proves
+    // the producer is alive, and the last-known value of each pin is
+    // still valid.
     auto is_fresh = [&](std::uint64_t ts_iso, std::uint64_t ts_dmp) -> bool {
         if (ts_iso == 0 || ts_dmp == 0) return false;
         if (now_ns < ts_iso || now_ns < ts_dmp) return false; // clock wrap guard
@@ -915,7 +922,7 @@ ExternalSimConnector::AbsPhaseFront ExternalSimConnector::GetAbsPhaseFront(
         // Strict-less-than so a zero-length window means "must be from the
         // past" — i.e. always stale.  Otherwise an inject + check that
         // happen within the same nanosecond would erroneously pass as fresh.
-        return age_iso < window_ns && age_dmp < window_ns;
+        return age_iso < window_ns || age_dmp < window_ns;
     };
 
     auto decode_phase = [](bool iso, bool dmp) -> AbsPhaseFront::Phase {
