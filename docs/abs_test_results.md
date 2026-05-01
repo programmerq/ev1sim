@@ -19,19 +19,73 @@ self-explanatory: μ ("mu") is the friction coefficient between tire
 and road, "split" means the left and right wheels see different
 surfaces, and "jump" means the surface changes mid-stop.
 
-## Headline results (post AbsPhaseFront freshness fix, 2026-04-30)
+## Headline results (post tone-ring sign + interleave fixes, 2026-04-30)
 
 | Test     | BTCM-on stop      | BTCM-off stop    | Front locked time | ABS phase changes |
 |---|---|---|---|---|
-| high_mu  | 148.52 m / 9.47 s  | 148.52 m / 9.47 s | 0 % / 0 %          | 0 / 0 |
-| low_mu   | did NOT stop in 60 s, vf≈22.85 m/s | vf=1.57 m/s | 39-46 % / 36-41 % | 79 / 79 |
-| mu_jump  | did NOT stop in 30 s, vf=18.16 m/s | vf=18.60 m/s | 20-24 % / 20-24 % | 0 / 0 |
-| split_mu | 92.92 m / 7.87 s  | 77.68 m / 6.78 s | 0 % / 0 %          | 0 / 0 |
+| high_mu  | did NOT stop, vf≈18 m/s            | 148.52 m / 9.47 s | 0 % / 0 %         | 86 / 88 |
+| low_mu   | did NOT stop in 60 s, vf≈30.8 m/s  | vf=1.57 m/s       | 49-55 % / 36-41 % | 154 / 126 |
+| mu_jump  | did NOT stop in 30 s, vf≈23.3 m/s  | vf=18.60 m/s      | 56 % / 17 % FL/FR | 53 / 32 |
+| split_mu | 93.6 m / 7.6 s (when ABS quiet); doesn't stop when ABS engages | 77.7 m / 6.78 s | 0 % / 0 %         | 0 / 96 (flaky) |
 
-**Mixed picture:** the bus-side reporting bug is fixed (`low_mu` now
-shows 79 phase events per front wheel during the brake), but two
-scenarios still report zero engagement despite obvious wheel lock.
-Two distinct issues are at play.
+The firmware ABS algorithm now engages on three of four scenarios.
+The fourth (`split_mu`) is sensitive to startup timing — see below.
+Engagement is the *good* news; the *bad* news is that the algorithm
+over-dumps and makes braking worse than the no-ABS baseline on every
+test where it engages.
+
+### Fixed: bus-side ABS phase freshness (consumer)
+
+`GetAbsPhaseFront` ANDed iso/dmp ages against the freshness window.
+HOLD↔DUMP cycling only toggles dmp; iso stays at 1, so its timestamp
+ages out and the entire brake event reads stale.  Switched to OR.
+
+### Fixed: ev1sim → BTCM tone-ring chain
+
+Two upstream bugs prevented the firmware from seeing wheel rotation:
+
+  - **Sign of omega.**  Chrono's `GetSpindleOmega` is signed per the
+    spindle's body frame, so forward-rolling wheels often arrive as
+    negative numbers.  The host's tone-gen clamps phase ≥ 0 — negative
+    omega advances phase to 0 and emits no edges.  Real tone-ring
+    sensors are direction-agnostic; the controller now takes
+    `std::abs(omega)` at the bus boundary.
+  - **Edge coalescing in the host loop.**  The host-side
+    `ToneRingGen::step()` emits N level toggles per call when
+    `omega × dt > kHalfTooth`.  All toggles ran between AVR cycles, so
+    the AVR core only saw the final pin level — usually right back at
+    the starting value, or one transition instead of N.  At highway
+    omega the firmware undercounted by ~3 ×.  Fixed by splitting the
+    20 000-cycle AVR step into 100 sub-steps of 200 cycles each and
+    advancing the tone gen between sub-steps.
+
+These two together restored 4-wheel speed visibility to the firmware
+and unblocked the slip / decel branches of the ABS state machine.
+
+### Outstanding: ABS over-dumps (firmware tuning)
+
+Once engaged, the algorithm releases too much pressure.  On
+`high_mu`, BTCM-on holds front slip at 0.03 — essentially free-rolling
+— and never accumulates enough deceleration to stop within scenario
+time.  On `low_mu`, `mu_jump`, and `split_mu` it does the same and
+ends up worse than the no-ABS case.  Likely candidates: the
+`dump_duration_ms` is too long for the simulated valve dynamics; the
+exit-DUMP slip threshold (0.05) is too low (real ABS targets ~0.10);
+and the rear axle's longer DUMP (18 ms) compounds the issue on the
+self-energizing drum.
+
+### Outstanding: split_mu engagement is flaky
+
+In repeated runs `split_mu` reports either 0 / 0 phase events (and
+stops normally) or ~96 / 96 phase events (and over-dumps).  Root
+cause: `kSigDriverBrakePedalQ8` and `kSigChassisBrakeMasterPressureKpa`
+are both publish-on-change in ev1sim — if BTCM connects to the bus
+*after* the brake transition fires, it never sees the change and
+runs as if brake is never pressed.  The scenario's brake event was
+moved out to `t=12s` (was `t=7s`) to give BTCM more startup time, but
+the underlying issue is producer-side: ev1sim should publish
+brake-state heartbeats so late-joining consumers can pick up the
+current value.
 
 ### Fixed: AbsPhaseFront bus-side freshness (consumer side)
 

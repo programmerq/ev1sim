@@ -36,9 +36,16 @@ case "$TEST" in
 esac
 
 EV1SIM_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-ELECTRICSIM_DIR="$(cd "$EV1SIM_DIR/../electricsim" 2>/dev/null && pwd || true)"
+# Allow ELECTRICSIM_DIR override via environment so the script can run
+# against a worktree build of the controllers — the default points at
+# the main checkout.
+if [[ -n "${ELECTRICSIM_DIR:-}" ]]; then
+    ELECTRICSIM_DIR="$(cd "$ELECTRICSIM_DIR" && pwd)"
+else
+    ELECTRICSIM_DIR="$(cd "$EV1SIM_DIR/../electricsim" 2>/dev/null && pwd || true)"
+fi
 [[ -z "$ELECTRICSIM_DIR" ]] && {
-    echo "[abs] cannot find ../electricsim" >&2
+    echo "[abs] cannot find electricsim (set ELECTRICSIM_DIR or place at ../electricsim)" >&2
     exit 1
 }
 
