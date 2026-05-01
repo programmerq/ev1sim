@@ -88,26 +88,57 @@ This is more physically accurate but doesn't on its own fix the
 over-modulation — the firmware-side algorithm is still the bigger
 contributor to the issue.
 
+### Investigated: tone-ring undercount root cause
+
+`test_btcm_tone_ring_validation` (in electricsim) drives the AVR's
+INT0 pin at known frequencies (100 Hz, 1 kHz, 3 kHz) and reads the
+firmware's processed `wheel_speed_rps` back through `g_abs_diag`.
+
+Findings, in order of investigation:
+
+  - **simavr's any-change ISR works correctly on isolated bursts.**
+    Direct probe — drive 20 toggles in 1.25 ms (well below one
+    50 ms tone-ring window), read `g_edge_count[FL]` before the
+    firmware's window-check can clear it: captured 20 / 20.  No
+    edges lost in the pin → IRQ → ISR plumbing.
+
+  - **Sustained drives consistently land at ~0.61 × expected rps.**
+    Across 100 Hz / 1 kHz / 3 kHz probes over 250 ms each, the
+    firmware-reported rps lands at 0.609 ± 0.02 of the analytical
+    expected value — repeatable, frequency-independent.
+
+  - **Two-thirds of the gap is firmware-side window-timer drift.**
+    A synthetic probe (write `c = 100` directly, skip the pin
+    chain) reveals the firmware's tone-ring window-check fires at
+    ~64 ms, not 50 ms — main-loop work (UART status, ABS algo
+    tick, rear EMB tick) inflates the dt by ~28 %.  The formula
+    `c × 5000 / dt` uses the actual measured dt, so this drift
+    propagates linearly into the reported rps: 50 / 64 = 0.78.
+
+  - **The remaining ~17 % loss happens between pin transition and
+    counter update over long drives.**  Direct burst probes are
+    1:1, but sustained kHz drives lose ~17 % beyond the dt drift.
+    Root cause still open; possibly a simavr scheduling-edge
+    interaction.
+
+**Compensation applied:** ToneRingGen on the host now multiplies
+the simulated angular advance per sub-step by
+`kEdgeCalibration = 1.64` (≈ 1 / 0.61) so the firmware's ABS
+algorithm sees realistic wheel speeds.  The validation test
+asserts the underlying ratio lands in [0.55, 0.70] so a future
+regression in simavr or the firmware ISR layer trips the test.
+
 ### Outstanding: ABS over-modulates and reduces braking effort
 
-Once engaged, the algorithm releases too much pressure.  On
-`high_mu`, BTCM-on holds front slip at 0.04 — essentially free-rolling
-— and never accumulates enough deceleration to stop within scenario
-time.  On `low_mu`, `mu_jump`, and `split_mu` it does the same and
-ends up worse than the no-ABS case.
+Even with realistic wheel-speed inputs, the firmware algorithm
+over-releases pressure.  On `high_mu`, BTCM-on holds front slip at
+0.04 (essentially free-rolling) and reaches v ≈ 19 m/s by scenario
+end vs BTCM-off stopping cleanly in 148 m / 9.47 s.  On `low_mu`,
+`mu_jump`, and `split_mu` the pattern is the same.
 
-Three threads of investigation tracked:
+The remaining contributing factors:
 
-1. **Firmware tone-ring undercount.**  Even after the tone-ring
-   sign + sub-step fixes, the firmware's reported wheel rps reads
-   ~50 % of the chassis's actual omega.  Hypothesis: simavr's
-   any-change INT0/INT1 fires reliably on each pin transition but
-   `IRQ_FLAG_FILTERED` in `avr_raise_irq_float` may collapse some
-   tight back-to-back sequences.  Needs a focused reproduction in
-   isolation (drive a known-frequency square wave and count what
-   the firmware sees over a long window).
-
-2. **Vehicle-speed estimator drift on light decel.**  When the
+1. **Vehicle-speed estimator drift on light decel.**  When the
    modulator over-releases, chassis decel becomes small.  The
    firmware's accelerometer-projected `vehicle_speed_mps` then
    stays high, slip looks high, the algorithm dumps more — death
@@ -115,9 +146,15 @@ Three threads of investigation tracked:
    `accel_trust_decay_per_s > 0` so the projection eases toward
    the max-wheel reference over time.
 
-3. **Modulator hydraulic τ tuning.**  τ_apply = 5 ms / τ_dump =
+2. **Modulator hydraulic τ tuning.**  τ_apply = 5 ms / τ_dump =
    60 ms are first-pass values.  Real GM EV1 service-bay numbers
    would let us calibrate these properly.
+
+3. **Per-axle tooth count in firmware.**  The host's tone-ring
+   generator now uses 48-tooth front / 47-tooth rear (per the EV1
+   service manual), but the firmware-side `cfg.teeth_per_wheel`
+   is still a single global value (48).  Small effect (47/48 =
+   98 %), but worth fixing for correctness.
 
 ### Fixed: AbsPhaseFront bus-side freshness (consumer side)
 
