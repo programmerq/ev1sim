@@ -1,0 +1,21 @@
+{
+  "//": "Config wrapper for the mu-jump (asphalt → ice transition) ABS test.",
+  "//1": "Uses level/flat_ice_transition.json: 100 m of asphalt (friction 0.9)",
+  "//2": "followed by 500 m of ice (friction 0.08).",
+
+  "vehicle_model": "ev1",
+  "terrain": {
+    "type": "level",
+    "level_file": "level/flat_ice_transition.json"
+  },
+  "simulation": {
+    "step_size_s": 0.002,
+    "render_fps": 60,
+    "realtime": false,
+    "headless": true
+  },
+  "telemetry": { "log_to_file": false, "show_hud": false },
+  "external_sim": { "enabled": true },
+  "vehicle_dynamics": { "start_propulsion_enabled": true },
+  "scenario": { "path": "config/scenarios/abs_mu_jump.json" }
+}

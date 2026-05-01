@@ -1,0 +1,43 @@
+{
+  "//": "Straight-line ABS stop on a uniformly slippery surface (low mu).",
+  "//1": "Models a hard brake on packed snow / ice.  Friction limit is far",
+  "//2": "below what the brake hardware can produce — without ABS the wheels",
+  "//3": "lock instantly and the car slides on whatever-mu, taking forever",
+  "//4": "to stop.  With ABS the wheels stay near the peak-slip point and",
+  "//5": "actually decelerate close to the friction limit.  This is the",
+  "//6": "scenario where ABS earns its keep — stopping distance differences",
+  "//7": "should be dramatic.",
+  "//8": "",
+  "//9": "Lower target speed (15 m/s ≈ 34 mph) because ice + 30 m/s would",
+  "//10": "take more than max_time_s of coasting before the wheels even",
+  "//11": "start spinning under throttle.",
+  "//12": "",
+  "//13": "Pair with config/abs_low_mu.json (rigid-plane low-mu friction 0.10).",
+
+  "name": "abs_low_mu_stop",
+  "driver_mode": "local",
+  "max_time_s": 60.0,
+  "events": [
+    {"at_time_s": 0.30, "action": "key_on_cycle"},
+    {"at_time_s": 0.60, "action": "key_on_cycle"},
+    {"at_time_s": 0.90, "action": "prnd_up"},
+    {"at_time_s": 1.10, "action": "prnd_up"},
+    {"at_time_s": 1.30, "action": "prnd_up"},
+    {"at_time_s": 1.50, "action": "set_throttle", "value": 1.0},
+    {"at_time_s": 5.00, "action": "wait_for_speed", "value": 15.0},
+    {"at_time_s": 5.00, "action": "set_throttle", "value": 0.0},
+    {"at_time_s": 7.00, "action": "set_brake",   "value": 1.0},
+    {"at_time_s": 55.0, "action": "set_brake",   "value": 0.0}
+  ],
+  "stats": {
+    "output_csv": "scenario_abs_low_mu_stop.csv",
+    "sample_period_s": 0.02,
+    "fields": [
+      "sim_time_s", "speed_mps", "pos_x", "pos_y", "yaw_rate",
+      "applied_front_brake", "applied_rear_brake",
+      "wheel_omega_fl", "wheel_omega_fr", "wheel_omega_rl", "wheel_omega_rr",
+      "slip_ratio_fl", "slip_ratio_fr", "slip_ratio_rl", "slip_ratio_rr",
+      "abs_phase_fl", "abs_phase_fr", "emb_cmd_lr", "emb_cmd_rr"
+    ]
+  }
+}

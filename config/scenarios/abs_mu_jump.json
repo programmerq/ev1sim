@@ -1,0 +1,41 @@
+{
+  "//": "'Mu-jump' / 'transition' braking — drive onto ice while braking.",
+  "//1": "Standard automotive validation test: accelerate on dry asphalt,",
+  "//2": "begin braking while still on asphalt, then cross onto ice at speed.",
+  "//3": "Exercises ABS adaptation as the friction limit drops sharply.",
+  "//4": "",
+  "//5": "Without ABS the wheels stay locked into the ice transition; the",
+  "//6": "car slides until friction alone stops it.  With ABS the wheels",
+  "//7": "back off to peak slip on ice and the car decelerates roughly at",
+  "//8": "the new (much lower) friction limit.",
+  "//9": "",
+  "//10": "Pair with config/abs_mu_jump.json (loads level/flat_ice_transition.json:",
+  "//11": "asphalt for first 100 m, then ice for 500 m).",
+
+  "name": "abs_mu_jump",
+  "driver_mode": "local",
+  "max_time_s": 30.0,
+  "events": [
+    {"at_time_s": 0.30, "action": "key_on_cycle"},
+    {"at_time_s": 0.60, "action": "key_on_cycle"},
+    {"at_time_s": 0.90, "action": "prnd_up"},
+    {"at_time_s": 1.10, "action": "prnd_up"},
+    {"at_time_s": 1.30, "action": "prnd_up"},
+    {"at_time_s": 1.50, "action": "set_throttle", "value": 1.0},
+    {"at_time_s": 5.00, "action": "wait_for_speed", "value": 20.0},
+    {"at_time_s": 5.00, "action": "set_throttle", "value": 0.0},
+    {"at_time_s": 6.00, "action": "set_brake",   "value": 1.0},
+    {"at_time_s": 25.0, "action": "set_brake",   "value": 0.0}
+  ],
+  "stats": {
+    "output_csv": "scenario_abs_mu_jump.csv",
+    "sample_period_s": 0.02,
+    "fields": [
+      "sim_time_s", "speed_mps", "pos_x", "pos_y", "yaw_rate",
+      "applied_front_brake", "applied_rear_brake",
+      "wheel_omega_fl", "wheel_omega_fr", "wheel_omega_rl", "wheel_omega_rr",
+      "slip_ratio_fl", "slip_ratio_fr", "slip_ratio_rl", "slip_ratio_rr",
+      "abs_phase_fl", "abs_phase_fr", "emb_cmd_lr", "emb_cmd_rr"
+    ]
+  }
+}

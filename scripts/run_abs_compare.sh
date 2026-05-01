@@ -1,30 +1,39 @@
 #!/usr/bin/env bash
-# Run the ABS hard-brake scenario twice — once with BTCM commanding the
-# brakes, once without — and produce a side-by-side comparison.
-#
-# BTCM-on run:  PIM + BTCM controllers running.  ev1sim's
-#               ApplyAbsFrontBrake modulates the front via solenoid
-#               phases, ApplyRearEmbBrake drives the rear via EMB cmds.
-#               This is the realistic stop with anti-lock active.
-#
-# BTCM-off run: only PIM running (no BTCM).  ev1sim's freshness path
-#               sees solenoid signals as stale → front passes through
-#               local pedal; rear-motor signals stale → rear free-rolls.
-#               Models the real EV1 BTCM-failure mode.
-#
-# After both runs, compare_abs_runs.py crunches the CSVs and prints a
-# stopping-distance + per-wheel slip summary plus an ASCII speed plot.
+# Run an ABS test scenario twice — once with BTCM commanding the brakes,
+# once without — and produce a side-by-side comparison.
 #
 # Usage:
-#   ./scripts/run_abs_compare.sh
+#   ./scripts/run_abs_compare.sh [test]
 #
-# Outputs:
-#   /tmp/ev1sim_abs/
-#       abs_btcm_on.csv     — full-controller run
-#       abs_btcm_off.csv    — BTCM disabled
-#       summary.txt         — stopping-distance + slip stats + ASCII plot
+# Where [test] is one of:
+#   high_mu     — straight stop on dry asphalt        (default)
+#   low_mu      — straight stop on uniformly slippery surface (ice)
+#   mu_jump     — accelerate on asphalt, brake into ice transition
+#   split_mu    — left wheels on asphalt, right wheels on ice
+#
+# BTCM-on run:  PIM + RSA + BTCM controllers running.  Front wheels
+#               modulated via solenoid HOLD/DUMP phases; rear wheels via
+#               EMB self-energizing drum model.
+#
+# BTCM-off run: only PIM running (no BTCM, no RSA-driven run mode).
+#               ev1sim's freshness path sees solenoid signals as stale →
+#               front passes through hydraulic line; rear free-rolls
+#               (no hydraulic backup on EV1 rear brakes).
+#
+# Outputs in /tmp/ev1sim_abs_<test>/:
+#   abs_btcm_on.csv    — full-controller run
+#   abs_btcm_off.csv   — BTCM disabled
+#   summary.txt        — stop distance + per-wheel slip + ASCII plots
+#   *.btcm.log         — BTCM stdout (ABS phase events live here)
+#   *.ev1sim.log       — ev1sim stdout (scenario events + freshness)
 
 set -euo pipefail
+
+TEST="${1:-high_mu}"
+case "$TEST" in
+    high_mu|low_mu|mu_jump|split_mu) ;;
+    *) echo "[abs] unknown test '$TEST' — use high_mu | low_mu | mu_jump | split_mu" >&2; exit 1 ;;
+esac
 
 EV1SIM_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 ELECTRICSIM_DIR="$(cd "$EV1SIM_DIR/../electricsim" 2>/dev/null && pwd || true)"
@@ -42,22 +51,12 @@ RSA_BIN="$ELECTRICSIM_DIR/build/ev1/rsa/rsa_controller"
 [[ -x "$BTCM_BIN"   ]] || { echo "missing $BTCM_BIN"   >&2; exit 1; }
 [[ -x "$RSA_BIN"    ]] || { echo "missing $RSA_BIN"    >&2; exit 1; }
 
-OUT="/tmp/ev1sim_abs"
+CONFIG="$EV1SIM_DIR/config/abs_${TEST}.json"
+[[ -f "$CONFIG" ]] || { echo "missing $CONFIG" >&2; exit 1; }
+
+OUT="/tmp/ev1sim_abs_${TEST}"
 rm -rf "$OUT"
 mkdir -p "$OUT"
-
-# Clean any stale SHM segments left behind by a previous run that didn't
-# exit cleanly.  Without this, new readers can register but writers' frames
-# end up on a "ghost" segment and never reach the new readers — debugged
-# 2026-04-30 with the BTCM not seeing ev1sim's q8 publishes.
-python3 - <<'PY' 2>/dev/null || true
-import ctypes
-libc = ctypes.CDLL("libc.dylib")
-libc.shm_unlink.argtypes = [ctypes.c_char_p]
-libc.shm_unlink.restype  = ctypes.c_int
-for n in ["/electricsim_ev1_bus", "/electricsim_chassis_bus"]:
-    libc.shm_unlink(n.encode())
-PY
 
 cleanup_shm() {
     python3 - <<'PY' 2>/dev/null || true
@@ -76,47 +75,33 @@ run_scenario() {
     local csv_dest="$3"
 
     cleanup_shm
-    echo "[abs] === $label ==="
+    echo "[abs] === $label ($TEST) ==="
     local pim_log="$OUT/$label.pim.log"
     local btcm_log="$OUT/$label.btcm.log"
+    local rsa_log="$OUT/$label.rsa.log"
     local sim_log="$OUT/$label.ev1sim.log"
 
-    local rsa_log="$OUT/$label.rsa.log"
-
-    # Launch ev1sim FIRST so the chassis + main bus segments exist before
-    # the controllers attach.  Multiple SHM clients with create=true seem
-    # to reliably stream frames only when the publisher is up first.
-    "$EV1SIM_BIN" \
-        --headless \
-        --external-sim on \
-        --start-propulsion-enabled \
-        --scenario "$EV1SIM_DIR/config/scenarios/abs_hard_brake.json" \
-        > "$sim_log" 2>&1 &
+    # ev1sim creates the SHM segments; controllers attach.  Wait for the
+    # "connected to main harness bus" log line before starting controllers.
+    "$EV1SIM_BIN" --config "$CONFIG" > "$sim_log" 2>&1 &
     local sim_pid=$!
-
-    # Wait for ev1sim to log "connected to bus" before launching controllers.
-    # SHM segments need to be fully initialized by ev1sim (the only process
-    # using create=true) before electricsim controllers try to attach with
-    # create=false.  Without this, controllers race and miss frames.
     local waited=0
     while ! grep -q "connected to main harness bus" "$sim_log" 2>/dev/null; do
         sleep 0.2
         waited=$((waited + 1))
-        if [[ $waited -gt 30 ]]; then
-            echo "[abs] ev1sim failed to bring up buses within 6s" >&2
+        if [[ $waited -gt 60 ]]; then
+            echo "[abs] ev1sim failed to bring up buses within 12 s" >&2
             cat "$sim_log" >&2
+            kill "$sim_pid" 2>/dev/null || true
             exit 1
         fi
     done
-    sleep 0.3  # extra slack so SHM init definitely completes
+    sleep 0.3
 
     ( cd "$ELECTRICSIM_DIR/build" && exec "$PIM_BIN" ) > "$pim_log" 2>&1 &
     local pim_pid=$!
     sleep 0.3
 
-    # RSA is needed alongside BTCM — its run-mode broadcast and the
-    # downstream run_1 signal gate the BTCM ABS algorithm.  Without RSA,
-    # BTCM treats the vehicle as "not enabled" and won't engage ABS.
     local rsa_pid=""
     local btcm_pid=""
     if [[ "$with_btcm" == "1" ]]; then
@@ -138,21 +123,36 @@ run_scenario() {
     }
     trap cleanup EXIT INT TERM
 
-    # ev1sim runs the scenario to completion; wait for it.
     wait "$sim_pid" 2>/dev/null || true
 
     cleanup
     trap - EXIT INT TERM
 
-    mv "$EV1SIM_DIR/scenario_abs_hard_brake.csv" "$csv_dest"
-    echo "[abs] $label CSV → $csv_dest"
+    # Scenario writes its CSV in ev1sim's cwd (here, EV1SIM_DIR).  Filename
+    # convention: scenario_<name>.csv where <name> matches the scenario's
+    # "name" field — for our suite, that's the basename of the scenario file.
+    local sc_name
+    case "$TEST" in
+        high_mu)  sc_name="abs_high_mu_stop" ;;
+        low_mu)   sc_name="abs_low_mu_stop"  ;;
+        mu_jump)  sc_name="abs_mu_jump"      ;;
+        split_mu) sc_name="abs_split_mu"     ;;
+    esac
+    local default_csv="$EV1SIM_DIR/scenario_${sc_name}.csv"
+    if [[ -f "$default_csv" ]]; then
+        mv "$default_csv" "$csv_dest"
+        echo "[abs] $label CSV → $csv_dest"
+    else
+        echo "[abs] WARNING: expected CSV at $default_csv not found" >&2
+        echo "[abs] check $sim_log for scenario errors" >&2
+    fi
 }
 
 run_scenario abs_btcm_on  1  "$OUT/abs_btcm_on.csv"
 run_scenario abs_btcm_off 0  "$OUT/abs_btcm_off.csv"
 
 echo
-echo "[abs] === comparison ==="
+echo "[abs] === comparison: $TEST ==="
 "$EV1SIM_DIR/scripts/compare_abs_runs.py" \
     "$OUT/abs_btcm_on.csv" \
     "$OUT/abs_btcm_off.csv" \

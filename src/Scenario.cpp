@@ -200,6 +200,18 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
 
     const auto bus_throttle =
         bus.GetThrottleCmd(std::chrono::milliseconds(200));
+    const auto bus_abs    = bus.GetAbsPhaseFront(std::chrono::milliseconds(200));
+    const auto bus_rear   = bus.GetRearEmbCmd(std::chrono::milliseconds(200));
+
+    // Encode ABS phase as int for CSV-friendly plotting.
+    auto phase_to_int = [](ExternalSimConnector::AbsPhaseFront::Phase p) -> int {
+        switch (p) {
+            case ExternalSimConnector::AbsPhaseFront::Phase::APPLY: return 0;
+            case ExternalSimConnector::AbsPhaseFront::Phase::HOLD:  return 1;
+            case ExternalSimConnector::AbsPhaseFront::Phase::DUMP:  return 2;
+        }
+        return 0;
+    };
 
     auto write_field = [&](const std::string& f) -> void {
         if      (f == "sim_time_s")           m_csv << sim_time;
@@ -230,6 +242,25 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
         else if (f == "slip_ratio_fr")        m_csv << state.slip_ratio[1];
         else if (f == "slip_ratio_rl")        m_csv << state.slip_ratio[2];
         else if (f == "slip_ratio_rr")        m_csv << state.slip_ratio[3];
+        // BTCM-side bus state — captures what the controller is commanding,
+        // independent of what the physics is doing.  Useful for annotating
+        // ABS events on a wheel-speed graph.
+        //   abs_phase_fl/fr:  0=APPLY (full pressure), 1=HOLD (frozen),
+        //                     2=DUMP (release).  Only meaningful when the
+        //                     bus value is fresh; -1 when BTCM is silent.
+        //   abs_fresh_fl/fr:  1 when BTCM data arrived within the last 200 ms.
+        //   emb_cmd_lr/rr:    rear motor command in [-1, +1].  +1=full apply.
+        //   emb_fresh_lr/rr:  1 when BTCM data arrived within the last 200 ms.
+        else if (f == "abs_phase_fl")
+            m_csv << (bus_abs.fl_fresh ? phase_to_int(bus_abs.fl) : -1);
+        else if (f == "abs_phase_fr")
+            m_csv << (bus_abs.fr_fresh ? phase_to_int(bus_abs.fr) : -1);
+        else if (f == "abs_fresh_fl")         m_csv << (bus_abs.fl_fresh ? 1 : 0);
+        else if (f == "abs_fresh_fr")         m_csv << (bus_abs.fr_fresh ? 1 : 0);
+        else if (f == "emb_cmd_lr")           m_csv << bus_rear.lr;
+        else if (f == "emb_cmd_rr")           m_csv << bus_rear.rr;
+        else if (f == "emb_fresh_lr")         m_csv << (bus_rear.lr_fresh ? 1 : 0);
+        else if (f == "emb_fresh_rr")         m_csv << (bus_rear.rr_fresh ? 1 : 0);
         else                                  m_csv << "";  // unknown field
     };
 
