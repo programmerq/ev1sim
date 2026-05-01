@@ -1,332 +1,125 @@
-# ABS validation test results — first pass
+# ABS validation — overview
 
-Four standard ABS validation tests, BTCM-on vs BTCM-off comparison.
-Run with `./scripts/run_abs_compare.sh <test>` from the ev1sim repo
-root; outputs land in `/tmp/ev1sim_abs_<test>/`.
+This is the high-level narrative for the EV1 ABS validation suite.
+For raw numbers, charts, and per-scenario engineering data, see the
+auto-generated [**ABS engineering report**](reports/abs_scenarios.md)
+— that's the data artifact you'd flip through to evaluate behavior.
+The companion [**tone-ring validation report**](reports/tone_ring_validation.md)
+isolates the simavr edge-counting plumbing from the chassis side.
 
-## Quick reference — what each test checks
+## The four standard scenarios
 
-| Test            | Surface                           | Validates                                       |
+| Test       | Surface                          | What it validates                              |
 |---|---|---|
-| `high_mu`       | uniform asphalt (μ=0.9)           | does ABS at least not hurt on dry roads?        |
-| `low_mu`        | uniform ice (μ=0.10)              | does ABS keep wheels at peak slip on slick?     |
-| `mu_jump`       | asphalt → ice transition          | does ABS adapt when grip suddenly drops?        |
-| `split_mu`      | left=asphalt, right=ice           | does per-wheel ABS keep the car straight?       |
+| `high_mu`  | uniform asphalt (μ ≈ 0.9)        | ABS shouldn't hurt on dry pavement             |
+| `low_mu`   | uniform ice (μ ≈ 0.10)           | ABS should keep wheels rolling on slippery     |
+| `mu_jump`  | asphalt → ice transition         | algorithm must adapt as grip suddenly drops    |
+| `split_mu` | left = asphalt, right = ice      | per-wheel ABS keeps the car going straight    |
 
-In real automotive validation these go by names like "high-mu stop",
-"split-friction stop", and "mu-jump stop".  The terminology is
-self-explanatory: μ ("mu") is the friction coefficient between tire
-and road, "split" means the left and right wheels see different
-surfaces, and "jump" means the surface changes mid-stop.
+Industry calls these "high-mu stop", "low-mu stop", "split-friction
+stop", and "mu-jump" / "transition" stop.  μ ("mu") is the friction
+coefficient between tire and road.
 
-## Headline results (post accel-off + tire-radius fix + tone-ring calibration, 2026-05-01)
-
-| Test     | BTCM-on stop      | BTCM-off stop    | Δ                |
-|---|---|---|---|
-| high_mu  | 152.0 m / 9.98 s   | 148.5 m / 9.47 s | **+3.5 m** (~2 % worse than no-ABS) |
-| low_mu   | didn't stop, v_f = 31.6 m/s | didn't stop, v_f = 1.57 m/s | — |
-| mu_jump  | didn't stop, v_f = 23.5 m/s | didn't stop, v_f = 18.6 m/s | — |
-| split_mu | 92.0 m / 7.87 s    | 72.5 m / 6.53 s  | +19.5 m (per-wheel modulation gap, see below) |
-
-ABS engages reliably on all four scenarios and **on dry pavement
-(`high_mu`) BTCM-on now stops within 2 % of the no-ABS baseline**.
-The remaining gaps are:
-
-  - `low_mu` and `mu_jump` still show extended wheel lock on ice.
-    The original-EV1-style "max wheel × tire radius" speed
-    estimator with a max_ref_decel clamp underestimates ground
-    speed when all four wheels are locked together, so the
-    algorithm's slip computation collapses to ~0 on ice and the
-    state machine sees no reason to keep dumping pressure.  This
-    is a known limitation of first-gen ABS.
-
-  - `split_mu` BTCM-on takes ~25 % longer to stop than BTCM-off
-    because the rear EMB applies symmetric force on both sides
-    while the ice-side wheel can't carry that force productively.
-    A working **per-wheel** rear EMB modulation would close the
-    gap.  Currently the rear EMB sees the same DUMP/HOLD command
-    regardless of which side is on ice.
-
-Auto-generated comparison: [reports/abs_scenarios.md](reports/abs_scenarios.md)
-(re-run `scripts/abs_report.py` after `scripts/run_abs_compare.sh` for
-each test).
-
-### Fixed: bus-side ABS phase freshness (consumer)
-
-`GetAbsPhaseFront` ANDed iso/dmp ages against the freshness window.
-HOLD↔DUMP cycling only toggles dmp; iso stays at 1, so its timestamp
-ages out and the entire brake event reads stale.  Switched to OR.
-
-### Fixed: ev1sim → BTCM tone-ring chain
-
-Two upstream bugs prevented the firmware from seeing wheel rotation:
-
-  - **Sign of omega.**  Chrono's `GetSpindleOmega` is signed per the
-    spindle's body frame, so forward-rolling wheels often arrive as
-    negative numbers.  The host's tone-gen clamps phase ≥ 0 — negative
-    omega advances phase to 0 and emits no edges.  Real tone-ring
-    sensors are direction-agnostic; the controller now takes
-    `std::abs(omega)` at the bus boundary.
-  - **Edge coalescing in the host loop.**  The host-side
-    `ToneRingGen::step()` emits N level toggles per call when
-    `omega × dt > kHalfTooth`.  All toggles ran between AVR cycles, so
-    the AVR core only saw the final pin level — usually right back at
-    the starting value, or one transition instead of N.  At highway
-    omega the firmware undercounted by ~3 ×.  Fixed by splitting the
-    20 000-cycle AVR step into 100 sub-steps of 200 cycles each and
-    advancing the tone gen between sub-steps.
-
-These two together restored 4-wheel speed visibility to the firmware
-and unblocked the slip / decel branches of the ABS state machine.
-
-### Fixed: split_mu engagement flakiness (publish-on-change race)
-
-`kSigDriverBrakePedalQ8` and `kSigChassisBrakeMasterPressureKpa`
-were publish-on-change-only in ev1sim — if BTCM connected to the bus
-*after* a brake transition fired, it never saw the change and ran as
-if the pedal were still at zero.  Fixed by adding a 200 ms heartbeat
-in `ExternalSimConnector::Tick`: both signals re-publish on the
-heartbeat slot even when the value hasn't changed, so a late-joining
-consumer picks up the current state within one heartbeat interval.
-Verified by re-running `split_mu` 4 times — engagement counts now
-range 164–178 phase events per wheel, stable.
-
-### Improved (still imperfect): finite-rate hydraulic model
-
-The previous brake-modulation model snapped pressure between 1.0 ×
-local on APPLY and 0.2 × local on DUMP, with HOLD freezing the
-current output.  Real ABS valves are flow-limited: a 12 ms DUMP
-pulse bleeds ~20 % of pressure, not the 80 % the step model
-implied.  The new finite-rate model ramps pressure exponentially:
-APPLY rises with τ = 5 ms (caliper fill), DUMP decays with
-τ = 60 ms (orifice-limited release), HOLD freezes.
-
-This is more physically accurate but doesn't on its own fix the
-over-modulation — the firmware-side algorithm is still the bigger
-contributor to the issue.
-
-### Investigated: tone-ring undercount root cause
-
-`test_btcm_tone_ring_validation` (in electricsim) drives the AVR's
-INT0 pin at known frequencies (100 Hz, 1 kHz, 3 kHz) and reads the
-firmware's processed `wheel_speed_rps` back through `g_abs_diag`.
-
-Findings, in order of investigation:
-
-  - **simavr's any-change ISR works correctly on isolated bursts.**
-    Direct probe — drive 20 toggles in 1.25 ms (well below one
-    50 ms tone-ring window), read `g_edge_count[FL]` before the
-    firmware's window-check can clear it: captured 20 / 20.  No
-    edges lost in the pin → IRQ → ISR plumbing.
-
-  - **Sustained drives consistently land at ~0.61 × expected rps.**
-    Across 100 Hz / 1 kHz / 3 kHz probes over 250 ms each, the
-    firmware-reported rps lands at 0.609 ± 0.02 of the analytical
-    expected value — repeatable, frequency-independent.
-
-  - **Two-thirds of the gap is firmware-side window-timer drift.**
-    A synthetic probe (write `c = 100` directly, skip the pin
-    chain) reveals the firmware's tone-ring window-check fires at
-    ~64 ms, not 50 ms — main-loop work (UART status, ABS algo
-    tick, rear EMB tick) inflates the dt by ~28 %.  The formula
-    `c × 5000 / dt` uses the actual measured dt, so this drift
-    propagates linearly into the reported rps: 50 / 64 = 0.78.
-
-  - **The remaining ~17 % loss happens between pin transition and
-    counter update over long drives.**  Direct burst probes are
-    1:1, but sustained kHz drives lose ~17 % beyond the dt drift.
-    Root cause still open; possibly a simavr scheduling-edge
-    interaction.
-
-**Compensation applied:** ToneRingGen on the host now multiplies
-the simulated angular advance per sub-step by
-`kEdgeCalibration = 1.64` (≈ 1 / 0.61) so the firmware's ABS
-algorithm sees realistic wheel speeds.  The validation test
-asserts the underlying ratio lands in [0.55, 0.70] so a future
-regression in simavr or the firmware ISR layer trips the test.
-
-### Fixed: accelerometer-induced vehicle-speed drift
-
-Earlier iterations of the firmware enabled the longitudinal
-accelerometer integration in the vehicle-speed estimator.  Combined
-with the over-aggressive modulator, this caused a death spiral on
-high-mu surfaces: ABS over-released pressure → chassis decelerated
-slowly → accelerometer reported small decel → projected vehicle
-speed stayed high → slip computation looked elevated → algorithm
-dumped more pressure.
-
-The original GM EV1 BTCM did not have an accelerometer — it used
-"fastest healthy wheel × tire radius" with a `max_ref_decel_mps2`
-clamp.  We've made the accelerometer path **optional at build
-time** (default OFF) to match that, gated by a CMake flag
-`BTCM_USE_ACCELEROMETER`.  Even when disabled, the host bridge
-still publishes accel onto the chassis bus so it shows up in
-scan-tool logs and traces — it's just not consumed by the algorithm.
-
-With accel OFF, the `high_mu` regression goes away (BTCM-on now
-stops within 2 % of the no-ABS distance) and `split_mu` BTCM-on
-also stops cleanly.
-
-### Note on accelerometer latency
-
-In the sim, `g_host_sensors.longit_accel_q8` is poked directly into
-SRAM by the BTCM controller bridge — there's no I2C round-trip.  On
-real ATmega328P hardware, reading a typical I2C accelerometer (e.g.
-ADXL345) at 100 kHz takes ~500 µs (~8 % of a 5 ms control tick).
-Increasing the firmware tick rate above ~1 kHz would start to
-saturate I2C bandwidth.  Documented in
-`btcm_firmware.c::main()` near the `BTCM_USE_ACCELEROMETER` gate.
-
-### Fixed: tire radius mismatch
-
-Firmware default was 0.31 m (245/40R18 — leftover from earlier
-template).  Real GM EV1 ran P175/65R14 = 0.2915 m unloaded.  The
-~6 % discrepancy translated directly into a slip-ratio bias in the
-firmware's view since it was inconsistent with the chassis-side
-tire model.  Fixed in `abs_init_defaults`.
-
-### Outstanding: rear EMB lacks per-wheel modulation
-
-`split_mu` BTCM-on takes ~25 % longer than BTCM-off because the
-rear EMB applies symmetric force on both wheels even when one side
-is on ice.  The ice-side rear contributes drag without producing
-brake force.  A per-wheel rear EMB modulator (split the rear ABS
-phase command per side) would close this gap.
-
-### Outstanding: low-mu / mu-jump still show extended lock
-
-When all four wheels lock together on ice, the max-wheel-based
-speed estimator collapses with the wheels.  This is a fundamental
-limitation of first-gen ABS without an accelerometer, present on
-real 1990s GM EV1s as well.  Two paths forward:
-
-  - Re-enable the accelerometer path (`BTCM_USE_ACCELEROMETER=ON`)
-    and tune `accel_trust_decay_per_s` so the projection is used
-    primarily on these all-locked windows.
-  - Tune `max_ref_decel_mps2` lower on slippery surfaces (would
-    require a road-condition signal or self-calibrating logic).
-
-### Outstanding: per-axle tooth count in firmware
-
-The host's tone-ring generator now uses 48-tooth front / 47-tooth
-rear (per the EV1 service manual), but the firmware-side
-`cfg.teeth_per_wheel` is still a single global value (48).  Small
-effect (47/48 = 98 % rps reading on rear), but worth fixing for
-correctness — would require extending `abs_axle_config_t` with a
-per-axle `teeth_per_wheel` field.
-
-### Fixed: AbsPhaseFront bus-side freshness (consumer side)
-
-The `low_mu` run was producing ~130 firmware ABS phase events but the
-ev1sim CSV showed 0.  Root cause: solenoid signals publish *on
-change*, but the firmware's ABS algorithm enters HOLD↔DUMP cycling
-during a long lock event — and *both* phases hold `iso=1`.  Only the
-dump pin toggles, so `kSigSolFL_ISO` was published once at HOLD entry
-and never refreshed for the remainder of the brake event.
-`ExternalSimConnector::GetAbsPhaseFront`'s freshness check required
-*both* `ts_iso` and `ts_dmp` ages within the 200 ms window, which
-went stale ~200 ms after the first HOLD entry.  Fix: OR the ages
-instead of AND.  As long as either pin updated recently, the producer
-is alive and the last-known values of both pins are valid.
-
-### Outstanding: firmware ABS algorithm doesn't engage on mu-jump
-and split-mu
-
-`mu_jump` has fronts 20-24 % time-locked and `split_mu` has rears
-exhibiting 0.7+ peak slip on the ice side, yet the firmware logs
-*zero* phase events during either brake (only the boot POST + a
-release-edge artifact).  The firmware genuinely doesn't see these as
-slip events worth modulating.
-
-Likely candidates for the firmware tuning gap, ranked by suspicion:
-
-1. **Reference speed estimator collapses with the wheels.**  When all
-   four wheels lock together (mu_jump second half), the
-   `max_ref_decel_mps2 = 11.0` clamp prevents instant collapse but
-   only buys ~2 s before slip estimates approach zero.
-2. **Tone-ring sample window vs. locked-wheel detection.**  The
-   firmware integrates wheel pulses over a 50 ms window.  For a
-   fully-locked wheel emitting zero pulses, the firmware reads
-   `wheel_rps = 0` correctly — but the *deceleration estimate* (used
-   for early HOLD via `decel_threshold_rps2`) requires several
-   consecutive samples before `wheel_accel_rps2` exceeds threshold,
-   by which time slip has already saturated.
-3. **Asymmetric grip on split-mu doesn't lock either side enough.**
-   Ice-side wheels skid freely (slip ≈ 0.7) but never time-lock
-   because they're free-rolling, not stopped — and the
-   `slip_threshold_enter = 0.15` *should* trigger HOLD here, so this
-   one is the most surprising and worth focused diagnosis.
-
-Next focused batch on the firmware: trace what `vehicle_speed_mps`
-and per-wheel `slip_ratio` look like *inside* the ATmega328P during
-a `split_mu` brake event.  Add a debug log (perhaps gated on a
-`-DABS_TRACE` flag) emitting the algorithm's view of slip + accel
-each tick.
-
-## What the data shows about the ABS chain
-
-- **Hardware-modeling chain works correctly.**  Rear EMB peak slip
-  is consistently ~0.7 with BTCM-on vs ~0.05 with BTCM-off (visible
-  on `mu_jump` rear data: 0.99 BTCM-on vs 0.014 BTCM-off) — proves
-  the BTCM rear-motor commands are reaching ev1sim and the
-  `BrakeDrum` self-energizing model is producing torque per-wheel.
-- **Front ABS modulator wiring works correctly end-to-end.**  Now
-  visible in the `low_mu` annotation lane: `DDDDDDDDDD____` showing
-  the ~16 s sustained DUMP that the firmware actually commands.
-- **The firmware-side algorithm tuning still has gaps.**  Wheels
-  visibly lock on `mu_jump` and `split_mu` without provoking
-  modulation.  See the breakdown in the section above.
-
-## Anti-result on split-mu (worth noting)
-
-On `split_mu`, BTCM-**on** stops in 94 m and BTCM-**off** stops in
-77 m — i.e. enabling the brake controller makes the car *worse*.
-This isn't an ABS regression; it's a known-correct simulation
-artifact:
-
-- BTCM-on commands the rear EMB at full force on **both** sides.
-  The right rear is on ice (μ=0.08) and skids freely without
-  contributing braking, but its drag still upsets the chassis.
-- BTCM-off doesn't command the rear at all.  Both rear wheels
-  free-roll, and only the front (asphalt-side dominant) decelerates
-  the car.
-
-A working per-wheel ABS would modulate the ice-side rear down to
-peak-slip and let the asphalt-side rear use its full friction.
-Until the AVR firmware ABS engages, the BTCM-on case can't be
-better than the BTCM-off case on asymmetric surfaces — and is
-sometimes worse.
-
-## Repro
+## How to run
 
 ```sh
-# Run any one test:
-./scripts/run_abs_compare.sh high_mu
-./scripts/run_abs_compare.sh low_mu
-./scripts/run_abs_compare.sh mu_jump
-./scripts/run_abs_compare.sh split_mu
-
-# All tests (writes /tmp/ev1sim_abs_<test>/summary.txt for each):
+# All four:
 for t in high_mu low_mu mu_jump split_mu; do
     ./scripts/run_abs_compare.sh "$t"
 done
+
+# Then regenerate the engineering report:
+./scripts/abs_report.py docs/reports/abs_scenarios.md
+
+# Optional: refresh the tone-ring validation memo too:
+./build/ev1/btcm/test_btcm_tone_ring_validation \
+    ../electricsim/build/firmware/btcm_firmware.elf \
+    docs/reports/tone_ring_validation.md
 ```
 
-Each comparison prints two ASCII overlays: vehicle speed
-(BTCM-on vs BTCM-off) and chassis vs per-wheel "ground-equivalent
-speed" (the gap is slip).  The BTCM-on plot has an annotation lane
-showing front-left ABS phase: `_` for APPLY, `H` for HOLD,
-`D` for DUMP.  The `low_mu` run shows sustained `DDDDDD...` as
-the firmware aggressively dumps front pressure on ice.
+`run_abs_compare.sh` writes
+`/tmp/ev1sim_abs_<test>/{summary.txt,abs_btcm_on.csv,abs_btcm_off.csv,*.log}`.
+The report script reads those and emits markdown + SVG charts under
+`docs/reports/`.
 
-## Next concrete step
+## Architectural notes worth knowing while reading the report
 
-A focused diagnostic on the firmware-side ABS algorithm, since the
-bus-side reporting is now trustworthy.  Specifically: instrument
-`abs_algo.c` (gated on a build-time flag so we don't bloat the
-production firmware) to emit per-tick records of
-`vehicle_speed_mps`, per-wheel `wheel_speed_rps`,
-`wheel_accel_rps2`, and the resulting `slip` value during a
-`split_mu` run.  Compare against ev1sim's per-wheel slip ratios in
-the CSV — that gap is the firmware's perception error, and it
-should point at the specific tuning parameter that's wrong.
+These are the design choices the algorithm makes — read the
+engineering report for actual numbers.
+
+### Accelerometer is build-time optional
+
+The original GM EV1 BTCM did **not** have a longitudinal
+accelerometer.  Its vehicle-speed estimator used "fastest healthy
+wheel × tire radius" with a `max_ref_decel_mps2` clamp.  We default
+to that mode (`BTCM_USE_ACCELEROMETER=OFF`) to model the original
+hardware accurately.
+
+When the accel path was always-on, an over-aggressive modulator
+caused a death spiral on dry pavement: ABS released too much
+pressure → chassis decelerated slowly → accelerometer reading was
+small → projected `vehicle_speed_mps` stayed high → slip looked
+elevated → algorithm dumped more.  Disabling restored sane behavior.
+Re-enable the option (`-DBTCM_USE_ACCELEROMETER=ON`) for second-gen
+ABS comparison runs.
+
+The host bridge keeps publishing accel onto the chassis bus even
+when the firmware's algorithm doesn't consume it, so the signal is
+still visible in scan-tool logs and traces.
+
+### Tone-ring chain has documented compensations
+
+`test_btcm_tone_ring_validation` (see report) shows the firmware's
+reported wheel rps lands at ~0.61 × the analytical expected value
+on sustained drives, even though direct edge-count probes show the
+simavr → ISR plumbing is 1:1.  Two pieces account for the gap:
+
+1. **Window-timer drift** (~22 % of the loss).  The firmware's
+   tone-ring window check fires at ~64 ms instead of 50 ms because
+   main-loop work inflates the dt.  The formula uses the measured
+   dt, so this propagates linearly: 50/64 ≈ 0.78.
+2. **Sustained-drive edge loss** (~17 % of the loss).  Unexplained;
+   probably a simavr scheduling-edge interaction.
+
+`ToneRingGen::kEdgeCalibration = 1.64` on the host compensates so
+the firmware's ABS algorithm sees realistic wheel speeds.
+
+### Tone rings are 48-tooth front, 47-tooth rear
+
+Per the EV1 service manual.  Host-side `ToneRingGen` already uses
+per-wheel teeth.  Firmware-side `cfg.teeth_per_wheel` is still a
+single global value (48), so the rear's reported rps is off by
+2 % (47/48) — small but nonzero, listed in the outstanding-issues
+section of the engineering report.
+
+### Tire radius
+
+P175/65R14 = 0.2915 m unloaded.  Both ev1sim's chassis tire model
+and the firmware's `cfg.tire_radius_m` use this value, so slip-ratio
+computations are consistent across the boundary.  Real tires change
+radius with pressure / temperature; we don't model that.
+
+### Modulator hydraulic τ
+
+The host's brake modulator (`SimApp::ApplyAbsFrontBrake`) uses a
+finite-rate first-order model:
+
+  - APPLY: pressure rises toward MC at τ = 5 ms (caliper fill)
+  - DUMP:  pressure decays toward 0 at τ = 60 ms (orifice flow)
+  - HOLD:  pressure freezes
+
+Values are first-pass estimates.  Real GM EV1 service-bay numbers
+would let us calibrate properly.
+
+## Outstanding issues
+
+Most of these are listed in the engineering report's per-scenario
+sections.  At the architectural level:
+
+- **Rear EMB lacks per-wheel modulation.** `split_mu` BTCM-on takes
+  ~25 % longer to stop than BTCM-off because the rear motors apply
+  symmetric force regardless of which side is on ice.
+- **Low-mu / mu-jump still show extended lock.** When all four
+  wheels lock together on ice, the no-accelerometer speed estimator
+  collapses with them.  Fundamental first-gen ABS limitation.
+- **Per-axle teeth count in firmware** (see above).
