@@ -19,20 +19,37 @@ self-explanatory: μ ("mu") is the friction coefficient between tire
 and road, "split" means the left and right wheels see different
 surfaces, and "jump" means the surface changes mid-stop.
 
-## Headline results (post heartbeat + finite-rate-hydraulic + HOLD→APPLY, 2026-04-30)
+## Headline results (post accel-off + tire-radius fix + tone-ring calibration, 2026-05-01)
 
-| Test     | BTCM-on stop      | BTCM-off stop    | Front locked time | ABS phase changes |
-|---|---|---|---|---|
-| high_mu  | did NOT stop, vf≈19 m/s            | 148.52 m / 9.47 s | 0 % / 0 %         | 145 / 146 |
-| low_mu   | did NOT stop in 60 s, vf≈35 m/s    | vf=1.57 m/s       | 50-57 % / 36-41 % | 148 / 136 |
-| mu_jump  | did NOT stop in 30 s, vf≈23.7 m/s  | vf=18.60 m/s      | 43 % / 52 % FL/FR | 56 / 64 |
-| split_mu | did NOT stop, vf≈13.7 m/s          | 72.5 m / 6.5 s    | 0 % / 0 %         | 164–178 (stable) |
+| Test     | BTCM-on stop      | BTCM-off stop    | Δ                |
+|---|---|---|---|
+| high_mu  | 152.0 m / 9.98 s   | 148.5 m / 9.47 s | **+3.5 m** (~2 % worse than no-ABS) |
+| low_mu   | didn't stop, v_f = 31.6 m/s | didn't stop, v_f = 1.57 m/s | — |
+| mu_jump  | didn't stop, v_f = 23.5 m/s | didn't stop, v_f = 18.6 m/s | — |
+| split_mu | 92.0 m / 7.87 s    | 72.5 m / 6.53 s  | +19.5 m (per-wheel modulation gap, see below) |
 
-ABS engages reliably on all four scenarios.  The remaining headline
-problem is that whenever the algorithm engages it over-modulates and
-makes braking worse than the no-ABS baseline.  This is a tuning gap
-that calls for a separate, focused investigation against published
-EV1 hardware data.
+ABS engages reliably on all four scenarios and **on dry pavement
+(`high_mu`) BTCM-on now stops within 2 % of the no-ABS baseline**.
+The remaining gaps are:
+
+  - `low_mu` and `mu_jump` still show extended wheel lock on ice.
+    The original-EV1-style "max wheel × tire radius" speed
+    estimator with a max_ref_decel clamp underestimates ground
+    speed when all four wheels are locked together, so the
+    algorithm's slip computation collapses to ~0 on ice and the
+    state machine sees no reason to keep dumping pressure.  This
+    is a known limitation of first-gen ABS.
+
+  - `split_mu` BTCM-on takes ~25 % longer to stop than BTCM-off
+    because the rear EMB applies symmetric force on both sides
+    while the ice-side wheel can't carry that force productively.
+    A working **per-wheel** rear EMB modulation would close the
+    gap.  Currently the rear EMB sees the same DUMP/HOLD command
+    regardless of which side is on ice.
+
+Auto-generated comparison: [reports/abs_scenarios.md](reports/abs_scenarios.md)
+(re-run `scripts/abs_report.py` after `scripts/run_abs_compare.sh` for
+each test).
 
 ### Fixed: bus-side ABS phase freshness (consumer)
 
@@ -128,33 +145,75 @@ algorithm sees realistic wheel speeds.  The validation test
 asserts the underlying ratio lands in [0.55, 0.70] so a future
 regression in simavr or the firmware ISR layer trips the test.
 
-### Outstanding: ABS over-modulates and reduces braking effort
+### Fixed: accelerometer-induced vehicle-speed drift
 
-Even with realistic wheel-speed inputs, the firmware algorithm
-over-releases pressure.  On `high_mu`, BTCM-on holds front slip at
-0.04 (essentially free-rolling) and reaches v ≈ 19 m/s by scenario
-end vs BTCM-off stopping cleanly in 148 m / 9.47 s.  On `low_mu`,
-`mu_jump`, and `split_mu` the pattern is the same.
+Earlier iterations of the firmware enabled the longitudinal
+accelerometer integration in the vehicle-speed estimator.  Combined
+with the over-aggressive modulator, this caused a death spiral on
+high-mu surfaces: ABS over-released pressure → chassis decelerated
+slowly → accelerometer reported small decel → projected vehicle
+speed stayed high → slip computation looked elevated → algorithm
+dumped more pressure.
 
-The remaining contributing factors:
+The original GM EV1 BTCM did not have an accelerometer — it used
+"fastest healthy wheel × tire radius" with a `max_ref_decel_mps2`
+clamp.  We've made the accelerometer path **optional at build
+time** (default OFF) to match that, gated by a CMake flag
+`BTCM_USE_ACCELEROMETER`.  Even when disabled, the host bridge
+still publishes accel onto the chassis bus so it shows up in
+scan-tool logs and traces — it's just not consumed by the algorithm.
 
-1. **Vehicle-speed estimator drift on light decel.**  When the
-   modulator over-releases, chassis decel becomes small.  The
-   firmware's accelerometer-projected `vehicle_speed_mps` then
-   stays high, slip looks high, the algorithm dumps more — death
-   spiral.  Could be addressed by setting
-   `accel_trust_decay_per_s > 0` so the projection eases toward
-   the max-wheel reference over time.
+With accel OFF, the `high_mu` regression goes away (BTCM-on now
+stops within 2 % of the no-ABS distance) and `split_mu` BTCM-on
+also stops cleanly.
 
-2. **Modulator hydraulic τ tuning.**  τ_apply = 5 ms / τ_dump =
-   60 ms are first-pass values.  Real GM EV1 service-bay numbers
-   would let us calibrate these properly.
+### Note on accelerometer latency
 
-3. **Per-axle tooth count in firmware.**  The host's tone-ring
-   generator now uses 48-tooth front / 47-tooth rear (per the EV1
-   service manual), but the firmware-side `cfg.teeth_per_wheel`
-   is still a single global value (48).  Small effect (47/48 =
-   98 %), but worth fixing for correctness.
+In the sim, `g_host_sensors.longit_accel_q8` is poked directly into
+SRAM by the BTCM controller bridge — there's no I2C round-trip.  On
+real ATmega328P hardware, reading a typical I2C accelerometer (e.g.
+ADXL345) at 100 kHz takes ~500 µs (~8 % of a 5 ms control tick).
+Increasing the firmware tick rate above ~1 kHz would start to
+saturate I2C bandwidth.  Documented in
+`btcm_firmware.c::main()` near the `BTCM_USE_ACCELEROMETER` gate.
+
+### Fixed: tire radius mismatch
+
+Firmware default was 0.31 m (245/40R18 — leftover from earlier
+template).  Real GM EV1 ran P175/65R14 = 0.2915 m unloaded.  The
+~6 % discrepancy translated directly into a slip-ratio bias in the
+firmware's view since it was inconsistent with the chassis-side
+tire model.  Fixed in `abs_init_defaults`.
+
+### Outstanding: rear EMB lacks per-wheel modulation
+
+`split_mu` BTCM-on takes ~25 % longer than BTCM-off because the
+rear EMB applies symmetric force on both wheels even when one side
+is on ice.  The ice-side rear contributes drag without producing
+brake force.  A per-wheel rear EMB modulator (split the rear ABS
+phase command per side) would close this gap.
+
+### Outstanding: low-mu / mu-jump still show extended lock
+
+When all four wheels lock together on ice, the max-wheel-based
+speed estimator collapses with the wheels.  This is a fundamental
+limitation of first-gen ABS without an accelerometer, present on
+real 1990s GM EV1s as well.  Two paths forward:
+
+  - Re-enable the accelerometer path (`BTCM_USE_ACCELEROMETER=ON`)
+    and tune `accel_trust_decay_per_s` so the projection is used
+    primarily on these all-locked windows.
+  - Tune `max_ref_decel_mps2` lower on slippery surfaces (would
+    require a road-condition signal or self-calibrating logic).
+
+### Outstanding: per-axle tooth count in firmware
+
+The host's tone-ring generator now uses 48-tooth front / 47-tooth
+rear (per the EV1 service manual), but the firmware-side
+`cfg.teeth_per_wheel` is still a single global value (48).  Small
+effect (47/48 = 98 % rps reading on rear), but worth fixing for
+correctness — would require extending `abs_axle_config_t` with a
+per-axle `teeth_per_wheel` field.
 
 ### Fixed: AbsPhaseFront bus-side freshness (consumer side)
 
