@@ -115,7 +115,12 @@ run_scenario() {
         ( cd "$ELECTRICSIM_DIR/build" && exec "$RSA_BIN" ) > "$rsa_log" 2>&1 &
         rsa_pid=$!
         sleep 0.3
-        ( cd "$ELECTRICSIM_DIR/build" && exec "$BTCM_BIN" ) > "$btcm_log" 2>&1 &
+        # Capture BTCM-side state into a CSV alongside ev1sim's
+        # chassis-side stats CSV.  Lets the report overlay firmware-
+        # view data on chassis-view charts (vehicle-speed estimator,
+        # firmware-perceived slip, accelerometer reading, etc.).
+        local btcm_csv="$OUT/$label.btcm.csv"
+        ( cd "$ELECTRICSIM_DIR/build" && BTCM_CSV_LOG="$btcm_csv" exec "$BTCM_BIN" ) > "$btcm_log" 2>&1 &
         btcm_pid=$!
         sleep 0.3
     fi

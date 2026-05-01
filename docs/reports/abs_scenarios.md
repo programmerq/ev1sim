@@ -1,6 +1,6 @@
 # EV1 ABS validation — engineering report
 
-_Generated 2026-05-01 14:05 by `scripts/abs_report.py`._
+_Generated 2026-05-01 15:24 by `scripts/abs_report.py`._
 
 This report aggregates the four standard ABS validation
 scenarios.  Each scenario gets its own section with setup,
@@ -17,10 +17,10 @@ script.
 
 | Test | BTCM-on stop | BTCM-off stop | Δ stop dist | ABS events FL/FR | yaw drift (on / off) |
 |---|---|---|---:|---:|---|
-| high_mu | 152.13 m / 9.98 s | 148.52 m / 9.47 s | +3.6 m | 34 / 38 | +1.50° / +0.07° |
-| low_mu | didn't stop, v\_f = 31.68 m/s | didn't stop, v\_f = 1.57 m/s | — | 138 / 146 | +1.01° / +3.54° |
-| mu_jump | didn't stop, v\_f = 23.04 m/s | didn't stop, v\_f = 18.60 m/s | — | 51 / 44 | -2.29° / +0.24° |
-| split_mu | 87.11 m / 7.81 s | 72.49 m / 6.53 s | +14.6 m | 21 / 27 | +0.29° / +0.09° |
+| high_mu | 150.30 m / 9.98 s | 148.52 m / 9.47 s | +1.8 m | 69 / 70 | +0.01° / +0.07° |
+| low_mu | didn't stop, v\_f = 3.11 m/s | didn't stop, v\_f = 1.57 m/s | — | 142 / 130 | -0.53° / +3.54° |
+| mu_jump | didn't stop, v\_f = 18.61 m/s | didn't stop, v\_f = 18.60 m/s | — | 10 / 19 | +0.15° / +0.24° |
+| split_mu | 74.20 m / 6.98 s | 72.49 m / 6.53 s | +1.7 m | 71 / 66 | +0.09° / +0.09° |
 
 Δ stop dist > 0 means BTCM-on took *longer* than BTCM-off.
 Yaw drift > 0 = car rotated counter-clockwise (toward driver
@@ -43,26 +43,26 @@ left).  On `split_mu` the car drifts toward the asphalt side
 | Metric | BTCM-on | BTCM-off |
 |---|---|---|
 | Brake-on at | t = 14.10 s, v = 30.06 m/s | t = 14.10 s, v = 30.06 m/s |
-| Stop result | 152.13 m / 9.98 s | 148.52 m / 9.47 s |
-| FL events | 34 | 0 |
-| FR events | 38 | 0 |
-| Yaw drift over brake | +1.50° | +0.07° |
+| Stop result | 150.30 m / 9.98 s | 148.52 m / 9.47 s |
+| FL events | 69 | 0 |
+| FR events | 70 | 0 |
+| Yaw drift over brake | +0.01° | +0.07° |
 
 ### Per-wheel slip statistics (BTCM-on)
 
 | Wheel | peak | mean | time-locked |
 |---|---:|---:|---:|
-| FL | 0.767 | 0.068 | 0.0% |
-| FR | 0.824 | 0.068 | 0.0% |
-| RL | 0.941 | 0.073 | 0.0% |
-| RR | 0.645 | 0.070 | 0.0% |
+| FL | 0.709 | 0.066 | 0.0% |
+| FR | 0.664 | 0.067 | 0.0% |
+| RL | 0.666 | 0.069 | 0.0% |
+| RR | 0.571 | 0.066 | 0.0% |
 
 ### Front ABS phase distribution during brake event (BTCM-on)
 
 | Wheel | APPLY | HOLD | DUMP | stale | phase transitions |
 |---|---:|---:|---:|---:|---:|
-| FL | 74.6% | 10.8% | 7.9% | 6.7% | 37 |
-| FR | 71.9% | 11.7% | 7.6% | 8.8% | 41 |
+| FL | 18.4% | 8.8% | 12.0% | 60.8% | 75 |
+| FR | 19.9% | 8.8% | 12.9% | 58.5% | 85 |
 
 ### Charts
 
@@ -126,6 +126,29 @@ instant; the firmware's view is a window-average.
 
 ![yaw rate](abs_scenarios.charts/high_mu_yaw.svg)
 
+**BTCM firmware internal view.**  What the AVR's ABS
+algorithm *thinks* is happening, sampled from the
+firmware's `abs_controller_t` state via the host-side
+`BTCM_CSV_LOG` snapshot.  Black = chassis truth (ev1sim);
+blue = firmware's own `vehicle_speed_mps` reference;
+colored = firmware's per-wheel ground speed (rps × tire
+radius).  Time axis aligned to BTCM's brake-on event so
+t=0 here matches t=0 in the chassis charts above.
+Divergences between chassis truth and firmware view
+show where the ABS algorithm's perception is wrong.
+
+![BTCM internal view](abs_scenarios.charts/high_mu_btcm_view.svg)
+
+**BTCM-side accelerometer reading.**  The host bridge
+publishes longitudinal accel onto the chassis bus and
+pokes it into `g_host_sensors` even when the firmware's
+ABS algorithm doesn't consume it (build-time gated by
+`BTCM_USE_ACCELEROMETER`, default OFF to match original
+EV1).  Useful for understanding what a second-gen ABS
+would see if the firmware was rebuilt with the gate on.
+
+![BTCM accelerometer](abs_scenarios.charts/high_mu_btcm_accel.svg)
+
 ## `low_mu`
 
 ### Setup
@@ -142,26 +165,26 @@ instant; the firmware's view is a window-average.
 | Metric | BTCM-on | BTCM-off |
 |---|---|---|
 | Brake-on at | t = 38.29 s, v = 15.01 m/s | t = 38.29 s, v = 15.01 m/s |
-| Stop result | didn't stop, v\_f = 31.68 m/s | didn't stop, v\_f = 1.57 m/s |
-| FL events | 138 | 0 |
-| FR events | 146 | 0 |
-| Yaw drift over brake | +1.01° | +3.54° |
+| Stop result | didn't stop, v\_f = 3.11 m/s | didn't stop, v\_f = 1.57 m/s |
+| FL events | 142 | 0 |
+| FR events | 130 | 0 |
+| Yaw drift over brake | -0.53° | +3.54° |
 
 ### Per-wheel slip statistics (BTCM-on)
 
 | Wheel | peak | mean | time-locked |
 |---|---:|---:|---:|
-| FL | 1.000 | 0.502 | 44.0% |
-| FR | 1.000 | 0.537 | 47.5% |
-| RL | 0.028 | 0.013 | 0.0% |
-| RR | 0.028 | 0.012 | 0.0% |
+| FL | 1.000 | 0.466 | 38.5% |
+| FR | 1.000 | 0.474 | 39.2% |
+| RL | 0.391 | 0.060 | 0.0% |
+| RR | 0.407 | 0.060 | 0.0% |
 
 ### Front ABS phase distribution during brake event (BTCM-on)
 
 | Wheel | APPLY | HOLD | DUMP | stale | phase transitions |
 |---|---:|---:|---:|---:|---:|
-| FL | 16.6% | 26.8% | 53.9% | 2.7% | 137 |
-| FR | 17.2% | 28.3% | 51.8% | 2.7% | 145 |
+| FL | 47.2% | 11.9% | 5.9% | 35.0% | 141 |
+| FR | 50.5% | 10.9% | 4.8% | 33.8% | 130 |
 
 ### Charts
 
@@ -225,6 +248,29 @@ instant; the firmware's view is a window-average.
 
 ![yaw rate](abs_scenarios.charts/low_mu_yaw.svg)
 
+**BTCM firmware internal view.**  What the AVR's ABS
+algorithm *thinks* is happening, sampled from the
+firmware's `abs_controller_t` state via the host-side
+`BTCM_CSV_LOG` snapshot.  Black = chassis truth (ev1sim);
+blue = firmware's own `vehicle_speed_mps` reference;
+colored = firmware's per-wheel ground speed (rps × tire
+radius).  Time axis aligned to BTCM's brake-on event so
+t=0 here matches t=0 in the chassis charts above.
+Divergences between chassis truth and firmware view
+show where the ABS algorithm's perception is wrong.
+
+![BTCM internal view](abs_scenarios.charts/low_mu_btcm_view.svg)
+
+**BTCM-side accelerometer reading.**  The host bridge
+publishes longitudinal accel onto the chassis bus and
+pokes it into `g_host_sensors` even when the firmware's
+ABS algorithm doesn't consume it (build-time gated by
+`BTCM_USE_ACCELEROMETER`, default OFF to match original
+EV1).  Useful for understanding what a second-gen ABS
+would see if the firmware was rebuilt with the gate on.
+
+![BTCM accelerometer](abs_scenarios.charts/low_mu_btcm_accel.svg)
+
 ## `mu_jump`
 
 ### Setup
@@ -241,26 +287,26 @@ instant; the firmware's view is a window-average.
 | Metric | BTCM-on | BTCM-off |
 |---|---|---|
 | Brake-on at | t = 19.95 s, v = 20.01 m/s | t = 19.95 s, v = 20.01 m/s |
-| Stop result | didn't stop, v\_f = 23.04 m/s | didn't stop, v\_f = 18.60 m/s |
-| FL events | 51 | 0 |
-| FR events | 44 | 0 |
-| Yaw drift over brake | -2.29° | +0.24° |
+| Stop result | didn't stop, v\_f = 18.61 m/s | didn't stop, v\_f = 18.60 m/s |
+| FL events | 10 | 0 |
+| FR events | 19 | 0 |
+| Yaw drift over brake | +0.15° | +0.24° |
 
 ### Per-wheel slip statistics (BTCM-on)
 
 | Wheel | peak | mean | time-locked |
 |---|---:|---:|---:|
-| FL | 1.000 | 0.804 | 58.9% |
-| FR | 1.000 | 0.426 | 30.9% |
-| RL | 0.996 | 0.064 | 0.6% |
-| RR | 0.994 | 0.068 | 0.6% |
+| FL | 1.000 | 0.355 | 21.0% |
+| FR | 1.000 | 0.427 | 23.2% |
+| RL | 0.174 | 0.013 | 0.0% |
+| RR | 0.161 | 0.013 | 0.0% |
 
 ### Front ABS phase distribution during brake event (BTCM-on)
 
 | Wheel | APPLY | HOLD | DUMP | stale | phase transitions |
 |---|---:|---:|---:|---:|---:|
-| FL | 16.4% | 32.1% | 38.4% | 13.2% | 50 |
-| FR | 16.4% | 27.7% | 42.8% | 13.2% | 43 |
+| FL | 45.3% | 1.3% | 5.7% | 47.8% | 10 |
+| FR | 44.7% | 6.9% | 3.1% | 45.3% | 19 |
 
 ### Charts
 
@@ -324,6 +370,29 @@ instant; the firmware's view is a window-average.
 
 ![yaw rate](abs_scenarios.charts/mu_jump_yaw.svg)
 
+**BTCM firmware internal view.**  What the AVR's ABS
+algorithm *thinks* is happening, sampled from the
+firmware's `abs_controller_t` state via the host-side
+`BTCM_CSV_LOG` snapshot.  Black = chassis truth (ev1sim);
+blue = firmware's own `vehicle_speed_mps` reference;
+colored = firmware's per-wheel ground speed (rps × tire
+radius).  Time axis aligned to BTCM's brake-on event so
+t=0 here matches t=0 in the chassis charts above.
+Divergences between chassis truth and firmware view
+show where the ABS algorithm's perception is wrong.
+
+![BTCM internal view](abs_scenarios.charts/mu_jump_btcm_view.svg)
+
+**BTCM-side accelerometer reading.**  The host bridge
+publishes longitudinal accel onto the chassis bus and
+pokes it into `g_host_sensors` even when the firmware's
+ABS algorithm doesn't consume it (build-time gated by
+`BTCM_USE_ACCELEROMETER`, default OFF to match original
+EV1).  Useful for understanding what a second-gen ABS
+would see if the firmware was rebuilt with the gate on.
+
+![BTCM accelerometer](abs_scenarios.charts/mu_jump_btcm_accel.svg)
+
 ## `split_mu`
 
 ### Setup
@@ -340,26 +409,26 @@ instant; the firmware's view is a window-average.
 | Metric | BTCM-on | BTCM-off |
 |---|---|---|
 | Brake-on at | t = 12.02 s, v = 20.86 m/s | t = 12.02 s, v = 20.86 m/s |
-| Stop result | 87.11 m / 7.81 s | 72.49 m / 6.53 s |
-| FL events | 21 | 0 |
-| FR events | 27 | 0 |
-| Yaw drift over brake | +0.29° | +0.09° |
+| Stop result | 74.20 m / 6.98 s | 72.49 m / 6.53 s |
+| FL events | 71 | 0 |
+| FR events | 66 | 0 |
+| Yaw drift over brake | +0.09° | +0.09° |
 
 ### Per-wheel slip statistics (BTCM-on)
 
 | Wheel | peak | mean | time-locked |
 |---|---:|---:|---:|
-| FL | 0.570 | 0.084 | 0.0% |
-| FR | 0.689 | 0.085 | 0.0% |
-| RL | 0.753 | 0.094 | 0.0% |
-| RR | 0.811 | 0.090 | 0.0% |
+| FL | 0.696 | 0.074 | 0.0% |
+| FR | 0.509 | 0.078 | 0.0% |
+| RL | 0.556 | 0.087 | 0.0% |
+| RR | 0.809 | 0.090 | 0.0% |
 
 ### Front ABS phase distribution during brake event (BTCM-on)
 
 | Wheel | APPLY | HOLD | DUMP | stale | phase transitions |
 |---|---:|---:|---:|---:|---:|
-| FL | 58.5% | 3.4% | 27.5% | 10.6% | 39 |
-| FR | 61.9% | 4.2% | 27.8% | 6.1% | 47 |
+| FL | 31.2% | 7.1% | 34.9% | 26.8% | 151 |
+| FR | 33.4% | 7.4% | 31.9% | 27.3% | 147 |
 
 ### Charts
 
@@ -422,6 +491,29 @@ instant; the firmware's view is a window-average.
 **Yaw rate.**  Positive = counter-clockwise rotation.
 
 ![yaw rate](abs_scenarios.charts/split_mu_yaw.svg)
+
+**BTCM firmware internal view.**  What the AVR's ABS
+algorithm *thinks* is happening, sampled from the
+firmware's `abs_controller_t` state via the host-side
+`BTCM_CSV_LOG` snapshot.  Black = chassis truth (ev1sim);
+blue = firmware's own `vehicle_speed_mps` reference;
+colored = firmware's per-wheel ground speed (rps × tire
+radius).  Time axis aligned to BTCM's brake-on event so
+t=0 here matches t=0 in the chassis charts above.
+Divergences between chassis truth and firmware view
+show where the ABS algorithm's perception is wrong.
+
+![BTCM internal view](abs_scenarios.charts/split_mu_btcm_view.svg)
+
+**BTCM-side accelerometer reading.**  The host bridge
+publishes longitudinal accel onto the chassis bus and
+pokes it into `g_host_sensors` even when the firmware's
+ABS algorithm doesn't consume it (build-time gated by
+`BTCM_USE_ACCELEROMETER`, default OFF to match original
+EV1).  Useful for understanding what a second-gen ABS
+would see if the firmware was rebuilt with the gate on.
+
+![BTCM accelerometer](abs_scenarios.charts/split_mu_btcm_accel.svg)
 
 **Trajectory.**  pos_x vs pos_y over the brake event.
 

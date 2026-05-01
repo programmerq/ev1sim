@@ -22,25 +22,90 @@ coefficient between tire and road.
 
 ## How to run
 
+### Automated test sweep (headless)
+
 ```sh
-# All four:
+# All four scenarios, BTCM-on vs BTCM-off comparison:
 for t in high_mu low_mu mu_jump split_mu; do
     ./scripts/run_abs_compare.sh "$t"
 done
 
 # Then regenerate the engineering report:
 ./scripts/abs_report.py docs/reports/abs_scenarios.md
+```
 
-# Optional: refresh the tone-ring validation memo too:
+`run_abs_compare.sh` writes per-scenario outputs to
+`/tmp/ev1sim_abs_<test>/`:
+
+  - `summary.txt` — distance, slip stats, ABS event counts
+  - `abs_btcm_on.csv` / `abs_btcm_off.csv` — chassis-side data
+  - `abs_btcm_on.btcm.csv` — **BTCM-side firmware view** (vehicle-
+    speed estimator, per-wheel slip / accel / phase / locked-dwell,
+    accelerometer reading) sampled at 50 Hz wall clock.  Toggled by
+    `BTCM_CSV_LOG` env var; the script sets it automatically for
+    BTCM-on runs.
+  - `abs_btcm_*.log` — full controller stdout/stderr per process
+
+### Manual scenario run (with window, for visual debugging)
+
+To watch a scenario with the Chrono visualization open, start the
+controllers in separate terminals.  All four ABS configs are set up
+for `realtime: true` so BTCM has wall-clock time to engage; flip
+`headless: false` in the config you're running to get a window.
+
+```sh
+# Terminal 1 — ev1sim with window
+cd ev1sim
+# Edit config/abs_<test>.json: set "headless": false
+./build/ev1sim --config config/abs_<test>.json
+
+# Terminal 2 — PIM (powertrain control)
+cd ../electricsim
+./build/ev1/pim/pim_controller
+
+# Terminal 3 — RSA (key/run-mode)
+./build/ev1/rsa/rsa_controller
+
+# Terminal 4 — BTCM (brake controller).  BTCM_CSV_LOG optional;
+# BTCM_ABS_TRACE=1 enables per-tick algorithm-state log lines.
+./build/ev1/btcm/ex_btcm_controller
+```
+
+Order matters: ev1sim creates the SHM bus segments, the controllers
+attach.  Watch ev1sim's stdout for `connected to main harness bus`
+before starting the controllers, and start RSA before BTCM so the
+run-mode broadcast is live when BTCM tries to read it.
+
+The `--config <name>` form works too — leave the abs_<test>.json
+files alone and pass via env / a copy if you only want headless: false
+for a single one-off run.
+
+### Refreshing reports
+
+```sh
+# Engineering report (runs all 4 scenarios should be done first):
+./scripts/abs_report.py docs/reports/abs_scenarios.md
+
+# Tone-ring validation memo (one-off):
 ./build/ev1/btcm/test_btcm_tone_ring_validation \
     ../electricsim/build/firmware/btcm_firmware.elf \
     docs/reports/tone_ring_validation.md
 ```
 
-`run_abs_compare.sh` writes
-`/tmp/ev1sim_abs_<test>/{summary.txt,abs_btcm_on.csv,abs_btcm_off.csv,*.log}`.
-The report script reads those and emits markdown + SVG charts under
-`docs/reports/`.
+### Why `realtime: true` matters
+
+ev1sim and the electricsim controllers (BTCM, PIM, RSA) each run on
+their own simulated clocks: ev1sim ticks Chrono physics, BTCM
+advances the simavr-emulated AVR.  When ev1sim is unpaced
+(`realtime: false`) it can run many times faster than BTCM's
+simulated AVR, and a 10-second brake event finishes in a wall-
+clock fraction of that — long before the firmware has had a chance
+to engage ABS.  Setting `realtime: true` paces ev1sim against wall
+clock so both sides see the same event durations.
+
+ev1sim emits a startup warning if a scenario has stats logging,
+external_sim is enabled, but realtime is false — flag is the
+honest answer.
 
 ## Architectural notes worth knowing while reading the report
 

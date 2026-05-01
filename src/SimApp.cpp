@@ -169,6 +169,32 @@ SimApp::SimApp(const Config& config) : m_config(config) {
     // Startup banner — always printed regardless of headless/interactive mode.
     std::cout << "[SimApp] Vehicle: KEY OFF — press K to cycle RSA state (OFF→RUN→ACC→OFF)\n";
 
+    // Warn loudly when an external-sim scenario runs without realtime
+    // pacing.  ev1sim and the electricsim controllers (BTCM, PIM, RSA)
+    // each run on their own simulated clocks: ev1sim ticks chrono
+    // physics, BTCM advances the simavr-emulated AVR.  When ev1sim is
+    // unpaced (`realtime: false`) it can run many times faster than the
+    // BTCM, and the brake event finishes in BTCM-wall-clock-seconds
+    // long before the firmware has had a chance to engage ABS.  Setting
+    // `realtime: true` paces ev1sim against wall clock so both sides
+    // see the same event durations.  The headline ABS-test scenarios
+    // depend on this — without it, results are unreliable.
+    if (m_config.external_sim.enabled &&
+        m_scenario && m_scenario->has_stats() &&
+        !m_config.simulation.realtime) {
+        std::cerr << "\n";
+        std::cerr << "[SimApp] WARNING: scenario has stats logging and "
+                     "external_sim is enabled, but simulation.realtime is "
+                     "false.\n";
+        std::cerr << "[SimApp]          ev1sim will run as fast as the host "
+                     "allows while electricsim controllers (BTCM/PIM/RSA)\n";
+        std::cerr << "[SimApp]          run on their own simavr clocks — "
+                     "the two sides will see different event durations\n";
+        std::cerr << "[SimApp]          and ABS results will be unreliable.  "
+                     "Set \"simulation.realtime\": true.\n";
+        std::cerr << "\n";
+    }
+
     if (headless) {
         std::cout << "[SimApp] Headless mode — no window.  Exits ";
         if (m_scripted)

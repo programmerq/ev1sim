@@ -139,6 +139,20 @@ def find_brake_indices(rows: list[dict]) -> tuple[int, int]:
     return on_idx, off_idx
 
 
+def find_btcm_brake_indices(rows: list[dict]) -> tuple[int, int]:
+    """Same idea, but on the BTCM CSV — uses brake_pin field."""
+    on_idx, off_idx = -1, -1
+    for i, r in enumerate(rows):
+        bp = r.get("brake_pin", 0)
+        if on_idx < 0 and bp >= 0.5:
+            on_idx = i
+        elif on_idx >= 0 and off_idx < 0 and bp < 0.5:
+            off_idx = i
+    if off_idx < 0:
+        off_idx = len(rows) - 1
+    return on_idx, off_idx
+
+
 # ---------------------------------------------------------------------------
 # SVG primitives — hand-written, no matplotlib dependency
 # ---------------------------------------------------------------------------
@@ -609,6 +623,111 @@ def chart_actuator_lag(rows: list[dict], brake_idx: int, end_idx: int,
     return svg.render()
 
 
+def chart_btcm_internal_view(btcm_rows: list[dict],
+                              chassis_rows: list[dict],
+                              title: str) -> str:
+    """The BTCM firmware's *own* perception of the brake event.
+
+    Plots the firmware-side `vehicle_speed_mps` (the algorithm's
+    reference speed estimate) and the four per-wheel ground-speed
+    readings derived from tone-ring counts (`wheel_speed_rps × tire
+    radius`).  All BTCM-side data is aligned to the BTCM's own brake-
+    on event (where brake_pin first goes high) so t=0 here corresponds
+    to t=0 in the chassis-view charts above (which use the chassis-
+    side brake-on as their reference).  Real wall-clock time has a
+    ~1 s offset between ev1sim and BTCM startup that we don't try to
+    surface.
+
+    Useful for spotting where the firmware's view diverges from
+    reality: vehicle_speed_mps may stick high when ABS over-modulates
+    (max-wheel-based estimator with no accelerometer), or wheel-speed
+    quantization at the firmware's 50 ms tone-ring window can show
+    up as a stair-step compared to the smoother chassis truth.
+    """
+    svg = Svg(w=720, h=260, title=title)
+    btcm_on, btcm_off = find_btcm_brake_indices(btcm_rows)
+    if btcm_on < 0 or not btcm_rows:
+        svg.axes(0, 1, 0, 1, "t since brake-on [s]", "m/s")
+        return svg.render()
+    t0 = btcm_rows[btcm_on]["wall_t_s"]
+
+    # Trim past the end of brake (off_idx)+ a little tail.
+    end = min(btcm_off + 50, len(btcm_rows) - 1)
+    sub = btcm_rows[btcm_on:end + 1]
+    fw_v   = [(r["wall_t_s"] - t0, r["vehicle_speed_mps"])  for r in sub]
+    fw_fl  = [(r["wall_t_s"] - t0, r["wheel_speed_fl"] * TIRE_RADIUS_M) for r in sub]
+    fw_fr  = [(r["wall_t_s"] - t0, r["wheel_speed_fr"] * TIRE_RADIUS_M) for r in sub]
+    fw_rl  = [(r["wall_t_s"] - t0, r["wheel_speed_rl"] * TIRE_RADIUS_M) for r in sub]
+    fw_rr  = [(r["wall_t_s"] - t0, r["wheel_speed_rr"] * TIRE_RADIUS_M) for r in sub]
+
+    # Overlay the chassis truth on the same time axis.  Chassis brake
+    # event has its own indices.
+    ch_on, ch_off = find_brake_indices(chassis_rows)
+    chassis_pts: list[tuple[float, float]] = []
+    if ch_on >= 0:
+        c0 = chassis_rows[ch_on]["sim_time_s"]
+        end_c = min(ch_off + 50, len(chassis_rows) - 1)
+        chassis_pts = [(r["sim_time_s"] - c0, r["speed_mps"])
+                       for r in chassis_rows[ch_on:end_c + 1]]
+
+    xs = [p[0] for p in fw_v] + [p[0] for p in chassis_pts]
+    ys = ([p[1] for p in fw_v]
+          + [p[1] for p in chassis_pts]
+          + [p[1] for p in fw_fl]
+          + [p[1] for p in fw_fr]
+          + [p[1] for p in fw_rl]
+          + [p[1] for p in fw_rr])
+    if not xs or not ys:
+        svg.axes(0, 1, 0, 1, "t since brake-on [s]", "m/s")
+        return svg.render()
+    ax = svg.axes(min(xs), max(xs), 0, max(ys) * 1.05,
+                  x_label="t since brake-on [s]", y_label="m/s")
+    svg.polyline(ax, chassis_pts, color="#000", width=1.6)
+    svg.polyline(ax, fw_v,  color="#3470c0", width=1.6)
+    svg.polyline(ax, fw_fl, color="#c0392b", width=1.0)
+    svg.polyline(ax, fw_fr, color="#27ae60", width=1.0)
+    svg.polyline(ax, fw_rl, color="#2980b9", width=1.0, dash="3 3")
+    svg.polyline(ax, fw_rr, color="#8e44ad", width=1.0, dash="3 3")
+    svg.legend(ax, [
+        ("chassis truth (ev1sim)",        "#000"),
+        ("firmware vehicle_speed_mps",    "#3470c0"),
+        ("firmware FL ground-speed",      "#c0392b"),
+        ("firmware FR ground-speed",      "#27ae60"),
+        ("firmware RL ground-speed",      "#2980b9"),
+        ("firmware RR ground-speed",      "#8e44ad"),
+    ])
+    return svg.render()
+
+
+def chart_btcm_accel(btcm_rows: list[dict], title: str) -> str:
+    """Accelerometer reading the BTCM firmware sees vs. zero line.
+
+    Even when the algorithm doesn't consume it (build-time gated by
+    BTCM_USE_ACCELEROMETER), the host bridge still publishes accel
+    so we can see what a future-gen ABS would have available.
+    """
+    svg = Svg(w=720, h=180, title=title)
+    btcm_on, btcm_off = find_btcm_brake_indices(btcm_rows)
+    if btcm_on < 0 or not btcm_rows:
+        svg.axes(0, 1, -1, 1, "t since brake-on [s]", "accel [m/s²]")
+        return svg.render()
+    t0 = btcm_rows[btcm_on]["wall_t_s"]
+    end = min(btcm_off + 50, len(btcm_rows) - 1)
+    sub = btcm_rows[btcm_on:end + 1]
+    pts = [(r["wall_t_s"] - t0, r["longit_accel_mps2"]) for r in sub]
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    if not pts:
+        svg.axes(0, 1, -1, 1, "t since brake-on [s]", "accel [m/s²]")
+        return svg.render()
+    y_max = max(0.5, max(abs(min(ys)), abs(max(ys))) * 1.15)
+    ax = svg.axes(min(xs), max(xs), -y_max, y_max,
+                  x_label="t since brake-on [s]", y_label="longit accel [m/s²]")
+    svg.hline(ax, 0, color="#666", dash="1 0")
+    svg.polyline(ax, pts, color="#3470c0", width=1.2)
+    return svg.render()
+
+
 def chart_yaw_rate(rows: list[dict], brake_idx: int, end_idx: int,
                     title: str) -> str:
     svg = Svg(w=720, h=200, title=title)
@@ -717,6 +836,7 @@ def stop_str(d: dict, prefix: str) -> str:
 
 def write_scenario_section(t: str, d: dict,
                            on_rows: list[dict], off_rows: list[dict],
+                           btcm_rows: list[dict],
                            charts_dir: Path,
                            out_md_dir: Path) -> list[str]:
     """Emit a per-scenario section.  Generates SVG charts in charts_dir
@@ -765,6 +885,15 @@ def write_scenario_section(t: str, d: dict,
     yaw_svg       = write_svg("yaw",
                               chart_yaw_rate(on_rows, on_brake, on_end,
                                               f"{t} — yaw rate during brake event (BTCM-on)"))
+    btcm_view_svg = ""
+    btcm_accel_svg = ""
+    if btcm_rows:
+        btcm_view_svg = write_svg("btcm_view",
+                                   chart_btcm_internal_view(btcm_rows, on_rows,
+                                       f"{t} — BTCM firmware internal view (firmware vs chassis truth)"))
+        btcm_accel_svg = write_svg("btcm_accel",
+                                    chart_btcm_accel(btcm_rows,
+                                        f"{t} — BTCM-side accelerometer reading"))
 
     lines: list[str] = []
     lines.append(f"## `{t}`")
@@ -882,6 +1011,32 @@ def write_scenario_section(t: str, d: dict,
     lines.append(f"![yaw rate]({yaw_svg})")
     lines.append("")
 
+    if btcm_view_svg:
+        lines.append("**BTCM firmware internal view.**  What the AVR's ABS")
+        lines.append("algorithm *thinks* is happening, sampled from the")
+        lines.append("firmware's `abs_controller_t` state via the host-side")
+        lines.append("`BTCM_CSV_LOG` snapshot.  Black = chassis truth (ev1sim);")
+        lines.append("blue = firmware's own `vehicle_speed_mps` reference;")
+        lines.append("colored = firmware's per-wheel ground speed (rps × tire")
+        lines.append("radius).  Time axis aligned to BTCM's brake-on event so")
+        lines.append("t=0 here matches t=0 in the chassis charts above.")
+        lines.append("Divergences between chassis truth and firmware view")
+        lines.append("show where the ABS algorithm's perception is wrong.")
+        lines.append("")
+        lines.append(f"![BTCM internal view]({btcm_view_svg})")
+        lines.append("")
+    if btcm_accel_svg:
+        lines.append("**BTCM-side accelerometer reading.**  The host bridge")
+        lines.append("publishes longitudinal accel onto the chassis bus and")
+        lines.append("pokes it into `g_host_sensors` even when the firmware's")
+        lines.append("ABS algorithm doesn't consume it (build-time gated by")
+        lines.append("`BTCM_USE_ACCELEROMETER`, default OFF to match original")
+        lines.append("EV1).  Useful for understanding what a second-gen ABS")
+        lines.append("would see if the firmware was rebuilt with the gate on.")
+        lines.append("")
+        lines.append(f"![BTCM accelerometer]({btcm_accel_svg})")
+        lines.append("")
+
     if t == "split_mu":
         traj_svg = write_svg("trajectory",
                               chart_trajectory(on_rows, off_rows,
@@ -909,20 +1064,23 @@ def main(argv: list[str]) -> int:
     charts_dir = out_md_dir / f"{out_path.stem}.charts"
 
     parsed: dict[str, dict] = {}
-    on_rows_by:  dict[str, list[dict]] = {}
-    off_rows_by: dict[str, list[dict]] = {}
+    on_rows_by:   dict[str, list[dict]] = {}
+    off_rows_by:  dict[str, list[dict]] = {}
+    btcm_rows_by: dict[str, list[dict]] = {}
     missing: list[str] = []
     for t in TESTS:
         d = Path(SUMMARY_DIR_TMPL.format(test=t))
         s = d / "summary.txt"
-        on_csv  = d / "abs_btcm_on.csv"
-        off_csv = d / "abs_btcm_off.csv"
+        on_csv   = d / "abs_btcm_on.csv"
+        off_csv  = d / "abs_btcm_off.csv"
+        btcm_csv = d / "abs_btcm_on.btcm.csv"
         if not (s.exists() and on_csv.exists() and off_csv.exists()):
             missing.append(t)
             continue
         parsed[t]      = parse_summary(s.read_text())
         on_rows_by[t]  = load_csv(on_csv)
         off_rows_by[t] = load_csv(off_csv)
+        btcm_rows_by[t] = load_csv(btcm_csv) if btcm_csv.exists() else []
 
     if missing:
         for m in missing:
@@ -992,6 +1150,7 @@ def main(argv: list[str]) -> int:
             continue
         lines.extend(write_scenario_section(
             t, parsed[t], on_rows_by[t], off_rows_by[t],
+            btcm_rows_by.get(t, []),
             charts_dir, out_md_dir))
 
     out_path.write_text("\n".join(lines) + "\n")
