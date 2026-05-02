@@ -220,6 +220,17 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   - IPC trip-reset (momentary)
   - Seatbelt driver toggle (BUCKLED/UNBUCKLED)
   - Seatbelt passenger toggle (BUCKLED/UNBUCKLED)
+- [x] **Headlamp + turn-signal active-state display rows** — derived from
+  the existing electricsim bulb feed line cache (signals 4000-block, no new
+  bus subscriptions).  FloatingUiPanel now shows:
+  - "Headlamps: OFF / LOW / HIGH" from LLBH/RLBH (low) and LHBH/RHBH (high)
+  - "L Turn: ON / OFF" from LFTS|LRTS (flashes per tick — visible as rapid oscillation)
+  - "R Turn: ON / OFF" from RFTS|RRTS (same pattern)
+  These cover three IPC LCD telltale slots (HIGH_BEAM, LEFT_TURN, RIGHT_TURN)
+  that the IPC supervisor declares but does not yet drive via its LCD output
+  path.  The fourth declared-but-deferred IPC LCD slot, WAIT (charge-wait
+  indicator), has no equivalent bulb feed line and remains fully deferred
+  until electricsim adds a separate charge-state signal.
 - [ ] **Remaining UI candidates** — next floating-panel rounds:
   - Trunk open/close (T key covers it but panel would be friendlier)
   - Hood open/close
