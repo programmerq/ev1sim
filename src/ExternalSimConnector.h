@@ -400,6 +400,20 @@ public:
     bool GetIpcSeatbeltTelltalePassenger() const;
     bool HasReceivedIpcSeatbeltTelltalePassenger() const;
 
+    /// Incoming PIM cruise-control active flag (ID 5860, main harness segment).
+    /// Published by PIM each tick on change.
+    /// bool: true = cruise ACTIVE (engaged), false = STANDBY or OFF.
+    /// Returns false if never received.
+    bool GetPimCruiseActive() const;
+    bool HasReceivedPimCruiseActive() const;
+
+    /// Incoming PIM cruise-control setpoint (ID 5861, main harness segment).
+    /// float32 LE, target speed in m/s.  Non-zero while ACTIVE or STANDBY;
+    /// zero only when state == OFF (setpoint fully cleared).
+    /// Returns 0.0f if never received.
+    float GetPimCruiseSetpointMps() const;
+    bool  HasReceivedPimCruiseSetpointMps() const;
+
     // ---------------------------------------------------------------------
     // Test hooks — feed the connector synthetic delta records as though they
     // arrived over the bus.  Used by unit tests; not part of the runtime path.
@@ -410,9 +424,9 @@ public:
     /// Used by unit tests; not part of the runtime path.
     void DebugInjectU8(std::uint32_t signal_id, std::uint8_t value);
 
-    /// Inject a float signal value (rear EMB motor commands, etc.).
-    /// Updates the corresponding state field + timestamp so the
-    /// freshness-window logic in GetRearEmbCmd works.  Used by unit tests.
+    /// Inject a float signal value (rear EMB motor commands, cruise setpoint, etc.).
+    /// Updates the corresponding state field + timestamp so freshness-window
+    /// logic works correctly.  Used by unit tests.
     void DebugInjectFloat(std::uint32_t signal_id, float value);
 
 private:

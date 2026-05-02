@@ -983,3 +983,66 @@ TEST_CASE("IPC seatbelt telltale subscription: FindEndpoint returns passenger me
     CHECK(std::string(ep->short_name)     == "ipc_seatbelt_telltale_passenger");
     CHECK(ep->input_to_sim);   // IPC publishes → ev1sim subscribes
 }
+
+// ---------------------------------------------------------------------------
+// PIM cruise-control subscription (main harness bus 5860 / 5861)
+// These signals live on the main harness segment (same as ABS/RSA), so they
+// are subscribed from main_transport but NOT registered as endpoints.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("PIM cruise subscription: default never-received sentinel",
+          "[ExternalSim][Cruise]") {
+    ExternalSimConnector c;
+    CHECK_FALSE(c.HasReceivedPimCruiseActive());
+    CHECK_FALSE(c.GetPimCruiseActive());          // default false (off/standby)
+    CHECK_FALSE(c.HasReceivedPimCruiseSetpointMps());
+    CHECK(c.GetPimCruiseSetpointMps() == 0.0f);   // default zero
+}
+
+TEST_CASE("PIM cruise subscription: DebugInjectU8 sets cruise active (5860)",
+          "[ExternalSim][Cruise]") {
+    ExternalSimConnector c;
+    // 5860 = kSigPimCruiseActive, 1 = engaged.
+    c.DebugInjectU8(5860, 1u);
+    CHECK(c.HasReceivedPimCruiseActive());
+    CHECK(c.GetPimCruiseActive());
+    // Setpoint still not received.
+    CHECK_FALSE(c.HasReceivedPimCruiseSetpointMps());
+}
+
+TEST_CASE("PIM cruise subscription: DebugInjectU8 clears cruise active (5860)",
+          "[ExternalSim][Cruise]") {
+    ExternalSimConnector c;
+    c.DebugInjectU8(5860, 1u);   // engage
+    CHECK(c.GetPimCruiseActive());
+    c.DebugInjectU8(5860, 0u);   // disengage
+    CHECK(c.HasReceivedPimCruiseActive());
+    CHECK_FALSE(c.GetPimCruiseActive());
+}
+
+TEST_CASE("PIM cruise subscription: DebugInjectFloat delivers setpoint (5861)",
+          "[ExternalSim][Cruise]") {
+    ExternalSimConnector c;
+    // 5861 = kSigPimCruiseSetpointMps, float32.
+    c.DebugInjectFloat(5861, 23.5f);
+    CHECK(c.HasReceivedPimCruiseSetpointMps());
+    CHECK_THAT(c.GetPimCruiseSetpointMps(), WithinAbs(23.5f, 0.001f));
+    // Active flag still not received.
+    CHECK_FALSE(c.HasReceivedPimCruiseActive());
+}
+
+TEST_CASE("PIM cruise subscription: setpoint zero delivered correctly",
+          "[ExternalSim][Cruise]") {
+    ExternalSimConnector c;
+    c.DebugInjectFloat(5861, 0.0f);
+    CHECK(c.HasReceivedPimCruiseSetpointMps());
+    CHECK_THAT(c.GetPimCruiseSetpointMps(), WithinAbs(0.0f, 0.0001f));
+}
+
+TEST_CASE("PIM cruise subscription: 5860/5861 not in endpoint table (main harness bus)",
+          "[ExternalSim][Cruise]") {
+    // Cruise signals live on the main harness bus, same as ABS/RSA — they are
+    // subscribed from main_transport but NOT registered as chassis-bus endpoints.
+    CHECK(ExternalSimConnector::FindEndpoint(5860) == nullptr);
+    CHECK(ExternalSimConnector::FindEndpoint(5861) == nullptr);
+}

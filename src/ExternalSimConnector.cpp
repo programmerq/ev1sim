@@ -273,6 +273,14 @@ constexpr int           kNumDoorLockPwSignals         = 4;  // 4084+4085+4086+40
 // Locked in lockstep with electricsim/ev1/rsa/rsa_signals.hpp kSigRunModeBroadcast = 5711.
 constexpr std::uint32_t kSigRunModeBroadcast = 5711U;
 
+// PIM cruise-control state — published by PIM on the main harness segment.
+// ev1sim subscribes (input direction); not registered as published endpoints.
+// Locked in lockstep with electricsim/ev1/pim/pim_signals.hpp:
+//   kSigPimCruiseActive      = 5860  (bool, uint8: 0=off/standby, 1=engaged)
+//   kSigPimCruiseSetpointMps = 5861  (float32 LE, target speed in m/s)
+constexpr std::uint32_t kSigPimCruiseActive      = 5860U;
+constexpr std::uint32_t kSigPimCruiseSetpointMps = 5861U;
+
 // BTCM front ABS solenoid signals — published by BTCM on the main harness segment.
 // ev1sim subscribes (input_to_sim direction); not registered as published endpoints.
 // Locked in lockstep with electricsim/ev1/btcm/btcm_signals.hpp:
@@ -793,6 +801,14 @@ struct ExternalSimConnector::State {
     std::uint8_t  rsa_run_mode            = 0xFFu;
     bool          has_rsa_run_mode        = false;
 
+    // PIM cruise-control state (IDs 5860/5861, main harness segment).
+    // Subscribed from PIM.  cruise_active: false = OFF/STANDBY, true = ACTIVE.
+    // cruise_setpoint_mps: target speed in m/s; 0.0 only when state == OFF.
+    bool          pim_cruise_active            = false;
+    bool          has_pim_cruise_active        = false;
+    float         pim_cruise_setpoint_mps      = 0.0f;
+    bool          has_pim_cruise_setpoint_mps  = false;
+
     // BTCM front ABS solenoid states (IDs 5010-5013, main harness segment).
     // Subscribed from BTCM.  last_update_ns tracks freshness; 0 = never received.
     bool          sol_fl_iso              = false;
@@ -1019,6 +1035,20 @@ bool ExternalSimConnector::GetIpcSeatbeltTelltalePassenger() const {
 }
 bool ExternalSimConnector::HasReceivedIpcSeatbeltTelltalePassenger() const {
     return m_state->has_ipc_seatbelt_telltale_passenger;
+}
+
+bool ExternalSimConnector::GetPimCruiseActive() const {
+    return m_state->pim_cruise_active;
+}
+bool ExternalSimConnector::HasReceivedPimCruiseActive() const {
+    return m_state->has_pim_cruise_active;
+}
+
+float ExternalSimConnector::GetPimCruiseSetpointMps() const {
+    return m_state->pim_cruise_setpoint_mps;
+}
+bool ExternalSimConnector::HasReceivedPimCruiseSetpointMps() const {
+    return m_state->has_pim_cruise_setpoint_mps;
 }
 
 void ExternalSimConnector::SetPanelSensor(PanelID panel, bool ajar) {
@@ -1346,6 +1376,9 @@ void ExternalSimConnector::DebugInjectFloat(std::uint32_t signal_id, float value
     } else if (signal_id == kSigRearMotorRR) {
         m_state->rear_motor_rr    = value;
         m_state->rear_motor_rr_ns = now_ns;
+    } else if (signal_id == kSigPimCruiseSetpointMps) {
+        m_state->pim_cruise_setpoint_mps     = value;
+        m_state->has_pim_cruise_setpoint_mps = true;
     }
     // Other float signals are not currently subscribed as inputs.
 }
@@ -1388,6 +1421,9 @@ void ExternalSimConnector::DebugInjectU8(std::uint32_t signal_id,
     } else if (signal_id == kSigIpcSeatbeltTelltalePassenger) {
         m_state->ipc_seatbelt_telltale_passenger     = (value != 0u);
         m_state->has_ipc_seatbelt_telltale_passenger = true;
+    } else if (signal_id == kSigPimCruiseActive) {
+        m_state->pim_cruise_active     = (value != 0u);
+        m_state->has_pim_cruise_active = true;
     }
     // All other uint8 signals are not currently subscribed as inputs.
 }
@@ -1726,6 +1762,18 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                         st.rsa_run_mode     = new_mode;
                         st.has_rsa_run_mode = true;
                     }
+                } else if (d.signal_id == kSigPimCruiseActive && !d.payload.empty()) {
+                    // PIM cruise active flag: uint8 bool (0=off/standby, 1=engaged).
+                    st.pim_cruise_active     = (d.payload[0] != 0u);
+                    st.has_pim_cruise_active = true;
+                } else if (d.signal_id == kSigPimCruiseSetpointMps &&
+                           d.payload.size() >= 4) {
+                    // PIM cruise setpoint: float32 LE, m/s.
+                    std::uint32_t bits = 0;
+                    for (int b = 0; b < 4; ++b)
+                        bits |= static_cast<std::uint32_t>(d.payload[b]) << (b * 8);
+                    std::memcpy(&st.pim_cruise_setpoint_mps, &bits, 4);
+                    st.has_pim_cruise_setpoint_mps = true;
                 } else if (d.signal_id == kSigSolFL_ISO && !d.payload.empty()) {
                     st.sol_fl_iso     = (d.payload[0] & 1u) != 0;
                     st.sol_fl_iso_ns  = polled.frame.header.monotonic_time_ns
