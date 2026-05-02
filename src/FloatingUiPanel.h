@@ -79,6 +79,13 @@ std::wstring FormatIpcSeatbeltTelltaleLabel(const wchar_t* seat_name,
 /// Shows "Gear: P / R / N / D" accordingly.
 std::wstring FormatPrndGearLabel(int pos);
 
+// RSA shift-blocked cue label helper (display-only, not a button).
+/// Format RSA shift-blocked cue label.
+/// blocked:       true = shift refused this tick (brake not pressed in PARK).
+/// ever_received: false if no frame from RSA yet (shows "Shift: ---").
+/// Shows "Shift: BRAKE TO SHIFT" when blocked, "Shift: OK" otherwise.
+std::wstring FormatRsaShiftBlockedLabel(bool blocked, bool ever_received);
+
 // RSA run-mode status label helper (display-only, not a button).
 /// Format RSA run-mode label from the kSigRunModeBroadcast (5711) uint8 value.
 /// mode: 0=OFF, 1=ACC, 2=RUN (per rsa_scan.h; the broadcast signal does not

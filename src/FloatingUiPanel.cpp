@@ -108,6 +108,13 @@ std::wstring FormatPrndGearLabel(int pos) {
     return label;
 }
 
+std::wstring FormatRsaShiftBlockedLabel(bool blocked, bool ever_received) {
+    if (!ever_received) {
+        return L"Shift: ---";
+    }
+    return blocked ? L"Shift: BRAKE TO SHIFT" : L"Shift: OK";
+}
+
 std::wstring FormatRsaRunModeLabel(std::uint8_t mode, bool ever_received) {
     if (!ever_received) {
         return L"Mode: ---";

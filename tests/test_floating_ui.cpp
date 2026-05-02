@@ -344,6 +344,28 @@ TEST_CASE("FormatIpcSeatbeltTelltaleLabel: passenger never-received shows placeh
 }
 
 // ---------------------------------------------------------------------------
+// RSA shift-blocked cue label helper (FormatRsaShiftBlockedLabel)
+// Chassis bus signal 4088; 0=not blocked, 1=shift blocked this tick.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("FormatRsaShiftBlockedLabel: never-received shows placeholder",
+          "[FloatingUI][RSA]") {
+    // blocked value is irrelevant when ever_received=false.
+    CHECK(FormatRsaShiftBlockedLabel(false, /*ever_received=*/false) == L"Shift: ---");
+    CHECK(FormatRsaShiftBlockedLabel(true,  /*ever_received=*/false) == L"Shift: ---");
+}
+
+TEST_CASE("FormatRsaShiftBlockedLabel: received and not blocked shows OK",
+          "[FloatingUI][RSA]") {
+    CHECK(FormatRsaShiftBlockedLabel(false, /*ever_received=*/true) == L"Shift: OK");
+}
+
+TEST_CASE("FormatRsaShiftBlockedLabel: received and blocked shows BRAKE TO SHIFT",
+          "[FloatingUI][RSA]") {
+    CHECK(FormatRsaShiftBlockedLabel(true, /*ever_received=*/true) == L"Shift: BRAKE TO SHIFT");
+}
+
+// ---------------------------------------------------------------------------
 // PRND gear selector label helper (FormatPrndGearLabel)
 // ---------------------------------------------------------------------------
 

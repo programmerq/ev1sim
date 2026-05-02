@@ -386,6 +386,13 @@ public:
     bool GetDefrostGridActive() const;
     bool HasReceivedDefrostGridActive() const;
 
+    /// Incoming RSA shift-blocked cue (ID 4088, chassis segment).
+    /// Published by RSA when a P→non-P shift is refused (brake switch not pressed).
+    /// Level signal: true while the driver holds a non-PARK request without brake.
+    /// bool: true = shift blocked, false = no block.  Returns false if never received.
+    bool GetRsaShiftBlocked() const;
+    bool HasReceivedRsaShiftBlocked() const;
+
     /// Incoming IPC seatbelt telltale — driver seat (ID 4130, chassis segment).
     /// Published by IPC when the driver seat is unbuckled AND speed > ~8 km/h.
     /// bool: true = lamp on (unbuckled at speed), false = lamp off.

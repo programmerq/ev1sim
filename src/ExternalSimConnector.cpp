@@ -276,6 +276,15 @@ constexpr std::uint32_t kSigPowerWindowMotorDriver    = 4086U;
 constexpr std::uint32_t kSigPowerWindowMotorPassenger = 4087U;
 constexpr int           kNumDoorLockPwSignals         = 4;  // 4084+4085+4086+4087
 
+// RSA shift-blocked cue (electricsim/RSA → ev1sim, chassis segment).
+//   4088  vehicle.body.rsa.shift_blocked    uint8 bool: 0=no block, 1=blocked this tick
+// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// kSigChassisRsaShiftBlocked = 4088.
+// Published as 1 when a P→non-P shift is refused (brake switch not pressed).
+// Level signal: 1 while the PRND selector holds a non-PARK request without brake; 0 otherwise.
+constexpr std::uint32_t kSigRsaShiftBlocked = 4088U;
+constexpr int           kNumRsaShiftBlockedSignals = 1;
+
 // RSA run-mode broadcast — published by RSA on the main harness segment.
 // ev1sim subscribes to this (input_to_sim = true for subscription, but we
 // don't register it as an endpoint we publish — only receive).
@@ -420,14 +429,15 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // +kNumHvacSignals for hvac_blower_level (4082) + defrost_grid_active (4083).
 // +kNumAmbientSignals for ambient temp (4090) + ambient humidity (4091).
 // +kNumDoorLockPwSignals for door lock cmds (4084/4085) + power window motor cmds (4086/4087).
+// +kNumRsaShiftBlockedSignals for RSA shift-blocked cue (4088) — RSA → ev1sim.
 // +kNumIpcTelltaleSignals for IPC seatbelt telltales (4130/4131) — IPC → ev1sim.
 // +kNumIpcTripDistSignals for IPC trip distance (4132) — IPC → ev1sim.
 constexpr int kNumEndpoints =
     NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumCombSw + 1 /*charge_coupler*/ +
     kNumPrndSelector + kNumMotorSignals + kNumThrottleCmdSignals +
     kNumBrakeSignals + kNumWiperSignals + kNumHvacSignals +
-    kNumAmbientSignals + kNumDoorLockPwSignals + kNumIpcTelltaleSignals +
-    kNumIpcTripDistSignals +
+    kNumAmbientSignals + kNumDoorLockPwSignals + kNumRsaShiftBlockedSignals +
+    kNumIpcTelltaleSignals + kNumIpcTripDistSignals +
     kNumDynamics + kNumDriverInputs;
 
 std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
@@ -521,6 +531,11 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     out[i++] = {kSigPowerWindowMotorPassenger,
                 "vehicle.body.power_window_motor.passenger",
                 "power_window_motor_passenger", true};
+    // RSA shift-blocked cue (RSA → ev1sim, chassis segment, input_to_sim=true).
+    // Level signal: 1 while a P→non-P shift is refused (brake not pressed); 0 otherwise.
+    out[i++] = {kSigRsaShiftBlocked,
+                "vehicle.body.rsa.shift_blocked",
+                "rsa_shift_blocked", true};
     for (int d = 0; d < kNumDynamics; ++d, ++i) {
         out[i] = {kDynamicsBase + kDynamicsNames[d].offset,
                   kDynamicsNames[d].qualified, kDynamicsNames[d].shortname,
@@ -818,6 +833,12 @@ struct ExternalSimConnector::State {
     std::uint8_t  pw_motor_cmd[2]         = {0xFFu, 0xFFu};  // [0]=driver, [1]=passenger
     bool          has_pw_motor_cmd[2]     = {false, false};
 
+    // RSA shift-blocked cue (ID 4088, chassis segment) — received from RSA.
+    // bool: true = shift refused this tick (P→non-P, brake not pressed); false = no block.
+    // Level signal: remains true while the driver holds a non-PARK request without brake.
+    bool          rsa_shift_blocked       = false;
+    bool          has_rsa_shift_blocked   = false;
+
     // RSA run-mode broadcast (ID 5711, main harness segment).
     // Subscribed from RSA; 0xFF = never received.
     std::uint8_t  rsa_run_mode            = 0xFFu;
@@ -1043,6 +1064,13 @@ bool ExternalSimConnector::GetDefrostGridActive() const {
 }
 bool ExternalSimConnector::HasReceivedDefrostGridActive() const {
     return m_state->has_hvac_defrost_grid_active;
+}
+
+bool ExternalSimConnector::GetRsaShiftBlocked() const {
+    return m_state->rsa_shift_blocked;
+}
+bool ExternalSimConnector::HasReceivedRsaShiftBlocked() const {
+    return m_state->has_rsa_shift_blocked;
 }
 
 bool ExternalSimConnector::GetIpcSeatbeltTelltaleDriver() const {
@@ -1453,6 +1481,9 @@ void ExternalSimConnector::DebugInjectU8(std::uint32_t signal_id,
     } else if (signal_id == kSigIpcSeatbeltTelltalePassenger) {
         m_state->ipc_seatbelt_telltale_passenger     = (value != 0u);
         m_state->has_ipc_seatbelt_telltale_passenger = true;
+    } else if (signal_id == kSigRsaShiftBlocked) {
+        m_state->rsa_shift_blocked     = (value != 0u);
+        m_state->has_rsa_shift_blocked = true;
     } else if (signal_id == kSigPimCruiseActive) {
         m_state->pim_cruise_active     = (value != 0u);
         m_state->has_pim_cruise_active = true;
@@ -1628,6 +1659,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                 d.signal_id == kSigDoorLockCmdPassenger ||
                 d.signal_id == kSigPowerWindowMotorDriver ||
                 d.signal_id == kSigPowerWindowMotorPassenger ||
+                d.signal_id == kSigRsaShiftBlocked     ||
                 d.signal_id == kSigHvacBlowerLevel     ||
                 d.signal_id == kSigDefrostGridActive   ||
                 d.signal_id == kSigIpcSeatbeltTelltaleDriver ||

@@ -413,6 +413,18 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                 },
                 []() {});   // no-op: display-only row
 
+            // --- RSA shift-blocked cue (display-only; chassis bus 4088) ---
+            // Subscribes to kSigChassisRsaShiftBlocked (4088) published by RSA.
+            // Shows "Shift: BRAKE TO SHIFT" when a P→non-P shift is refused,
+            // "Shift: OK" when no block is active, "Shift: ---" before first frame.
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatRsaShiftBlockedLabel(
+                        m_external_sim->GetRsaShiftBlocked(),
+                        m_external_sim->HasReceivedRsaShiftBlocked());
+                },
+                []() {});   // no-op: display-only row
+
             // --- RSA run-mode status (display-only; main harness bus 5711) ---
             // Subscribes to kSigRunModeBroadcast (5711) published by RSA each tick.
             // Shows "Mode: OFF / ACC / RUN" or "Mode: ---" before first frame arrives.

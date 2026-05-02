@@ -27,6 +27,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     constexpr int kNumAmbient       = 2;   // ambient_temp_c (4090), ambient_humidity_pct (4091)
     constexpr int kNumDoorLockPw    = 4;   // door_lock_cmd driver/passenger (4084/4085)
                                            // + power_window_motor driver/passenger (4086/4087)
+    constexpr int kNumRsaShiftBlocked = 1; // rsa_shift_blocked (4088)
     constexpr int kNumIpcTelltale   = 2;   // ipc_seatbelt_telltale_driver (4130),
                                            // ipc_seatbelt_telltale_passenger (4131)
     constexpr int kNumIpcTripDist   = 1;   // ipc_trip_distance_m (4132)
@@ -53,6 +54,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
                          kNumCombSw + kNumChargeCplr + kNumPrnd + kNumMotor +
                          kNumThrottleCmd + kNumBrake + kNumWiper +
                          kNumHvac + kNumAmbient + kNumDoorLockPw +
+                         kNumRsaShiftBlocked +
                          kNumIpcTelltale + kNumIpcTripDist +
                          kNumDynamics + kNumDriverInputs;
     REQUIRE(ExternalSimConnector::EndpointCount() == expected);
@@ -68,11 +70,12 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     int charge_coupler_count = 0;
     int prnd_count           = 0;
     int dynamics_count       = 0;   // includes motor_rpm + motor_torque_nm
-    int hvac_count           = 0;   // hvac_blower_level (4082) + defrost_grid_active (4083)
-    int door_lock_pw_count   = 0;   // door lock cmds (4084/4085) + pw motor cmds (4086/4087)
-    int ipc_telltale_count   = 0;   // IPC seatbelt telltales (4130/4131)
-    int ipc_trip_dist_count  = 0;   // IPC trip distance (4132)
-    int driver_input_count   = 0;
+    int hvac_count            = 0;   // hvac_blower_level (4082) + defrost_grid_active (4083)
+    int door_lock_pw_count    = 0;   // door lock cmds (4084/4085) + pw motor cmds (4086/4087)
+    int rsa_shift_blocked_count = 0; // rsa_shift_blocked (4088)
+    int ipc_telltale_count    = 0;   // IPC seatbelt telltales (4130/4131)
+    int ipc_trip_dist_count   = 0;   // IPC trip distance (4132)
+    int driver_input_count    = 0;
 
     const auto* eps = ExternalSimConnector::Endpoints();
     for (int i = 0; i < ExternalSimConnector::EndpointCount(); ++i) {
@@ -117,6 +120,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
         } else if (e.signal_id >= 4084 && e.signal_id <= 4087) {
             CHECK(e.input_to_sim);          // door lock cmds (4084/4085) + pw motor cmds (4086/4087) flow into ev1sim
             ++door_lock_pw_count;
+        } else if (e.signal_id == 4088) {
+            CHECK(e.input_to_sim);          // RSA shift-blocked cue flows into ev1sim
+            ++rsa_shift_blocked_count;
         } else if (e.signal_id == 4130 || e.signal_id == 4131) {
             CHECK(e.input_to_sim);          // IPC seatbelt telltales flow into ev1sim
             ++ipc_telltale_count;
@@ -176,11 +182,13 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     // hvac_count: blower level (4082) + defrost grid (4083) — from HTCM.
     CHECK(hvac_count           == kNumHvac);
     // door_lock_pw_count: door lock cmds (4084/4085) + power window motor cmds (4086/4087).
-    CHECK(door_lock_pw_count   == kNumDoorLockPw);
+    CHECK(door_lock_pw_count      == kNumDoorLockPw);
+    // rsa_shift_blocked_count: RSA shift-blocked cue (4088).
+    CHECK(rsa_shift_blocked_count == kNumRsaShiftBlocked);
     // ipc_telltale_count: driver seatbelt telltale (4130) + passenger (4131) — from IPC.
-    CHECK(ipc_telltale_count   == kNumIpcTelltale);
+    CHECK(ipc_telltale_count      == kNumIpcTelltale);
     // ipc_trip_dist_count: trip distance (4132) — from IPC.
-    CHECK(ipc_trip_dist_count  == kNumIpcTripDist);
+    CHECK(ipc_trip_dist_count     == kNumIpcTripDist);
     CHECK(driver_input_count   == kNumDriverInputs);
 }
 
@@ -917,6 +925,44 @@ TEST_CASE("HVAC defrost grid subscription: FindEndpoint returns correct metadata
     CHECK(std::string(ep->qualified_name) == "vehicle.hvac.defrost_grid_active");
     CHECK(std::string(ep->short_name)     == "hvac_defrost_grid_active");
     CHECK(ep->input_to_sim);   // HTCM publishes → ev1sim subscribes
+}
+
+// ---------------------------------------------------------------------------
+// RSA shift-blocked cue subscription (chassis bus 4088)
+// ---------------------------------------------------------------------------
+
+TEST_CASE("RSA shift-blocked subscription: default never-received / not blocked",
+          "[ExternalSim][RSA]") {
+    ExternalSimConnector c;
+    CHECK_FALSE(c.HasReceivedRsaShiftBlocked());
+    CHECK_FALSE(c.GetRsaShiftBlocked());   // default false (no block)
+}
+
+TEST_CASE("RSA shift-blocked subscription: DebugInjectU8 sets blocked true",
+          "[ExternalSim][RSA]") {
+    ExternalSimConnector c;
+    c.DebugInjectU8(4088, 1u);  // 4088 = kSigChassisRsaShiftBlocked, 1=blocked
+    CHECK(c.HasReceivedRsaShiftBlocked());
+    CHECK(c.GetRsaShiftBlocked());
+}
+
+TEST_CASE("RSA shift-blocked subscription: DebugInjectU8 clears blocked",
+          "[ExternalSim][RSA]") {
+    ExternalSimConnector c;
+    c.DebugInjectU8(4088, 1u);
+    CHECK(c.GetRsaShiftBlocked());
+    c.DebugInjectU8(4088, 0u);  // 0=not blocked
+    CHECK(c.HasReceivedRsaShiftBlocked());  // has_received latches on first write
+    CHECK_FALSE(c.GetRsaShiftBlocked());
+}
+
+TEST_CASE("RSA shift-blocked subscription: FindEndpoint returns correct metadata",
+          "[ExternalSim][RSA]") {
+    const auto* ep = ExternalSimConnector::FindEndpoint(4088);
+    REQUIRE(ep != nullptr);
+    CHECK(std::string(ep->qualified_name) == "vehicle.body.rsa.shift_blocked");
+    CHECK(std::string(ep->short_name)     == "rsa_shift_blocked");
+    CHECK(ep->input_to_sim);   // RSA publishes → ev1sim subscribes
 }
 
 // ---------------------------------------------------------------------------
