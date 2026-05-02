@@ -2,6 +2,7 @@
 
 #include "CameraManager.h"
 #include "Config.h"
+#include "DriverCommand.h"
 #include "ExternalSimConnector.h"
 #include "FloatingUiPanel.h"
 #include "HornAudio.h"
@@ -168,6 +169,11 @@ private:
 
     // Running count of IPC trip-reset button presses (HUD display only; not on bus).
     int m_trip_reset_count = 0;
+
+    // Last-applied driver command — updated each tick after all overrides
+    // (propulsion gate, electronics throttle, scenario) are applied.
+    // Read by the floating-UI throttle/brake display rows each frame.
+    DriverCommand m_last_cmd;
 
     // Last-seen door lock cmd from RSA — used to suppress repeated log lines.
     // 0xFF = never received.

@@ -103,6 +103,14 @@ std::wstring FormatPimCruiseStatusLabel(bool ever_received_active,
 /// Shows "Trip: 12.3 km" (one decimal place).
 std::wstring FormatIpcTripDistanceLabel(bool ever_received, float distance_m);
 
+// Pedal percent label helpers (display-only, not buttons).
+/// Format throttle or brake pedal position as an integer percent.
+/// name: label prefix, e.g. "Throttle" or "Brake".
+/// value_0_to_1: pedal travel in [0, 1]; clamped and rounded to nearest int.
+/// NaN / inf are rendered as "---".
+/// Shows e.g. "Throttle: 47%" (no trailing decimal, locale-independent).
+std::wstring FormatPedalPercentLabel(const char* name, double value_0_to_1);
+
 // ---------------------------------------------------------------------------
 class FloatingUiPanel : public irr::IEventReceiver {
 public:

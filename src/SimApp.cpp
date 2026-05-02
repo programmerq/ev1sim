@@ -425,6 +425,26 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                         m_external_sim->HasReceivedRunMode());
                 },
                 []() {});   // no-op: display-only row
+
+            // --- Throttle percent (display-only; local DriverCommand cache) ---
+            // Reads m_last_cmd.throttle — the final post-override throttle applied
+            // to Chrono each tick.  No bus subscription; pure local state.
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatPedalPercentLabel("Throttle", m_last_cmd.throttle);
+                },
+                []() {});   // no-op: display-only row
+
+            // --- Brake percent (display-only; local DriverCommand cache) ---
+            // Reads m_last_cmd.front_brake — the front pedal travel value [0..1]
+            // set by KeyboardInputController (keyboard input controller sets
+            // front_brake to the driver pedal position; front/rear are identical
+            // for keyboard input).  No bus subscription; pure local state.
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatPedalPercentLabel("Brake", m_last_cmd.front_brake);
+                },
+                []() {});   // no-op: display-only row
         }
     }
 
@@ -799,6 +819,9 @@ int SimApp::RunWithVisualization() {
             cmd.front_brake = 1.0;
             cmd.rear_brake  = 1.0;
         }
+
+        // Snapshot the final post-override command for the floating-UI display rows.
+        m_last_cmd = cmd;
 
         m_world->GetDriver().SetCommand(cmd);
 

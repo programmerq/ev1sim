@@ -5,6 +5,8 @@
 #include "PhysicalWorld.h"
 #include "KeyboardInputController.h"
 
+#include <limits>
+
 // ---------------------------------------------------------------------------
 // Label format tests (pure, no Irrlicht)
 // ---------------------------------------------------------------------------
@@ -479,4 +481,51 @@ TEST_CASE("FormatIpcTripDistanceLabel: 1000 metres shows 1.0 km",
 TEST_CASE("FormatIpcTripDistanceLabel: 500 metres shows 0.5 km",
           "[FloatingUI][IPC][Trip]") {
     CHECK(FormatIpcTripDistanceLabel(/*ever_received=*/true, 500.0f) == L"Trip: 0.5 km");
+}
+
+// ---------------------------------------------------------------------------
+// Pedal percent label helpers (FormatPedalPercentLabel)
+// value_0_to_1: clamped 0..1, displayed as integer percent (no trailing decimal).
+// ---------------------------------------------------------------------------
+
+TEST_CASE("FormatPedalPercentLabel: throttle 0% and 100% endpoints",
+          "[FloatingUI][Pedal]") {
+    CHECK(FormatPedalPercentLabel("Throttle", 0.0)  == L"Throttle: 0%");
+    CHECK(FormatPedalPercentLabel("Throttle", 1.0)  == L"Throttle: 100%");
+}
+
+TEST_CASE("FormatPedalPercentLabel: brake 0% and 100% endpoints",
+          "[FloatingUI][Pedal]") {
+    CHECK(FormatPedalPercentLabel("Brake", 0.0) == L"Brake: 0%");
+    CHECK(FormatPedalPercentLabel("Brake", 1.0) == L"Brake: 100%");
+}
+
+TEST_CASE("FormatPedalPercentLabel: intermediate values 25/50/75 percent",
+          "[FloatingUI][Pedal]") {
+    CHECK(FormatPedalPercentLabel("Throttle", 0.25) == L"Throttle: 25%");
+    CHECK(FormatPedalPercentLabel("Throttle", 0.50) == L"Throttle: 50%");
+    CHECK(FormatPedalPercentLabel("Throttle", 0.75) == L"Throttle: 75%");
+}
+
+TEST_CASE("FormatPedalPercentLabel: values outside [0,1] are clamped",
+          "[FloatingUI][Pedal]") {
+    // Below 0 → clamped to 0%
+    CHECK(FormatPedalPercentLabel("Throttle", -0.5) == L"Throttle: 0%");
+    CHECK(FormatPedalPercentLabel("Brake",    -1.0) == L"Brake: 0%");
+    // Above 1 → clamped to 100%
+    CHECK(FormatPedalPercentLabel("Throttle", 1.5)  == L"Throttle: 100%");
+    CHECK(FormatPedalPercentLabel("Brake",    2.0)  == L"Brake: 100%");
+}
+
+TEST_CASE("FormatPedalPercentLabel: NaN shows placeholder",
+          "[FloatingUI][Pedal]") {
+    const double nan_val = std::numeric_limits<double>::quiet_NaN();
+    CHECK(FormatPedalPercentLabel("Throttle", nan_val) == L"Throttle: ---");
+    CHECK(FormatPedalPercentLabel("Brake",    nan_val) == L"Brake: ---");
+}
+
+TEST_CASE("FormatPedalPercentLabel: rounding — 0.474 rounds to 47, 0.475 rounds to 48",
+          "[FloatingUI][Pedal]") {
+    CHECK(FormatPedalPercentLabel("Throttle", 0.474) == L"Throttle: 47%");
+    CHECK(FormatPedalPercentLabel("Throttle", 0.475) == L"Throttle: 48%");
 }

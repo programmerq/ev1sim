@@ -1,6 +1,7 @@
 #include "FloatingUiPanel.h"
 
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <cwchar>
 #include <cstdio>
@@ -152,6 +153,29 @@ std::wstring FormatIpcTripDistanceLabel(bool ever_received, float distance_m) {
     wchar_t buf[64];
     const double km = static_cast<double>(distance_m) / 1000.0;
     std::swprintf(buf, sizeof(buf) / sizeof(buf[0]), L"Trip: %.1f km", km);
+    return buf;
+}
+
+std::wstring FormatPedalPercentLabel(const char* name, double value_0_to_1) {
+    // Build a wide-character version of the name.
+    wchar_t wname[64] = {};
+    for (int i = 0; name[i] && i < 63; ++i)
+        wname[i] = static_cast<wchar_t>(name[i]);
+
+    // Guard against NaN / infinity — show placeholder.
+    if (!std::isfinite(value_0_to_1)) {
+        wchar_t buf[80];
+        std::swprintf(buf, sizeof(buf) / sizeof(buf[0]), L"%ls: ---", wname);
+        return buf;
+    }
+
+    // Clamp to [0, 1] and convert to integer percent (round to nearest).
+    if (value_0_to_1 < 0.0) value_0_to_1 = 0.0;
+    if (value_0_to_1 > 1.0) value_0_to_1 = 1.0;
+    const int pct = static_cast<int>(value_0_to_1 * 100.0 + 0.5);
+
+    wchar_t buf[80];
+    std::swprintf(buf, sizeof(buf) / sizeof(buf[0]), L"%ls: %d%%", wname, pct);
     return buf;
 }
 
