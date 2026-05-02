@@ -329,6 +329,7 @@ TEST_CASE("Scenario: shipped scenario JSON files parse cleanly",
         {"config/scenarios/abs_mu_jump.json",             "local",      10},
         {"config/scenarios/abs_split_mu.json",            "local",      10},
         {"config/scenarios/abs_brake_and_steer.json",     "local",      11},
+        {"config/scenarios/abs_diagonal_mu.json",         "local",      10},
     };
 
     for (const auto& exp : shipped) {

@@ -1,0 +1,48 @@
+{
+  "//": "ABS validation: diagonal split-µ alternating-stripe pattern.",
+  "//1": "Approximates real diagonal split-µ — at any instant during the",
+  "//2": "brake event, one diagonal pair of wheels (FL+RR or FR+RL) is on",
+  "//3": "asphalt and the other is on ice; the diagonal flips every wheelbase",
+  "//4": "as the car drives forward.  See scripts/gen_diagonal_mu_level.py",
+  "//5": "for the geometric construction and why a static diagonal pattern",
+  "//6": "isn't expressible in chrono's flat-patch ground.",
+  "//7": "",
+  "//8": "Without ABS the BTCM has no chance — fronts lock at the same time,",
+  "//9": "rears free-roll, and the car plows.  With per-wheel ABS the",
+  "//10": "modulator can keep each wheel near peak slip on its current",
+  "//11": "surface.  Headline metric: comparison of FL/FR/RL/RR slip patterns",
+  "//12": "BTCM-on vs BTCM-off, plus yaw drift from the alternating split.",
+  "//13": "",
+  "//14": "Pair with config/abs_diagonal_mu.json (loads",
+  "//15": "level/flat_diagonal_mu.json: 70 m asphalt runway, then 250 m of",
+  "//16": "alternating-diagonal stripes with 2.512 m period).",
+
+  "name": "abs_diagonal_mu",
+  "driver_mode": "local",
+  "max_time_s": 30.0,
+  "events": [
+    {"at_time_s":  0.30, "action": "key_on_cycle"},
+    {"at_time_s":  0.60, "action": "key_on_cycle"},
+    {"at_time_s":  0.90, "action": "prnd_up"},
+    {"at_time_s":  1.10, "action": "prnd_up"},
+    {"at_time_s":  1.30, "action": "prnd_up"},
+    {"at_time_s":  1.50, "action": "set_throttle",   "value": 1.0},
+    {"at_time_s":  5.00, "action": "wait_for_speed", "value": 18.0},
+    {"at_time_s":  5.00, "action": "set_throttle",   "value": 0.0},
+    {"at_time_s":  6.00, "action": "set_brake",      "value": 1.0},
+    {"at_time_s": 25.00, "action": "set_brake",      "value": 0.0}
+  ],
+  "stats": {
+    "output_csv": "scenario_abs_diagonal_mu.csv",
+    "sample_period_s": 0.02,
+    "fields": [
+      "sim_time_s", "speed_mps", "pos_x", "pos_y", "yaw_rate", "yaw_deg",
+      "applied_throttle", "applied_front_brake", "applied_rear_brake",
+      "applied_steering",
+      "wheel_omega_fl", "wheel_omega_fr", "wheel_omega_rl", "wheel_omega_rr",
+      "slip_ratio_fl", "slip_ratio_fr", "slip_ratio_rl", "slip_ratio_rr",
+      "abs_phase_fl", "abs_phase_fr", "emb_cmd_lr", "emb_cmd_rr",
+      "front_brake_pressure", "rear_brake_position"
+    ]
+  }
+}

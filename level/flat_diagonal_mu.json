@@ -1,0 +1,3242 @@
+{
+  "spawn": {
+    "x": -75.0,
+    "y": 0.0,
+    "z": 0.5,
+    "yaw_deg": 0.0
+  },
+  "patches": [
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        -45.0,
+        0.0,
+        0.0
+      ],
+      "size": [
+        70.0,
+        30.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        -8.744,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        -8.744,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        -6.231999999999999,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        -6.231999999999999,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        -3.7199999999999998,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        -3.7199999999999998,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        -1.2080000000000004,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        -1.2080000000000004,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        1.304,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        1.304,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        3.8160000000000007,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        3.8160000000000007,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        6.327999999999999,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        6.327999999999999,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        8.84,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        8.84,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        11.352,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        11.352,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        13.864,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        13.864,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        16.376,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        16.376,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        18.888,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        18.888,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        21.4,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        21.4,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        23.912,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        23.912,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        26.424,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        26.424,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        28.936,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        28.936,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        31.448,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        31.448,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        33.96,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        33.96,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        36.472,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        36.472,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        38.984,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        38.984,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        41.496,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        41.496,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        44.008,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        44.008,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        46.52,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        46.52,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        49.032000000000004,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        49.032000000000004,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        51.544,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        51.544,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        54.056,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        54.056,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        56.568,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        56.568,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        59.08,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        59.08,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        61.592,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        61.592,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        64.104,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        64.104,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        66.616,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        66.616,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        69.128,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        69.128,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        71.64,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        71.64,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        74.152,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        74.152,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        76.664,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        76.664,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        79.176,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        79.176,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        81.688,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        81.688,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        84.2,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        84.2,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        86.712,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        86.712,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        89.224,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        89.224,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        91.736,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        91.736,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        94.248,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        94.248,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        96.76,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        96.76,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        99.272,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        99.272,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        101.784,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        101.784,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        104.296,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        104.296,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        106.808,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        106.808,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        109.32000000000001,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        109.32000000000001,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        111.832,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        111.832,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        114.344,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        114.344,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        116.856,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        116.856,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        119.368,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        119.368,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        121.88,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        121.88,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        124.392,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        124.392,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        126.904,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        126.904,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        129.416,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        129.416,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        131.928,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        131.928,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        134.44,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        134.44,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        136.952,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        136.952,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        139.464,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        139.464,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        141.976,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        141.976,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        144.488,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        144.488,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        147.0,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        147.0,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        149.512,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        149.512,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        152.024,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        152.024,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        154.536,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        154.536,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        157.048,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        157.048,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        159.56,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        159.56,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        162.072,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        162.072,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        164.584,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        164.584,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        167.096,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        167.096,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        169.608,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        169.608,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        172.12,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        172.12,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        174.632,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        174.632,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        177.144,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        177.144,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        179.656,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        179.656,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        182.168,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        182.168,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        184.68,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        184.68,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        187.192,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        187.192,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        189.704,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        189.704,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        192.216,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        192.216,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        194.728,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        194.728,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        197.24,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        197.24,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        199.752,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        199.752,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        202.264,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        202.264,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        204.776,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        204.776,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        207.288,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        207.288,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        209.8,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        209.8,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        212.312,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        212.312,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        214.824,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        214.824,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        217.336,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        217.336,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        219.848,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        219.848,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        222.36,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        222.36,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        224.872,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        224.872,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        227.38400000000001,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        227.38400000000001,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        229.89600000000002,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        229.89600000000002,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        232.408,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        232.408,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        234.92,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        234.92,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        237.432,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        237.432,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "ice",
+      "friction": 0.08,
+      "texture": "chrono:textures/bluewhite.png",
+      "texture_scale": 10.0,
+      "center": [
+        239.944,
+        7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        239.944,
+        -7.5,
+        0.0
+      ],
+      "size": [
+        2.512,
+        15.0
+      ]
+    },
+    {
+      "type": "plane",
+      "surface": "asphalt",
+      "friction": 0.9,
+      "texture": "road.jpg",
+      "texture_scale": 5.0,
+      "center": [
+        270.0,
+        0.0,
+        0.0
+      ],
+      "size": [
+        60.0,
+        30.0
+      ]
+    }
+  ]
+}

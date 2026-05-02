@@ -32,7 +32,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-TESTS = ["high_mu", "low_mu", "mu_jump", "split_mu", "brake_and_steer"]
+TESTS = ["high_mu", "low_mu", "mu_jump", "split_mu", "brake_and_steer", "diagonal_mu"]
 SUMMARY_DIR_TMPL = "/tmp/ev1sim_abs_{test}"
 
 # Tire radius used by the chassis side (matches firmware default now).
@@ -69,6 +69,12 @@ SETUP = {
         "approach":   "throttle to ≥ 25 m/s, throttle off, full brake AND 0.4 steering input applied 0.3 s after brake-on",
         "brake_at":   "scenario t = 6 s, steering t = 6.3 s",
         "checks":     "steerability under maximum brake — locked fronts can't generate lateral force, so the BTCM-off case should plow straight while BTCM-on follows the steering input.  Headline metric: yaw drift over the brake event and lateral pos_y.",
+    },
+    "diagonal_mu": {
+        "surface":    "alternating-stripe diagonal split-µ (asphalt μ=0.9, ice μ=0.08, wheelbase-period stripes)",
+        "approach":   "throttle to ≥ 18 m/s on the asphalt runway, throttle off, full brake.  Brake fires inside the diagonal zone where one diagonal pair (FL+RR or FR+RL) is on asphalt and the other diagonal pair is on ice; the diagonal flips every wheelbase as the car drives.",
+        "brake_at":   "scenario t = 6 s",
+        "checks":     "per-wheel ABS modulation under continuously-changing per-wheel friction.  No single-axle (front-only or rear-only) algorithm can keep up here; the BTCM has to make distinct decisions for each wheel based on its own sensor data.",
     },
 }
 
@@ -746,6 +752,7 @@ LEVEL_FILES = {
     "mu_jump":         "level/flat_ice_transition.json",
     "split_mu":        "level/flat_split_mu.json",
     "brake_and_steer": "level/flat_asphalt.json",
+    "diagonal_mu":     "level/flat_diagonal_mu.json",
 }
 
 
