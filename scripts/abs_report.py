@@ -32,7 +32,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-TESTS = ["high_mu", "low_mu", "mu_jump", "split_mu"]
+TESTS = ["high_mu", "low_mu", "mu_jump", "split_mu", "brake_and_steer"]
 SUMMARY_DIR_TMPL = "/tmp/ev1sim_abs_{test}"
 
 # Tire radius used by the chassis side (matches firmware default now).
@@ -63,6 +63,12 @@ SETUP = {
         "approach":   "throttle to ≥ 20 m/s straddling the seam, throttle off, full brake",
         "brake_at":   "scenario t = 12 s",
         "checks":     "yaw stability — without per-wheel ABS the asphalt-side wheels brake while ice-side skids, generating a yaw moment",
+    },
+    "brake_and_steer": {
+        "surface":    "uniform asphalt (μ = 0.9)",
+        "approach":   "throttle to ≥ 25 m/s, throttle off, full brake AND 0.4 steering input applied 0.3 s after brake-on",
+        "brake_at":   "scenario t = 6 s, steering t = 6.3 s",
+        "checks":     "steerability under maximum brake — locked fronts can't generate lateral force, so the BTCM-off case should plow straight while BTCM-on follows the steering input.  Headline metric: yaw drift over the brake event and lateral pos_y.",
     },
 }
 
@@ -735,10 +741,11 @@ def chart_btcm_accel(btcm_rows: list[dict], title: str) -> str:
 # Map test name → level JSON path so the replay can render surface
 # patches as a colored background (asphalt grey, ice light blue).
 LEVEL_FILES = {
-    "high_mu":  "level/flat_asphalt.json",
-    "low_mu":   "level/flat_ice.json",
-    "mu_jump":  "level/flat_ice_transition.json",
-    "split_mu": "level/flat_split_mu.json",
+    "high_mu":         "level/flat_asphalt.json",
+    "low_mu":          "level/flat_ice.json",
+    "mu_jump":         "level/flat_ice_transition.json",
+    "split_mu":        "level/flat_split_mu.json",
+    "brake_and_steer": "level/flat_asphalt.json",
 }
 
 

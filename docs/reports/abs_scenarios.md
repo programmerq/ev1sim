@@ -1,6 +1,6 @@
 # EV1 ABS validation — engineering report
 
-_Generated 2026-05-02 01:52 by `scripts/abs_report.py`._
+_Generated 2026-05-02 09:28 by `scripts/abs_report.py`._
 
 This report aggregates the four standard ABS validation
 scenarios.  Each scenario gets its own section with setup,
@@ -21,6 +21,7 @@ script.
 | low_mu | didn't stop, v\_f = 2.91 m/s | didn't stop, v\_f = 1.57 m/s | — | 116 / 107 | +0.13° / +3.54° |
 | mu_jump | didn't stop, v\_f = 3.95 m/s | didn't stop, v\_f = 3.65 m/s | — | 204 / 176 | +3.36° / -1.00° |
 | split_mu | 74.74 m / 7.14 s | 72.49 m / 6.53 s | +2.2 m | 73 / 78 | -0.72° / +0.09° |
+| brake_and_steer | 73.94 m / 5.95 s | 67.05 m / 4.99 s | +6.9 m | 103 / 94 | +82.00° / +27.86° |
 
 Δ stop dist > 0 means BTCM-on took *longer* than BTCM-off.
 Yaw drift > 0 = car rotated counter-clockwise (toward driver
@@ -526,4 +527,128 @@ would see if the firmware was rebuilt with the gate on.
 **Trajectory.**  pos_x vs pos_y over the brake event.
 
 ![trajectory](abs_scenarios.charts/split_mu_trajectory.svg)
+
+## `brake_and_steer`
+
+### Setup
+
+| Field | Value |
+|---|---|
+| Surface | uniform asphalt (μ = 0.9) |
+| Approach | throttle to ≥ 25 m/s, throttle off, full brake AND 0.4 steering input applied 0.3 s after brake-on |
+| Brake fires | scenario t = 6 s, steering t = 6.3 s |
+| Validates | steerability under maximum brake — locked fronts can't generate lateral force, so the BTCM-off case should plow straight while BTCM-on follows the steering input.  Headline metric: yaw drift over the brake event and lateral pos_y. |
+
+### Result summary (BTCM-on vs BTCM-off)
+
+| Metric | BTCM-on | BTCM-off |
+|---|---|---|
+| Brake-on at | t = 11.28 s, v = 25.05 m/s | t = 11.28 s, v = 25.05 m/s |
+| Stop result | 73.94 m / 5.95 s | 67.05 m / 4.99 s |
+| FL events | 103 | 0 |
+| FR events | 94 | 0 |
+| Yaw drift over brake | +82.00° | +27.86° |
+
+### Per-wheel slip statistics (BTCM-on)
+
+| Wheel | peak | mean | time-locked |
+|---|---:|---:|---:|
+| FL | 0.998 | 0.429 | 10.8% |
+| FR | 0.987 | 0.391 | 5.4% |
+| RL | 0.998 | 0.061 | 0.5% |
+| RR | 0.604 | 0.087 | 0.0% |
+
+### Front ABS phase distribution during brake event (BTCM-on)
+
+| Wheel | APPLY | HOLD | DUMP | stale | phase transitions |
+|---|---:|---:|---:|---:|---:|
+| FL | 29.8% | 11.6% | 27.7% | 30.9% | 133 |
+| FR | 12.6% | 9.5% | 22.1% | 55.8% | 99 |
+
+### Charts
+
+**[▶ Animated top-down replay (open in browser)](abs_scenarios.charts/brake_and_steer_replay.html)** — watch the car drive through the brake event with per-wheel slip color-coded, surface patches drawn behind, and a scrubbable timeline.  Toggle BTCM-on / BTCM-off in the dropdown to A/B the same instant.
+
+**Vehicle speed**
+
+![speed compare](abs_scenarios.charts/brake_and_steer_speed.svg)
+
+**Effective brake force at each axle.**  Front solid,
+rear dashed.  Front line is `applied_front_brake` directly
+(the post-ABS-modulation ratio fed to Chrono).  Rear line
+is *derived* from `emb_cmd_lr/rr`: max(0, cmd) averaged
+across L and R, because the CSV's `applied_rear_brake`
+captures the *symmetric* driver-pedal command rather than
+the per-wheel override that `ApplyRearEmbBrake` feeds into
+Chrono.  BTCM-off rear is forced to 0 here — the EV1's
+rear EMB has no hydraulic backup line, so when the
+controller is out of the loop the rear free-rolls.
+
+![brake outputs](abs_scenarios.charts/brake_and_steer_brake_outputs.svg)
+
+**Front ABS phase timeline (hydraulic axle).**  Discrete
+APPLY/HOLD/DUMP solenoid bands.  See the rear EMB chart
+just below for the *equivalent* rear-axle modulation —
+same algorithm decisions, different actuator (continuous
+motor command in [-1, +1] instead of solenoid phases).
+
+![ABS phase timeline](abs_scenarios.charts/brake_and_steer_phase.svg)
+
+**Rear EMB motor command (electromechanical axle).** Continuous-valued analog of the front Gantt above. `+1` = motor pushing apply, `-1` = motor releasing the shoes, `~0` = hold position.
+
+![rear EMB cmd](abs_scenarios.charts/brake_and_steer_rear_emb.svg)
+
+**Command vs actual actuator state.**  Solid lines are
+commands sent to Chrono; dashed lines are the modeled
+post-actuator-lag values (caliper hydraulic τ ≈ 50 ms
+apply / 80 ms release; rear shoe rate-limited at ~3.33/s).
+Useful for understanding why ABS modulation looks blunt
+on the speed chart — the actuator lag smooths the rapid
+HOLD↔DUMP cycling into a slower-changing pressure curve.
+
+![actuator lag](abs_scenarios.charts/brake_and_steer_actuator_lag.svg)
+
+**Per-wheel ground speed** (chassis line + 4 wheel lines).  Gap = slip.
+
+![per-wheel speeds](abs_scenarios.charts/brake_and_steer_wheel_speed.svg)
+
+**Slip ratios.**  Threshold reference lines at 0.05 and
+0.15 mark the algorithm's exit / enter slip thresholds.
+Note the chassis-side slip values are *raw tire-contact*
+data from Chrono's TMeasy model and look noisier than a
+real ABS would see — production ABS heavily filters this
+(typically a 10–30 ms low-pass), and our firmware's own
+perception of slip (derived from tone-ring counts over
+50 ms windows) is naturally smoother.  The peaks here
+show what the *tire* is actually doing instant-to-
+instant; the firmware's view is a window-average.
+
+![slip ratios](abs_scenarios.charts/brake_and_steer_slip.svg)
+
+**Yaw rate.**  Positive = counter-clockwise rotation.
+
+![yaw rate](abs_scenarios.charts/brake_and_steer_yaw.svg)
+
+**BTCM firmware internal view.**  What the AVR's ABS
+algorithm *thinks* is happening, sampled from the
+firmware's `abs_controller_t` state via the host-side
+`BTCM_CSV_LOG` snapshot.  Black = chassis truth (ev1sim);
+blue = firmware's own `vehicle_speed_mps` reference;
+colored = firmware's per-wheel ground speed (rps × tire
+radius).  Time axis aligned to BTCM's brake-on event so
+t=0 here matches t=0 in the chassis charts above.
+Divergences between chassis truth and firmware view
+show where the ABS algorithm's perception is wrong.
+
+![BTCM internal view](abs_scenarios.charts/brake_and_steer_btcm_view.svg)
+
+**BTCM-side accelerometer reading.**  The host bridge
+publishes longitudinal accel onto the chassis bus and
+pokes it into `g_host_sensors` even when the firmware's
+ABS algorithm doesn't consume it (build-time gated by
+`BTCM_USE_ACCELEROMETER`, default OFF to match original
+EV1).  Useful for understanding what a second-gen ABS
+would see if the firmware was rebuilt with the gate on.
+
+![BTCM accelerometer](abs_scenarios.charts/brake_and_steer_btcm_accel.svg)
 

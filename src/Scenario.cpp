@@ -223,6 +223,7 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
         else if (f == "applied_throttle")     m_csv << applied_cmd.throttle;
         else if (f == "applied_front_brake")  m_csv << applied_cmd.front_brake;
         else if (f == "applied_rear_brake")   m_csv << applied_cmd.rear_brake;
+        else if (f == "applied_steering")     m_csv << applied_cmd.steering;
         else if (f == "front_brake_pressure") m_csv << state.front_brake_pressure;
         else if (f == "rear_brake_position")  m_csv << state.rear_brake_position;
         else if (f == "throttle_cmd_q8")      m_csv << static_cast<int>(bus_throttle.q8);
