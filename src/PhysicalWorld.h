@@ -468,6 +468,12 @@ public:
         m_trunk = (m_trunk == State::LOCKED) ? State::UNLOCKED : State::LOCKED;
     }
 
+    /// Set the lock state for a specific door directly.
+    /// Used by the RSA mirror path (kSigChassisDoorLockCmd* 4084/4085).
+    void set_driver(State s)    { m_driver    = s; }
+    void set_passenger(State s) { m_passenger = s; }
+    void set_trunk(State s)     { m_trunk     = s; }
+
     /// True if any door is locked (e.g. for "central lock state" telltale).
     bool any_locked() const {
         return m_driver    == State::LOCKED ||
@@ -519,6 +525,36 @@ private:
     Config m_cfg{};
     double m_temp_c       = 18.0;
     double m_humidity_pct = 55.0;
+};
+
+/// Seatbelt buckle sensors — driver seat and passenger seat.
+///
+/// Models the two reed-switch-style buckle sensors in the EV1.  Both default
+/// to buckled (true) matching the pre-UI behaviour where ev1sim always reported
+/// the driver as buckled.
+///
+/// Signals:
+///   kSigDriverSeatbeltBuckled (6964)          — driver
+///   kSigDriverSeatbeltBuckledPassenger (6965) — passenger
+///
+/// TODO(consumer): IPC seatbelt-light telltale should wire passenger signal
+/// (6965) — deferred to a future electricsim round.
+class Seatbelts {
+public:
+    bool driver_buckled()    const { return m_driver;    }
+    bool passenger_buckled() const { return m_passenger; }
+
+    void set_driver(bool buckled)    { m_driver    = buckled; }
+    void set_passenger(bool buckled) { m_passenger = buckled; }
+
+    /// Toggle driver buckle state: BUCKLED ↔ UNBUCKLED.
+    void toggle_driver()    { m_driver    = !m_driver;    }
+    /// Toggle passenger buckle state: BUCKLED ↔ UNBUCKLED.
+    void toggle_passenger() { m_passenger = !m_passenger; }
+
+private:
+    bool m_driver    = true;   // default: buckled (matches pre-UI behaviour)
+    bool m_passenger = true;   // default: buckled
 };
 
 /// RSA exterior pillar keypad (5 buttons: 1/2, 3/4, 5/6, 7/8, 9/0).
@@ -649,6 +685,9 @@ public:
     DoorLocks&       door_locks()       { return m_door_locks; }
     const DoorLocks& door_locks() const { return m_door_locks; }
 
+    Seatbelts&       seatbelts()       { return m_seatbelts; }
+    const Seatbelts& seatbelts() const { return m_seatbelts; }
+
     AmbientTempSensor&       ambient_temp_sensor()       { return m_ambient_temp; }
     const AmbientTempSensor& ambient_temp_sensor() const { return m_ambient_temp; }
 
@@ -694,6 +733,7 @@ private:
     CruiseStalk        m_cruise_stalk;
     WiperStalk         m_wiper_stalk;
     DoorLocks          m_door_locks;
+    Seatbelts          m_seatbelts;
     AmbientTempSensor  m_ambient_temp;
     PowerWindows       m_power_windows;
     RsaExteriorKeypad  m_rsa_ext_keypad;
