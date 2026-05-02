@@ -20,11 +20,14 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     constexpr int kNumMotor       = 2;   // motor_rpm (4070), motor_torque_nm (4071)
     constexpr int kNumWiper       = 2;   // wiper_motor_command (4080), washer_pump_command (4081)
     constexpr int kNumAmbient     = 2;   // ambient_temp_c (4090), ambient_humidity_pct (4091)
+    constexpr int kNumDoorLockPw  = 4;   // door_lock_cmd driver/passenger (4084/4085)
+                                         // + power_window_motor driver/passenger (4086/4087)
     // Driver inputs on the main harness segment (electricsim_ev1_bus), output
     // from ev1sim: brake_pedal_q8 (6900), steering_deg_q8 (6901),
     // gear_selector (6902), throttle_q8 (6903), brake_switch (6904),
     // hazard_request (6944), turn_signal_left (6948), turn_signal_right (6949),
-    // seatbelt_buckled (6964), rsa_mode_button (6971),
+    // seatbelt_buckled (6964), seatbelt_buckled_passenger (6965),
+    // rsa_mode_button (6971),
     // rsa_keypad_button1 (6975), button2 (6976), button3 (6977),
     // button4 (6978), button5 (6979),
     // ipc_trip_reset (6952), cruise_set (6953), cruise_resume (6954),
@@ -37,10 +40,11 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     // rsa_exterior_keypad5 (6989),
     // door_handle_attempt_driver (6990), door_handle_attempt_passenger (6991).
     // (6970 is reserved — not registered as an endpoint.)
-    constexpr int kNumDriverInputs = 34;
+    constexpr int kNumDriverInputs = 35;  // +1 for passenger seatbelt (6965)
     const int expected = NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS +
                          kNumCombSw + kNumChargeCplr + kNumPrnd + kNumMotor +
-                         kNumWiper + kNumAmbient + kNumDynamics + kNumDriverInputs;
+                         kNumWiper + kNumAmbient + kNumDoorLockPw +
+                         kNumDynamics + kNumDriverInputs;
     REQUIRE(ExternalSimConnector::EndpointCount() == expected);
 
     // Unique signal IDs and names.
@@ -54,6 +58,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     int charge_coupler_count = 0;
     int prnd_count           = 0;
     int dynamics_count       = 0;   // includes motor_rpm + motor_torque_nm
+    int door_lock_pw_count   = 0;   // door lock cmds (4084/4085) + pw motor cmds (4086/4087)
     int driver_input_count   = 0;
 
     const auto* eps = ExternalSimConnector::Endpoints();
@@ -87,6 +92,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
         } else if (e.signal_id == 4080 || e.signal_id == 4081) {
             CHECK(e.input_to_sim);          // wiper motor + washer pump cmds flow into ev1sim
             ++dynamics_count;
+        } else if (e.signal_id >= 4084 && e.signal_id <= 4087) {
+            CHECK(e.input_to_sim);          // door lock cmds (4084/4085) + pw motor cmds (4086/4087) flow into ev1sim
+            ++door_lock_pw_count;
         } else if (e.signal_id == 4090 || e.signal_id == 4091) {
             CHECK_FALSE(e.input_to_sim);    // ambient temp + humidity are outputs from ev1sim
             ++dynamics_count;
@@ -100,6 +108,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
                    e.signal_id == 6948 ||
                    e.signal_id == 6949 ||
                    e.signal_id == 6964 ||
+                   e.signal_id == 6965 ||
                    e.signal_id == 6971 ||
                    (e.signal_id >= 6975 && e.signal_id <= 6979) ||
                    (e.signal_id >= 6952 && e.signal_id <= 6959) ||
@@ -112,7 +121,8 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
             // 6952=ipc_trip_reset  6953=cruise_set  6954=cruise_resume
             // 6955=cruise_cancel   6956=cruise_speed_up  6957=cruise_speed_down
             // 6958=wiper_switch    6959=wiper_wash_request
-            // 6964=seatbelt_buckled  6971=rsa_mode_button
+            // 6964=seatbelt_buckled  6965=seatbelt_buckled_passenger
+            // 6971=rsa_mode_button
             // 6975..6979=rsa_keypad_button[1..5]  (6970 reserved; not registered)
             // 6980=power_window_driver_up   6981=power_window_driver_down
             // 6982=power_window_passenger_up  6983=power_window_passenger_down
@@ -130,9 +140,11 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     CHECK(comb_sw_count        == kNumCombSw);
     CHECK(prnd_count           == kNumPrnd);
     CHECK(charge_coupler_count == kNumChargeCplr);
-    // dynamics_count includes the 18 original dynamics + 2 motor signals (4070-4071)
-    // + 2 wiper signals (4080-4081) + 2 ambient env signals (4090-4091).
+    // dynamics_count: 18 original dynamics + 2 motor (4070-4071)
+    // + 2 wiper (4080-4081) + 2 ambient env (4090-4091).
     CHECK(dynamics_count       == kNumDynamics + kNumMotor + kNumWiper + kNumAmbient);
+    // door_lock_pw_count: door lock cmds (4084/4085) + power window motor cmds (4086/4087).
+    CHECK(door_lock_pw_count   == kNumDoorLockPw);
     CHECK(driver_input_count   == kNumDriverInputs);
 }
 
@@ -666,4 +678,100 @@ TEST_CASE("GetAbsPhaseFront can mix fresh and stale per wheel",
     CHECK_FALSE(phase.fr_fresh);
     CHECK(phase.fl == Phase::HOLD);
     CHECK(phase.fr == Phase::APPLY);  // stale defaults to APPLY
+}
+
+// ---------------------------------------------------------------------------
+// Door lock subscription (chassis bus 4084/4085)
+// ---------------------------------------------------------------------------
+
+TEST_CASE("Door lock cmd subscription: default never-received sentinel",
+          "[ExternalSim][DoorLock]") {
+    ExternalSimConnector c;
+    CHECK_FALSE(c.HasReceivedDoorLockCmd(0));   // driver — never received
+    CHECK_FALSE(c.HasReceivedDoorLockCmd(1));   // passenger — never received
+    CHECK(c.GetDoorLockCmd(0) == 0xFFu);
+    CHECK(c.GetDoorLockCmd(1) == 0xFFu);
+}
+
+TEST_CASE("Door lock cmd subscription: DebugInjectU8 delivers driver cmd",
+          "[ExternalSim][DoorLock]") {
+    ExternalSimConnector c;
+    c.DebugInjectU8(4084, 0u);  // 4084 = kSigChassisDoorLockCmdDriver, 0=unlocked
+    CHECK(c.HasReceivedDoorLockCmd(0));
+    CHECK(c.GetDoorLockCmd(0) == 0u);  // unlocked
+    CHECK_FALSE(c.HasReceivedDoorLockCmd(1));   // passenger untouched
+}
+
+TEST_CASE("Door lock cmd subscription: DebugInjectU8 delivers passenger cmd",
+          "[ExternalSim][DoorLock]") {
+    ExternalSimConnector c;
+    c.DebugInjectU8(4085, 1u);  // 4085 = kSigChassisDoorLockCmdPassenger, 1=locked
+    CHECK(c.HasReceivedDoorLockCmd(1));
+    CHECK(c.GetDoorLockCmd(1) == 1u);  // locked
+    CHECK_FALSE(c.HasReceivedDoorLockCmd(0));   // driver untouched
+}
+
+TEST_CASE("Door lock cmd subscription: out-of-range side returns never-received",
+          "[ExternalSim][DoorLock]") {
+    ExternalSimConnector c;
+    c.DebugInjectU8(4084, 0u);
+    CHECK_FALSE(c.HasReceivedDoorLockCmd(-1));
+    CHECK_FALSE(c.HasReceivedDoorLockCmd(2));
+    CHECK(c.GetDoorLockCmd(-1) == 0xFFu);
+    CHECK(c.GetDoorLockCmd(2)  == 0xFFu);
+}
+
+// ---------------------------------------------------------------------------
+// Power window motor subscription (chassis bus 4086/4087)
+// ---------------------------------------------------------------------------
+
+TEST_CASE("Power window motor subscription: default never-received sentinel",
+          "[ExternalSim][PowerWindow]") {
+    ExternalSimConnector c;
+    CHECK_FALSE(c.HasReceivedPowerWindowMotor(0));   // driver
+    CHECK_FALSE(c.HasReceivedPowerWindowMotor(1));   // passenger
+    CHECK(c.GetPowerWindowMotor(0) == 0xFFu);
+    CHECK(c.GetPowerWindowMotor(1) == 0xFFu);
+}
+
+TEST_CASE("Power window motor subscription: DebugInjectU8 delivers driver motor cmd",
+          "[ExternalSim][PowerWindow]") {
+    ExternalSimConnector c;
+    c.DebugInjectU8(4086, 1u);  // 4086 = kSigChassisPowerWindowMotorDriver, 1=up
+    CHECK(c.HasReceivedPowerWindowMotor(0));
+    CHECK(c.GetPowerWindowMotor(0) == 1u);   // up
+    CHECK_FALSE(c.HasReceivedPowerWindowMotor(1));   // passenger untouched
+}
+
+TEST_CASE("Power window motor subscription: DebugInjectU8 delivers passenger motor cmd",
+          "[ExternalSim][PowerWindow]") {
+    ExternalSimConnector c;
+    c.DebugInjectU8(4087, 2u);  // 4087 = kSigChassisPowerWindowMotorPassenger, 2=down
+    CHECK(c.HasReceivedPowerWindowMotor(1));
+    CHECK(c.GetPowerWindowMotor(1) == 2u);   // down
+    CHECK_FALSE(c.HasReceivedPowerWindowMotor(0));   // driver untouched
+}
+
+TEST_CASE("FindEndpoint returns door lock and power window motor cmd rows",
+          "[ExternalSim][DoorLock][PowerWindow]") {
+    // Door lock cmds are inputs to ev1sim (electricsim/RSA → ev1sim).
+    const auto* dl_drv = ExternalSimConnector::FindEndpoint(4084);
+    REQUIRE(dl_drv != nullptr);
+    CHECK(std::string(dl_drv->qualified_name) == "vehicle.body.door_lock_cmd.driver");
+    CHECK(dl_drv->input_to_sim);
+
+    const auto* dl_pax = ExternalSimConnector::FindEndpoint(4085);
+    REQUIRE(dl_pax != nullptr);
+    CHECK(std::string(dl_pax->qualified_name) == "vehicle.body.door_lock_cmd.passenger");
+    CHECK(dl_pax->input_to_sim);
+
+    const auto* pw_drv = ExternalSimConnector::FindEndpoint(4086);
+    REQUIRE(pw_drv != nullptr);
+    CHECK(std::string(pw_drv->qualified_name) == "vehicle.body.power_window_motor.driver");
+    CHECK(pw_drv->input_to_sim);
+
+    const auto* pw_pax = ExternalSimConnector::FindEndpoint(4087);
+    REQUIRE(pw_pax != nullptr);
+    CHECK(std::string(pw_pax->qualified_name) == "vehicle.body.power_window_motor.passenger");
+    CHECK(pw_pax->input_to_sim);
 }
