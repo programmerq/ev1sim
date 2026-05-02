@@ -8,6 +8,7 @@
 #include <chrono>
 #include <cmath>
 #include <csignal>
+#include <ctime>
 #include <iostream>
 #include <thread>
 
@@ -51,6 +52,11 @@ SimApp::SimApp(const Config& config) : m_config(config) {
     // 4. Horn audio — CoreAudio on macOS, no-op elsewhere.  Safe headless.
     m_horn = std::make_unique<HornAudio>();
 
+    // 4b. Physical-world inputs — constructed early (before visualization) so
+    //     floating-UI panel lambdas can safely dereference m_physical during
+    //     their initial label evaluation in AddButton().
+    m_physical = std::make_unique<ev1sim::PhysicalWorld>();
+
     // 5. Visualization (creates window).  Skipped entirely in headless mode;
     //    no Irrlicht device, no window, no OpenGL context.
     if (!headless) {
@@ -67,17 +73,105 @@ SimApp::SimApp(const Config& config) : m_config(config) {
 
         // 7. Vehicle lights — needs Irrlicht scene graph to be populated.
         m_lights = std::make_unique<VehicleLights>();
+
+        // 7b. Floating UI panel — anchored top-left, below the banner area.
+        //     All button callbacks are registered here; the panel starts hidden.
+        //     The panel is shown/hidden via TAB (UI mode toggle).
+        {
+            auto* gui = m_vis->GetDevice()->getGUIEnvironment();
+            // Offset 10 px from left, 10 px from top.  Panel is 220 px wide.
+            m_floating_ui = std::make_unique<FloatingUiPanel>(gui, 10, 10, 220, 22);
+
+            // Register as user event receiver so GUI clicks fire our callbacks.
+            m_vis->AddUserEventReceiver(m_floating_ui.get());
+
+            // --- Hazard toggle ---
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatHazardLabel(m_physical->hazard_switch().on());
+                },
+                [this]() {
+                    m_physical->hazard_switch().toggle();
+                    std::cout << "[UI] Hazard: "
+                              << (m_physical->hazard_switch().on() ? "ON" : "OFF") << "\n";
+                });
+
+            // --- Door locks: Lock All / Unlock All (one button, label flips) ---
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatLockAllLabel(m_physical->door_locks().any_locked());
+                },
+                [this]() {
+                    if (m_physical->door_locks().any_locked())
+                        m_physical->door_locks().unlock_all();
+                    else
+                        m_physical->door_locks().lock_all();
+                    std::cout << "[UI] Doors: "
+                              << (m_physical->door_locks().any_locked()
+                                      ? "some locked" : "all unlocked") << "\n";
+                });
+
+            // --- Door locks: Driver ---
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatDoorLabel(L"Driver",
+                        m_physical->door_locks().driver() == ev1sim::DoorLocks::State::LOCKED);
+                },
+                [this]() {
+                    m_physical->door_locks().toggle_driver();
+                    using S = ev1sim::DoorLocks::State;
+                    std::cout << "[UI] Driver door: "
+                              << (m_physical->door_locks().driver() == S::LOCKED
+                                      ? "locked" : "unlocked") << "\n";
+                });
+
+            // --- Door locks: Passenger ---
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatDoorLabel(L"Passenger",
+                        m_physical->door_locks().passenger() == ev1sim::DoorLocks::State::LOCKED);
+                },
+                [this]() {
+                    m_physical->door_locks().toggle_passenger();
+                    using S = ev1sim::DoorLocks::State;
+                    std::cout << "[UI] Passenger door: "
+                              << (m_physical->door_locks().passenger() == S::LOCKED
+                                      ? "locked" : "unlocked") << "\n";
+                });
+
+            // --- Door locks: Trunk ---
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatDoorLabel(L"Trunk",
+                        m_physical->door_locks().trunk() == ev1sim::DoorLocks::State::LOCKED);
+                },
+                [this]() {
+                    m_physical->door_locks().toggle_trunk();
+                    using S = ev1sim::DoorLocks::State;
+                    std::cout << "[UI] Trunk: "
+                              << (m_physical->door_locks().trunk() == S::LOCKED
+                                      ? "locked" : "unlocked") << "\n";
+                });
+
+            // --- Charge coupler toggle ---
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatCouplerLabel(m_physical->charge_coupler().present());
+                },
+                [this]() {
+                    m_physical->charge_coupler().set_present(
+                        !m_physical->charge_coupler().present());
+                    std::cout << "[UI] Charge coupler: "
+                              << (m_physical->charge_coupler().present()
+                                      ? "PLUGGED" : "UNPLUGGED") << "\n";
+                });
+        }
     }
 
     // 8. Vehicle panels (hood, trunk, doors) — state-only until panel OBJs exist.
     m_panels = std::make_unique<VehiclePanels>();
 
-    // 8b. Physical-world inputs (combination switch first; more components
-    //     to follow per docs/TODO.md).  These are driver-actuated switches
-    //     whose state is published wire-level on the chassis bus.
-    m_physical = std::make_unique<ev1sim::PhysicalWorld>();
-
-    // 8c. Wiper renderer — phase-based sweep animation driven by RHJB motor command.
+    // 8b. Wiper renderer — phase-based sweep animation driven by RHJB motor command.
     m_wiper = std::make_unique<WiperRenderer>();
 
     // 9. External electrical-simulator connector.  Non-blocking — if the
@@ -125,7 +219,8 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                      "P=pause  R=respawn  C=camera  Scroll=zoom  B=horn  O=hi  L=lo  "
                      "H=headlights  K=key-on  .=PRND-up  ,=PRND-down  "
                      "Q=turn-L  E=turn-R  X=hazard  "
-                     "F=hood  T=trunk  [=doorL  ]=doorR  Z=snapshot  Esc=quit\n";
+                     "F=hood  T=trunk  [=doorL  ]=doorR  Z=snapshot  "
+                     "TAB=UI panel  Esc=quit\n";
         if (m_paused)
             std::cout << "[SimApp] Started PAUSED — press P to begin simulation\n";
     }
@@ -353,6 +448,19 @@ int SimApp::RunWithVisualization() {
         if (m_keyboard->ConsumeSnapshotToggle())
             m_show_snapshot = !m_show_snapshot;
 
+        // TAB = toggle UI mode (mouse cursor + floating panel).
+        if (m_keyboard->ConsumeUiModeToggle()) {
+            m_ui_mode = !m_ui_mode;
+            // Camera: stop consuming mouse events while UI mode is active.
+            m_camera->SetGrabbingMouse(!m_ui_mode);
+            // Show/hide OS cursor.
+            m_vis->GetDevice()->getCursorControl()->setVisible(m_ui_mode);
+            // Show/hide floating panel.
+            if (m_floating_ui)
+                m_floating_ui->SetVisible(m_ui_mode);
+            std::cout << "[SimApp] UI mode: " << (m_ui_mode ? "ON" : "OFF") << "\n";
+        }
+
         // Cruise stalk: G=SET, Y=RESUME, N=CANCEL, +(=)=SPEED+, -=SPEED-.
         if (m_keyboard->ConsumeCruiseSet()) {
             m_physical->cruise_stalk().press_set();
@@ -415,6 +523,10 @@ int SimApp::RunWithVisualization() {
 
         // --- Camera override ---
         m_camera->Update(m_world->GetPose());
+
+        // --- Floating UI panel label refresh ---
+        if (m_floating_ui)
+            m_floating_ui->UpdateLabels();
 
         // --- Panel toggles (1-4) ---
         for (int i = 0; i < VehiclePanels::NUM_PANELS; ++i) {
@@ -522,6 +634,26 @@ int SimApp::RunWithVisualization() {
                 static_cast<std::uint8_t>(m_physical->wiper_stalk().position()));
             m_external_sim->SetDriverWiperWashRequest(
                 m_physical->wiper_stalk().consume_wash());
+        }
+        // Ambient temp + humidity (chassis bus 4090-4091).
+        // Time-of-day from system clock → local time → fractional hours.
+        {
+            const auto now_wall = std::chrono::system_clock::now();
+            const std::time_t now_t = std::chrono::system_clock::to_time_t(now_wall);
+            std::tm local_tm{};
+#if defined(_WIN32)
+            localtime_s(&local_tm, &now_t);
+#else
+            localtime_r(&now_t, &local_tm);
+#endif
+            const double tod_hours = local_tm.tm_hour
+                                   + local_tm.tm_min  / 60.0
+                                   + local_tm.tm_sec  / 3600.0;
+            m_physical->ambient_temp_sensor().update(tod_hours);
+            m_external_sim->SetAmbientTempC(
+                static_cast<float>(m_physical->ambient_temp_sensor().temp_c()));
+            m_external_sim->SetAmbientHumidityPct(
+                static_cast<float>(m_physical->ambient_temp_sensor().humidity_pct()));
         }
         // Motor RPM and torque (chassis bus 4070-4071).
         {
@@ -650,7 +782,7 @@ int SimApp::RunWithVisualization() {
                 const int bx = dim.Width / 2 - 220;
                 const int by = 60;
                 const int bw = 440;
-                const int bh = 296;
+                const int bh = 312;
                 drv->draw2DRectangle(
                     irr::video::SColor(180, 20, 20, 30),
                     irr::core::recti(bx, by, bx + bw, by + bh));
@@ -683,6 +815,7 @@ int SimApp::RunWithVisualization() {
                 drawL(L"T            trunk toggle",                        norm);
                 drawL(L"[ / ]        door L / R toggle",                  norm);
                 drawL(L"Z            physical-world snapshot overlay",     norm);
+                drawL(L"TAB          UI panel (mouse clicks)",            norm);
                 drawL(L"C            camera mode cycle",                   norm);
                 drawL(L"P            pause",                               norm);
                 drawL(L"R            respawn",                             norm);
@@ -889,6 +1022,34 @@ int SimApp::RunHeadless() {
                 static_cast<std::uint8_t>(m_physical->wiper_stalk().position()));
             m_external_sim->SetDriverWiperWashRequest(
                 m_physical->wiper_stalk().consume_wash());
+            // Power window switches (6980-6983) — no input source today;
+            // floating UI will call press()/release() when it lands.
+            {
+                const auto& pw = m_physical->power_windows();
+                m_external_sim->SetDriverPowerWindowDriverUp(pw.driver_up());
+                m_external_sim->SetDriverPowerWindowDriverDown(pw.driver_down());
+                m_external_sim->SetDriverPowerWindowPassengerUp(pw.passenger_up());
+                m_external_sim->SetDriverPowerWindowPassengerDown(pw.passenger_down());
+            }
+        }
+        // Ambient temp + humidity (chassis bus 4090-4091).
+        {
+            const auto now_wall = std::chrono::system_clock::now();
+            const std::time_t now_t = std::chrono::system_clock::to_time_t(now_wall);
+            std::tm local_tm{};
+#if defined(_WIN32)
+            localtime_s(&local_tm, &now_t);
+#else
+            localtime_r(&now_t, &local_tm);
+#endif
+            const double tod_hours = local_tm.tm_hour
+                                   + local_tm.tm_min  / 60.0
+                                   + local_tm.tm_sec  / 3600.0;
+            m_physical->ambient_temp_sensor().update(tod_hours);
+            m_external_sim->SetAmbientTempC(
+                static_cast<float>(m_physical->ambient_temp_sensor().temp_c()));
+            m_external_sim->SetAmbientHumidityPct(
+                static_cast<float>(m_physical->ambient_temp_sensor().humidity_pct()));
         }
         // Motor RPM and torque (chassis bus 4070-4071).
         {

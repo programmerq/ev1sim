@@ -3,6 +3,7 @@
 #include "CameraManager.h"
 #include "Config.h"
 #include "ExternalSimConnector.h"
+#include "FloatingUiPanel.h"
 #include "HornAudio.h"
 #include "KeyboardInputController.h"
 #include "PhysicalWorld.h"
@@ -66,6 +67,7 @@ private:
     std::unique_ptr<ExternalSimConnector>   m_external_sim;
     std::unique_ptr<ScriptedDriver>         m_scripted;
     std::unique_ptr<WiperRenderer>          m_wiper;
+    std::unique_ptr<FloatingUiPanel>        m_floating_ui;
 
     std::shared_ptr<chrono::vehicle::ChWheeledVehicleVisualSystemIrrlicht> m_vis;
     chrono::ChRealtimeStepTimer m_realtime_timer;
@@ -102,6 +104,10 @@ private:
 
     // Physical-world snapshot overlay — toggled by Z key.
     bool m_show_snapshot = false;
+
+    // UI mode — when true the cursor is shown and mouse clicks go to the
+    // floating panel instead of the camera.  Toggled by TAB.
+    bool m_ui_mode = false;
 
     // Running count of IPC trip-reset button presses (HUD display only; not on bus).
     int m_trip_reset_count = 0;
