@@ -268,3 +268,32 @@ TEST_CASE("KeyboardInputController: holding TAB does not repeat toggle",
     ctrl.Update(0.016);
     CHECK(ctrl.ConsumeUiModeToggle() == false);
 }
+
+// ---------------------------------------------------------------------------
+// HVAC status label helpers (FormatHvacBlowerLabel, FormatDefrostGridLabel)
+// ---------------------------------------------------------------------------
+
+TEST_CASE("FormatHvacBlowerLabel: all four HTCM levels", "[FloatingUI][HVAC]") {
+    CHECK(FormatHvacBlowerLabel(0u) == L"Blower: OFF");
+    CHECK(FormatHvacBlowerLabel(1u) == L"Blower: LOW");
+    CHECK(FormatHvacBlowerLabel(2u) == L"Blower: MED");
+    CHECK(FormatHvacBlowerLabel(3u) == L"Blower: HIGH");
+}
+
+TEST_CASE("FormatHvacBlowerLabel: never-received sentinel (0xFF) shows placeholder",
+          "[FloatingUI][HVAC]") {
+    CHECK(FormatHvacBlowerLabel(0xFFu) == L"Blower: ---");
+}
+
+TEST_CASE("FormatHvacBlowerLabel: unknown value shows fallback", "[FloatingUI][HVAC]") {
+    CHECK(FormatHvacBlowerLabel(4u)   == L"Blower: ?");
+    CHECK(FormatHvacBlowerLabel(200u) == L"Blower: ?");
+}
+
+TEST_CASE("FormatDefrostGridLabel: OFF when not active", "[FloatingUI][HVAC]") {
+    CHECK(FormatDefrostGridLabel(false) == L"Defrost: OFF");
+}
+
+TEST_CASE("FormatDefrostGridLabel: ON when active", "[FloatingUI][HVAC]") {
+    CHECK(FormatDefrostGridLabel(true) == L"Defrost: ON");
+}

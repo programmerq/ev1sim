@@ -4,6 +4,7 @@
 
 #include <irrlicht.h>
 
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <vector>
@@ -55,6 +56,13 @@ std::wstring FormatCruiseLabel(const wchar_t* action);
 std::wstring FormatTripResetLabel();
 /// Format seatbelt toggle button label.  door_name: e.g. L"D" or L"P".
 std::wstring FormatSeatbeltLabel(const wchar_t* seat_name, bool buckled);
+
+// HVAC status label helpers (display-only, not buttons).
+/// Format HVAC blower level label.
+/// level: 0=OFF, 1=LOW, 2=MED, 3=HIGH, 0xFF=no data (shows "---").
+std::wstring FormatHvacBlowerLabel(std::uint8_t level);
+/// Format defrost grid status label.  active: true=ON, false=OFF.
+std::wstring FormatDefrostGridLabel(bool active);
 
 // ---------------------------------------------------------------------------
 class FloatingUiPanel : public irr::IEventReceiver {

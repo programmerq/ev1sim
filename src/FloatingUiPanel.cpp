@@ -1,6 +1,7 @@
 #include "FloatingUiPanel.h"
 
 #include <cassert>
+#include <cstdint>
 
 // ---------------------------------------------------------------------------
 // Pure label-format helpers
@@ -64,6 +65,23 @@ std::wstring FormatSeatbeltLabel(const wchar_t* seat_name, bool buckled) {
     label += seat_name;
     label += buckled ? L": BUCKLED" : L": UNBUCKLED";
     return label;
+}
+
+std::wstring FormatHvacBlowerLabel(std::uint8_t level) {
+    // Encoding per HTCM supervisor: 0=OFF, 1=LOW, 2=MED, 3=HIGH.
+    // 0xFF = never received from bus (show placeholder).
+    switch (level) {
+        case 0:    return L"Blower: OFF";
+        case 1:    return L"Blower: LOW";
+        case 2:    return L"Blower: MED";
+        case 3:    return L"Blower: HIGH";
+        case 0xFF: return L"Blower: ---";
+        default:   return L"Blower: ?";
+    }
+}
+
+std::wstring FormatDefrostGridLabel(bool active) {
+    return active ? L"Defrost: ON" : L"Defrost: OFF";
 }
 
 // ---------------------------------------------------------------------------

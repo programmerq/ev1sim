@@ -307,6 +307,23 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                               << (m_physical->seatbelts().passenger_buckled()
                                       ? "BUCKLED" : "UNBUCKLED") << "\n";
                 });
+
+            // --- HVAC status (display-only; no click action) ---
+            // Subscribes to HTCM chassis-bus signals 4082 (blower level) and
+            // 4083 (defrost grid).  Labels update each frame via UpdateLabels().
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatHvacBlowerLabel(
+                        m_external_sim->GetHvacBlowerLevel());
+                },
+                []() {});   // no-op: display-only row
+
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatDefrostGridLabel(
+                        m_external_sim->GetDefrostGridActive());
+                },
+                []() {});   // no-op: display-only row
         }
     }
 
