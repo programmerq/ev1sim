@@ -44,8 +44,14 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   passenger window × up/down (4 momentary bools).  Signals 6980-6983 pinned
   and published on the main harness segment.  PowerWindows have no keyboard
   binding; floating UI panel will drive them when its widget set expands.
-- [ ] **Seatbelt sensors** (driver, passenger) — reed switches in the
-  buckles.  Defer keyboard binding; needs floating UI panel.
+- [x] **Seatbelt sensors** (driver, passenger) — reed switches in the
+  buckles.  `PhysicalWorld::Seatbelts` holds independent driver/passenger
+  bool state (default: both buckled).  Driver seatbelt publishes
+  `kSigDriverSeatbeltBuckled` (6964); passenger seatbelt publishes
+  `kSigDriverSeatbeltBuckledPassenger` (6965) — both on the main harness
+  segment.  FloatingUiPanel toggles added (Wave 2).
+  Consumer wiring (IPC seatbelt-light telltale) is a TODO on the
+  electricsim side.
 - [x] **Ambient temp sensor** — naive almanac-style diurnal sinusoid model
   (`AmbientTempSensor` in `PhysicalWorld`).  Publishes `kSigChassisAmbientTempC`
   (4090) and `kSigChassisAmbientHumidityPct` (4091) on the chassis bus each tick
@@ -100,21 +106,25 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   - Hazard toggle (X keyboard path still works in parallel)
   - Door locks: Lock All/Unlock All + Driver/Passenger/Trunk individual toggles
   - Charge coupler: PLUGGED/UNPLUGGED (replaces stub-false)
-- [ ] **Wave 2 UI candidates** — each of these will get one or more panel
-  buttons in future rounds:
-  - Wiper speed / wash
+- [x] **Wave 2 UI buttons landed** — the following items now have panel
+  buttons:
+  - Wiper cycle (OFF→INT→LOW→HIGH→OFF) + momentary Wash
+  - Cruise stalk: SET, RESUME, CANCEL, +, - (5 momentary buttons)
+  - IPC trip-reset (momentary)
+  - Seatbelt driver toggle (BUCKLED/UNBUCKLED)
+  - Seatbelt passenger toggle (BUCKLED/UNBUCKLED)
+- [ ] **Remaining UI candidates** — next floating-panel rounds:
   - Trunk open/close (T key covers it but panel would be friendlier)
   - Hood open/close
-  - Power windows (driver, passenger)
-  - IPC LCD/LED brightness
-  - RSA LEDs / exterior keypad entry (separate Wave 2 agent)
-  - Exterior keypad (5-button door-pillar)
-  - Seatbelt buckle sensors (driver, passenger)
+  - Power windows (driver, passenger) — signals 6980-6983 pinned, no
+    panel buttons yet
+  - Pedals: brake pressure slider, accelerator slider (currently
+    keyboard-only — no analog range exposed in FloatingUiPanel)
+  - Steering wheel angle indicator / override
+  - IPC LCD brightness and LED telltale overrides
+  - RSA LEDs (door-lock feedback, entry-accepted, entry-denied)
   - HVAC: temp setpoint, fan speed, mode, AC, defrost
-  - Steering rack position override
-  - Brake calipers / solenoids test mode
   - Shifter (PRND) — currently keyboard-only
-  - RSA exterior keypad (door-pillar, 5 buttons)
 
 ## Bus-mediated physics
 - [x] **Front-brake torque from BTCM ABS solenoid state (DONE).** ev1sim
