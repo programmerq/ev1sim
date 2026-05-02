@@ -140,6 +140,93 @@ TEST_CASE("FloatingUI callback: charge coupler toggle flips present flag",
 }
 
 // ---------------------------------------------------------------------------
+// Wave 2 label helpers
+// ---------------------------------------------------------------------------
+
+TEST_CASE("FormatWiperLabel: all four positions", "[FloatingUI]") {
+    CHECK(FormatWiperLabel(0) == L"Wiper: OFF");
+    CHECK(FormatWiperLabel(1) == L"Wiper: INT");
+    CHECK(FormatWiperLabel(2) == L"Wiper: LOW");
+    CHECK(FormatWiperLabel(3) == L"Wiper: HIGH");
+}
+
+TEST_CASE("FormatWiperLabel: out-of-range returns fallback", "[FloatingUI]") {
+    CHECK(FormatWiperLabel(-1) == L"Wiper: ?");
+    CHECK(FormatWiperLabel(4)  == L"Wiper: ?");
+}
+
+TEST_CASE("FormatWashLabel: static label", "[FloatingUI]") {
+    CHECK(FormatWashLabel() == L"Wash");
+}
+
+TEST_CASE("FormatCruiseLabel: action appended", "[FloatingUI]") {
+    CHECK(FormatCruiseLabel(L"SET")    == L"Cruise: SET");
+    CHECK(FormatCruiseLabel(L"RES")    == L"Cruise: RES");
+    CHECK(FormatCruiseLabel(L"CANCEL") == L"Cruise: CANCEL");
+    CHECK(FormatCruiseLabel(L"+")      == L"Cruise: +");
+    CHECK(FormatCruiseLabel(L"-")      == L"Cruise: -");
+}
+
+TEST_CASE("FormatTripResetLabel: static label", "[FloatingUI]") {
+    CHECK(FormatTripResetLabel() == L"Trip Reset");
+}
+
+TEST_CASE("FormatSeatbeltLabel: driver buckled / unbuckled", "[FloatingUI]") {
+    CHECK(FormatSeatbeltLabel(L"D", true)  == L"Seatbelt D: BUCKLED");
+    CHECK(FormatSeatbeltLabel(L"D", false) == L"Seatbelt D: UNBUCKLED");
+}
+
+TEST_CASE("FormatSeatbeltLabel: passenger buckled / unbuckled", "[FloatingUI]") {
+    CHECK(FormatSeatbeltLabel(L"P", true)  == L"Seatbelt P: BUCKLED");
+    CHECK(FormatSeatbeltLabel(L"P", false) == L"Seatbelt P: UNBUCKLED");
+}
+
+TEST_CASE("FloatingUI callback: wiper cycle updates label", "[FloatingUI][Callbacks]") {
+    ev1sim::PhysicalWorld world;
+    using P = ev1sim::WiperStalk::Position;
+    REQUIRE(world.wiper_stalk().position() == P::OFF);
+
+    auto cb = [&]() { world.wiper_stalk().cycle_position(); };
+
+    cb();
+    CHECK(world.wiper_stalk().position() == P::INT);
+    CHECK(FormatWiperLabel(static_cast<int>(world.wiper_stalk().position()))
+          == L"Wiper: INT");
+
+    cb(); cb(); cb();  // LOW → HIGH → OFF
+    CHECK(world.wiper_stalk().position() == P::OFF);
+    CHECK(FormatWiperLabel(static_cast<int>(world.wiper_stalk().position()))
+          == L"Wiper: OFF");
+}
+
+TEST_CASE("FloatingUI callback: seatbelt driver toggle", "[FloatingUI][Callbacks]") {
+    ev1sim::PhysicalWorld world;
+    REQUIRE(world.seatbelts().driver_buckled());
+
+    auto cb = [&]() { world.seatbelts().toggle_driver(); };
+
+    cb();
+    CHECK_FALSE(world.seatbelts().driver_buckled());
+    CHECK(FormatSeatbeltLabel(L"D", world.seatbelts().driver_buckled())
+          == L"Seatbelt D: UNBUCKLED");
+
+    cb();
+    CHECK(world.seatbelts().driver_buckled());
+    CHECK(FormatSeatbeltLabel(L"D", world.seatbelts().driver_buckled())
+          == L"Seatbelt D: BUCKLED");
+}
+
+TEST_CASE("FloatingUI callback: seatbelt passenger toggle leaves driver unchanged",
+          "[FloatingUI][Callbacks]") {
+    ev1sim::PhysicalWorld world;
+    REQUIRE(world.seatbelts().passenger_buckled());
+
+    world.seatbelts().toggle_passenger();
+    CHECK_FALSE(world.seatbelts().passenger_buckled());
+    CHECK(world.seatbelts().driver_buckled());  // driver unaffected
+}
+
+// ---------------------------------------------------------------------------
 // UI mode toggle state machine in KeyboardInputController
 // ---------------------------------------------------------------------------
 

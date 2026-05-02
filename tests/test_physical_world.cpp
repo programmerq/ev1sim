@@ -851,3 +851,52 @@ TEST_CASE("test_door_handles_attempt_when_unlocked_opens_panel",
     // Lock state should be unchanged (handle pull doesn't auto-unlock).
     CHECK(locks.driver() == DoorLocks::State::UNLOCKED);
 }
+
+// ---------------------------------------------------------------------------
+// Seatbelts
+// ---------------------------------------------------------------------------
+
+TEST_CASE("Seatbelts: default state is both buckled", "[PhysicalWorld][Seatbelts]") {
+    Seatbelts sb;
+    CHECK(sb.driver_buckled());
+    CHECK(sb.passenger_buckled());
+}
+
+TEST_CASE("Seatbelts: set_driver / set_passenger are independent", "[PhysicalWorld][Seatbelts]") {
+    Seatbelts sb;
+    sb.set_driver(false);
+    CHECK_FALSE(sb.driver_buckled());
+    CHECK(sb.passenger_buckled());  // passenger unchanged
+
+    sb.set_passenger(false);
+    CHECK_FALSE(sb.driver_buckled());
+    CHECK_FALSE(sb.passenger_buckled());
+
+    sb.set_driver(true);
+    CHECK(sb.driver_buckled());
+    CHECK_FALSE(sb.passenger_buckled());  // passenger still unbuckled
+}
+
+TEST_CASE("Seatbelts: toggle_driver flips driver only", "[PhysicalWorld][Seatbelts]") {
+    Seatbelts sb;
+    // Default: both buckled.
+    sb.toggle_driver();
+    CHECK_FALSE(sb.driver_buckled());
+    CHECK(sb.passenger_buckled());  // unchanged
+
+    sb.toggle_driver();
+    CHECK(sb.driver_buckled());
+    CHECK(sb.passenger_buckled());
+}
+
+TEST_CASE("Seatbelts: toggle_passenger flips passenger only", "[PhysicalWorld][Seatbelts]") {
+    Seatbelts sb;
+    // Default: both buckled.
+    sb.toggle_passenger();
+    CHECK(sb.driver_buckled());      // unchanged
+    CHECK_FALSE(sb.passenger_buckled());
+
+    sb.toggle_passenger();
+    CHECK(sb.driver_buckled());
+    CHECK(sb.passenger_buckled());
+}
