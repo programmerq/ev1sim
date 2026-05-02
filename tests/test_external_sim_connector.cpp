@@ -29,6 +29,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
                                            // + power_window_motor driver/passenger (4086/4087)
     constexpr int kNumIpcTelltale   = 2;   // ipc_seatbelt_telltale_driver (4130),
                                            // ipc_seatbelt_telltale_passenger (4131)
+    constexpr int kNumIpcTripDist   = 1;   // ipc_trip_distance_m (4132)
     // Driver inputs on the main harness segment (electricsim_ev1_bus), output
     // from ev1sim: brake_pedal_q8 (6900), steering_deg_q8 (6901),
     // gear_selector (6902), throttle_q8 (6903), brake_switch (6904),
@@ -52,7 +53,8 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
                          kNumCombSw + kNumChargeCplr + kNumPrnd + kNumMotor +
                          kNumThrottleCmd + kNumBrake + kNumWiper +
                          kNumHvac + kNumAmbient + kNumDoorLockPw +
-                         kNumIpcTelltale + kNumDynamics + kNumDriverInputs;
+                         kNumIpcTelltale + kNumIpcTripDist +
+                         kNumDynamics + kNumDriverInputs;
     REQUIRE(ExternalSimConnector::EndpointCount() == expected);
 
     // Unique signal IDs and names.
@@ -69,6 +71,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     int hvac_count           = 0;   // hvac_blower_level (4082) + defrost_grid_active (4083)
     int door_lock_pw_count   = 0;   // door lock cmds (4084/4085) + pw motor cmds (4086/4087)
     int ipc_telltale_count   = 0;   // IPC seatbelt telltales (4130/4131)
+    int ipc_trip_dist_count  = 0;   // IPC trip distance (4132)
     int driver_input_count   = 0;
 
     const auto* eps = ExternalSimConnector::Endpoints();
@@ -117,6 +120,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
         } else if (e.signal_id == 4130 || e.signal_id == 4131) {
             CHECK(e.input_to_sim);          // IPC seatbelt telltales flow into ev1sim
             ++ipc_telltale_count;
+        } else if (e.signal_id == 4132) {
+            CHECK(e.input_to_sim);          // IPC trip distance flows into ev1sim
+            ++ipc_trip_dist_count;
         } else if (e.signal_id == 4090 || e.signal_id == 4091) {
             CHECK_FALSE(e.input_to_sim);    // ambient temp + humidity are outputs from ev1sim
             ++dynamics_count;
@@ -173,6 +179,8 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     CHECK(door_lock_pw_count   == kNumDoorLockPw);
     // ipc_telltale_count: driver seatbelt telltale (4130) + passenger (4131) — from IPC.
     CHECK(ipc_telltale_count   == kNumIpcTelltale);
+    // ipc_trip_dist_count: trip distance (4132) — from IPC.
+    CHECK(ipc_trip_dist_count  == kNumIpcTripDist);
     CHECK(driver_input_count   == kNumDriverInputs);
 }
 
@@ -1045,4 +1053,46 @@ TEST_CASE("PIM cruise subscription: 5860/5861 not in endpoint table (main harnes
     // subscribed from main_transport but NOT registered as chassis-bus endpoints.
     CHECK(ExternalSimConnector::FindEndpoint(5860) == nullptr);
     CHECK(ExternalSimConnector::FindEndpoint(5861) == nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// IPC trip distance subscription (chassis bus 4132)
+// ---------------------------------------------------------------------------
+
+TEST_CASE("IPC trip distance subscription: default never-received sentinel",
+          "[ExternalSim][IPC]") {
+    ExternalSimConnector c;
+    CHECK_FALSE(c.HasReceivedIpcTripDistance());
+    // Default sentinel is -1.0f (not 0.0) so the caller can distinguish
+    // "never received" from "trip just reset to zero".
+    CHECK_THAT(c.GetIpcTripDistanceM(), WithinAbs(-1.0f, 0.001f));
+}
+
+TEST_CASE("IPC trip distance subscription: DebugInjectFloat delivers distance (4132)",
+          "[ExternalSim][IPC]") {
+    ExternalSimConnector c;
+    // 4132 = kSigChassisIpcTripDistanceM.
+    c.DebugInjectFloat(4132, 12300.0f);  // 12.3 km
+    CHECK(c.HasReceivedIpcTripDistance());
+    CHECK_THAT(c.GetIpcTripDistanceM(), WithinAbs(12300.0f, 0.01f));
+}
+
+TEST_CASE("IPC trip distance subscription: DebugInjectFloat delivers zero after reset (4132)",
+          "[ExternalSim][IPC]") {
+    ExternalSimConnector c;
+    c.DebugInjectFloat(4132, 5000.0f);
+    CHECK_THAT(c.GetIpcTripDistanceM(), WithinAbs(5000.0f, 0.01f));
+    // Simulate a trip-reset: IPC publishes 0.0.
+    c.DebugInjectFloat(4132, 0.0f);
+    CHECK(c.HasReceivedIpcTripDistance());
+    CHECK_THAT(c.GetIpcTripDistanceM(), WithinAbs(0.0f, 0.001f));
+}
+
+TEST_CASE("IPC trip distance subscription: FindEndpoint returns correct metadata (4132)",
+          "[ExternalSim][IPC]") {
+    const auto* ep = ExternalSimConnector::FindEndpoint(4132);
+    REQUIRE(ep != nullptr);
+    CHECK(std::string(ep->qualified_name) == "vehicle.ipc.trip_distance_m");
+    CHECK(std::string(ep->short_name)     == "ipc_trip_distance_m");
+    CHECK(ep->input_to_sim);   // IPC publishes → ev1sim subscribes
 }

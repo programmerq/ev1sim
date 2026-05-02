@@ -143,6 +143,18 @@ std::wstring FormatPimCruiseStatusLabel(bool ever_received_active,
     return buf;
 }
 
+std::wstring FormatIpcTripDistanceLabel(bool ever_received, float distance_m) {
+    if (!ever_received) {
+        return L"Trip: ---";
+    }
+    // Convert metres to kilometres, show one decimal place.
+    // "Trip: 12.3 km"
+    wchar_t buf[64];
+    const double km = static_cast<double>(distance_m) / 1000.0;
+    std::swprintf(buf, sizeof(buf) / sizeof(buf[0]), L"Trip: %.1f km", km);
+    return buf;
+}
+
 // ---------------------------------------------------------------------------
 // FloatingUiPanel
 // ---------------------------------------------------------------------------

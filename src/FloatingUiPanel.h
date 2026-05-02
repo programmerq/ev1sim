@@ -96,6 +96,13 @@ std::wstring FormatPimCruiseStatusLabel(bool ever_received_active,
                                         bool active,
                                         float setpoint_mps);
 
+// IPC trip distance label helper (display-only, not a button).
+/// Format IPC trip distance label.
+/// ever_received: false if no trip-distance frame received yet (shows "Trip: ---").
+/// distance_m: accumulated trip distance in metres; converted to km for display.
+/// Shows "Trip: 12.3 km" (one decimal place).
+std::wstring FormatIpcTripDistanceLabel(bool ever_received, float distance_m);
+
 // ---------------------------------------------------------------------------
 class FloatingUiPanel : public irr::IEventReceiver {
 public:

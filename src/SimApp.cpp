@@ -401,6 +401,18 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                 },
                 []() {});   // no-op: display-only row
 
+            // --- IPC trip distance (display-only; chassis bus 4132) ---
+            // Subscribes to kSigChassisIpcTripDistanceM (4132) published by IPC each tick
+            // (epsilon-gated, ~0.5 m).  Converts metres to km for display.
+            // Shows "Trip: 12.3 km" or "Trip: ---" before first frame arrives.
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatIpcTripDistanceLabel(
+                        m_external_sim->HasReceivedIpcTripDistance(),
+                        m_external_sim->GetIpcTripDistanceM());
+                },
+                []() {});   // no-op: display-only row
+
             // --- RSA run-mode status (display-only; main harness bus 5711) ---
             // Subscribes to kSigRunModeBroadcast (5711) published by RSA each tick.
             // Shows "Mode: OFF / ACC / RUN" or "Mode: ---" before first frame arrives.

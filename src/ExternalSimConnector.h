@@ -400,6 +400,13 @@ public:
     bool GetIpcSeatbeltTelltalePassenger() const;
     bool HasReceivedIpcSeatbeltTelltalePassenger() const;
 
+    /// Incoming IPC trip distance (ID 4132, chassis segment).
+    /// Published by IPC controller on change (epsilon ~0.5 m) after each supervisor tick.
+    /// float32 LE, metres.  Resets to 0.0 on trip-reset button press (kSigDriverIpcTripResetButton).
+    /// Returns -1.0f (sentinel) if never received.
+    float GetIpcTripDistanceM() const;
+    bool  HasReceivedIpcTripDistance() const;
+
     /// Incoming PIM cruise-control active flag (ID 5860, main harness segment).
     /// Published by PIM each tick on change.
     /// bool: true = cruise ACTIVE (engaged), false = STANDBY or OFF.

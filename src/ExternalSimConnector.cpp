@@ -184,7 +184,7 @@ constexpr int           kNumExteriorKeypadInputs             = 7;  // 5 buttons 
 // 6985, 6986, 6987, 6988, 6989, 6990, 6991 = 35 total.
 // (6970 is reserved; not registered as an endpoint.)
 constexpr int kNumPassengerSeatbelt = 1;  // passenger seatbelt (6965)
-constexpr int           kNumDriverInputs = 15 + kNumNewDriverInputs + kNumPowerWindowInputs + kNumExteriorKeypadInputs + kNumPassengerSeatbelt;
+constexpr int kNumDriverInputs = 15 + kNumNewDriverInputs + kNumPowerWindowInputs + kNumExteriorKeypadInputs + kNumPassengerSeatbelt;
 
 // Motor state signals on the chassis segment (ev1sim → electricsim, float32 LE).
 //   4070  vehicle.dynamics.motor_rpm        motor shaft RPM
@@ -249,6 +249,15 @@ constexpr int           kNumHvacSignals       = 2;
 constexpr std::uint32_t kSigIpcSeatbeltTelltaleDriver    = 4130U;
 constexpr std::uint32_t kSigIpcSeatbeltTelltalePassenger = 4131U;
 constexpr int           kNumIpcTelltaleSignals           = 2;
+
+// IPC trip distance (electricsim/IPC → ev1sim, chassis segment).
+//   4132  vehicle.ipc.trip_distance_m   float32 LE, metres
+// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// kSigChassisIpcTripDistanceM = 4132.
+// Published by IPC controller on change (epsilon ~0.5 m); resets to 0.0 on
+// trip-reset button press.
+constexpr std::uint32_t kSigIpcTripDistanceM    = 4132U;
+constexpr int           kNumIpcTripDistSignals  = 1;
 
 // Door lock commands (electricsim/RSA → ev1sim, chassis segment).
 //   4084  vehicle.body.door_lock_cmd.driver    uint8: 0=unlocked, 1=locked
@@ -412,11 +421,13 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // +kNumAmbientSignals for ambient temp (4090) + ambient humidity (4091).
 // +kNumDoorLockPwSignals for door lock cmds (4084/4085) + power window motor cmds (4086/4087).
 // +kNumIpcTelltaleSignals for IPC seatbelt telltales (4130/4131) — IPC → ev1sim.
+// +kNumIpcTripDistSignals for IPC trip distance (4132) — IPC → ev1sim.
 constexpr int kNumEndpoints =
     NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumCombSw + 1 /*charge_coupler*/ +
     kNumPrndSelector + kNumMotorSignals + kNumThrottleCmdSignals +
     kNumBrakeSignals + kNumWiperSignals + kNumHvacSignals +
     kNumAmbientSignals + kNumDoorLockPwSignals + kNumIpcTelltaleSignals +
+    kNumIpcTripDistSignals +
     kNumDynamics + kNumDriverInputs;
 
 std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
@@ -491,6 +502,11 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     out[i++] = {kSigIpcSeatbeltTelltalePassenger,
                 "vehicle.ipc.seatbelt_telltale_passenger",
                 "ipc_seatbelt_telltale_passenger", true};
+    // IPC trip distance (IPC → ev1sim, chassis segment, input_to_sim=true).
+    // Encoding: float32 LE, metres.  Published on change (epsilon ~0.5 m).
+    out[i++] = {kSigIpcTripDistanceM,
+                "vehicle.ipc.trip_distance_m",
+                "ipc_trip_distance_m", true};
     // Door lock commands (RSA → ev1sim, chassis segment, input_to_sim=true).
     out[i++] = {kSigDoorLockCmdDriver,
                 "vehicle.body.door_lock_cmd.driver",
@@ -786,6 +802,12 @@ struct ExternalSimConnector::State {
     bool          ipc_seatbelt_telltale_passenger      = false;
     bool          has_ipc_seatbelt_telltale_passenger  = false;
 
+    // IPC trip distance (ID 4132, chassis segment) — received from IPC.
+    // float32 LE, metres.  Published on change (epsilon ~0.5 m).  Resets to 0
+    // on trip-reset button press.  -1.0f = never received (sentinel).
+    float         ipc_trip_distance_m      = -1.0f;
+    bool          has_ipc_trip_distance_m  = false;
+
     // Door lock commands (IDs 4084/4085, chassis segment) — received from RSA.
     // 0=unlocked, 1=locked.  0xFF = never received.
     std::uint8_t  door_lock_cmd[2]        = {0xFFu, 0xFFu};  // [0]=driver, [1]=passenger
@@ -1035,6 +1057,13 @@ bool ExternalSimConnector::GetIpcSeatbeltTelltalePassenger() const {
 }
 bool ExternalSimConnector::HasReceivedIpcSeatbeltTelltalePassenger() const {
     return m_state->has_ipc_seatbelt_telltale_passenger;
+}
+
+float ExternalSimConnector::GetIpcTripDistanceM() const {
+    return m_state->ipc_trip_distance_m;
+}
+bool ExternalSimConnector::HasReceivedIpcTripDistance() const {
+    return m_state->has_ipc_trip_distance_m;
 }
 
 bool ExternalSimConnector::GetPimCruiseActive() const {
@@ -1379,6 +1408,9 @@ void ExternalSimConnector::DebugInjectFloat(std::uint32_t signal_id, float value
     } else if (signal_id == kSigPimCruiseSetpointMps) {
         m_state->pim_cruise_setpoint_mps     = value;
         m_state->has_pim_cruise_setpoint_mps = true;
+    } else if (signal_id == kSigIpcTripDistanceM) {
+        m_state->ipc_trip_distance_m     = value;
+        m_state->has_ipc_trip_distance_m = true;
     }
     // Other float signals are not currently subscribed as inputs.
 }
@@ -1577,8 +1609,19 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             const Endpoint* ep = FindEndpoint(d.signal_id);
             if (!ep || !ep->input_to_sim) continue;
             if (d.payload.empty()) continue;
+            // float32 LE chassis-bus signals — decode as 4-byte little-endian float.
+            if (d.signal_id == kSigIpcTripDistanceM) {
+                if (d.payload.size() >= 4) {
+                    DebugInjectFloat(d.signal_id,
+                        [&]() -> float {
+                            std::uint32_t bits = 0;
+                            for (int b = 0; b < 4; ++b)
+                                bits |= static_cast<std::uint32_t>(d.payload[static_cast<std::size_t>(b)]) << (b * 8);
+                            float v; std::memcpy(&v, &bits, 4); return v;
+                        }());
+                }
             // uint8 chassis-bus signals — decode as raw byte.
-            if (d.signal_id == kSigThrottleCmdQ8 ||
+            } else if (d.signal_id == kSigThrottleCmdQ8 ||
                 d.signal_id == kSigWiperMotorCommand ||
                 d.signal_id == kSigWasherPumpCommand ||
                 d.signal_id == kSigDoorLockCmdDriver   ||

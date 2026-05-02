@@ -449,3 +449,34 @@ TEST_CASE("FormatRsaRunModeLabel: unknown enum shows fallback with raw byte",
     CHECK(FormatRsaRunModeLabel(3u, /*ever_received=*/true) == L"Mode: ?(3)");
     CHECK(FormatRsaRunModeLabel(0xFFu, /*ever_received=*/true) == L"Mode: ?(255)");
 }
+
+// ---------------------------------------------------------------------------
+// IPC trip distance label helper (FormatIpcTripDistanceLabel)
+// Signal 4132: float32 LE, metres.  Displayed as km with one decimal place.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("FormatIpcTripDistanceLabel: never-received shows placeholder",
+          "[FloatingUI][IPC][Trip]") {
+    CHECK(FormatIpcTripDistanceLabel(/*ever_received=*/false, 0.0f) == L"Trip: ---");
+    CHECK(FormatIpcTripDistanceLabel(/*ever_received=*/false, -1.0f) == L"Trip: ---");
+}
+
+TEST_CASE("FormatIpcTripDistanceLabel: zero metres shows 0.0 km",
+          "[FloatingUI][IPC][Trip]") {
+    CHECK(FormatIpcTripDistanceLabel(/*ever_received=*/true, 0.0f) == L"Trip: 0.0 km");
+}
+
+TEST_CASE("FormatIpcTripDistanceLabel: 12300 metres shows 12.3 km",
+          "[FloatingUI][IPC][Trip]") {
+    CHECK(FormatIpcTripDistanceLabel(/*ever_received=*/true, 12300.0f) == L"Trip: 12.3 km");
+}
+
+TEST_CASE("FormatIpcTripDistanceLabel: 1000 metres shows 1.0 km",
+          "[FloatingUI][IPC][Trip]") {
+    CHECK(FormatIpcTripDistanceLabel(/*ever_received=*/true, 1000.0f) == L"Trip: 1.0 km");
+}
+
+TEST_CASE("FormatIpcTripDistanceLabel: 500 metres shows 0.5 km",
+          "[FloatingUI][IPC][Trip]") {
+    CHECK(FormatIpcTripDistanceLabel(/*ever_received=*/true, 500.0f) == L"Trip: 0.5 km");
+}
