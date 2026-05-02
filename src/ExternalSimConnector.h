@@ -150,9 +150,14 @@ public:
 
     /// Outgoing seatbelt buckle state (ID 6964).  Encoded as 1-byte uint8
     /// (0=unbuckled, 1=buckled).  Published on main harness segment.
-    /// Defaults to true (driver always buckled) until a UI toggle is added —
-    /// see docs/TODO.md for the floating-UI panel item.
+    /// Driven by PhysicalWorld::Seatbelts.driver_buckled() each tick.
     void SetDriverSeatbeltBuckled(bool buckled);
+
+    /// Outgoing passenger seatbelt buckle state (ID 6965).  Mirrors driver
+    /// (6964) for the passenger seat.  Published on main harness segment.
+    /// Driven by PhysicalWorld::Seatbelts.passenger_buckled() each tick.
+    /// TODO(consumer): IPC seatbelt-light telltale — deferred to future round.
+    void SetDriverSeatbeltBuckledPassenger(bool buckled);
 
     /// Outgoing turn-signal stalk position (IDs 6948, 6949).
     /// Encoded as 1-byte uint8 boolean each (0=inactive, 1=active).
@@ -326,6 +331,18 @@ public:
     /// Received from RHJB. true = pump active, false = idle.
     bool GetWasherPumpCommand() const;
     bool HasReceivedWasherPumpCommand() const;
+
+    /// Incoming door lock commands from RSA (IDs 4084/4085, chassis segment).
+    /// uint8: 0=unlocked, 1=locked.  Returns 0xFF if never received.
+    /// side: 0=driver, 1=passenger.
+    std::uint8_t GetDoorLockCmd(int side) const;
+    bool         HasReceivedDoorLockCmd(int side) const;
+
+    /// Incoming power window motor commands from RSA (IDs 4086/4087, chassis segment).
+    /// uint8: 0=stop, 1=up, 2=down.  Returns 0xFF if never received.
+    /// side: 0=driver, 1=passenger.
+    std::uint8_t GetPowerWindowMotor(int side) const;
+    bool         HasReceivedPowerWindowMotor(int side) const;
 
     // ---------------------------------------------------------------------
     // Test hooks — feed the connector synthetic delta records as though they

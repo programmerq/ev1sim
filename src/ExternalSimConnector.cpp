@@ -116,6 +116,10 @@ constexpr std::uint32_t kSigDriverThrottleQ8      = 6903U;
 constexpr std::uint32_t kSigDriverBrakeSwitch     = 6904U;
 // Driver seatbelt buckle — locked in lockstep with kSigDriverSeatbeltBuckled = 6964.
 constexpr std::uint32_t kSigDriverSeatbeltBuckled = 6964U;
+// Passenger seatbelt buckle — locked in lockstep with
+// kSigDriverSeatbeltBuckledPassenger = 6965 (mirrors driver).
+// TODO(consumer): IPC seatbelt-light telltale — deferred.
+constexpr std::uint32_t kSigDriverSeatbeltBuckledPassenger = 6965U;
 // Turn signal stalk position — locked in lockstep with electricsim
 // ev1_driver_inputs.hpp kSigDriverTurnSignalLeft/Right = 6948/6949.
 constexpr std::uint32_t kSigDriverTurnSignalLeft  = 6948U;
@@ -173,13 +177,14 @@ constexpr std::uint32_t kSigDriverDoorHandleAttemptPassenger = 6991U;
 constexpr int           kNumExteriorKeypadInputs             = 7;  // 5 buttons + 2 handles
 
 // Number of driver-input endpoints on the main harness segment.
-// 6900, 6901, 6902, 6903, 6904, 6944, 6948, 6949, 6964,
+// 6900, 6901, 6902, 6903, 6904, 6944, 6948, 6949, 6964, 6965,
 // 6971, 6975, 6976, 6977, 6978, 6979,
 // 6952, 6953, 6954, 6955, 6956, 6957, 6958, 6959,
 // 6980, 6981, 6982, 6983,
-// 6985, 6986, 6987, 6988, 6989, 6990, 6991 = 34 total.
+// 6985, 6986, 6987, 6988, 6989, 6990, 6991 = 35 total.
 // (6970 is reserved; not registered as an endpoint.)
-constexpr int           kNumDriverInputs = 15 + kNumNewDriverInputs + kNumPowerWindowInputs + kNumExteriorKeypadInputs;
+constexpr int kNumPassengerSeatbelt = 1;  // passenger seatbelt (6965)
+constexpr int           kNumDriverInputs = 15 + kNumNewDriverInputs + kNumPowerWindowInputs + kNumExteriorKeypadInputs + kNumPassengerSeatbelt;
 
 // Motor state signals on the chassis segment (ev1sim → electricsim, float32 LE).
 //   4070  vehicle.dynamics.motor_rpm        motor shaft RPM
@@ -205,6 +210,23 @@ constexpr int           kNumAmbientSignals      = 2;
 constexpr std::uint32_t kSigWiperMotorCommand  = 4080U;
 constexpr std::uint32_t kSigWasherPumpCommand  = 4081U;
 constexpr int           kNumWiperSignals       = 2;
+
+// Door lock commands (electricsim/RSA → ev1sim, chassis segment).
+//   4084  vehicle.body.door_lock_cmd.driver    uint8: 0=unlocked, 1=locked
+//   4085  vehicle.body.door_lock_cmd.passenger uint8: 0=unlocked, 1=locked
+// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// kSigChassisDoorLockCmdDriver = 4084, kSigChassisDoorLockCmdPassenger = 4085.
+constexpr std::uint32_t kSigDoorLockCmdDriver    = 4084U;
+constexpr std::uint32_t kSigDoorLockCmdPassenger = 4085U;
+
+// Power window motor commands (electricsim/RSA → ev1sim, chassis segment).
+//   4086  vehicle.body.power_window_motor.driver    uint8: 0=stop, 1=up, 2=down
+//   4087  vehicle.body.power_window_motor.passenger uint8: 0=stop, 1=up, 2=down
+// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// kSigChassisPowerWindowMotorDriver = 4086, kSigChassisPowerWindowMotorPassenger = 4087.
+constexpr std::uint32_t kSigPowerWindowMotorDriver    = 4086U;
+constexpr std::uint32_t kSigPowerWindowMotorPassenger = 4087U;
+constexpr int           kNumDoorLockPwSignals         = 4;  // 4084+4085+4086+4087
 
 // RSA run-mode broadcast — published by RSA on the main harness segment.
 // ev1sim subscribes to this (input_to_sim = true for subscription, but we
@@ -332,10 +354,11 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // +kNumMotorSignals for motor RPM + torque (IDs 4070-4071, chassis segment).
 // +kNumWiperSignals for wiper motor command (4080) + washer pump command (4081).
 // +kNumAmbientSignals for ambient temp (4090) + ambient humidity (4091).
+// +kNumDoorLockPwSignals for door lock cmds (4084/4085) + power window motor cmds (4086/4087).
 constexpr int kNumEndpoints =
     NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumCombSw + 1 /*charge_coupler*/ +
     kNumPrndSelector + kNumMotorSignals + kNumWiperSignals + kNumAmbientSignals +
-    kNumDynamics + kNumDriverInputs;
+    kNumDoorLockPwSignals + kNumDynamics + kNumDriverInputs;
 
 std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     std::array<ExternalSimConnector::Endpoint, kNumEndpoints> out{};
@@ -387,6 +410,20 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.body.wiper_motor.command", "wiper_motor_command", true};
     out[i++] = {kSigWasherPumpCommand,
                 "vehicle.body.washer_pump.command", "washer_pump_command", true};
+    // Door lock commands (RSA → ev1sim, chassis segment, input_to_sim=true).
+    out[i++] = {kSigDoorLockCmdDriver,
+                "vehicle.body.door_lock_cmd.driver",
+                "door_lock_cmd_driver", true};
+    out[i++] = {kSigDoorLockCmdPassenger,
+                "vehicle.body.door_lock_cmd.passenger",
+                "door_lock_cmd_passenger", true};
+    // Power window motor commands (RSA → ev1sim, chassis segment, input_to_sim=true).
+    out[i++] = {kSigPowerWindowMotorDriver,
+                "vehicle.body.power_window_motor.driver",
+                "power_window_motor_driver", true};
+    out[i++] = {kSigPowerWindowMotorPassenger,
+                "vehicle.body.power_window_motor.passenger",
+                "power_window_motor_passenger", true};
     for (int d = 0; d < kNumDynamics; ++d, ++i) {
         out[i] = {kDynamicsBase + kDynamicsNames[d].offset,
                   kDynamicsNames[d].qualified, kDynamicsNames[d].shortname,
@@ -406,6 +443,9 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.driver.brake_switch", "driver_brake_switch", false};
     out[i++] = {kSigDriverSeatbeltBuckled,
                 "vehicle.driver.seatbelt_buckled", "driver_seatbelt_buckled", false};
+    out[i++] = {kSigDriverSeatbeltBuckledPassenger,
+                "vehicle.driver.seatbelt_buckled_passenger",
+                "driver_seatbelt_buckled_passenger", false};
     out[i++] = {kSigDriverHazardRequest,
                 "vehicle.driver.hazard_request", "driver_hazard_request", false};
     out[i++] = {kSigDriverTurnSignalLeft,
@@ -542,12 +582,14 @@ struct ExternalSimConnector::State {
     std::int16_t  driver_steering_pub = 0x7FFF;
     std::uint8_t  driver_gear_pub    = 0xFF;
     std::uint8_t  driver_throttle_pub = 0xFF;
-    // New discrete driver inputs (ID 6904, 6964) on the main harness segment.
-    bool          driver_brake_switch      = false;
-    bool          driver_seatbelt_buckled  = true;   // default: always buckled
+    // New discrete driver inputs (ID 6904, 6964, 6965) on the main harness segment.
+    bool          driver_brake_switch                = false;
+    bool          driver_seatbelt_buckled            = true;   // default: always buckled
+    bool          driver_seatbelt_buckled_passenger  = true;   // default: always buckled
     // Published sentinels (use 0xFF-equivalent to force first publish).
-    std::int8_t   driver_brake_switch_pub     = -1;  // -1 forces first publish
-    std::int8_t   driver_seatbelt_buckled_pub = -1;  // -1 forces first publish
+    std::int8_t   driver_brake_switch_pub               = -1;  // -1 forces first publish
+    std::int8_t   driver_seatbelt_buckled_pub           = -1;  // -1 forces first publish
+    std::int8_t   driver_seatbelt_buckled_passenger_pub = -1;  // -1 forces first publish
 
     // Turn signal stalk and hazard switch (IDs 6948, 6949, 6944).
     bool          driver_turn_left        = false;
@@ -634,6 +676,16 @@ struct ExternalSimConnector::State {
     // 0=idle, 1=pump active.
     bool          washer_pump_cmd         = false;
     bool          has_washer_pump_cmd     = false;
+
+    // Door lock commands (IDs 4084/4085, chassis segment) — received from RSA.
+    // 0=unlocked, 1=locked.  0xFF = never received.
+    std::uint8_t  door_lock_cmd[2]        = {0xFFu, 0xFFu};  // [0]=driver, [1]=passenger
+    bool          has_door_lock_cmd[2]    = {false, false};
+
+    // Power window motor commands (IDs 4086/4087, chassis segment) — received from RSA.
+    // 0=stop, 1=up, 2=down.  0xFF = never received.
+    std::uint8_t  pw_motor_cmd[2]         = {0xFFu, 0xFFu};  // [0]=driver, [1]=passenger
+    bool          has_pw_motor_cmd[2]     = {false, false};
 
     // RSA run-mode broadcast (ID 5711, main harness segment).
     // Subscribed from RSA; 0xFF = never received.
@@ -787,6 +839,24 @@ bool ExternalSimConnector::HasReceivedWasherPumpCommand() const {
     return m_state->has_washer_pump_cmd;
 }
 
+std::uint8_t ExternalSimConnector::GetDoorLockCmd(int side) const {
+    if (side < 0 || side > 1) return 0xFFu;
+    return m_state->door_lock_cmd[side];
+}
+bool ExternalSimConnector::HasReceivedDoorLockCmd(int side) const {
+    if (side < 0 || side > 1) return false;
+    return m_state->has_door_lock_cmd[side];
+}
+
+std::uint8_t ExternalSimConnector::GetPowerWindowMotor(int side) const {
+    if (side < 0 || side > 1) return 0xFFu;
+    return m_state->pw_motor_cmd[side];
+}
+bool ExternalSimConnector::HasReceivedPowerWindowMotor(int side) const {
+    if (side < 0 || side > 1) return false;
+    return m_state->has_pw_motor_cmd[side];
+}
+
 void ExternalSimConnector::SetPanelSensor(PanelID panel, bool ajar) {
     int idx = static_cast<int>(panel);
     if (idx < 0 || idx >= VehiclePanels::NUM_PANELS) return;
@@ -832,6 +902,10 @@ void ExternalSimConnector::SetDriverBrakeSwitch(bool pressed) {
 
 void ExternalSimConnector::SetDriverSeatbeltBuckled(bool buckled) {
     m_state->driver_seatbelt_buckled = buckled;
+}
+
+void ExternalSimConnector::SetDriverSeatbeltBuckledPassenger(bool buckled) {
+    m_state->driver_seatbelt_buckled_passenger = buckled;
 }
 
 void ExternalSimConnector::SetDriverTurnSignalLeft(bool active) {
@@ -1074,6 +1148,18 @@ void ExternalSimConnector::DebugInjectU8(std::uint32_t signal_id,
     } else if (signal_id == kSigWasherPumpCommand) {
         m_state->washer_pump_cmd     = (value != 0u);
         m_state->has_washer_pump_cmd = true;
+    } else if (signal_id == kSigDoorLockCmdDriver) {
+        m_state->door_lock_cmd[0]  = value;
+        m_state->has_door_lock_cmd[0] = true;
+    } else if (signal_id == kSigDoorLockCmdPassenger) {
+        m_state->door_lock_cmd[1]  = value;
+        m_state->has_door_lock_cmd[1] = true;
+    } else if (signal_id == kSigPowerWindowMotorDriver) {
+        m_state->pw_motor_cmd[0]    = value;
+        m_state->has_pw_motor_cmd[0] = true;
+    } else if (signal_id == kSigPowerWindowMotorPassenger) {
+        m_state->pw_motor_cmd[1]    = value;
+        m_state->has_pw_motor_cmd[1] = true;
     }
     // All other uint8 signals are not currently subscribed as inputs.
 }
@@ -1213,8 +1299,12 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             const Endpoint* ep = FindEndpoint(d.signal_id);
             if (!ep || !ep->input_to_sim) continue;
             if (d.payload.empty()) continue;
-            // The wiper motor command (4080) is a uint8 enum — decode as raw byte.
-            if (d.signal_id == kSigWiperMotorCommand) {
+            // Uint8 enum signals — decode as raw byte.
+            if (d.signal_id == kSigWiperMotorCommand   ||
+                d.signal_id == kSigDoorLockCmdDriver   ||
+                d.signal_id == kSigDoorLockCmdPassenger ||
+                d.signal_id == kSigPowerWindowMotorDriver ||
+                d.signal_id == kSigPowerWindowMotorPassenger) {
                 DebugInjectU8(d.signal_id, d.payload[0]);
             } else {
                 // All other inbound signals are boolean (bool) — decode LSB.
@@ -1437,6 +1527,13 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         if (seatbelt_val != st.driver_seatbelt_buckled_pub) {
             drv.push_back(MakeBoolDelta(kSigDriverSeatbeltBuckled, st.driver_seatbelt_buckled));
             st.driver_seatbelt_buckled_pub = seatbelt_val;
+        }
+        // Passenger seatbelt (6965) — publish on change.
+        const std::int8_t seatbelt_p_val = st.driver_seatbelt_buckled_passenger ? 1 : 0;
+        if (seatbelt_p_val != st.driver_seatbelt_buckled_passenger_pub) {
+            drv.push_back(MakeBoolDelta(kSigDriverSeatbeltBuckledPassenger,
+                                        st.driver_seatbelt_buckled_passenger));
+            st.driver_seatbelt_buckled_passenger_pub = seatbelt_p_val;
         }
         // Turn signal stalk (6948, 6949) and hazard (6944) — publish on change.
         const std::int8_t turn_left_val  = st.driver_turn_left  ? 1 : 0;
