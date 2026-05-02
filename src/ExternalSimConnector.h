@@ -344,6 +344,16 @@ public:
     std::uint8_t GetPowerWindowMotor(int side) const;
     bool         HasReceivedPowerWindowMotor(int side) const;
 
+    /// Incoming HVAC blower level from HTCM (ID 4082, chassis segment).
+    /// uint8: 0=OFF, 1=LOW, 2=MED, 3=HIGH.  Returns 0xFF if never received.
+    std::uint8_t GetHvacBlowerLevel() const;
+    bool         HasReceivedHvacBlowerLevel() const;
+
+    /// Incoming defrost grid active flag from HTCM (ID 4083, chassis segment).
+    /// bool: true = rear defrost grid energised.  Returns false if never received.
+    bool GetDefrostGridActive() const;
+    bool HasReceivedDefrostGridActive() const;
+
     // ---------------------------------------------------------------------
     // Test hooks — feed the connector synthetic delta records as though they
     // arrived over the bus.  Used by unit tests; not part of the runtime path.

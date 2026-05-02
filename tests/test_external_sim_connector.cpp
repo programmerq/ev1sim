@@ -19,6 +19,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     constexpr int kNumPrnd        = 4;   // PRND selector lines (4050-4053)
     constexpr int kNumMotor       = 2;   // motor_rpm (4070), motor_torque_nm (4071)
     constexpr int kNumWiper       = 2;   // wiper_motor_command (4080), washer_pump_command (4081)
+    constexpr int kNumHvac        = 2;   // hvac_blower_level (4082), defrost_grid_active (4083)
     constexpr int kNumAmbient     = 2;   // ambient_temp_c (4090), ambient_humidity_pct (4091)
     constexpr int kNumDoorLockPw  = 4;   // door_lock_cmd driver/passenger (4084/4085)
                                          // + power_window_motor driver/passenger (4086/4087)
@@ -43,7 +44,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     constexpr int kNumDriverInputs = 35;  // +1 for passenger seatbelt (6965)
     const int expected = NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS +
                          kNumCombSw + kNumChargeCplr + kNumPrnd + kNumMotor +
-                         kNumWiper + kNumAmbient + kNumDoorLockPw +
+                         kNumWiper + kNumHvac + kNumAmbient + kNumDoorLockPw +
                          kNumDynamics + kNumDriverInputs;
     REQUIRE(ExternalSimConnector::EndpointCount() == expected);
 
@@ -58,6 +59,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     int charge_coupler_count = 0;
     int prnd_count           = 0;
     int dynamics_count       = 0;   // includes motor_rpm + motor_torque_nm
+    int hvac_count           = 0;   // hvac_blower_level (4082) + defrost_grid_active (4083)
     int door_lock_pw_count   = 0;   // door lock cmds (4084/4085) + pw motor cmds (4086/4087)
     int driver_input_count   = 0;
 
@@ -92,6 +94,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
         } else if (e.signal_id == 4080 || e.signal_id == 4081) {
             CHECK(e.input_to_sim);          // wiper motor + washer pump cmds flow into ev1sim
             ++dynamics_count;
+        } else if (e.signal_id == 4082 || e.signal_id == 4083) {
+            CHECK(e.input_to_sim);          // HTCM blower level + defrost grid flow into ev1sim
+            ++hvac_count;
         } else if (e.signal_id >= 4084 && e.signal_id <= 4087) {
             CHECK(e.input_to_sim);          // door lock cmds (4084/4085) + pw motor cmds (4086/4087) flow into ev1sim
             ++door_lock_pw_count;
@@ -143,6 +148,8 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     // dynamics_count: 18 original dynamics + 2 motor (4070-4071)
     // + 2 wiper (4080-4081) + 2 ambient env (4090-4091).
     CHECK(dynamics_count       == kNumDynamics + kNumMotor + kNumWiper + kNumAmbient);
+    // hvac_count: blower level (4082) + defrost grid (4083) — from HTCM.
+    CHECK(hvac_count           == kNumHvac);
     // door_lock_pw_count: door lock cmds (4084/4085) + power window motor cmds (4086/4087).
     CHECK(door_lock_pw_count   == kNumDoorLockPw);
     CHECK(driver_input_count   == kNumDriverInputs);
@@ -774,4 +781,75 @@ TEST_CASE("FindEndpoint returns door lock and power window motor cmd rows",
     REQUIRE(pw_pax != nullptr);
     CHECK(std::string(pw_pax->qualified_name) == "vehicle.body.power_window_motor.passenger");
     CHECK(pw_pax->input_to_sim);
+}
+
+// ---------------------------------------------------------------------------
+// HVAC blower level subscription (chassis bus 4082)
+// ---------------------------------------------------------------------------
+
+TEST_CASE("HVAC blower level subscription: default never-received sentinel",
+          "[ExternalSim][HVAC]") {
+    ExternalSimConnector c;
+    CHECK_FALSE(c.HasReceivedHvacBlowerLevel());
+    // 0xFF is the "never received" sentinel.
+    CHECK(c.GetHvacBlowerLevel() == 0xFFu);
+}
+
+TEST_CASE("HVAC blower level subscription: DebugInjectU8 delivers all four levels",
+          "[ExternalSim][HVAC]") {
+    // Encoding per htcm_supervisor.h: 0=OFF, 1=LOW, 2=MED, 3=HIGH.
+    for (std::uint8_t level = 0; level <= 3; ++level) {
+        ExternalSimConnector c;
+        c.DebugInjectU8(4082, level);  // 4082 = kSigChassisHvacBlowerLevel
+        CHECK(c.HasReceivedHvacBlowerLevel());
+        CHECK(c.GetHvacBlowerLevel() == level);
+    }
+}
+
+TEST_CASE("HVAC blower level subscription: FindEndpoint returns correct metadata",
+          "[ExternalSim][HVAC]") {
+    const auto* ep = ExternalSimConnector::FindEndpoint(4082);
+    REQUIRE(ep != nullptr);
+    CHECK(std::string(ep->qualified_name) == "vehicle.hvac.blower_level");
+    CHECK(std::string(ep->short_name)     == "hvac_blower_level");
+    CHECK(ep->input_to_sim);   // HTCM publishes → ev1sim subscribes
+}
+
+// ---------------------------------------------------------------------------
+// HVAC defrost grid subscription (chassis bus 4083)
+// ---------------------------------------------------------------------------
+
+TEST_CASE("HVAC defrost grid subscription: default never-received / inactive",
+          "[ExternalSim][HVAC]") {
+    ExternalSimConnector c;
+    CHECK_FALSE(c.HasReceivedDefrostGridActive());
+    CHECK_FALSE(c.GetDefrostGridActive());   // default false (safe/off)
+}
+
+TEST_CASE("HVAC defrost grid subscription: DebugInjectU8 activates defrost",
+          "[ExternalSim][HVAC]") {
+    ExternalSimConnector c;
+    c.DebugInjectU8(4083, 1u);  // 4083 = kSigChassisDefrostGridActive, 1=active
+    CHECK(c.HasReceivedDefrostGridActive());
+    CHECK(c.GetDefrostGridActive());
+}
+
+TEST_CASE("HVAC defrost grid subscription: DebugInjectU8 deactivates defrost",
+          "[ExternalSim][HVAC]") {
+    ExternalSimConnector c;
+    // Activate then deactivate.
+    c.DebugInjectU8(4083, 1u);
+    CHECK(c.GetDefrostGridActive());
+    c.DebugInjectU8(4083, 0u);  // 0=inactive
+    CHECK(c.HasReceivedDefrostGridActive());
+    CHECK_FALSE(c.GetDefrostGridActive());
+}
+
+TEST_CASE("HVAC defrost grid subscription: FindEndpoint returns correct metadata",
+          "[ExternalSim][HVAC]") {
+    const auto* ep = ExternalSimConnector::FindEndpoint(4083);
+    REQUIRE(ep != nullptr);
+    CHECK(std::string(ep->qualified_name) == "vehicle.hvac.defrost_grid_active");
+    CHECK(std::string(ep->short_name)     == "hvac_defrost_grid_active");
+    CHECK(ep->input_to_sim);   // HTCM publishes → ev1sim subscribes
 }

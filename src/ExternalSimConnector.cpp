@@ -211,6 +211,18 @@ constexpr std::uint32_t kSigWiperMotorCommand  = 4080U;
 constexpr std::uint32_t kSigWasherPumpCommand  = 4081U;
 constexpr int           kNumWiperSignals       = 2;
 
+// HVAC blower level + defrost grid (electricsim/HTCM → ev1sim, chassis segment).
+//   4082  vehicle.hvac.blower_level   uint8 enum: 0=OFF, 1=LOW, 2=MED, 3=HIGH
+//   4083  vehicle.hvac.defrost_grid   uint8 bool: 0=inactive, 1=active
+// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// kSigChassisHvacBlowerLevel = 4082, kSigChassisDefrostGridActive = 4083.
+// Encoding confirmed from electricsim/ev1/htcm/htcm_supervisor.h:
+//   hvac_blower_level: 0=OFF, 1=LOW, 2=MED, 3=HIGH (clamped 0-3)
+//   defrost_grid_active: bool
+constexpr std::uint32_t kSigHvacBlowerLevel  = 4082U;
+constexpr std::uint32_t kSigDefrostGridActive = 4083U;
+constexpr int           kNumHvacSignals       = 2;
+
 // Door lock commands (electricsim/RSA → ev1sim, chassis segment).
 //   4084  vehicle.body.door_lock_cmd.driver    uint8: 0=unlocked, 1=locked
 //   4085  vehicle.body.door_lock_cmd.passenger uint8: 0=unlocked, 1=locked
@@ -353,12 +365,13 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // +kNumPrndSelector for the 4 PRND selector lines (IDs 4050-4053, chassis segment).
 // +kNumMotorSignals for motor RPM + torque (IDs 4070-4071, chassis segment).
 // +kNumWiperSignals for wiper motor command (4080) + washer pump command (4081).
+// +kNumHvacSignals for hvac_blower_level (4082) + defrost_grid_active (4083).
 // +kNumAmbientSignals for ambient temp (4090) + ambient humidity (4091).
 // +kNumDoorLockPwSignals for door lock cmds (4084/4085) + power window motor cmds (4086/4087).
 constexpr int kNumEndpoints =
     NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumCombSw + 1 /*charge_coupler*/ +
-    kNumPrndSelector + kNumMotorSignals + kNumWiperSignals + kNumAmbientSignals +
-    kNumDoorLockPwSignals + kNumDynamics + kNumDriverInputs;
+    kNumPrndSelector + kNumMotorSignals + kNumWiperSignals + kNumHvacSignals +
+    kNumAmbientSignals + kNumDoorLockPwSignals + kNumDynamics + kNumDriverInputs;
 
 std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     std::array<ExternalSimConnector::Endpoint, kNumEndpoints> out{};
@@ -410,6 +423,12 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.body.wiper_motor.command", "wiper_motor_command", true};
     out[i++] = {kSigWasherPumpCommand,
                 "vehicle.body.washer_pump.command", "washer_pump_command", true};
+    // HVAC blower level + defrost grid (HTCM → ev1sim, chassis segment, input_to_sim=true).
+    // Encoding: blower 0=OFF/1=LOW/2=MED/3=HIGH; defrost 0=off/1=on.
+    out[i++] = {kSigHvacBlowerLevel,
+                "vehicle.hvac.blower_level", "hvac_blower_level", true};
+    out[i++] = {kSigDefrostGridActive,
+                "vehicle.hvac.defrost_grid_active", "hvac_defrost_grid_active", true};
     // Door lock commands (RSA → ev1sim, chassis segment, input_to_sim=true).
     out[i++] = {kSigDoorLockCmdDriver,
                 "vehicle.body.door_lock_cmd.driver",
@@ -677,6 +696,15 @@ struct ExternalSimConnector::State {
     bool          washer_pump_cmd         = false;
     bool          has_washer_pump_cmd     = false;
 
+    // HVAC blower level (ID 4082, chassis segment) — received from HTCM.
+    // uint8: 0=OFF, 1=LOW, 2=MED, 3=HIGH.  0xFF = never received.
+    std::uint8_t  hvac_blower_level       = 0xFFu;
+    bool          has_hvac_blower_level   = false;
+    // HVAC defrost grid active (ID 4083, chassis segment) — received from HTCM.
+    // bool: false=inactive, true=active.
+    bool          hvac_defrost_grid_active     = false;
+    bool          has_hvac_defrost_grid_active = false;
+
     // Door lock commands (IDs 4084/4085, chassis segment) — received from RSA.
     // 0=unlocked, 1=locked.  0xFF = never received.
     std::uint8_t  door_lock_cmd[2]        = {0xFFu, 0xFFu};  // [0]=driver, [1]=passenger
@@ -855,6 +883,20 @@ std::uint8_t ExternalSimConnector::GetPowerWindowMotor(int side) const {
 bool ExternalSimConnector::HasReceivedPowerWindowMotor(int side) const {
     if (side < 0 || side > 1) return false;
     return m_state->has_pw_motor_cmd[side];
+}
+
+std::uint8_t ExternalSimConnector::GetHvacBlowerLevel() const {
+    return m_state->hvac_blower_level;
+}
+bool ExternalSimConnector::HasReceivedHvacBlowerLevel() const {
+    return m_state->has_hvac_blower_level;
+}
+
+bool ExternalSimConnector::GetDefrostGridActive() const {
+    return m_state->hvac_defrost_grid_active;
+}
+bool ExternalSimConnector::HasReceivedDefrostGridActive() const {
+    return m_state->has_hvac_defrost_grid_active;
 }
 
 void ExternalSimConnector::SetPanelSensor(PanelID panel, bool ajar) {
@@ -1160,6 +1202,12 @@ void ExternalSimConnector::DebugInjectU8(std::uint32_t signal_id,
     } else if (signal_id == kSigPowerWindowMotorPassenger) {
         m_state->pw_motor_cmd[1]    = value;
         m_state->has_pw_motor_cmd[1] = true;
+    } else if (signal_id == kSigHvacBlowerLevel) {
+        m_state->hvac_blower_level     = value;
+        m_state->has_hvac_blower_level = true;
+    } else if (signal_id == kSigDefrostGridActive) {
+        m_state->hvac_defrost_grid_active     = (value != 0u);
+        m_state->has_hvac_defrost_grid_active = true;
     }
     // All other uint8 signals are not currently subscribed as inputs.
 }
@@ -1304,7 +1352,9 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                 d.signal_id == kSigDoorLockCmdDriver   ||
                 d.signal_id == kSigDoorLockCmdPassenger ||
                 d.signal_id == kSigPowerWindowMotorDriver ||
-                d.signal_id == kSigPowerWindowMotorPassenger) {
+                d.signal_id == kSigPowerWindowMotorPassenger ||
+                d.signal_id == kSigHvacBlowerLevel     ||
+                d.signal_id == kSigDefrostGridActive) {
                 DebugInjectU8(d.signal_id, d.payload[0]);
             } else {
                 // All other inbound signals are boolean (bool) — decode LSB.
