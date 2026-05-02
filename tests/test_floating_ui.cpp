@@ -297,3 +297,46 @@ TEST_CASE("FormatDefrostGridLabel: OFF when not active", "[FloatingUI][HVAC]") {
 TEST_CASE("FormatDefrostGridLabel: ON when active", "[FloatingUI][HVAC]") {
     CHECK(FormatDefrostGridLabel(true) == L"Defrost: ON");
 }
+
+// ---------------------------------------------------------------------------
+// IPC LCD telltale label helpers (FormatIpcSeatbeltTelltaleLabel)
+// ---------------------------------------------------------------------------
+
+TEST_CASE("FormatIpcSeatbeltTelltaleLabel: driver lamp off (received)",
+          "[FloatingUI][IPC]") {
+    CHECK(FormatIpcSeatbeltTelltaleLabel(L"D", false, /*ever_received=*/true)
+          == L"Seatbelt (D): OFF");
+}
+
+TEST_CASE("FormatIpcSeatbeltTelltaleLabel: driver lamp on (received)",
+          "[FloatingUI][IPC]") {
+    CHECK(FormatIpcSeatbeltTelltaleLabel(L"D", true, /*ever_received=*/true)
+          == L"Seatbelt (D): ON");
+}
+
+TEST_CASE("FormatIpcSeatbeltTelltaleLabel: driver never-received shows placeholder",
+          "[FloatingUI][IPC]") {
+    // lamp_on is ignored when ever_received is false.
+    CHECK(FormatIpcSeatbeltTelltaleLabel(L"D", false, /*ever_received=*/false)
+          == L"Seatbelt (D): ---");
+    CHECK(FormatIpcSeatbeltTelltaleLabel(L"D", true, /*ever_received=*/false)
+          == L"Seatbelt (D): ---");
+}
+
+TEST_CASE("FormatIpcSeatbeltTelltaleLabel: passenger lamp off (received)",
+          "[FloatingUI][IPC]") {
+    CHECK(FormatIpcSeatbeltTelltaleLabel(L"P", false, /*ever_received=*/true)
+          == L"Seatbelt (P): OFF");
+}
+
+TEST_CASE("FormatIpcSeatbeltTelltaleLabel: passenger lamp on (received)",
+          "[FloatingUI][IPC]") {
+    CHECK(FormatIpcSeatbeltTelltaleLabel(L"P", true, /*ever_received=*/true)
+          == L"Seatbelt (P): ON");
+}
+
+TEST_CASE("FormatIpcSeatbeltTelltaleLabel: passenger never-received shows placeholder",
+          "[FloatingUI][IPC]") {
+    CHECK(FormatIpcSeatbeltTelltaleLabel(L"P", false, /*ever_received=*/false)
+          == L"Seatbelt (P): ---");
+}

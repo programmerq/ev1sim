@@ -352,6 +352,29 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                         m_external_sim->GetDefrostGridActive());
                 },
                 []() {});   // no-op: display-only row
+
+            // --- IPC LCD telltale status (display-only; no click action) ---
+            // Subscribes to IPC chassis-bus signals 4130 (driver seatbelt telltale)
+            // and 4131 (passenger seatbelt telltale).  Lamp is ON when the seat is
+            // unbuckled AND vehicle speed > ~8 km/h (IPC supervisor threshold).
+            // Labels update each frame via UpdateLabels().
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatIpcSeatbeltTelltaleLabel(
+                        L"D",
+                        m_external_sim->GetIpcSeatbeltTelltaleDriver(),
+                        m_external_sim->HasReceivedIpcSeatbeltTelltaleDriver());
+                },
+                []() {});   // no-op: display-only row
+
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatIpcSeatbeltTelltaleLabel(
+                        L"P",
+                        m_external_sim->GetIpcSeatbeltTelltalePassenger(),
+                        m_external_sim->HasReceivedIpcSeatbeltTelltalePassenger());
+                },
+                []() {});   // no-op: display-only row
         }
     }
 

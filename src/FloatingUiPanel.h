@@ -64,6 +64,15 @@ std::wstring FormatHvacBlowerLabel(std::uint8_t level);
 /// Format defrost grid status label.  active: true=ON, false=OFF.
 std::wstring FormatDefrostGridLabel(bool active);
 
+// IPC LCD telltale status label helpers (display-only, not buttons).
+/// Format IPC seatbelt telltale label.
+/// seat_name: e.g. L"D" (driver) or L"P" (passenger).
+/// lamp_on: true=lamp on (unbuckled at speed), false=lamp off.
+/// ever_received: false if no data from IPC yet (shows "---").
+std::wstring FormatIpcSeatbeltTelltaleLabel(const wchar_t* seat_name,
+                                            bool lamp_on,
+                                            bool ever_received);
+
 // ---------------------------------------------------------------------------
 class FloatingUiPanel : public irr::IEventReceiver {
 public:

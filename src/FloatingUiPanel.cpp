@@ -84,6 +84,20 @@ std::wstring FormatDefrostGridLabel(bool active) {
     return active ? L"Defrost: ON" : L"Defrost: OFF";
 }
 
+std::wstring FormatIpcSeatbeltTelltaleLabel(const wchar_t* seat_name,
+                                            bool lamp_on,
+                                            bool ever_received) {
+    std::wstring label = L"Seatbelt (";
+    label += seat_name;
+    label += L"): ";
+    if (!ever_received) {
+        label += L"---";
+    } else {
+        label += lamp_on ? L"ON" : L"OFF";
+    }
+    return label;
+}
+
 // ---------------------------------------------------------------------------
 // FloatingUiPanel
 // ---------------------------------------------------------------------------
