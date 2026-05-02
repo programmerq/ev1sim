@@ -414,6 +414,36 @@ public:
     float GetIpcTripDistanceM() const;
     bool  HasReceivedIpcTripDistance() const;
 
+    /// Incoming IPC brake telltale (ID 4134, chassis segment).
+    /// Published by IPC when the BTCM reports brake_ind (DTC 42).
+    /// bool: true = lamp on, false = lamp off.  Returns false if never received.
+    bool GetIpcBrakeTelltale() const;
+    bool HasReceivedIpcBrakeTelltale() const;
+
+    /// Incoming IPC park brake telltale (ID 4135, chassis segment).
+    /// Published by IPC when the BTCM reports park_brake_ind (DTC 44).
+    /// bool: true = lamp on, false = lamp off.  Returns false if never received.
+    bool GetIpcParkBrakeTelltale() const;
+    bool HasReceivedIpcParkBrakeTelltale() const;
+
+    /// Incoming IPC antilock telltale (ID 4136, chassis segment).
+    /// Published by IPC when the BTCM reports antilock_ind (DTC 41).
+    /// bool: true = lamp on, false = lamp off.  Returns false if never received.
+    bool GetIpcAntilockTelltale() const;
+    bool HasReceivedIpcAntilockTelltale() const;
+
+    /// Incoming IPC low-traction telltale (ID 4137, chassis segment).
+    /// Published by IPC when the BTCM reports low_trac_ind (DTC 43).
+    /// bool: true = lamp on, false = lamp off.  Returns false if never received.
+    bool GetIpcLowTracTelltale() const;
+    bool HasReceivedIpcLowTracTelltale() const;
+
+    /// Incoming IPC airbag telltale (ID 4138, chassis segment).
+    /// Published by IPC when ipc_supervisor_set_airbag_input(true) is active (DTC 40).
+    /// bool: true = lamp on, false = lamp off.  Returns false if never received.
+    bool GetIpcAirBagTelltale() const;
+    bool HasReceivedIpcAirBagTelltale() const;
+
     /// Incoming PIM cruise-control active flag (ID 5860, main harness segment).
     /// Published by PIM each tick on change.
     /// bool: true = cruise ACTIVE (engaged), false = STANDBY or OFF.

@@ -110,6 +110,16 @@ std::wstring FormatPimCruiseStatusLabel(bool ever_received_active,
 /// Shows "Trip: 12.3 km" (one decimal place).
 std::wstring FormatIpcTripDistanceLabel(bool ever_received, float distance_m);
 
+// IPC BTCM / airbag telltale label helpers (display-only, not buttons).
+/// Format an IPC telltale label using a short display name.
+/// name: e.g. L"Brake", L"ParkBrake", L"ABS", L"LowTrac", L"AirBag".
+/// lamp_on: true=lamp on, false=lamp off.
+/// ever_received: false if no frame received yet (shows "---").
+/// Shows e.g. "Brake: ON" / "Brake: OFF" / "Brake: ---".
+std::wstring FormatIpcTelltaleLampLabel(const wchar_t* name,
+                                        bool lamp_on,
+                                        bool ever_received);
+
 // Pedal percent label helpers (display-only, not buttons).
 /// Format throttle or brake pedal position as an integer percent.
 /// name: label prefix, e.g. "Throttle" or "Brake".

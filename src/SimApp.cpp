@@ -413,6 +413,63 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                 },
                 []() {});   // no-op: display-only row
 
+            // --- IPC BTCM / airbag telltales (display-only; chassis bus 4134–4138) ---
+            // Subscribes to kSigChassisIpcBrakeTelltale (4134) published by IPC each tick.
+            // Driven by BTCM brake_ind (DTC 42).  Shows "Brake: ON / OFF / ---".
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatIpcTelltaleLampLabel(
+                        L"Brake",
+                        m_external_sim->GetIpcBrakeTelltale(),
+                        m_external_sim->HasReceivedIpcBrakeTelltale());
+                },
+                []() {});   // no-op: display-only row
+
+            // Subscribes to kSigChassisIpcParkBrakeTelltale (4135) published by IPC.
+            // Driven by BTCM park_brake_ind (DTC 44).  Shows "ParkBrake: ON / OFF / ---".
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatIpcTelltaleLampLabel(
+                        L"ParkBrake",
+                        m_external_sim->GetIpcParkBrakeTelltale(),
+                        m_external_sim->HasReceivedIpcParkBrakeTelltale());
+                },
+                []() {});   // no-op: display-only row
+
+            // Subscribes to kSigChassisIpcAntilockTelltale (4136) published by IPC.
+            // Driven by BTCM antilock_ind (DTC 41).  Shows "ABS: ON / OFF / ---".
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatIpcTelltaleLampLabel(
+                        L"ABS",
+                        m_external_sim->GetIpcAntilockTelltale(),
+                        m_external_sim->HasReceivedIpcAntilockTelltale());
+                },
+                []() {});   // no-op: display-only row
+
+            // Subscribes to kSigChassisIpcLowTracTelltale (4137) published by IPC.
+            // Driven by BTCM low_trac_ind (DTC 43).  Shows "LowTrac: ON / OFF / ---".
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatIpcTelltaleLampLabel(
+                        L"LowTrac",
+                        m_external_sim->GetIpcLowTracTelltale(),
+                        m_external_sim->HasReceivedIpcLowTracTelltale());
+                },
+                []() {});   // no-op: display-only row
+
+            // Subscribes to kSigChassisIpcAirBagTelltale (4138) published by IPC.
+            // Driven by ipc_supervisor_set_airbag_input (DTC 40).
+            // Shows "AirBag: ON / OFF / ---".
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatIpcTelltaleLampLabel(
+                        L"AirBag",
+                        m_external_sim->GetIpcAirBagTelltale(),
+                        m_external_sim->HasReceivedIpcAirBagTelltale());
+                },
+                []() {});   // no-op: display-only row
+
             // --- RSA shift-blocked cue (display-only; chassis bus 4088) ---
             // Subscribes to kSigChassisRsaShiftBlocked (4088) published by RSA.
             // Shows "Shift: BRAKE TO SHIFT" when a P→non-P shift is refused,

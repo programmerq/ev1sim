@@ -163,6 +163,19 @@ std::wstring FormatIpcTripDistanceLabel(bool ever_received, float distance_m) {
     return buf;
 }
 
+std::wstring FormatIpcTelltaleLampLabel(const wchar_t* name,
+                                        bool lamp_on,
+                                        bool ever_received) {
+    std::wstring label = name;
+    label += L": ";
+    if (!ever_received) {
+        label += L"---";
+    } else {
+        label += lamp_on ? L"ON" : L"OFF";
+    }
+    return label;
+}
+
 std::wstring FormatPedalPercentLabel(const char* name, double value_0_to_1) {
     // Build a wide-character version of the name.
     wchar_t wname[64] = {};

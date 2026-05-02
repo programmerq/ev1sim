@@ -259,6 +259,21 @@ constexpr int           kNumIpcTelltaleSignals           = 2;
 constexpr std::uint32_t kSigIpcTripDistanceM    = 4132U;
 constexpr int           kNumIpcTripDistSignals  = 1;
 
+// IPC BTCM / airbag telltale outputs (electricsim/IPC → ev1sim, chassis segment).
+//   4134  vehicle.ipc.brake_telltale         uint8 bool: 0=off, 1=on (DTC 42, BTCM brake_ind)
+//   4135  vehicle.ipc.park_brake_telltale    uint8 bool: 0=off, 1=on (DTC 44, BTCM park_brake_ind)
+//   4136  vehicle.ipc.antilock_telltale      uint8 bool: 0=off, 1=on (DTC 41, BTCM antilock_ind)
+//   4137  vehicle.ipc.low_trac_telltale      uint8 bool: 0=off, 1=on (DTC 43, BTCM low_trac_ind)
+//   4138  vehicle.ipc.air_bag_telltale       uint8 bool: 0=off, 1=on (DTC 40, set_airbag_input)
+// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// kSigChassisIpcBrakeTelltale=4134 .. kSigChassisIpcAirBagTelltale=4138.
+constexpr std::uint32_t kSigIpcBrakeTelltale     = 4134U;
+constexpr std::uint32_t kSigIpcParkBrakeTelltale = 4135U;
+constexpr std::uint32_t kSigIpcAntilockTelltale  = 4136U;
+constexpr std::uint32_t kSigIpcLowTracTelltale   = 4137U;
+constexpr std::uint32_t kSigIpcAirBagTelltale    = 4138U;
+constexpr int           kNumIpcBtcmTelltaleSignals = 5;
+
 // Door lock commands (electricsim/RSA → ev1sim, chassis segment).
 //   4084  vehicle.body.door_lock_cmd.driver    uint8: 0=unlocked, 1=locked
 //   4085  vehicle.body.door_lock_cmd.passenger uint8: 0=unlocked, 1=locked
@@ -432,12 +447,13 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // +kNumRsaShiftBlockedSignals for RSA shift-blocked cue (4088) — RSA → ev1sim.
 // +kNumIpcTelltaleSignals for IPC seatbelt telltales (4130/4131) — IPC → ev1sim.
 // +kNumIpcTripDistSignals for IPC trip distance (4132) — IPC → ev1sim.
+// +kNumIpcBtcmTelltaleSignals for IPC BTCM/airbag telltales (4134–4138) — IPC → ev1sim.
 constexpr int kNumEndpoints =
     NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumCombSw + 1 /*charge_coupler*/ +
     kNumPrndSelector + kNumMotorSignals + kNumThrottleCmdSignals +
     kNumBrakeSignals + kNumWiperSignals + kNumHvacSignals +
     kNumAmbientSignals + kNumDoorLockPwSignals + kNumRsaShiftBlockedSignals +
-    kNumIpcTelltaleSignals + kNumIpcTripDistSignals +
+    kNumIpcTelltaleSignals + kNumIpcTripDistSignals + kNumIpcBtcmTelltaleSignals +
     kNumDynamics + kNumDriverInputs;
 
 std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
@@ -517,6 +533,23 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     out[i++] = {kSigIpcTripDistanceM,
                 "vehicle.ipc.trip_distance_m",
                 "ipc_trip_distance_m", true};
+    // IPC BTCM / airbag telltales (IPC → ev1sim, chassis segment, input_to_sim=true).
+    // Encoding: uint8 bool — 0=lamp off, 1=lamp on.
+    out[i++] = {kSigIpcBrakeTelltale,
+                "vehicle.ipc.brake_telltale",
+                "ipc_brake_telltale", true};
+    out[i++] = {kSigIpcParkBrakeTelltale,
+                "vehicle.ipc.park_brake_telltale",
+                "ipc_park_brake_telltale", true};
+    out[i++] = {kSigIpcAntilockTelltale,
+                "vehicle.ipc.antilock_telltale",
+                "ipc_antilock_telltale", true};
+    out[i++] = {kSigIpcLowTracTelltale,
+                "vehicle.ipc.low_trac_telltale",
+                "ipc_low_trac_telltale", true};
+    out[i++] = {kSigIpcAirBagTelltale,
+                "vehicle.ipc.air_bag_telltale",
+                "ipc_air_bag_telltale", true};
     // Door lock commands (RSA → ev1sim, chassis segment, input_to_sim=true).
     out[i++] = {kSigDoorLockCmdDriver,
                 "vehicle.body.door_lock_cmd.driver",
@@ -823,6 +856,19 @@ struct ExternalSimConnector::State {
     float         ipc_trip_distance_m      = -1.0f;
     bool          has_ipc_trip_distance_m  = false;
 
+    // IPC BTCM / airbag telltales (IDs 4134–4138, chassis segment) — received from IPC.
+    // bool: false=lamp off, true=lamp on.
+    bool          ipc_brake_telltale              = false;
+    bool          has_ipc_brake_telltale          = false;
+    bool          ipc_park_brake_telltale         = false;
+    bool          has_ipc_park_brake_telltale     = false;
+    bool          ipc_antilock_telltale           = false;
+    bool          has_ipc_antilock_telltale       = false;
+    bool          ipc_low_trac_telltale           = false;
+    bool          has_ipc_low_trac_telltale       = false;
+    bool          ipc_air_bag_telltale            = false;
+    bool          has_ipc_air_bag_telltale        = false;
+
     // Door lock commands (IDs 4084/4085, chassis segment) — received from RSA.
     // 0=unlocked, 1=locked.  0xFF = never received.
     std::uint8_t  door_lock_cmd[2]        = {0xFFu, 0xFFu};  // [0]=driver, [1]=passenger
@@ -1092,6 +1138,41 @@ float ExternalSimConnector::GetIpcTripDistanceM() const {
 }
 bool ExternalSimConnector::HasReceivedIpcTripDistance() const {
     return m_state->has_ipc_trip_distance_m;
+}
+
+bool ExternalSimConnector::GetIpcBrakeTelltale() const {
+    return m_state->ipc_brake_telltale;
+}
+bool ExternalSimConnector::HasReceivedIpcBrakeTelltale() const {
+    return m_state->has_ipc_brake_telltale;
+}
+
+bool ExternalSimConnector::GetIpcParkBrakeTelltale() const {
+    return m_state->ipc_park_brake_telltale;
+}
+bool ExternalSimConnector::HasReceivedIpcParkBrakeTelltale() const {
+    return m_state->has_ipc_park_brake_telltale;
+}
+
+bool ExternalSimConnector::GetIpcAntilockTelltale() const {
+    return m_state->ipc_antilock_telltale;
+}
+bool ExternalSimConnector::HasReceivedIpcAntilockTelltale() const {
+    return m_state->has_ipc_antilock_telltale;
+}
+
+bool ExternalSimConnector::GetIpcLowTracTelltale() const {
+    return m_state->ipc_low_trac_telltale;
+}
+bool ExternalSimConnector::HasReceivedIpcLowTracTelltale() const {
+    return m_state->has_ipc_low_trac_telltale;
+}
+
+bool ExternalSimConnector::GetIpcAirBagTelltale() const {
+    return m_state->ipc_air_bag_telltale;
+}
+bool ExternalSimConnector::HasReceivedIpcAirBagTelltale() const {
+    return m_state->has_ipc_air_bag_telltale;
 }
 
 bool ExternalSimConnector::GetPimCruiseActive() const {
@@ -1481,6 +1562,21 @@ void ExternalSimConnector::DebugInjectU8(std::uint32_t signal_id,
     } else if (signal_id == kSigIpcSeatbeltTelltalePassenger) {
         m_state->ipc_seatbelt_telltale_passenger     = (value != 0u);
         m_state->has_ipc_seatbelt_telltale_passenger = true;
+    } else if (signal_id == kSigIpcBrakeTelltale) {
+        m_state->ipc_brake_telltale     = (value != 0u);
+        m_state->has_ipc_brake_telltale = true;
+    } else if (signal_id == kSigIpcParkBrakeTelltale) {
+        m_state->ipc_park_brake_telltale     = (value != 0u);
+        m_state->has_ipc_park_brake_telltale = true;
+    } else if (signal_id == kSigIpcAntilockTelltale) {
+        m_state->ipc_antilock_telltale     = (value != 0u);
+        m_state->has_ipc_antilock_telltale = true;
+    } else if (signal_id == kSigIpcLowTracTelltale) {
+        m_state->ipc_low_trac_telltale     = (value != 0u);
+        m_state->has_ipc_low_trac_telltale = true;
+    } else if (signal_id == kSigIpcAirBagTelltale) {
+        m_state->ipc_air_bag_telltale     = (value != 0u);
+        m_state->has_ipc_air_bag_telltale = true;
     } else if (signal_id == kSigRsaShiftBlocked) {
         m_state->rsa_shift_blocked     = (value != 0u);
         m_state->has_rsa_shift_blocked = true;
@@ -1663,7 +1759,12 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                 d.signal_id == kSigHvacBlowerLevel     ||
                 d.signal_id == kSigDefrostGridActive   ||
                 d.signal_id == kSigIpcSeatbeltTelltaleDriver ||
-                d.signal_id == kSigIpcSeatbeltTelltalePassenger) {
+                d.signal_id == kSigIpcSeatbeltTelltalePassenger ||
+                d.signal_id == kSigIpcBrakeTelltale    ||
+                d.signal_id == kSigIpcParkBrakeTelltale ||
+                d.signal_id == kSigIpcAntilockTelltale ||
+                d.signal_id == kSigIpcLowTracTelltale  ||
+                d.signal_id == kSigIpcAirBagTelltale) {
                 DebugInjectU8(d.signal_id, d.payload[0]);
             } else {
                 // All other inbound signals are boolean (bool) — decode LSB.
