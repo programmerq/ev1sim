@@ -38,6 +38,34 @@ std::wstring FormatDoorHandleLabel(const wchar_t* door_name) {
     return label;
 }
 
+std::wstring FormatWiperLabel(int pos) {
+    const wchar_t* names[] = { L"OFF", L"INT", L"LOW", L"HIGH" };
+    std::wstring label = L"Wiper: ";
+    label += (pos >= 0 && pos <= 3) ? names[pos] : L"?";
+    return label;
+}
+
+std::wstring FormatWashLabel() {
+    return L"Wash";
+}
+
+std::wstring FormatCruiseLabel(const wchar_t* action) {
+    std::wstring label = L"Cruise: ";
+    label += action;
+    return label;
+}
+
+std::wstring FormatTripResetLabel() {
+    return L"Trip Reset";
+}
+
+std::wstring FormatSeatbeltLabel(const wchar_t* seat_name, bool buckled) {
+    std::wstring label = L"Seatbelt ";
+    label += seat_name;
+    label += buckled ? L": BUCKLED" : L": UNBUCKLED";
+    return label;
+}
+
 // ---------------------------------------------------------------------------
 // FloatingUiPanel
 // ---------------------------------------------------------------------------

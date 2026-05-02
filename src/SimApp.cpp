@@ -219,6 +219,94 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                                   << "\n";
                     }
                 });
+
+            // --- Wiper: cycle position (OFF → INT → LOW → HIGH → OFF) ---
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatWiperLabel(
+                        static_cast<int>(m_physical->wiper_stalk().position()));
+                },
+                [this]() {
+                    m_physical->wiper_stalk().cycle_position();
+                    const char* wiper_names[] = {"OFF", "INT", "LOW", "HIGH"};
+                    int widx = static_cast<int>(m_physical->wiper_stalk().position());
+                    std::cout << "[UI] Wiper: " << wiper_names[widx] << "\n";
+                });
+
+            // --- Wiper wash (momentary) ---
+            m_floating_ui->AddButton(
+                []() -> std::wstring { return FormatWashLabel(); },
+                [this]() {
+                    m_physical->wiper_stalk().press_wash();
+                    std::cout << "[UI] Wiper wash\n";
+                });
+
+            // --- Cruise stalk: SET, RESUME, CANCEL, +, - ---
+            m_floating_ui->AddButton(
+                []() -> std::wstring { return FormatCruiseLabel(L"SET"); },
+                [this]() {
+                    m_physical->cruise_stalk().press_set();
+                    std::cout << "[UI] Cruise: SET\n";
+                });
+            m_floating_ui->AddButton(
+                []() -> std::wstring { return FormatCruiseLabel(L"RES"); },
+                [this]() {
+                    m_physical->cruise_stalk().press_resume();
+                    std::cout << "[UI] Cruise: RESUME\n";
+                });
+            m_floating_ui->AddButton(
+                []() -> std::wstring { return FormatCruiseLabel(L"CANCEL"); },
+                [this]() {
+                    m_physical->cruise_stalk().press_cancel();
+                    std::cout << "[UI] Cruise: CANCEL\n";
+                });
+            m_floating_ui->AddButton(
+                []() -> std::wstring { return FormatCruiseLabel(L"+"); },
+                [this]() {
+                    m_physical->cruise_stalk().press_speed_up();
+                    std::cout << "[UI] Cruise: SPEED+\n";
+                });
+            m_floating_ui->AddButton(
+                []() -> std::wstring { return FormatCruiseLabel(L"-"); },
+                [this]() {
+                    m_physical->cruise_stalk().press_speed_down();
+                    std::cout << "[UI] Cruise: SPEED-\n";
+                });
+
+            // --- IPC trip-reset (momentary) ---
+            m_floating_ui->AddButton(
+                []() -> std::wstring { return FormatTripResetLabel(); },
+                [this]() {
+                    m_physical->ipc_trip_reset().press();
+                    ++m_trip_reset_count;
+                    std::cout << "[UI] IPC trip-reset pressed\n";
+                });
+
+            // --- Seatbelt: Driver toggle ---
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatSeatbeltLabel(L"D",
+                        m_physical->seatbelts().driver_buckled());
+                },
+                [this]() {
+                    m_physical->seatbelts().toggle_driver();
+                    std::cout << "[UI] Seatbelt D: "
+                              << (m_physical->seatbelts().driver_buckled()
+                                      ? "BUCKLED" : "UNBUCKLED") << "\n";
+                });
+
+            // --- Seatbelt: Passenger toggle ---
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatSeatbeltLabel(L"P",
+                        m_physical->seatbelts().passenger_buckled());
+                },
+                [this]() {
+                    m_physical->seatbelts().toggle_passenger();
+                    std::cout << "[UI] Seatbelt P: "
+                              << (m_physical->seatbelts().passenger_buckled()
+                                      ? "BUCKLED" : "UNBUCKLED") << "\n";
+                });
         }
     }
 
@@ -646,10 +734,12 @@ int SimApp::RunWithVisualization() {
             // Brake switch (6904): derive from brake travel with hysteresis.
             bool brake_sw = m_physical->brake_switch().update(cmd.front_brake);
             m_external_sim->SetDriverBrakeSwitch(brake_sw);
-            // Seatbelt (6964): default true — driver always buckled.
-            // TODO: add a floating-UI toggle in docs/TODO.md panel item so
-            // the user can unbuckle during development testing.
-            m_external_sim->SetDriverSeatbeltBuckled(true);
+            // Seatbelt driver (6964) + passenger (6965): driven by
+            // PhysicalWorld::Seatbelts; default buckled, toggleable via UI.
+            m_external_sim->SetDriverSeatbeltBuckled(
+                m_physical->seatbelts().driver_buckled());
+            m_external_sim->SetDriverSeatbeltBuckledPassenger(
+                m_physical->seatbelts().passenger_buckled());
             // Turn signal stalk (6948, 6949) and hazard switch (6944).
             m_external_sim->SetDriverTurnSignalLeft(
                 m_physical->turn_signal_stalk().active_left());
@@ -803,6 +893,39 @@ int SimApp::RunWithVisualization() {
             m_wiper->Tick(render_dt, wiper_cmd);
         }
         m_wiper->ApplyToScene();
+
+        // --- Door lock mirror from RSA (chassis bus 4084/4085) ---
+        // RSA publishes desired lock state; ev1sim mirrors it to DoorLocks.
+        {
+            using S = ev1sim::DoorLocks::State;
+            for (int side = 0; side < 2; ++side) {
+                if (!m_external_sim->HasReceivedDoorLockCmd(side)) continue;
+                const std::uint8_t cmd = m_external_sim->GetDoorLockCmd(side);
+                if (cmd == m_last_door_lock_cmd[side]) continue;
+                m_last_door_lock_cmd[side] = cmd;
+                const S new_state = (cmd == 1u) ? S::LOCKED : S::UNLOCKED;
+                if (side == 0) m_physical->door_locks().set_driver(new_state);
+                else           m_physical->door_locks().set_passenger(new_state);
+                std::cout << "[SimApp] Door lock " << (side == 0 ? "driver" : "passenger")
+                          << ": " << (new_state == S::LOCKED ? "LOCKED" : "UNLOCKED") << "\n";
+            }
+        }
+
+        // --- Power window motor log (chassis bus 4086/4087) — no visual yet ---
+        {
+            static const char* kPwNames[] = {"STOP", "UP", "DOWN"};
+            static const char* kSideNames[] = {"driver", "passenger"};
+            for (int side = 0; side < 2; ++side) {
+                if (!m_external_sim->HasReceivedPowerWindowMotor(side)) continue;
+                const std::uint8_t cmd = m_external_sim->GetPowerWindowMotor(side);
+                if (cmd == m_last_pw_motor_cmd[side]) continue;
+                m_last_pw_motor_cmd[side] = cmd;
+                const char* name = (cmd <= 2u) ? kPwNames[cmd] : "UNKNOWN";
+                // TODO: drive window position animation when geometry is available.
+                std::cout << "[SimApp] Power window " << kSideNames[side]
+                          << ": " << name << "\n";
+            }
+        }
 
         // --- Render ---
         m_vis->BeginScene();
@@ -1060,10 +1183,13 @@ int SimApp::RunHeadless() {
             // Brake switch (6904): derive from brake travel with hysteresis.
             bool brake_sw = m_physical->brake_switch().update(cmd.front_brake);
             m_external_sim->SetDriverBrakeSwitch(brake_sw);
-            // Seatbelt (6964): default true — driver always buckled.
-            // TODO: add a floating-UI toggle in docs/TODO.md panel item so
-            // the user can unbuckle during development testing.
-            m_external_sim->SetDriverSeatbeltBuckled(true);
+            // Seatbelt driver (6964) + passenger (6965): driven by
+            // PhysicalWorld::Seatbelts; default buckled.  No UI toggle in
+            // headless mode — state stays at default (both buckled).
+            m_external_sim->SetDriverSeatbeltBuckled(
+                m_physical->seatbelts().driver_buckled());
+            m_external_sim->SetDriverSeatbeltBuckledPassenger(
+                m_physical->seatbelts().passenger_buckled());
             // Turn signal stalk (6948, 6949) and hazard switch (6944).
             // In headless mode no keyboard cycles them; publish stable defaults
             // (both false) so LHJB sees a defined initial state.
@@ -1187,6 +1313,38 @@ int SimApp::RunHeadless() {
                     ? m_external_sim->GetWiperMotorCommand()
                     : 0u;
             m_wiper->Tick(tick_dt, wiper_cmd);
+        }
+
+        // --- Door lock mirror from RSA (chassis bus 4084/4085) ---
+        {
+            using S = ev1sim::DoorLocks::State;
+            for (int side = 0; side < 2; ++side) {
+                if (!m_external_sim->HasReceivedDoorLockCmd(side)) continue;
+                const std::uint8_t cmd = m_external_sim->GetDoorLockCmd(side);
+                if (cmd == m_last_door_lock_cmd[side]) continue;
+                m_last_door_lock_cmd[side] = cmd;
+                const S new_state = (cmd == 1u) ? S::LOCKED : S::UNLOCKED;
+                if (side == 0) m_physical->door_locks().set_driver(new_state);
+                else           m_physical->door_locks().set_passenger(new_state);
+                std::cout << "[SimApp] Door lock " << (side == 0 ? "driver" : "passenger")
+                          << ": " << (new_state == S::LOCKED ? "LOCKED" : "UNLOCKED") << "\n";
+            }
+        }
+
+        // --- Power window motor log (chassis bus 4086/4087) — no visual yet ---
+        {
+            static const char* kPwNames[] = {"STOP", "UP", "DOWN"};
+            static const char* kSideNames[] = {"driver", "passenger"};
+            for (int side = 0; side < 2; ++side) {
+                if (!m_external_sim->HasReceivedPowerWindowMotor(side)) continue;
+                const std::uint8_t cmd = m_external_sim->GetPowerWindowMotor(side);
+                if (cmd == m_last_pw_motor_cmd[side]) continue;
+                m_last_pw_motor_cmd[side] = cmd;
+                const char* name = (cmd <= 2u) ? kPwNames[cmd] : "UNKNOWN";
+                // TODO: drive window position animation when geometry is available.
+                std::cout << "[SimApp] Power window " << kSideNames[side]
+                          << ": " << name << "\n";
+            }
         }
 
         // --- Horn audio (external-sim-driven only in headless) ---

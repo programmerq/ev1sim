@@ -111,4 +111,12 @@ private:
 
     // Running count of IPC trip-reset button presses (HUD display only; not on bus).
     int m_trip_reset_count = 0;
+
+    // Last-seen door lock cmd from RSA — used to suppress repeated log lines.
+    // 0xFF = never received.
+    std::uint8_t m_last_door_lock_cmd[2] = {0xFFu, 0xFFu};  // [0]=driver,[1]=passenger
+
+    // Last-seen power window motor cmd — used to suppress repeated log lines.
+    // 0xFF = never received.
+    std::uint8_t m_last_pw_motor_cmd[2]  = {0xFFu, 0xFFu};  // [0]=driver,[1]=passenger
 };

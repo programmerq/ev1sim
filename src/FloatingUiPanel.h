@@ -44,6 +44,18 @@ std::wstring FormatCouplerLabel(bool present);
 std::wstring FormatExtKeypadButtonLabel(int button_idx);
 std::wstring FormatDoorHandleLabel(const wchar_t* door_name);
 
+// New label helpers — Wave 2 buttons.
+/// Format wiper stalk cycle button label.  pos: 0=OFF, 1=INT, 2=LOW, 3=HIGH.
+std::wstring FormatWiperLabel(int pos);
+/// Format wiper wash button label (always static "Wash").
+std::wstring FormatWashLabel();
+/// Format cruise stalk button labels.
+std::wstring FormatCruiseLabel(const wchar_t* action);
+/// Format IPC trip-reset button label (always static "Trip Reset").
+std::wstring FormatTripResetLabel();
+/// Format seatbelt toggle button label.  door_name: e.g. L"D" or L"P".
+std::wstring FormatSeatbeltLabel(const wchar_t* seat_name, bool buckled);
+
 // ---------------------------------------------------------------------------
 class FloatingUiPanel : public irr::IEventReceiver {
 public:
