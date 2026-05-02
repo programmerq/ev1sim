@@ -79,8 +79,10 @@ future-UI input on one side, chassis-segment signal publishing on the other.
 
 ## Outputs ev1sim could render (defer all)
 - [ ] Wiper motor visual sweep (model update needed).
-- [ ] Defrost grid visualization.
-- [ ] HVAC blower (audio + load).
+- [x] **Defrost grid visualization** — HTCM chassis-bus signal 4083 subscribed;
+  FloatingUiPanel renders "Defrost: ON/OFF" status row (no rear-window graphic yet).
+- [x] **HVAC blower status** — HTCM chassis-bus signal 4082 subscribed;
+  FloatingUiPanel renders "Blower: OFF/LOW/MED/HIGH" status row (audio/load deferred).
 - [ ] Door lock solenoid (audio + visual click).
 - [ ] Trunk animation (T key already toggles state; no visual today).
 
