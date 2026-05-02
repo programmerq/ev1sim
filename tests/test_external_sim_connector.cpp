@@ -36,6 +36,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     constexpr int kNumIpcExtraTelltale = 6; // service_now (4140), check_messages (4141),
                                             // temp (4142), battery_life (4143),
                                             // reduced_perf (4144), check_tire_press (4145)
+    constexpr int kNumBpmPackVoltage  = 1;  // bpm_pack_voltage_mv (4139) — BPM → ev1sim
     // Driver inputs on the main harness segment (electricsim_ev1_bus), output
     // from ev1sim: brake_pedal_q8 (6900), steering_deg_q8 (6901),
     // gear_selector (6902), throttle_q8 (6903), brake_switch (6904),
@@ -61,7 +62,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
                          kNumHvac + kNumAmbient + kNumDoorLockPw +
                          kNumRsaShiftBlocked +
                          kNumIpcTelltale + kNumIpcTripDist + kNumIpcBtcmTelltale +
-                         kNumIpcExtraTelltale +
+                         kNumIpcExtraTelltale + kNumBpmPackVoltage +
                          kNumDynamics + kNumDriverInputs;
     REQUIRE(ExternalSimConnector::EndpointCount() == expected);
 
@@ -79,6 +80,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     int hvac_count            = 0;   // hvac_blower_level (4082) + defrost_grid_active (4083)
     int door_lock_pw_count    = 0;   // door lock cmds (4084/4085) + pw motor cmds (4086/4087)
     int rsa_shift_blocked_count = 0; // rsa_shift_blocked (4088)
+    int bpm_pack_voltage_count    = 0;   // bpm_pack_voltage_mv (4139)
     int ipc_telltale_count        = 0;   // IPC seatbelt telltales (4130/4131)
     int ipc_trip_dist_count       = 0;   // IPC trip distance (4132)
     int ipc_btcm_telltale_count   = 0;   // IPC BTCM/airbag telltales (4134–4138)
@@ -131,6 +133,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
         } else if (e.signal_id == 4088) {
             CHECK(e.input_to_sim);          // RSA shift-blocked cue flows into ev1sim
             ++rsa_shift_blocked_count;
+        } else if (e.signal_id == 4139) {
+            CHECK(e.input_to_sim);          // BPM pack voltage flows into ev1sim
+            ++bpm_pack_voltage_count;
         } else if (e.signal_id == 4130 || e.signal_id == 4131) {
             CHECK(e.input_to_sim);          // IPC seatbelt telltales flow into ev1sim
             ++ipc_telltale_count;
@@ -199,6 +204,8 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     CHECK(door_lock_pw_count      == kNumDoorLockPw);
     // rsa_shift_blocked_count: RSA shift-blocked cue (4088).
     CHECK(rsa_shift_blocked_count == kNumRsaShiftBlocked);
+    // bpm_pack_voltage_count: BPM pack voltage (4139) — uint32 mV, from BPM.
+    CHECK(bpm_pack_voltage_count  == kNumBpmPackVoltage);
     // ipc_telltale_count: driver seatbelt telltale (4130) + passenger (4131) — from IPC.
     CHECK(ipc_telltale_count      == kNumIpcTelltale);
     // ipc_trip_dist_count: trip distance (4132) — from IPC.
@@ -1488,4 +1495,66 @@ TEST_CASE("IPC extra telltales: all six ON simultaneously (4140-4145)",
     CHECK(c.HasReceivedIpcBatteryLifeTelltale());
     CHECK(c.HasReceivedIpcReducedPerfTelltale());
     CHECK(c.HasReceivedIpcCheckTirePressTelltale());
+}
+
+// ---------------------------------------------------------------------------
+// BPM pack voltage (ID 4139, chassis segment) — new in this round.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("BPM pack voltage: default is 0 / not received",
+          "[ExternalSim][BPM]") {
+    ExternalSimConnector c;
+    CHECK(c.GetBpmPackVoltageMv() == 0u);
+    CHECK_FALSE(c.HasReceivedBpmPackVoltage());
+}
+
+TEST_CASE("BPM pack voltage: inject nominal 312 V = 312000 mV",
+          "[ExternalSim][BPM]") {
+    ExternalSimConnector c;
+    c.DebugInjectU32(4139u, 312000u);
+    CHECK(c.GetBpmPackVoltageMv() == 312000u);
+    CHECK(c.HasReceivedBpmPackVoltage());
+}
+
+TEST_CASE("BPM pack voltage: inject then update to new value",
+          "[ExternalSim][BPM]") {
+    ExternalSimConnector c;
+    c.DebugInjectU32(4139u, 300000u);
+    CHECK(c.GetBpmPackVoltageMv() == 300000u);
+    c.DebugInjectU32(4139u, 285500u);
+    CHECK(c.GetBpmPackVoltageMv() == 285500u);
+    CHECK(c.HasReceivedBpmPackVoltage());
+}
+
+TEST_CASE("BPM pack voltage: FindEndpoint returns correct metadata (4139)",
+          "[ExternalSim][BPM]") {
+    const auto* ep = ExternalSimConnector::FindEndpoint(4139u);
+    REQUIRE(ep != nullptr);
+    CHECK(std::string(ep->qualified_name) == "vehicle.bpm.pack_voltage_mv");
+    CHECK(std::string(ep->short_name)     == "bpm_pack_voltage_mv");
+    CHECK(ep->input_to_sim);
+}
+
+// ---------------------------------------------------------------------------
+// Vehicle speed accessor (derived from SetVehicleState, ID 4100 published out).
+// ---------------------------------------------------------------------------
+
+TEST_CASE("GetVehicleSpeedMps: returns -1 and HasVehicleSpeed false before SetVehicleState",
+          "[ExternalSim][Speed]") {
+    ExternalSimConnector c;
+    CHECK_FALSE(c.HasVehicleSpeed());
+    CHECK(c.GetVehicleSpeedMps() == -1.0f);
+}
+
+TEST_CASE("GetVehicleSpeedMps: returns speed after SetVehicleState",
+          "[ExternalSim][Speed]") {
+    ExternalSimConnector c;
+    VehicleState vs;
+    vs.speed_mps = 27.78;  // ~100 km/h
+    c.SetVehicleState(vs);
+    CHECK(c.HasVehicleSpeed());
+    // Use approximate comparison — float conversion from double loses precision.
+    const float got = c.GetVehicleSpeedMps();
+    CHECK(got > 27.0f);
+    CHECK(got < 28.0f);
 }

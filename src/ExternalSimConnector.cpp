@@ -291,6 +291,17 @@ constexpr std::uint32_t kSigIpcReducedPerfTelltale    = 4144U;
 constexpr std::uint32_t kSigIpcCheckTirePressTelltale = 4145U;
 constexpr int           kNumIpcExtraTelltaleSignals   = 6;
 
+// BPM pack voltage (electricsim/BPM → ev1sim, chassis segment).
+//   4139  vehicle.bpm.pack_voltage_mv   uint32 LE, millivolts.
+// BPM publishes on change (epsilon ~50 mV) after each supervisor tick while
+// key-on.  Derived from pack_hi_v_q8 (primary pack-voltage sense lead, Q8 V).
+// ev1sim subscribes to surface the live pack voltage in the floating-UI panel.
+// 0 = sentinel "never received"; valid range 0..~360 000 mV (0..360 V).
+// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// kSigChassisBpmPackVoltageMv = 4139.
+constexpr std::uint32_t kSigBpmPackVoltageMv     = 4139U;
+constexpr int           kNumBpmPackVoltageSignals = 1;
+
 // Door lock commands (electricsim/RSA → ev1sim, chassis segment).
 //   4084  vehicle.body.door_lock_cmd.driver    uint8: 0=unlocked, 1=locked
 //   4085  vehicle.body.door_lock_cmd.passenger uint8: 0=unlocked, 1=locked
@@ -466,13 +477,14 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // +kNumIpcTripDistSignals for IPC trip distance (4132) — IPC → ev1sim.
 // +kNumIpcBtcmTelltaleSignals for IPC BTCM/airbag telltales (4134–4138) — IPC → ev1sim.
 // +kNumIpcExtraTelltaleSignals for IPC extra LCD telltales (4140–4145) — IPC → ev1sim.
+// +kNumBpmPackVoltageSignals for BPM pack voltage (4139) — BPM → ev1sim.
 constexpr int kNumEndpoints =
     NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumCombSw + 1 /*charge_coupler*/ +
     kNumPrndSelector + kNumMotorSignals + kNumThrottleCmdSignals +
     kNumBrakeSignals + kNumWiperSignals + kNumHvacSignals +
     kNumAmbientSignals + kNumDoorLockPwSignals + kNumRsaShiftBlockedSignals +
     kNumIpcTelltaleSignals + kNumIpcTripDistSignals + kNumIpcBtcmTelltaleSignals +
-    kNumIpcExtraTelltaleSignals +
+    kNumIpcExtraTelltaleSignals + kNumBpmPackVoltageSignals +
     kNumDynamics + kNumDriverInputs;
 
 std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
@@ -589,6 +601,11 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     out[i++] = {kSigIpcCheckTirePressTelltale,
                 "vehicle.ipc.check_tire_press_telltale",
                 "ipc_check_tire_press_telltale", true};
+    // BPM pack voltage (BPM → ev1sim, chassis segment, input_to_sim=true).
+    // Encoding: uint32 LE, millivolts.  Published on change (epsilon ~50 mV).
+    out[i++] = {kSigBpmPackVoltageMv,
+                "vehicle.bpm.pack_voltage_mv",
+                "bpm_pack_voltage_mv", true};
     // Door lock commands (RSA → ev1sim, chassis segment, input_to_sim=true).
     out[i++] = {kSigDoorLockCmdDriver,
                 "vehicle.body.door_lock_cmd.driver",
@@ -907,6 +924,11 @@ struct ExternalSimConnector::State {
     bool          has_ipc_low_trac_telltale       = false;
     bool          ipc_air_bag_telltale            = false;
     bool          has_ipc_air_bag_telltale        = false;
+
+    // BPM pack voltage (ID 4139, chassis segment) — received from BPM.
+    // uint32 LE, millivolts.  0 = sentinel "never received"; valid range 0..~360 000 mV.
+    std::uint32_t bpm_pack_voltage_mv     = 0u;
+    bool          has_bpm_pack_voltage    = false;
 
     // IPC extra LCD telltales (IDs 4140–4145, chassis segment) — received from IPC.
     // bool: false=lamp off, true=lamp on.
@@ -1283,6 +1305,22 @@ float ExternalSimConnector::GetPimCruiseSetpointMps() const {
 }
 bool ExternalSimConnector::HasReceivedPimCruiseSetpointMps() const {
     return m_state->has_pim_cruise_setpoint_mps;
+}
+
+std::uint32_t ExternalSimConnector::GetBpmPackVoltageMv() const {
+    return m_state->bpm_pack_voltage_mv;
+}
+bool ExternalSimConnector::HasReceivedBpmPackVoltage() const {
+    return m_state->has_bpm_pack_voltage;
+}
+
+float ExternalSimConnector::GetVehicleSpeedMps() const {
+    return m_state->has_vstate
+               ? static_cast<float>(m_state->vstate.speed_mps)
+               : -1.0f;
+}
+bool ExternalSimConnector::HasVehicleSpeed() const {
+    return m_state->has_vstate;
 }
 
 void ExternalSimConnector::SetPanelSensor(PanelID panel, bool ajar) {
@@ -1701,6 +1739,15 @@ void ExternalSimConnector::DebugInjectU8(std::uint32_t signal_id,
     // All other uint8 signals are not currently subscribed as inputs.
 }
 
+void ExternalSimConnector::DebugInjectU32(std::uint32_t signal_id,
+                                           std::uint32_t value) {
+    if (signal_id == kSigBpmPackVoltageMv) {
+        m_state->bpm_pack_voltage_mv  = value;
+        m_state->has_bpm_pack_voltage = true;
+    }
+    // Other uint32 signals are not currently subscribed as inputs.
+}
+
 // ---------------------------------------------------------------------------
 // Tick — transport I/O (no-op in stub build)
 // ---------------------------------------------------------------------------
@@ -1860,6 +1907,14 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                                 bits |= static_cast<std::uint32_t>(d.payload[static_cast<std::size_t>(b)]) << (b * 8);
                             float v; std::memcpy(&v, &bits, 4); return v;
                         }());
+                }
+            // uint32 LE chassis-bus signals — decode as 4-byte little-endian unsigned.
+            } else if (d.signal_id == kSigBpmPackVoltageMv) {
+                if (d.payload.size() >= 4) {
+                    std::uint32_t mv = 0;
+                    for (int b = 0; b < 4; ++b)
+                        mv |= static_cast<std::uint32_t>(d.payload[static_cast<std::size_t>(b)]) << (b * 8);
+                    DebugInjectU32(d.signal_id, mv);
                 }
             // uint8 chassis-bus signals — decode as raw byte.
             } else if (d.signal_id == kSigThrottleCmdQ8 ||

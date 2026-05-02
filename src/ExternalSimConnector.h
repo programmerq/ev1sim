@@ -494,6 +494,20 @@ public:
     float GetPimCruiseSetpointMps() const;
     bool  HasReceivedPimCruiseSetpointMps() const;
 
+    /// Incoming BPM pack voltage (ID 4139, chassis segment).
+    /// uint32 LE, millivolts (mV).  BPM publishes on change (epsilon ~50 mV)
+    /// while key-on.  Range: 0..~360 000 mV (0..360 V nominal).
+    /// Returns 0 if never received.
+    std::uint32_t GetBpmPackVoltageMv() const;
+    bool          HasReceivedBpmPackVoltage() const;
+
+    /// Current vehicle speed from the ev1sim physics model (m/s).
+    /// Derived from the VehicleState snapshot set each tick via SetVehicleState().
+    /// Returns -1.0f if SetVehicleState() has never been called.
+    /// This is ev1sim's own output (ID 4100); no bus subscription required.
+    float GetVehicleSpeedMps() const;
+    bool  HasVehicleSpeed() const;
+
     // ---------------------------------------------------------------------
     // Test hooks — feed the connector synthetic delta records as though they
     // arrived over the bus.  Used by unit tests; not part of the runtime path.
@@ -508,6 +522,10 @@ public:
     /// Updates the corresponding state field + timestamp so freshness-window
     /// logic works correctly.  Used by unit tests.
     void DebugInjectFloat(std::uint32_t signal_id, float value);
+
+    /// Inject a uint32 signal value (BPM pack voltage, etc.).
+    /// Used by unit tests; not part of the runtime path.
+    void DebugInjectU32(std::uint32_t signal_id, std::uint32_t value);
 
 private:
     Options m_opts;
