@@ -107,6 +107,26 @@ std::wstring FormatPrndGearLabel(int pos) {
     return label;
 }
 
+std::wstring FormatRsaRunModeLabel(std::uint8_t mode, bool ever_received) {
+    if (!ever_received) {
+        return L"Mode: ---";
+    }
+    // kSigRunModeBroadcast (5711) encoding per rsa_scan.h: 0=OFF, 1=ACC, 2=RUN.
+    // START (enum 4 on the mode-button input 6971) is never broadcast on 5711;
+    // RSA transitions directly from START press → RUN state on the broadcast.
+    switch (mode) {
+        case 0: return L"Mode: OFF";
+        case 1: return L"Mode: ACC";
+        case 2: return L"Mode: RUN";
+        default: {
+            wchar_t buf[32];
+            std::swprintf(buf, sizeof(buf) / sizeof(buf[0]),
+                          L"Mode: ?(%u)", static_cast<unsigned>(mode));
+            return buf;
+        }
+    }
+}
+
 std::wstring FormatPimCruiseStatusLabel(bool ever_received_active,
                                         bool active,
                                         float setpoint_mps) {

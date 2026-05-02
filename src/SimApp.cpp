@@ -400,6 +400,19 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                         m_external_sim->GetPimCruiseSetpointMps());
                 },
                 []() {});   // no-op: display-only row
+
+            // --- RSA run-mode status (display-only; main harness bus 5711) ---
+            // Subscribes to kSigRunModeBroadcast (5711) published by RSA each tick.
+            // Shows "Mode: OFF / ACC / RUN" or "Mode: ---" before first frame arrives.
+            // Note: the broadcast signal carries only 0=OFF, 1=ACC, 2=RUN — the START
+            // enum from the mode-button input (6971) never appears on the broadcast.
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatRsaRunModeLabel(
+                        m_external_sim->GetRsaRunMode(),
+                        m_external_sim->HasReceivedRunMode());
+                },
+                []() {});   // no-op: display-only row
         }
     }
 

@@ -416,3 +416,36 @@ TEST_CASE("FormatPimCruiseStatusLabel: active with zero setpoint (edge case)",
     CHECK(FormatPimCruiseStatusLabel(/*ever_received=*/true, /*active=*/true, 0.0f)
           == L"Cruise: 0.0 m/s ON");
 }
+
+// ---------------------------------------------------------------------------
+// RSA run-mode label helper (FormatRsaRunModeLabel)
+// kSigRunModeBroadcast (5711): 0=OFF, 1=ACC, 2=RUN.
+// START (4) only appears on mode-button input (6971), never on the broadcast.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("FormatRsaRunModeLabel: never-received shows placeholder",
+          "[FloatingUI][RunMode]") {
+    // mode value is irrelevant when ever_received=false.
+    CHECK(FormatRsaRunModeLabel(0u, /*ever_received=*/false) == L"Mode: ---");
+    CHECK(FormatRsaRunModeLabel(2u, /*ever_received=*/false) == L"Mode: ---");
+}
+
+TEST_CASE("FormatRsaRunModeLabel: mode OFF (0)", "[FloatingUI][RunMode]") {
+    CHECK(FormatRsaRunModeLabel(0u, /*ever_received=*/true) == L"Mode: OFF");
+}
+
+TEST_CASE("FormatRsaRunModeLabel: mode ACC (1)", "[FloatingUI][RunMode]") {
+    CHECK(FormatRsaRunModeLabel(1u, /*ever_received=*/true) == L"Mode: ACC");
+}
+
+TEST_CASE("FormatRsaRunModeLabel: mode RUN (2)", "[FloatingUI][RunMode]") {
+    CHECK(FormatRsaRunModeLabel(2u, /*ever_received=*/true) == L"Mode: RUN");
+}
+
+TEST_CASE("FormatRsaRunModeLabel: unknown enum shows fallback with raw byte",
+          "[FloatingUI][RunMode]") {
+    // Values beyond 0-2 should not appear on the broadcast, but are handled
+    // gracefully so a mis-encoded or future enum value doesn't crash.
+    CHECK(FormatRsaRunModeLabel(3u, /*ever_received=*/true) == L"Mode: ?(3)");
+    CHECK(FormatRsaRunModeLabel(0xFFu, /*ever_received=*/true) == L"Mode: ?(255)");
+}
