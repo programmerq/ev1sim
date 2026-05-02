@@ -31,7 +31,7 @@
     "output_csv": "scenario_abs_mu_jump.csv",
     "sample_period_s": 0.02,
     "fields": [
-      "sim_time_s", "speed_mps", "pos_x", "pos_y", "yaw_rate",
+      "sim_time_s", "speed_mps", "pos_x", "pos_y", "yaw_rate", "yaw_deg",
       "applied_front_brake", "applied_rear_brake",
       "wheel_omega_fl", "wheel_omega_fr", "wheel_omega_rl", "wheel_omega_rr",
       "slip_ratio_fl", "slip_ratio_fr", "slip_ratio_rl", "slip_ratio_rr",

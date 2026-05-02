@@ -1,6 +1,6 @@
 # EV1 ABS validation — engineering report
 
-_Generated 2026-05-01 23:50 by `scripts/abs_report.py`._
+_Generated 2026-05-02 00:41 by `scripts/abs_report.py`._
 
 This report aggregates the four standard ABS validation
 scenarios.  Each scenario gets its own section with setup,
@@ -17,10 +17,10 @@ script.
 
 | Test | BTCM-on stop | BTCM-off stop | Δ stop dist | ABS events FL/FR | yaw drift (on / off) |
 |---|---|---|---:|---:|---|
-| high_mu | 150.30 m / 9.98 s | 148.52 m / 9.47 s | +1.8 m | 69 / 70 | +0.01° / +0.07° |
-| low_mu | didn't stop, v\_f = 3.11 m/s | didn't stop, v\_f = 1.57 m/s | — | 142 / 130 | -0.53° / +3.54° |
-| mu_jump | didn't stop, v\_f = 4.19 m/s | didn't stop, v\_f = 3.65 m/s | — | 239 / 266 | +1.24° / -1.00° |
-| split_mu | 74.20 m / 6.98 s | 72.49 m / 6.53 s | +1.7 m | 71 / 66 | +0.09° / +0.09° |
+| high_mu | 149.95 m / 9.89 s | 148.52 m / 9.47 s | +1.4 m | 77 / 66 | +0.24° / +0.07° |
+| low_mu | didn't stop, v\_f = 2.91 m/s | didn't stop, v\_f = 1.57 m/s | — | 149 / 132 | -0.25° / +3.54° |
+| mu_jump | didn't stop, v\_f = 4.10 m/s | didn't stop, v\_f = 3.65 m/s | — | 248 / 149 | -1.03° / -1.00° |
+| split_mu | 74.10 m / 7.01 s | 72.49 m / 6.53 s | +1.6 m | 72 / 78 | +0.02° / +0.09° |
 
 Δ stop dist > 0 means BTCM-on took *longer* than BTCM-off.
 Yaw drift > 0 = car rotated counter-clockwise (toward driver
@@ -43,28 +43,30 @@ left).  On `split_mu` the car drifts toward the asphalt side
 | Metric | BTCM-on | BTCM-off |
 |---|---|---|
 | Brake-on at | t = 14.10 s, v = 30.06 m/s | t = 14.10 s, v = 30.06 m/s |
-| Stop result | 150.30 m / 9.98 s | 148.52 m / 9.47 s |
-| FL events | 69 | 0 |
-| FR events | 70 | 0 |
-| Yaw drift over brake | +0.01° | +0.07° |
+| Stop result | 149.95 m / 9.89 s | 148.52 m / 9.47 s |
+| FL events | 77 | 0 |
+| FR events | 66 | 0 |
+| Yaw drift over brake | +0.24° | +0.07° |
 
 ### Per-wheel slip statistics (BTCM-on)
 
 | Wheel | peak | mean | time-locked |
 |---|---:|---:|---:|
-| FL | 0.709 | 0.066 | 0.0% |
-| FR | 0.664 | 0.067 | 0.0% |
-| RL | 0.666 | 0.069 | 0.0% |
-| RR | 0.571 | 0.066 | 0.0% |
+| FL | 0.708 | 0.064 | 0.0% |
+| FR | 0.639 | 0.065 | 0.0% |
+| RL | 0.851 | 0.068 | 0.0% |
+| RR | 0.794 | 0.068 | 0.0% |
 
 ### Front ABS phase distribution during brake event (BTCM-on)
 
 | Wheel | APPLY | HOLD | DUMP | stale | phase transitions |
 |---|---:|---:|---:|---:|---:|
-| FL | 18.4% | 8.8% | 12.0% | 60.8% | 75 |
-| FR | 19.9% | 8.8% | 12.9% | 58.5% | 85 |
+| FL | 24.6% | 6.7% | 13.7% | 55.0% | 89 |
+| FR | 21.1% | 7.3% | 13.7% | 57.9% | 81 |
 
 ### Charts
+
+**[▶ Animated top-down replay (open in browser)](abs_scenarios.charts/high_mu_replay.html)** — watch the car drive through the brake event with per-wheel slip color-coded, surface patches drawn behind, and a scrubbable timeline.  Toggle BTCM-on / BTCM-off in the dropdown to A/B the same instant.
 
 **Vehicle speed**
 
@@ -165,28 +167,30 @@ would see if the firmware was rebuilt with the gate on.
 | Metric | BTCM-on | BTCM-off |
 |---|---|---|
 | Brake-on at | t = 38.29 s, v = 15.01 m/s | t = 38.29 s, v = 15.01 m/s |
-| Stop result | didn't stop, v\_f = 3.11 m/s | didn't stop, v\_f = 1.57 m/s |
-| FL events | 142 | 0 |
-| FR events | 130 | 0 |
-| Yaw drift over brake | -0.53° | +3.54° |
+| Stop result | didn't stop, v\_f = 2.91 m/s | didn't stop, v\_f = 1.57 m/s |
+| FL events | 149 | 0 |
+| FR events | 132 | 0 |
+| Yaw drift over brake | -0.25° | +3.54° |
 
 ### Per-wheel slip statistics (BTCM-on)
 
 | Wheel | peak | mean | time-locked |
 |---|---:|---:|---:|
-| FL | 1.000 | 0.466 | 38.5% |
-| FR | 1.000 | 0.474 | 39.2% |
-| RL | 0.391 | 0.060 | 0.0% |
-| RR | 0.407 | 0.060 | 0.0% |
+| FL | 1.000 | 0.467 | 38.2% |
+| FR | 1.000 | 0.475 | 39.4% |
+| RL | 0.437 | 0.065 | 0.0% |
+| RR | 0.419 | 0.062 | 0.0% |
 
 ### Front ABS phase distribution during brake event (BTCM-on)
 
 | Wheel | APPLY | HOLD | DUMP | stale | phase transitions |
 |---|---:|---:|---:|---:|---:|
-| FL | 47.2% | 11.9% | 5.9% | 35.0% | 141 |
-| FR | 50.5% | 10.9% | 4.8% | 33.8% | 130 |
+| FL | 47.8% | 11.9% | 6.1% | 34.2% | 149 |
+| FR | 47.4% | 9.9% | 5.0% | 37.7% | 131 |
 
 ### Charts
+
+**[▶ Animated top-down replay (open in browser)](abs_scenarios.charts/low_mu_replay.html)** — watch the car drive through the brake event with per-wheel slip color-coded, surface patches drawn behind, and a scrubbable timeline.  Toggle BTCM-on / BTCM-off in the dropdown to A/B the same instant.
 
 **Vehicle speed**
 
@@ -287,28 +291,30 @@ would see if the firmware was rebuilt with the gate on.
 | Metric | BTCM-on | BTCM-off |
 |---|---|---|
 | Brake-on at | t = 7.76 s, v = 15.01 m/s | t = 7.76 s, v = 15.01 m/s |
-| Stop result | didn't stop, v\_f = 4.19 m/s | didn't stop, v\_f = 3.65 m/s |
-| FL events | 239 | 0 |
-| FR events | 266 | 0 |
-| Yaw drift over brake | +1.24° | -1.00° |
+| Stop result | didn't stop, v\_f = 4.10 m/s | didn't stop, v\_f = 3.65 m/s |
+| FL events | 248 | 0 |
+| FR events | 149 | 0 |
+| Yaw drift over brake | -1.03° | -1.00° |
 
 ### Per-wheel slip statistics (BTCM-on)
 
 | Wheel | peak | mean | time-locked |
 |---|---:|---:|---:|
-| FL | 1.000 | 0.520 | 10.1% |
-| FR | 1.000 | 0.344 | 3.3% |
-| RL | 0.562 | 0.015 | 0.0% |
-| RR | 0.559 | 0.014 | 0.0% |
+| FL | 1.000 | 0.415 | 8.9% |
+| FR | 1.000 | 0.519 | 26.2% |
+| RL | 0.567 | 0.016 | 0.0% |
+| RR | 0.573 | 0.013 | 0.0% |
 
 ### Front ABS phase distribution during brake event (BTCM-on)
 
 | Wheel | APPLY | HOLD | DUMP | stale | phase transitions |
 |---|---:|---:|---:|---:|---:|
-| FL | 6.1% | 23.5% | 60.2% | 10.2% | 239 |
-| FR | 5.2% | 28.0% | 60.2% | 6.7% | 266 |
+| FL | 5.9% | 32.8% | 50.9% | 10.4% | 248 |
+| FR | 6.9% | 16.9% | 53.9% | 22.4% | 149 |
 
 ### Charts
+
+**[▶ Animated top-down replay (open in browser)](abs_scenarios.charts/mu_jump_replay.html)** — watch the car drive through the brake event with per-wheel slip color-coded, surface patches drawn behind, and a scrubbable timeline.  Toggle BTCM-on / BTCM-off in the dropdown to A/B the same instant.
 
 **Vehicle speed**
 
@@ -409,28 +415,30 @@ would see if the firmware was rebuilt with the gate on.
 | Metric | BTCM-on | BTCM-off |
 |---|---|---|
 | Brake-on at | t = 12.02 s, v = 20.86 m/s | t = 12.02 s, v = 20.86 m/s |
-| Stop result | 74.20 m / 6.98 s | 72.49 m / 6.53 s |
-| FL events | 71 | 0 |
-| FR events | 66 | 0 |
-| Yaw drift over brake | +0.09° | +0.09° |
+| Stop result | 74.10 m / 7.01 s | 72.49 m / 6.53 s |
+| FL events | 72 | 0 |
+| FR events | 78 | 0 |
+| Yaw drift over brake | +0.02° | +0.09° |
 
 ### Per-wheel slip statistics (BTCM-on)
 
 | Wheel | peak | mean | time-locked |
 |---|---:|---:|---:|
-| FL | 0.696 | 0.074 | 0.0% |
-| FR | 0.509 | 0.078 | 0.0% |
-| RL | 0.556 | 0.087 | 0.0% |
-| RR | 0.809 | 0.090 | 0.0% |
+| FL | 0.654 | 0.079 | 0.0% |
+| FR | 0.636 | 0.086 | 0.0% |
+| RL | 0.760 | 0.094 | 0.0% |
+| RR | 0.697 | 0.092 | 0.0% |
 
 ### Front ABS phase distribution during brake event (BTCM-on)
 
 | Wheel | APPLY | HOLD | DUMP | stale | phase transitions |
 |---|---:|---:|---:|---:|---:|
-| FL | 31.2% | 7.1% | 34.9% | 26.8% | 151 |
-| FR | 33.4% | 7.4% | 31.9% | 27.3% | 147 |
+| FL | 32.4% | 8.1% | 32.7% | 26.8% | 157 |
+| FR | 33.2% | 7.9% | 34.2% | 24.8% | 166 |
 
 ### Charts
+
+**[▶ Animated top-down replay (open in browser)](abs_scenarios.charts/split_mu_replay.html)** — watch the car drive through the brake event with per-wheel slip color-coded, surface patches drawn behind, and a scrubbable timeline.  Toggle BTCM-on / BTCM-off in the dropdown to A/B the same instant.
 
 **Vehicle speed**
 

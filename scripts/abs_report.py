@@ -728,6 +728,307 @@ def chart_btcm_accel(btcm_rows: list[dict], title: str) -> str:
     return svg.render()
 
 
+# ---------------------------------------------------------------------------
+# Animated HTML replay — top-down view with scrubbable timeline
+# ---------------------------------------------------------------------------
+
+# Map test name → level JSON path so the replay can render surface
+# patches as a colored background (asphalt grey, ice light blue).
+LEVEL_FILES = {
+    "high_mu":  "level/flat_asphalt.json",
+    "low_mu":   "level/flat_ice.json",
+    "mu_jump":  "level/flat_ice_transition.json",
+    "split_mu": "level/flat_split_mu.json",
+}
+
+
+def make_replay_html(t: str,
+                     on_rows: list[dict],
+                     off_rows: list[dict],
+                     level_path) -> str:
+    """Self-contained HTML+SVG+JS top-down replay of a scenario.
+
+    Top-down view of the chassis with surface patches, car body
+    (rotated by yaw_deg), wheels colored by slip, position trail,
+    play / pause / scrub controls, and a BTCM-on/off run toggle.
+    No external resources — opens cleanly with file:// URLs.
+    """
+    import json
+
+    def frames_from(rows: list[dict]) -> list[dict]:
+        out = []
+        prev_t = -1.0
+        for r in rows:
+            t_s = r["sim_time_s"]
+            if t_s - prev_t < 0.04:  # decimate to ~25 fps
+                continue
+            prev_t = t_s
+            out.append({
+                "t":   round(t_s, 3),
+                "x":   round(r["pos_x"], 3),
+                "y":   round(r["pos_y"], 3),
+                "yaw": round(r.get("yaw_deg", 0.0), 2),
+                "v":   round(r["speed_mps"], 2),
+                "fb":  round(r["applied_front_brake"], 2),
+                "rb":  round(r["applied_rear_brake"], 2),
+                "sl":  [round(r[f"slip_ratio_{w}"], 3) for w in ("fl","fr","rl","rr")],
+                "ph":  [int(r.get(f"abs_phase_{w}", -1)) for w in ("fl","fr")],
+                "emb": [round(r.get(f"emb_cmd_{w}", 0.0), 2) for w in ("lr","rr")],
+            })
+        return out
+
+    on_frames  = frames_from(on_rows)
+    off_frames = frames_from(off_rows)
+    all_x = [f["x"] for f in (on_frames + off_frames)]
+    all_y = [f["y"] for f in (on_frames + off_frames)]
+    if not all_x:
+        return "<html><body>No data.</body></html>"
+    x_min, x_max = min(all_x) - 5, max(all_x) + 5
+    y_min, y_max = min(all_y) - 5, max(all_y) + 5
+    y_pad = max(3.0, (y_max - y_min) * 0.5)
+    y_min -= y_pad
+    y_max += y_pad
+
+    patches: list[dict] = []
+    if level_path and Path(level_path).exists():
+        try:
+            level = json.loads(Path(level_path).read_text())
+            for p in level.get("patches", []):
+                if p.get("type") != "plane":
+                    continue
+                cx, cy, _ = p.get("center", [0, 0, 0])
+                w, h = p.get("size", [0, 0])
+                patches.append({
+                    "cx": cx, "cy": cy, "w": w, "h": h,
+                    "surface": p.get("surface", "unknown"),
+                    "friction": p.get("friction", 0.5),
+                })
+        except Exception:
+            pass
+
+    # If no level file (high_mu and low_mu use a rigid_plane in the
+    # config rather than a level), synthesize a single patch covering
+    # the full traveled extent so the replay still shows surface
+    # context.  Friction and surface name from the test ID.
+    if not patches:
+        single = {
+            "high_mu":  {"surface": "asphalt", "friction": 0.9},
+            "low_mu":   {"surface": "ice",     "friction": 0.10},
+            "mu_jump":  {"surface": "asphalt", "friction": 0.9},
+            "split_mu": {"surface": "asphalt", "friction": 0.9},
+        }.get(t, {"surface": "asphalt", "friction": 0.9})
+        patches.append({
+            "cx": (x_min + x_max) / 2,
+            "cy": (y_min + y_max) / 2,
+            "w":  x_max - x_min,
+            "h":  y_max - y_min,
+            "surface":  single["surface"],
+            "friction": single["friction"],
+        })
+
+    payload = {
+        "test":       t,
+        "x_min":      x_min,
+        "x_max":      x_max,
+        "y_min":      y_min,
+        "y_max":      y_max,
+        "patches":    patches,
+        "on_frames":  on_frames,
+        "off_frames": off_frames,
+    }
+    payload_json = json.dumps(payload)
+
+    html = """<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<title>__TEST__ — top-down replay</title>
+<style>
+body { margin:0; padding:16px; font-family:ui-monospace,Consolas,Menlo,monospace;
+       background:#f6f7f8; color:#222; }
+h1 { font-size:16px; margin:0 0 8px 0; }
+#scene { background:#fff; border:1px solid #999; }
+#hud { font-size:12px; line-height:1.5; margin-top:8px; white-space:pre; }
+.controls { display:flex; gap:8px; align-items:center; margin:8px 0; flex-wrap:wrap; }
+button, label { font-family:inherit; font-size:12px; }
+button { padding:4px 10px; cursor:pointer; }
+input[type=range] { flex:1; min-width:300px; }
+select { font-family:inherit; font-size:12px; padding:2px 4px; }
+.legend { font-size:11px; color:#555; margin-top:4px; }
+.legend span { display:inline-block; padding:0 8px; }
+.legend .dot { display:inline-block; width:10px; height:10px; border-radius:50%;
+               vertical-align:middle; margin-right:4px; border:1px solid #444; }
+</style></head><body>
+<h1>__TEST__ — top-down replay (<span id="run-label">BTCM-on</span>)</h1>
+<svg id="scene" viewBox="0 0 980 320" width="980" height="320"></svg>
+<div class="controls">
+  <button id="play">▶ play</button>
+  <button id="step-back">«</button>
+  <button id="step-fwd">»</button>
+  <input type="range" id="scrub" min="0" max="100" value="0" step="1">
+  <span id="time-label">t = 0.00 s</span>
+  <label>speed
+    <select id="speed">
+      <option value="0.25">0.25×</option><option value="0.5">0.5×</option>
+      <option value="1" selected>1×</option><option value="2">2×</option>
+      <option value="4">4×</option>
+    </select></label>
+  <label>run
+    <select id="which-run">
+      <option value="on" selected>BTCM-on</option>
+      <option value="off">BTCM-off</option>
+    </select></label>
+</div>
+<div class="legend">
+  <span><span class="dot" style="background:#9bda9b"></span>rolling clean</span>
+  <span><span class="dot" style="background:#ffd66e"></span>mid-slip (peak grip)</span>
+  <span><span class="dot" style="background:#f08a8a"></span>locked / heavy slip</span>
+  <span><span class="dot" style="background:#7fb6ff"></span>spinning (negative slip)</span>
+  <span><span class="dot" style="background:#bbb"></span>asphalt</span>
+  <span><span class="dot" style="background:#cfe6ff"></span>ice</span>
+</div>
+<div id="hud"></div>
+<script>
+const DATA = __PAYLOAD__;
+const svg = document.getElementById("scene");
+const hud = document.getElementById("hud");
+const scrub = document.getElementById("scrub");
+const playBtn = document.getElementById("play");
+const timeLabel = document.getElementById("time-label");
+const runLabel = document.getElementById("run-label");
+const speedSel = document.getElementById("speed");
+const runSel = document.getElementById("which-run");
+const stepBack = document.getElementById("step-back");
+const stepFwd  = document.getElementById("step-fwd");
+const VIEW_W=980, VIEW_H=320;
+const carLengthM=4.31, carWidthM=1.76, wheelbaseM=2.51, trackM=1.50;
+function worldX(x){return((x-DATA.x_min)/(DATA.x_max-DATA.x_min))*VIEW_W;}
+function worldY(y){return VIEW_H-((y-DATA.y_min)/(DATA.y_max-DATA.y_min))*VIEW_H;}
+const sx=VIEW_W/(DATA.x_max-DATA.x_min), sy=VIEW_H/(DATA.y_max-DATA.y_min);
+function meterPxX(m){return m*sx;} function meterPxY(m){return m*sy;}
+function drawSurfaces(){
+  for(const p of DATA.patches){
+    const x0=worldX(p.cx-p.w/2), x1=worldX(p.cx+p.w/2);
+    const y0=worldY(p.cy+p.h/2), y1=worldY(p.cy-p.h/2);
+    const r=document.createElementNS("http://www.w3.org/2000/svg","rect");
+    r.setAttribute("x",Math.min(x0,x1));r.setAttribute("y",Math.min(y0,y1));
+    r.setAttribute("width",Math.abs(x1-x0));r.setAttribute("height",Math.abs(y1-y0));
+    let c="#fffbe0";
+    if(p.surface==="asphalt")c="#bbb"; else if(p.surface==="ice")c="#cfe6ff";
+    r.setAttribute("fill",c);r.setAttribute("stroke","#777");r.setAttribute("stroke-width","0.5");
+    svg.appendChild(r);
+    const tx=document.createElementNS("http://www.w3.org/2000/svg","text");
+    tx.setAttribute("x",(Math.min(x0,x1)+Math.max(x0,x1))/2);
+    tx.setAttribute("y",Math.min(y0,y1)+14);
+    tx.setAttribute("font-size","10");tx.setAttribute("fill","#666");
+    tx.setAttribute("text-anchor","middle");
+    tx.textContent=p.surface+" μ="+p.friction.toFixed(2);
+    svg.appendChild(tx);
+  }
+}
+function slipColor(s){
+  if(s<-0.05)return"#7fb6ff";
+  if(s<0.05)return"#9bda9b";
+  if(s<0.20)return"#ffd66e";
+  return"#f08a8a";
+}
+let trailG=null;
+function drawTrail(F,i){
+  if(trailG)trailG.remove();
+  trailG=document.createElementNS("http://www.w3.org/2000/svg","g");
+  svg.appendChild(trailG);
+  const tn=F[i].t, pts=[];
+  for(let k=0;k<=i;++k){
+    if(tn-F[k].t>3.0)continue;
+    pts.push(worldX(F[k].x).toFixed(1)+","+worldY(F[k].y).toFixed(1));
+  }
+  const p=document.createElementNS("http://www.w3.org/2000/svg","polyline");
+  p.setAttribute("fill","none");p.setAttribute("stroke","#3470c0");
+  p.setAttribute("stroke-width","1.5");p.setAttribute("stroke-opacity","0.6");
+  p.setAttribute("points",pts.join(" "));
+  trailG.appendChild(p);
+}
+const carG=document.createElementNS("http://www.w3.org/2000/svg","g");
+svg.appendChild(carG);
+const bodyW=meterPxX(carLengthM), bodyH=meterPxY(carWidthM);
+const body=document.createElementNS("http://www.w3.org/2000/svg","rect");
+body.setAttribute("x",-bodyW/2);body.setAttribute("y",-bodyH/2);
+body.setAttribute("width",bodyW);body.setAttribute("height",bodyH);
+body.setAttribute("fill","#e8e8e8");body.setAttribute("stroke","#222");
+body.setAttribute("stroke-width","1");body.setAttribute("rx",bodyH*0.15);
+carG.appendChild(body);
+const heading=document.createElementNS("http://www.w3.org/2000/svg","polygon");
+heading.setAttribute("points",
+  (bodyW*0.30)+",-"+(bodyH*0.20)+" "+
+  (bodyW*0.45)+",0 "+
+  (bodyW*0.30)+","+(bodyH*0.20));
+heading.setAttribute("fill","#3470c0");carG.appendChild(heading);
+const wheelOff=[
+  {ix: meterPxX(wheelbaseM/2), iy:-meterPxY(trackM/2)},
+  {ix: meterPxX(wheelbaseM/2), iy: meterPxY(trackM/2)},
+  {ix:-meterPxX(wheelbaseM/2), iy:-meterPxY(trackM/2)},
+  {ix:-meterPxX(wheelbaseM/2), iy: meterPxY(trackM/2)}];
+const wheelEls=[];
+for(let i=0;i<4;++i){
+  const c=document.createElementNS("http://www.w3.org/2000/svg","circle");
+  c.setAttribute("cx",wheelOff[i].ix);c.setAttribute("cy",wheelOff[i].iy);
+  c.setAttribute("r",4);c.setAttribute("stroke","#222");c.setAttribute("stroke-width","0.6");
+  carG.appendChild(c);wheelEls.push(c);
+}
+drawSurfaces();
+let frames=DATA.on_frames, idx=0, playing=false, lastWall=0, speed=1.0;
+function setRun(w){
+  frames=(w==="on")?DATA.on_frames:DATA.off_frames;
+  runLabel.textContent=(w==="on")?"BTCM-on":"BTCM-off";
+  scrub.max=Math.max(0,frames.length-1);
+  if(idx>=frames.length)idx=frames.length-1;
+  redraw();
+}
+function redraw(){
+  if(!frames.length)return;
+  const f=frames[Math.min(Math.floor(idx),frames.length-1)];
+  carG.setAttribute("transform",
+    "translate("+worldX(f.x).toFixed(1)+","+worldY(f.y).toFixed(1)+")"+
+    " rotate("+(-f.yaw).toFixed(2)+")");
+  for(let i=0;i<4;++i)wheelEls[i].setAttribute("fill",slipColor(f.sl[i]));
+  drawTrail(frames,Math.floor(idx));
+  scrub.value=Math.floor(idx);
+  timeLabel.textContent="t = "+f.t.toFixed(2)+" s";
+  const W=["FL","FR","RL","RR"];
+  let s="";
+  s+="v = "+f.v.toFixed(2)+" m/s    ";
+  s+="front cmd = "+f.fb.toFixed(2)+"    ";
+  s+="rear cmd  = "+f.rb.toFixed(2)+"\\n";
+  s+="slip:  ";
+  for(let i=0;i<4;++i)s+=W[i]+" "+f.sl[i].toFixed(2)+"  ";
+  s+="\\n";
+  const pn=p=>p===0?"APPLY":p===1?"HOLD":p===2?"DUMP":"—";
+  s+="ABS phase: FL "+pn(f.ph[0]).padEnd(5)+"  FR "+pn(f.ph[1]).padEnd(5);
+  s+="    EMB cmd: LR "+f.emb[0].toFixed(2)+"  RR "+f.emb[1].toFixed(2);
+  hud.textContent=s;
+}
+function tick(now){
+  if(!playing)return;
+  const dt=now-lastWall;lastWall=now;
+  idx+=(dt/40)*speed;
+  if(idx>=frames.length-1){idx=frames.length-1;playing=false;playBtn.textContent="▶ play";}
+  redraw();if(playing)requestAnimationFrame(tick);
+}
+playBtn.addEventListener("click",()=>{
+  if(playing){playing=false;playBtn.textContent="▶ play";return;}
+  if(idx>=frames.length-1)idx=0;
+  playing=true;lastWall=performance.now();playBtn.textContent="⏸ pause";
+  requestAnimationFrame(tick);
+});
+scrub.addEventListener("input",()=>{idx=parseInt(scrub.value,10);redraw();});
+speedSel.addEventListener("change",()=>{speed=parseFloat(speedSel.value);});
+runSel.addEventListener("change",()=>{setRun(runSel.value);});
+stepBack.addEventListener("click",()=>{idx=Math.max(0,Math.floor(idx)-1);redraw();});
+stepFwd.addEventListener("click",()=>{idx=Math.min(frames.length-1,Math.floor(idx)+1);redraw();});
+setRun("on");
+</script></body></html>
+"""
+    return html.replace("__TEST__", t).replace("__PAYLOAD__", payload_json)
+
+
 def chart_yaw_rate(rows: list[dict], brake_idx: int, end_idx: int,
                     title: str) -> str:
     svg = Svg(w=720, h=200, title=title)
@@ -857,6 +1158,17 @@ def write_scenario_section(t: str, d: dict,
         rel = p.relative_to(out_md_dir)
         return str(rel)
 
+    # Animated top-down replay (HTML).  Self-contained — embeds the
+    # frame data + JS + SVG in one file so the user can open it
+    # directly from their filesystem.  Carried as a sibling of the
+    # SVG charts so the report's link resolves.
+    repo_root  = out_md_dir.parent.parent  # docs/reports → repo root
+    level_path = repo_root / LEVEL_FILES.get(t, "")
+    replay_path = charts_dir / f"{t}_replay.html"
+    replay_path.parent.mkdir(parents=True, exist_ok=True)
+    replay_path.write_text(make_replay_html(t, on_rows, off_rows, level_path))
+    replay_rel = replay_path.relative_to(out_md_dir)
+
     speed_svg     = write_svg("speed",
                               chart_speed_compare(on_rows, off_rows,
                                                    on_brake, on_end,
@@ -945,6 +1257,12 @@ def write_scenario_section(t: str, d: dict,
     lines.append("")
 
     lines.append("### Charts")
+    lines.append("")
+    lines.append(f"**[▶ Animated top-down replay (open in browser)]({replay_rel})** — "
+                 "watch the car drive through the brake event with per-wheel slip "
+                 "color-coded, surface patches drawn behind, and a scrubbable "
+                 "timeline.  Toggle BTCM-on / BTCM-off in the dropdown to A/B "
+                 "the same instant.")
     lines.append("")
     lines.append("**Vehicle speed**")
     lines.append("")
