@@ -228,6 +228,16 @@ public:
     /// M key in ev1sim.
     void SetDriverWiperWashRequest(bool pressed);
 
+    /// Outgoing power window switch states (IDs 6980-6983, main harness segment).
+    /// Each is a 1-byte uint8 momentary bool (0=released, 1=held this tick).
+    /// EV1 is a 2-seater: driver window (up/down) + passenger window (up/down).
+    /// No keyboard binding — floating UI panel will drive press()/release() when
+    /// its widget set expands.  consumer = RSA (window-motor logic), future round.
+    void SetDriverPowerWindowDriverUp(bool held);
+    void SetDriverPowerWindowDriverDown(bool held);
+    void SetDriverPowerWindowPassengerUp(bool held);
+    void SetDriverPowerWindowPassengerDown(bool held);
+
     /// Outgoing motor RPM (ID 4070, chassis segment, float32 LE).
     /// Motor shaft speed in RPM (positive forward).
     void SetMotorRpm(float rpm);
@@ -235,6 +245,16 @@ public:
     /// Outgoing motor torque (ID 4071, chassis segment, float32 LE).
     /// Motor shaft torque in Nm (signed; positive = driving torque).
     void SetMotorTorqueNm(float torque_nm);
+
+    /// Outgoing ambient air temperature (ID 4090, chassis segment, float32 LE).
+    /// Published by ev1sim's AmbientTempSensor on each tick (epsilon-gated).
+    /// Intended consumers: HTCM (heat-pump model), BPM (battery thermal).
+    void SetAmbientTempC(float temp_c);
+
+    /// Outgoing ambient relative humidity (ID 4091, chassis segment, float32 LE).
+    /// Range: 0..100%.  Published by ev1sim's AmbientTempSensor on each tick
+    /// (epsilon-gated).  Inversely correlated with temperature by the diurnal model.
+    void SetAmbientHumidityPct(float humidity_pct);
 
     /// Incoming RSA run-mode broadcast (ID 5711, main harness segment).
     /// uint8 enum: 0=OFF, 1=ACC, 2=RUN.  RSA publishes this on every tick.

@@ -1,6 +1,7 @@
 #include "PhysicalWorld.h"
 
 #include <irrlicht.h>
+#include <cmath>
 #include <cstdio>
 
 namespace ev1sim {
@@ -607,6 +608,31 @@ const char* RsaKeypadDriver::expected_state_name() const {
         case ExpectedState::ACC: return "ACC";
     }
     return "OFF";
+}
+
+// ---------------------------------------------------------------------------
+// AmbientTempSensor
+// ---------------------------------------------------------------------------
+
+void AmbientTempSensor::update(double time_of_day_hours) {
+    // Diurnal sinusoid — peak at phase_offset_hours, trough 12 h earlier/later.
+    // sin argument: 2π * (hour - peak_hour) / 24
+    // At peak (hour == phase_offset_hours), sin == 0... wait, that's the zero
+    // crossing.  For the peak to occur at phase_offset_hours we shift by
+    // (phase_offset - 6) so sin reaches +1 at the desired hour:
+    //   sin(2π*(h - (peak - 6))/24) = sin(2π*(h - peak)/24 + π/2) = cos(...)
+    // Equivalently:
+    //   angle = 2π * (hour - phase_offset_hours) / 24
+    //   temp  = mean + amp * cos(angle)   [cos = sin + 90°]
+    const double two_pi = 2.0 * 3.14159265358979323846;
+    const double angle  = two_pi * (time_of_day_hours - m_cfg.phase_offset_hours) / 24.0;
+    m_temp_c       = m_cfg.mean_temp_c + m_cfg.diurnal_amp_c * std::cos(angle)
+                     + m_cfg.seed_offset_c;
+    // Humidity inversely correlated with temperature.
+    m_humidity_pct = m_cfg.mean_humidity_pct - m_cfg.diurnal_humidity_amp * std::cos(angle);
+    // Clamp humidity to valid range.
+    if (m_humidity_pct < 0.0)   m_humidity_pct = 0.0;
+    if (m_humidity_pct > 100.0) m_humidity_pct = 100.0;
 }
 
 }  // namespace ev1sim

@@ -19,6 +19,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     constexpr int kNumPrnd        = 4;   // PRND selector lines (4050-4053)
     constexpr int kNumMotor       = 2;   // motor_rpm (4070), motor_torque_nm (4071)
     constexpr int kNumWiper       = 2;   // wiper_motor_command (4080), washer_pump_command (4081)
+    constexpr int kNumAmbient     = 2;   // ambient_temp_c (4090), ambient_humidity_pct (4091)
     // Driver inputs on the main harness segment (electricsim_ev1_bus), output
     // from ev1sim: brake_pedal_q8 (6900), steering_deg_q8 (6901),
     // gear_selector (6902), throttle_q8 (6903), brake_switch (6904),
@@ -28,12 +29,14 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     // button4 (6978), button5 (6979),
     // ipc_trip_reset (6952), cruise_set (6953), cruise_resume (6954),
     // cruise_cancel (6955), cruise_speed_up (6956), cruise_speed_down (6957),
-    // wiper_switch (6958), wiper_wash_request (6959).
+    // wiper_switch (6958), wiper_wash_request (6959),
+    // power_window_driver_up (6980), power_window_driver_down (6981),
+    // power_window_passenger_up (6982), power_window_passenger_down (6983).
     // (6970 is reserved — not registered as an endpoint.)
-    constexpr int kNumDriverInputs = 23;
+    constexpr int kNumDriverInputs = 27;
     const int expected = NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS +
                          kNumCombSw + kNumChargeCplr + kNumPrnd + kNumMotor +
-                         kNumWiper + kNumDynamics + kNumDriverInputs;
+                         kNumWiper + kNumAmbient + kNumDynamics + kNumDriverInputs;
     REQUIRE(ExternalSimConnector::EndpointCount() == expected);
 
     // Unique signal IDs and names.
@@ -80,6 +83,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
         } else if (e.signal_id == 4080 || e.signal_id == 4081) {
             CHECK(e.input_to_sim);          // wiper motor + washer pump cmds flow into ev1sim
             ++dynamics_count;
+        } else if (e.signal_id == 4090 || e.signal_id == 4091) {
+            CHECK_FALSE(e.input_to_sim);    // ambient temp + humidity are outputs from ev1sim
+            ++dynamics_count;
         } else if ((e.signal_id >= 4100 && e.signal_id <= 4109) ||
                    (e.signal_id >= 4110 && e.signal_id <= 4113) ||
                    (e.signal_id >= 4120 && e.signal_id <= 4123)) {
@@ -92,7 +98,8 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
                    e.signal_id == 6964 ||
                    e.signal_id == 6971 ||
                    (e.signal_id >= 6975 && e.signal_id <= 6979) ||
-                   (e.signal_id >= 6952 && e.signal_id <= 6959)) {
+                   (e.signal_id >= 6952 && e.signal_id <= 6959) ||
+                   (e.signal_id >= 6980 && e.signal_id <= 6983)) {
             // Driver inputs on the main harness segment — outputs from ev1sim.
             // 6900=brake_pedal_q8  6901=steering_deg_q8  6902=gear_selector
             // 6903=throttle_q8     6904=brake_switch
@@ -102,6 +109,8 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
             // 6958=wiper_switch    6959=wiper_wash_request
             // 6964=seatbelt_buckled  6971=rsa_mode_button
             // 6975..6979=rsa_keypad_button[1..5]  (6970 reserved; not registered)
+            // 6980=power_window_driver_up   6981=power_window_driver_down
+            // 6982=power_window_passenger_up  6983=power_window_passenger_down
             CHECK_FALSE(e.input_to_sim);
             ++driver_input_count;
         } else {
@@ -115,8 +124,8 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     CHECK(prnd_count           == kNumPrnd);
     CHECK(charge_coupler_count == kNumChargeCplr);
     // dynamics_count includes the 18 original dynamics + 2 motor signals (4070-4071)
-    // + 2 wiper signals (4080-4081).
-    CHECK(dynamics_count       == kNumDynamics + kNumMotor + kNumWiper);
+    // + 2 wiper signals (4080-4081) + 2 ambient env signals (4090-4091).
+    CHECK(dynamics_count       == kNumDynamics + kNumMotor + kNumWiper + kNumAmbient);
     CHECK(driver_input_count   == kNumDriverInputs);
 }
 
@@ -403,6 +412,30 @@ TEST_CASE("SetMotorRpm and SetMotorTorqueNm store without crashing", "[ExternalS
     ExternalSimConnector c;
     CHECK_NOTHROW(c.SetMotorRpm(1500.0f));
     CHECK_NOTHROW(c.SetMotorTorqueNm(-12.5f));
+    CHECK_NOTHROW(c.Tick(0.0));
+}
+
+TEST_CASE("Ambient environment endpoints have correct IDs and direction", "[ExternalSim]") {
+    const auto* temp = ExternalSimConnector::FindEndpoint(4090);
+    REQUIRE(temp != nullptr);
+    CHECK(std::string(temp->qualified_name) == "vehicle.environment.ambient_temp_c");
+    CHECK(std::string(temp->short_name)     == "ambient_temp_c");
+    CHECK_FALSE(temp->input_to_sim);   // output from ev1sim
+
+    const auto* hum = ExternalSimConnector::FindEndpoint(4091);
+    REQUIRE(hum != nullptr);
+    CHECK(std::string(hum->qualified_name) == "vehicle.environment.ambient_humidity_pct");
+    CHECK(std::string(hum->short_name)     == "ambient_humidity_pct");
+    CHECK_FALSE(hum->input_to_sim);    // output from ev1sim
+}
+
+TEST_CASE("SetAmbientTempC and SetAmbientHumidityPct store without crashing", "[ExternalSim]") {
+    ExternalSimConnector c;
+    CHECK_NOTHROW(c.SetAmbientTempC(18.0f));
+    CHECK_NOTHROW(c.SetAmbientTempC(-5.0f));
+    CHECK_NOTHROW(c.SetAmbientHumidityPct(55.0f));
+    CHECK_NOTHROW(c.SetAmbientHumidityPct(0.0f));
+    CHECK_NOTHROW(c.SetAmbientHumidityPct(100.0f));
     CHECK_NOTHROW(c.Tick(0.0));
 }
 

@@ -382,6 +382,48 @@ private:
     bool     m_wash     = false;
 };
 
+/// Power window switches (driver + passenger × up + down).
+///
+/// EV1 is a 2-seater: driver window and passenger window, each with an up and
+/// a down momentary switch.  Each switch publishes a boolean on the main
+/// harness segment while held (true = held, false = released):
+///   kSigDriverPowerWindowDriverUp    (6980)
+///   kSigDriverPowerWindowDriverDown  (6981)
+///   kSigDriverPowerWindowPassengerUp   (6982)
+///   kSigDriverPowerWindowPassengerDown (6983)
+///
+/// No keyboard binding — the floating UI panel will call press()/release()
+/// when its widget set expands.  consumer = RSA (future round).
+class PowerWindows {
+public:
+    enum class Window    { DRIVER, PASSENGER };
+    enum class Direction { NONE, UP, DOWN };
+
+    /// Hold a switch while pressed.  Overwrites any previous direction for
+    /// that window (press DOWN while already UP → state becomes DOWN).
+    void press(Window w, Direction d) {
+        (w == Window::DRIVER ? m_driver : m_passenger) = d;
+    }
+
+    /// Release: return the window to NONE (no switch held).
+    void release(Window w) {
+        (w == Window::DRIVER ? m_driver : m_passenger) = Direction::NONE;
+    }
+
+    Direction state(Window w) const {
+        return (w == Window::DRIVER) ? m_driver : m_passenger;
+    }
+
+    bool driver_up()      const { return m_driver    == Direction::UP;   }
+    bool driver_down()    const { return m_driver    == Direction::DOWN;  }
+    bool passenger_up()   const { return m_passenger == Direction::UP;   }
+    bool passenger_down() const { return m_passenger == Direction::DOWN;  }
+
+private:
+    Direction m_driver    = Direction::NONE;
+    Direction m_passenger = Direction::NONE;
+};
+
 /// Door lock state model.
 ///
 /// Tracks the lock/unlock state of driver door, passenger door, and trunk.
@@ -439,6 +481,46 @@ private:
     State m_trunk     = State::UNLOCKED;
 };
 
+/// Naive almanac-style ambient temperature + humidity sensor.
+///
+/// Models a smooth diurnal (24-hour) sinusoidal cycle.  No live weather API —
+/// values are fully deterministic for a given Config and time-of-day input.
+///
+/// Diurnal model:
+///   temp_c        = mean + diurnal_amp * sin(2π * (hour - phase_offset) / 24)
+///   humidity_pct  = mean - diurnal_humidity_amp * sin(2π * (hour - phase_offset) / 24)
+///   (humidity inversely correlated with temperature)
+///
+/// Defaults model a moderate spring day (18°C mean, 8°C swing, 55% RH,
+/// peak temperature at 14:00 local time).
+class AmbientTempSensor {
+public:
+    /// Configurable parameters; defaults model a moderate spring day.
+    struct Config {
+        double mean_temp_c            = 18.0;   ///< mean of the daily temp cycle (°C)
+        double diurnal_amp_c          = 8.0;    ///< peak-to-trough swing / 2 (°C)
+        double mean_humidity_pct      = 55.0;   ///< mean relative humidity (%)
+        double diurnal_humidity_amp   = 15.0;   ///< humidity amplitude (inversely correlated)
+        double phase_offset_hours     = 14.0;   ///< hour-of-day when peak temp occurs
+        double seed_offset_c          = 0.0;    ///< per-run noise offset (0 = fully deterministic)
+    };
+
+    /// Replace configuration; takes effect on the next update() call.
+    void set_config(const Config& cfg) { m_cfg = cfg; }
+
+    /// Recompute temp + humidity from the current time of day.
+    /// @param time_of_day_hours  Local time expressed in hours [0..24).
+    void update(double time_of_day_hours);
+
+    double temp_c()       const { return m_temp_c; }
+    double humidity_pct() const { return m_humidity_pct; }
+
+private:
+    Config m_cfg{};
+    double m_temp_c       = 18.0;
+    double m_humidity_pct = 55.0;
+};
+
 /// Container for all physical-world input components.
 class PhysicalWorld {
 public:
@@ -475,6 +557,12 @@ public:
     DoorLocks&       door_locks()       { return m_door_locks; }
     const DoorLocks& door_locks() const { return m_door_locks; }
 
+    AmbientTempSensor&       ambient_temp_sensor()       { return m_ambient_temp; }
+    const AmbientTempSensor& ambient_temp_sensor() const { return m_ambient_temp; }
+
+    PowerWindows&       power_windows()       { return m_power_windows; }
+    const PowerWindows& power_windows() const { return m_power_windows; }
+
     /// Draw HUD overlays for: key state, combination switch, PRND selector,
     /// and turn signals/hazard.  Call between BeginScene and EndScene.
     /// rsa_run_mode: most recently received RSA run mode (0=OFF,1=ACC,2=RUN;
@@ -508,6 +596,8 @@ private:
     CruiseStalk        m_cruise_stalk;
     WiperStalk         m_wiper_stalk;
     DoorLocks          m_door_locks;
+    AmbientTempSensor  m_ambient_temp;
+    PowerWindows       m_power_windows;
 };
 
 }  // namespace ev1sim

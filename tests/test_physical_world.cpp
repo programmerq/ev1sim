@@ -520,6 +520,104 @@ TEST_CASE("DoorLocks: toggle_trunk leaves other doors unaffected", "[PhysicalWor
 }
 
 // ---------------------------------------------------------------------------
+// AmbientTempSensor — diurnal sinusoid model
+// ---------------------------------------------------------------------------
+
+TEST_CASE("test_ambient_temp_default_config", "[PhysicalWorld][AmbientTemp]") {
+    using Catch::Matchers::WithinAbs;
+    AmbientTempSensor sensor;
+
+    // Default config: mean=18, amp=8, phase_offset=14h.
+    // At noon (12h): angle = 2π*(12-14)/24 = -π/6
+    //   cos(-π/6) ≈ 0.866  →  temp ≈ 18 + 8*0.866 ≈ 24.93°C  (above mean)
+    sensor.update(12.0);
+    CHECK(sensor.temp_c() > 18.0);                           // above mean at noon
+    CHECK_THAT(sensor.temp_c(), WithinAbs(24.93, 0.5));
+
+    // At midnight (0h): angle = 2π*(0-14)/24 = -7π/6
+    //   cos(-7π/6) ≈ -0.866  →  temp ≈ 18 - 8*0.866 ≈ 11.07°C  (below mean)
+    sensor.update(0.0);
+    CHECK(sensor.temp_c() < 18.0);                           // below mean at midnight
+    CHECK_THAT(sensor.temp_c(), WithinAbs(11.07, 0.5));
+}
+
+TEST_CASE("test_ambient_temp_humidity_inverse_correlation", "[PhysicalWorld][AmbientTemp]") {
+    using Catch::Matchers::WithinAbs;
+    AmbientTempSensor sensor;
+
+    // Peak temperature occurs at phase_offset_hours=14 (2 pm).
+    // At that hour, cos(0) = 1 → temp_c = mean + amp = 18 + 8 = 26°C (maximum).
+    // Humidity at peak temp: mean_humidity - diurnal_humidity_amp = 55 - 15 = 40%.
+    sensor.update(14.0);
+    CHECK_THAT(sensor.temp_c(),       WithinAbs(26.0, 0.5));  // max temp
+    CHECK_THAT(sensor.humidity_pct(), WithinAbs(40.0, 0.5));  // min humidity
+
+    // Trough temperature occurs 12 h from peak, at 2h (14-12=2).
+    // cos(π) = -1 → temp_c = 18 - 8 = 10°C (minimum).
+    // Humidity at trough temp: 55 - 15*(-1) = 70%.
+    sensor.update(2.0);
+    CHECK_THAT(sensor.temp_c(),       WithinAbs(10.0, 0.5));  // min temp
+    CHECK_THAT(sensor.humidity_pct(), WithinAbs(70.0, 0.5));  // max humidity
+
+    // Verify inverse: when temp is highest, humidity is lowest, and vice versa.
+    double temp_at_peak, humidity_at_peak;
+    double temp_at_trough, humidity_at_trough;
+    sensor.update(14.0);
+    temp_at_peak    = sensor.temp_c();
+    humidity_at_peak = sensor.humidity_pct();
+    sensor.update(2.0);
+    temp_at_trough    = sensor.temp_c();
+    humidity_at_trough = sensor.humidity_pct();
+    CHECK(temp_at_peak > temp_at_trough);
+    CHECK(humidity_at_peak < humidity_at_trough);
+}
+
+TEST_CASE("test_ambient_temp_set_config_changes_output", "[PhysicalWorld][AmbientTemp]") {
+    using Catch::Matchers::WithinAbs;
+    AmbientTempSensor sensor;
+
+    // Override mean_temp_c = 30; amp=8, phase=14h.
+    // At peak (14h): temp = 30 + 8 = 38°C.
+    // At trough (2h): temp = 30 - 8 = 22°C.
+    AmbientTempSensor::Config cfg;
+    cfg.mean_temp_c = 30.0;
+    sensor.set_config(cfg);
+
+    sensor.update(14.0);  // peak
+    CHECK_THAT(sensor.temp_c(), WithinAbs(38.0, 0.5));
+
+    sensor.update(2.0);   // trough
+    CHECK_THAT(sensor.temp_c(), WithinAbs(22.0, 0.5));
+
+    // At noon: centered on 30, not 18.
+    sensor.update(12.0);
+    CHECK(sensor.temp_c() > 24.0);  // well above old default mean of 18
+    CHECK_THAT(sensor.temp_c(), WithinAbs(30.0 + 8.0 * 0.866, 0.5));
+}
+
+TEST_CASE("test_ambient_temp_phase_offset", "[PhysicalWorld][AmbientTemp]") {
+    using Catch::Matchers::WithinAbs;
+    AmbientTempSensor sensor;
+
+    // Shift peak to 10h (10am) instead of default 14h.
+    AmbientTempSensor::Config cfg;
+    cfg.phase_offset_hours = 10.0;
+    sensor.set_config(cfg);
+
+    // Peak should now be at 10h.
+    sensor.update(10.0);
+    double temp_at_10h = sensor.temp_c();
+    CHECK_THAT(temp_at_10h, WithinAbs(26.0, 0.5));  // mean + amp = 18 + 8
+
+    // At old peak (14h) with new offset: angle = 2π*(14-10)/24 = π/3
+    // cos(π/3) = 0.5  →  temp = 18 + 8*0.5 = 22°C  (not peak)
+    sensor.update(14.0);
+    double temp_at_14h = sensor.temp_c();
+    CHECK(temp_at_14h < temp_at_10h);  // old peak time is no longer the peak
+    CHECK_THAT(temp_at_14h, WithinAbs(22.0, 0.5));
+}
+
+// ---------------------------------------------------------------------------
 // BrakeSwitch basic tests (already in PhysicalWorld.h/.cpp, verify compile)
 // ---------------------------------------------------------------------------
 
@@ -535,4 +633,69 @@ TEST_CASE("BrakeSwitch: default off, hysteresis", "[PhysicalWorld]") {
 
     CHECK_FALSE(sw.update(0.02));  // below OFF threshold => released
     CHECK_FALSE(sw.pressed());
+}
+
+// ---------------------------------------------------------------------------
+// PowerWindows
+// ---------------------------------------------------------------------------
+
+TEST_CASE("test_power_windows_default_state", "[PhysicalWorld][PowerWindows]") {
+    PowerWindows pw;
+    using W = PowerWindows::Window;
+    using D = PowerWindows::Direction;
+
+    CHECK(pw.state(W::DRIVER)    == D::NONE);
+    CHECK(pw.state(W::PASSENGER) == D::NONE);
+    CHECK_FALSE(pw.driver_up());
+    CHECK_FALSE(pw.driver_down());
+    CHECK_FALSE(pw.passenger_up());
+    CHECK_FALSE(pw.passenger_down());
+}
+
+TEST_CASE("test_power_windows_press_release_driver_up", "[PhysicalWorld][PowerWindows]") {
+    PowerWindows pw;
+    using W = PowerWindows::Window;
+    using D = PowerWindows::Direction;
+
+    pw.press(W::DRIVER, D::UP);
+    CHECK(pw.driver_up());
+    CHECK_FALSE(pw.driver_down());
+    CHECK(pw.state(W::DRIVER) == D::UP);
+
+    pw.release(W::DRIVER);
+    CHECK_FALSE(pw.driver_up());
+    CHECK(pw.state(W::DRIVER) == D::NONE);
+}
+
+TEST_CASE("test_power_windows_press_overrides_existing", "[PhysicalWorld][PowerWindows]") {
+    PowerWindows pw;
+    using W = PowerWindows::Window;
+    using D = PowerWindows::Direction;
+
+    pw.press(W::DRIVER, D::UP);
+    CHECK(pw.driver_up());
+    CHECK_FALSE(pw.driver_down());
+
+    // Press DOWN while already UP — state becomes DOWN.
+    pw.press(W::DRIVER, D::DOWN);
+    CHECK_FALSE(pw.driver_up());
+    CHECK(pw.driver_down());
+    CHECK(pw.state(W::DRIVER) == D::DOWN);
+}
+
+TEST_CASE("test_power_windows_independent_per_window", "[PhysicalWorld][PowerWindows]") {
+    PowerWindows pw;
+    using W = PowerWindows::Window;
+    using D = PowerWindows::Direction;
+
+    pw.press(W::DRIVER,    D::UP);
+    pw.press(W::PASSENGER, D::DOWN);
+
+    CHECK(pw.driver_up());
+    CHECK_FALSE(pw.driver_down());
+    CHECK_FALSE(pw.passenger_up());
+    CHECK(pw.passenger_down());
+
+    CHECK(pw.state(W::DRIVER)    == D::UP);
+    CHECK(pw.state(W::PASSENGER) == D::DOWN);
 }

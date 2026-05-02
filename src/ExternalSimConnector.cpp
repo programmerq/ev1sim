@@ -147,13 +147,22 @@ constexpr std::uint32_t kSigDriverCruiseSpeedDown     = 6957U;
 constexpr std::uint32_t kSigDriverWiperSwitch         = 6958U;
 constexpr std::uint32_t kSigDriverWiperWashRequest    = 6959U;
 constexpr int           kNumNewDriverInputs           = 8;
+// Power window switch signals (momentary bool, held while pressed).
+// Locked in lockstep with electricsim kSigDriverPowerWindow* = 6980-6983.
+// consumer = RSA (window-motor logic), future round.
+constexpr std::uint32_t kSigDriverPowerWindowDriverUp      = 6980U;
+constexpr std::uint32_t kSigDriverPowerWindowDriverDown    = 6981U;
+constexpr std::uint32_t kSigDriverPowerWindowPassengerUp   = 6982U;
+constexpr std::uint32_t kSigDriverPowerWindowPassengerDown = 6983U;
+constexpr int           kNumPowerWindowInputs              = 4;
 
 // Number of driver-input endpoints on the main harness segment.
 // 6900, 6901, 6902, 6903, 6904, 6944, 6948, 6949, 6964,
 // 6971, 6975, 6976, 6977, 6978, 6979,
-// 6952, 6953, 6954, 6955, 6956, 6957, 6958, 6959 = 23 total.
+// 6952, 6953, 6954, 6955, 6956, 6957, 6958, 6959,
+// 6980, 6981, 6982, 6983 = 27 total.
 // (6970 is reserved; not registered as an endpoint.)
-constexpr int           kNumDriverInputs           = 15 + kNumNewDriverInputs;
+constexpr int           kNumDriverInputs = 15 + kNumNewDriverInputs + kNumPowerWindowInputs;
 
 // Motor state signals on the chassis segment (ev1sim → electricsim, float32 LE).
 //   4070  vehicle.dynamics.motor_rpm        motor shaft RPM
@@ -161,6 +170,15 @@ constexpr int           kNumDriverInputs           = 15 + kNumNewDriverInputs;
 constexpr std::uint32_t kSigMotorRpm      = 4070U;
 constexpr std::uint32_t kSigMotorTorqueNm = 4071U;
 constexpr int           kNumMotorSignals  = 2;
+
+// Ambient environment sensors (ev1sim → electricsim, chassis segment, float32 LE).
+//   4090  vehicle.environment.ambient_temp_c          ambient air temperature (°C)
+//   4091  vehicle.environment.ambient_humidity_pct    ambient relative humidity (%)
+// Publisher: ev1sim AmbientTempSensor (naive diurnal sinusoid; no live weather API).
+// Consumers: HTCM (heat-pump), BPM (battery thermal) — wiring deferred to future round.
+constexpr std::uint32_t kSigAmbientTempC       = 4090U;
+constexpr std::uint32_t kSigAmbientHumidityPct = 4091U;
+constexpr int           kNumAmbientSignals      = 2;
 
 // Wiper motor command (electricsim/RHJB → ev1sim, chassis segment).
 //   4080  vehicle.body.wiper_motor.command  uint8 enum: 0=OFF, 1=INT, 2=LOW, 3=HIGH
@@ -289,14 +307,18 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 //   6948 turn_signal_left, 6949 turn_signal_right, 6964 seatbelt_buckled,
 //   6971 rsa_mode_button,
 //   6975 rsa_keypad_button1, 6976..6979 (buttons 2-5)  (15 total).
+//   + 8 new: 6952 ipc_trip_reset, 6953-6957 cruise, 6958 wiper_switch, 6959 wiper_wash.
+//   + 4 new: 6980-6983 power window switches (driver up/down, passenger up/down).
 // (Slot 6970 is reserved; not registered.)
 // +1 for the charge coupler presence (ID 4060, chassis segment).
 // +kNumPrndSelector for the 4 PRND selector lines (IDs 4050-4053, chassis segment).
 // +kNumMotorSignals for motor RPM + torque (IDs 4070-4071, chassis segment).
 // +kNumWiperSignals for wiper motor command (4080) + washer pump command (4081).
+// +kNumAmbientSignals for ambient temp (4090) + ambient humidity (4091).
 constexpr int kNumEndpoints =
     NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumCombSw + 1 /*charge_coupler*/ +
-    kNumPrndSelector + kNumMotorSignals + kNumWiperSignals + kNumDynamics + kNumDriverInputs;
+    kNumPrndSelector + kNumMotorSignals + kNumWiperSignals + kNumAmbientSignals +
+    kNumDynamics + kNumDriverInputs;
 
 std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     std::array<ExternalSimConnector::Endpoint, kNumEndpoints> out{};
@@ -338,6 +360,11 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.dynamics.motor_rpm", "motor_rpm", false};
     out[i++] = {kSigMotorTorqueNm,
                 "vehicle.dynamics.motor_torque_nm", "motor_torque_nm", false};
+    // Ambient environment sensors (chassis segment, ev1sim → electricsim).
+    out[i++] = {kSigAmbientTempC,
+                "vehicle.environment.ambient_temp_c", "ambient_temp_c", false};
+    out[i++] = {kSigAmbientHumidityPct,
+                "vehicle.environment.ambient_humidity_pct", "ambient_humidity_pct", false};
     // Wiper motor command + washer pump command (RHJB → ev1sim, chassis segment).
     out[i++] = {kSigWiperMotorCommand,
                 "vehicle.body.wiper_motor.command", "wiper_motor_command", true};
@@ -398,6 +425,21 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.driver.wiper_switch", "driver_wiper_switch", false};
     out[i++] = {kSigDriverWiperWashRequest,
                 "vehicle.driver.wiper_wash_request", "driver_wiper_wash_request", false};
+    // Power window switch signals (6980-6983) — momentary bool, held while pressed.
+    // No keyboard binding; floating UI will drive press()/release() when it lands.
+    // consumer = RSA (window-motor logic), future round.
+    out[i++] = {kSigDriverPowerWindowDriverUp,
+                "vehicle.driver.power_window_driver_up",
+                "power_window_driver_up", false};
+    out[i++] = {kSigDriverPowerWindowDriverDown,
+                "vehicle.driver.power_window_driver_down",
+                "power_window_driver_down", false};
+    out[i++] = {kSigDriverPowerWindowPassengerUp,
+                "vehicle.driver.power_window_passenger_up",
+                "power_window_passenger_up", false};
+    out[i++] = {kSigDriverPowerWindowPassengerDown,
+                "vehicle.driver.power_window_passenger_down",
+                "power_window_passenger_down", false};
     return out;
 }
 
@@ -508,12 +550,31 @@ struct ExternalSimConnector::State {
     std::int8_t   driver_wiper_switch_pub      = -1;
     std::int8_t   driver_wiper_wash_pub        = -1;
 
+    // Power window switch states (IDs 6980-6983, main harness segment).
+    // Momentary bools (0=released, 1=held this tick).
+    // Default false — floating UI will toggle when it lands.
+    bool          driver_pw_driver_up         = false;
+    bool          driver_pw_driver_down       = false;
+    bool          driver_pw_passenger_up      = false;
+    bool          driver_pw_passenger_down    = false;
+    std::int8_t   driver_pw_driver_up_pub     = -1;   // -1 forces first publish
+    std::int8_t   driver_pw_driver_down_pub   = -1;
+    std::int8_t   driver_pw_passenger_up_pub  = -1;
+    std::int8_t   driver_pw_passenger_down_pub = -1;
+
     // Motor state (IDs 4070-4071, chassis segment).
     // Publish-on-change with small epsilon thresholds.
     float         motor_rpm               = 0.0f;
     float         motor_torque_nm         = 0.0f;
     float         motor_rpm_pub           = -9999.0f;   // sentinel: always publish first
     float         motor_torque_pub        = -9999.0f;
+
+    // Ambient environment sensors (IDs 4090-4091, chassis segment).
+    // Publish-on-change with small epsilon thresholds.
+    float         ambient_temp_c          = 18.0f;
+    float         ambient_humidity_pct    = 55.0f;
+    float         ambient_temp_pub        = -9999.0f;   // sentinel: always publish first
+    float         ambient_humidity_pub    = -9999.0f;
 
     // Wiper motor command (ID 4080, chassis segment) — received from RHJB.
     // 0xFF = never received; valid values 0=OFF, 1=INT, 2=LOW, 3=HIGH.
@@ -802,12 +863,36 @@ void ExternalSimConnector::SetDriverWiperWashRequest(bool pressed) {
     m_state->driver_wiper_wash = pressed;
 }
 
+void ExternalSimConnector::SetDriverPowerWindowDriverUp(bool held) {
+    m_state->driver_pw_driver_up = held;
+}
+
+void ExternalSimConnector::SetDriverPowerWindowDriverDown(bool held) {
+    m_state->driver_pw_driver_down = held;
+}
+
+void ExternalSimConnector::SetDriverPowerWindowPassengerUp(bool held) {
+    m_state->driver_pw_passenger_up = held;
+}
+
+void ExternalSimConnector::SetDriverPowerWindowPassengerDown(bool held) {
+    m_state->driver_pw_passenger_down = held;
+}
+
 void ExternalSimConnector::SetMotorRpm(float rpm) {
     m_state->motor_rpm = rpm;
 }
 
 void ExternalSimConnector::SetMotorTorqueNm(float torque_nm) {
     m_state->motor_torque_nm = torque_nm;
+}
+
+void ExternalSimConnector::SetAmbientTempC(float temp_c) {
+    m_state->ambient_temp_c = temp_c;
+}
+
+void ExternalSimConnector::SetAmbientHumidityPct(float humidity_pct) {
+    m_state->ambient_humidity_pct = humidity_pct;
 }
 
 std::uint8_t ExternalSimConnector::GetRsaRunMode() const {
@@ -1192,7 +1277,11 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             st.driver_turn_right_pub       = -1;
             st.driver_hazard_pub           = -1;
             for (int bi = 0; bi < 5; ++bi) st.driver_rsa_btn_pub[bi] = -1;
-            st.driver_rsa_mode_btn_pub     = -1;
+            st.driver_rsa_mode_btn_pub      = -1;
+            st.driver_pw_driver_up_pub      = -1;
+            st.driver_pw_driver_down_pub    = -1;
+            st.driver_pw_passenger_up_pub   = -1;
+            st.driver_pw_passenger_down_pub = -1;
             std::cout << "[ExternalSim] connected to main harness bus '"
                       << m_opts.main_harness_bus_name << "'\n";
         }
@@ -1339,6 +1428,16 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         }
         publish_bool_change(kSigDriverWiperWashRequest, st.driver_wiper_wash,
                             st.driver_wiper_wash_pub);
+        // Power window switches (6980-6983) — momentary bool, held while pressed.
+        // Default false (no UI source yet); floating UI will set press()/release().
+        publish_bool_change(kSigDriverPowerWindowDriverUp,
+                            st.driver_pw_driver_up,     st.driver_pw_driver_up_pub);
+        publish_bool_change(kSigDriverPowerWindowDriverDown,
+                            st.driver_pw_driver_down,   st.driver_pw_driver_down_pub);
+        publish_bool_change(kSigDriverPowerWindowPassengerUp,
+                            st.driver_pw_passenger_up,  st.driver_pw_passenger_up_pub);
+        publish_bool_change(kSigDriverPowerWindowPassengerDown,
+                            st.driver_pw_passenger_down, st.driver_pw_passenger_down_pub);
         if (!drv.empty()) {
             Frame mf{};
             mf.header.type              = FrameType::DeltaBatch;
@@ -1380,6 +1479,39 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             mf.deltas                   = std::move(mdyn);
             if (!st.transport->publish_frame(mf)) {
                 std::cerr << "[ExternalSim] publish_frame (motor state) failed — reconnecting\n";
+                st.transport.reset();
+                st.status = Status::Connecting;
+                st.next_reconnect_time = sim_time_s + m_opts.reconnect_period_s;
+                return;
+            }
+        }
+    }
+
+    // 5c. Publish ambient environment sensors (temp + humidity) on the chassis segment.
+    // Publish-on-change with small epsilon thresholds to avoid flooding.
+    {
+        constexpr float kTempEps     = 0.01f;
+        constexpr float kHumidityEps = 0.05f;
+        const bool temp_changed     = std::abs(st.ambient_temp_c - st.ambient_temp_pub) > kTempEps;
+        const bool humidity_changed = std::abs(st.ambient_humidity_pct - st.ambient_humidity_pub) > kHumidityEps;
+        if (temp_changed || humidity_changed) {
+            std::vector<DeltaRecord> env;
+            if (temp_changed) {
+                env.push_back(MakeFloatDelta(kSigAmbientTempC, st.ambient_temp_c));
+                st.ambient_temp_pub = st.ambient_temp_c;
+            }
+            if (humidity_changed) {
+                env.push_back(MakeFloatDelta(kSigAmbientHumidityPct, st.ambient_humidity_pct));
+                st.ambient_humidity_pub = st.ambient_humidity_pct;
+            }
+            Frame ef{};
+            ef.header.type              = FrameType::DeltaBatch;
+            ef.header.stream_id         = kStreamEv1Sim;
+            ef.header.sequence          = st.sequence++;
+            ef.header.monotonic_time_ns = NowNs();
+            ef.deltas                   = std::move(env);
+            if (!st.transport->publish_frame(ef)) {
+                std::cerr << "[ExternalSim] publish_frame (ambient env) failed — reconnecting\n";
                 st.transport.reset();
                 st.status = Status::Connecting;
                 st.next_reconnect_time = sim_time_s + m_opts.reconnect_period_s;
