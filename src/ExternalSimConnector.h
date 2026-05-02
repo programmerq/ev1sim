@@ -444,6 +444,42 @@ public:
     bool GetIpcAirBagTelltale() const;
     bool HasReceivedIpcAirBagTelltale() const;
 
+    /// Incoming IPC service-now telltale (ID 4140, chassis segment).
+    /// Published by IPC when SERVICE_NOW DTC is active (DTCs 31/33/35 via HTCM/PCM/BPM).
+    /// bool: true = lamp on, false = lamp off.  Returns false if never received.
+    bool GetIpcServiceNowTelltale() const;
+    bool HasReceivedIpcServiceNowTelltale() const;
+
+    /// Incoming IPC check-messages telltale (ID 4141, chassis segment).
+    /// Aggregate: any comm-loss DTC, any telltale-request DTC, or any BTCM indicator DTC.
+    /// bool: true = lamp on, false = lamp off.  Returns false if never received.
+    bool GetIpcCheckMessagesTelltale() const;
+    bool HasReceivedIpcCheckMessagesTelltale() const;
+
+    /// Incoming IPC temp telltale (ID 4142, chassis segment).
+    /// Published by IPC when TEMP DTC is active (DTCs 32/34/36 via HTCM/PCM/BPM).
+    /// bool: true = lamp on, false = lamp off.  Returns false if never received.
+    bool GetIpcTempTelltale() const;
+    bool HasReceivedIpcTempTelltale() const;
+
+    /// Incoming IPC battery-life telltale (ID 4143, chassis segment).
+    /// Published by IPC when DTC 38 is active via IPC_REQ_BATTERY_LIFE_FROM_BPM.
+    /// bool: true = lamp on, false = lamp off.  Returns false if never received.
+    bool GetIpcBatteryLifeTelltale() const;
+    bool HasReceivedIpcBatteryLifeTelltale() const;
+
+    /// Incoming IPC reduced-performance telltale (ID 4144, chassis segment).
+    /// Published by IPC when DTC 37 is active via IPC_REQ_REDUCED_PERF_FROM_PCM.
+    /// bool: true = lamp on, false = lamp off.  Returns false if never received.
+    bool GetIpcReducedPerfTelltale() const;
+    bool HasReceivedIpcReducedPerfTelltale() const;
+
+    /// Incoming IPC check-tire-pressure telltale (ID 4145, chassis segment).
+    /// Published by IPC when DTC 39 is active via IPC_REQ_CHECK_TIRE_PRESS_FROM_RSA.
+    /// bool: true = lamp on, false = lamp off.  Returns false if never received.
+    bool GetIpcCheckTirePressTelltale() const;
+    bool HasReceivedIpcCheckTirePressTelltale() const;
+
     /// Incoming PIM cruise-control active flag (ID 5860, main harness segment).
     /// Published by PIM each tick on change.
     /// bool: true = cruise ACTIVE (engaged), false = STANDBY or OFF.

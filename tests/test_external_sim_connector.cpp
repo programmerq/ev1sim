@@ -33,6 +33,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     constexpr int kNumIpcTripDist   = 1;   // ipc_trip_distance_m (4132)
     constexpr int kNumIpcBtcmTelltale = 5; // ipc_brake_telltale (4134), park_brake (4135),
                                            // antilock (4136), low_trac (4137), air_bag (4138)
+    constexpr int kNumIpcExtraTelltale = 6; // service_now (4140), check_messages (4141),
+                                            // temp (4142), battery_life (4143),
+                                            // reduced_perf (4144), check_tire_press (4145)
     // Driver inputs on the main harness segment (electricsim_ev1_bus), output
     // from ev1sim: brake_pedal_q8 (6900), steering_deg_q8 (6901),
     // gear_selector (6902), throttle_q8 (6903), brake_switch (6904),
@@ -58,6 +61,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
                          kNumHvac + kNumAmbient + kNumDoorLockPw +
                          kNumRsaShiftBlocked +
                          kNumIpcTelltale + kNumIpcTripDist + kNumIpcBtcmTelltale +
+                         kNumIpcExtraTelltale +
                          kNumDynamics + kNumDriverInputs;
     REQUIRE(ExternalSimConnector::EndpointCount() == expected);
 
@@ -78,6 +82,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     int ipc_telltale_count        = 0;   // IPC seatbelt telltales (4130/4131)
     int ipc_trip_dist_count       = 0;   // IPC trip distance (4132)
     int ipc_btcm_telltale_count   = 0;   // IPC BTCM/airbag telltales (4134–4138)
+    int ipc_extra_telltale_count  = 0;   // IPC extra LCD telltales (4140–4145)
     int driver_input_count        = 0;
 
     const auto* eps = ExternalSimConnector::Endpoints();
@@ -135,6 +140,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
         } else if (e.signal_id >= 4134 && e.signal_id <= 4138) {
             CHECK(e.input_to_sim);          // IPC BTCM/airbag telltales flow into ev1sim
             ++ipc_btcm_telltale_count;
+        } else if (e.signal_id >= 4140 && e.signal_id <= 4145) {
+            CHECK(e.input_to_sim);          // IPC extra LCD telltales flow into ev1sim
+            ++ipc_extra_telltale_count;
         } else if (e.signal_id == 4090 || e.signal_id == 4091) {
             CHECK_FALSE(e.input_to_sim);    // ambient temp + humidity are outputs from ev1sim
             ++dynamics_count;
@@ -198,6 +206,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     // ipc_btcm_telltale_count: brake (4134) + park_brake (4135) + antilock (4136)
     //                          + low_trac (4137) + air_bag (4138) — from IPC.
     CHECK(ipc_btcm_telltale_count == kNumIpcBtcmTelltale);
+    // ipc_extra_telltale_count: service_now (4140) + check_messages (4141) + temp (4142)
+    //                           + battery_life (4143) + reduced_perf (4144) + check_tire_press (4145).
+    CHECK(ipc_extra_telltale_count == kNumIpcExtraTelltale);
     CHECK(driver_input_count   == kNumDriverInputs);
 }
 
@@ -1288,4 +1299,193 @@ TEST_CASE("IPC airbag telltale: FindEndpoint returns correct metadata (4138)",
     CHECK(std::string(ep->qualified_name) == "vehicle.ipc.air_bag_telltale");
     CHECK(std::string(ep->short_name)     == "ipc_air_bag_telltale");
     CHECK(ep->input_to_sim);
+}
+
+// ---------------------------------------------------------------------------
+// IPC extra LCD telltale subscriber tests (signals 4140-4145)
+// ---------------------------------------------------------------------------
+
+TEST_CASE("IPC service-now telltale: default is false / not received",
+          "[ExternalSim][IPC]") {
+    ExternalSimConnector c;
+    CHECK_FALSE(c.GetIpcServiceNowTelltale());
+    CHECK_FALSE(c.HasReceivedIpcServiceNowTelltale());
+}
+
+TEST_CASE("IPC service-now telltale: inject ON then OFF",
+          "[ExternalSim][IPC]") {
+    ExternalSimConnector c;
+    c.DebugInjectU8(4140, 1u);
+    CHECK(c.GetIpcServiceNowTelltale());
+    CHECK(c.HasReceivedIpcServiceNowTelltale());
+    c.DebugInjectU8(4140, 0u);
+    CHECK_FALSE(c.GetIpcServiceNowTelltale());
+    CHECK(c.HasReceivedIpcServiceNowTelltale());
+}
+
+TEST_CASE("IPC service-now telltale: FindEndpoint returns correct metadata (4140)",
+          "[ExternalSim][IPC]") {
+    const auto* ep = ExternalSimConnector::FindEndpoint(4140);
+    REQUIRE(ep != nullptr);
+    CHECK(std::string(ep->qualified_name) == "vehicle.ipc.service_now_telltale");
+    CHECK(std::string(ep->short_name)     == "ipc_service_now_telltale");
+    CHECK(ep->input_to_sim);
+}
+
+TEST_CASE("IPC check-messages telltale: default is false / not received",
+          "[ExternalSim][IPC]") {
+    ExternalSimConnector c;
+    CHECK_FALSE(c.GetIpcCheckMessagesTelltale());
+    CHECK_FALSE(c.HasReceivedIpcCheckMessagesTelltale());
+}
+
+TEST_CASE("IPC check-messages telltale: inject ON then OFF",
+          "[ExternalSim][IPC]") {
+    ExternalSimConnector c;
+    c.DebugInjectU8(4141, 1u);
+    CHECK(c.GetIpcCheckMessagesTelltale());
+    CHECK(c.HasReceivedIpcCheckMessagesTelltale());
+    c.DebugInjectU8(4141, 0u);
+    CHECK_FALSE(c.GetIpcCheckMessagesTelltale());
+    CHECK(c.HasReceivedIpcCheckMessagesTelltale());
+}
+
+TEST_CASE("IPC check-messages telltale: FindEndpoint returns correct metadata (4141)",
+          "[ExternalSim][IPC]") {
+    const auto* ep = ExternalSimConnector::FindEndpoint(4141);
+    REQUIRE(ep != nullptr);
+    CHECK(std::string(ep->qualified_name) == "vehicle.ipc.check_messages_telltale");
+    CHECK(std::string(ep->short_name)     == "ipc_check_messages_telltale");
+    CHECK(ep->input_to_sim);
+}
+
+TEST_CASE("IPC temp telltale: default is false / not received",
+          "[ExternalSim][IPC]") {
+    ExternalSimConnector c;
+    CHECK_FALSE(c.GetIpcTempTelltale());
+    CHECK_FALSE(c.HasReceivedIpcTempTelltale());
+}
+
+TEST_CASE("IPC temp telltale: inject ON then OFF",
+          "[ExternalSim][IPC]") {
+    ExternalSimConnector c;
+    c.DebugInjectU8(4142, 1u);
+    CHECK(c.GetIpcTempTelltale());
+    CHECK(c.HasReceivedIpcTempTelltale());
+    c.DebugInjectU8(4142, 0u);
+    CHECK_FALSE(c.GetIpcTempTelltale());
+    CHECK(c.HasReceivedIpcTempTelltale());
+}
+
+TEST_CASE("IPC temp telltale: FindEndpoint returns correct metadata (4142)",
+          "[ExternalSim][IPC]") {
+    const auto* ep = ExternalSimConnector::FindEndpoint(4142);
+    REQUIRE(ep != nullptr);
+    CHECK(std::string(ep->qualified_name) == "vehicle.ipc.temp_telltale");
+    CHECK(std::string(ep->short_name)     == "ipc_temp_telltale");
+    CHECK(ep->input_to_sim);
+}
+
+TEST_CASE("IPC battery-life telltale: default is false / not received",
+          "[ExternalSim][IPC]") {
+    ExternalSimConnector c;
+    CHECK_FALSE(c.GetIpcBatteryLifeTelltale());
+    CHECK_FALSE(c.HasReceivedIpcBatteryLifeTelltale());
+}
+
+TEST_CASE("IPC battery-life telltale: inject ON then OFF",
+          "[ExternalSim][IPC]") {
+    ExternalSimConnector c;
+    c.DebugInjectU8(4143, 1u);
+    CHECK(c.GetIpcBatteryLifeTelltale());
+    CHECK(c.HasReceivedIpcBatteryLifeTelltale());
+    c.DebugInjectU8(4143, 0u);
+    CHECK_FALSE(c.GetIpcBatteryLifeTelltale());
+    CHECK(c.HasReceivedIpcBatteryLifeTelltale());
+}
+
+TEST_CASE("IPC battery-life telltale: FindEndpoint returns correct metadata (4143)",
+          "[ExternalSim][IPC]") {
+    const auto* ep = ExternalSimConnector::FindEndpoint(4143);
+    REQUIRE(ep != nullptr);
+    CHECK(std::string(ep->qualified_name) == "vehicle.ipc.battery_life_telltale");
+    CHECK(std::string(ep->short_name)     == "ipc_battery_life_telltale");
+    CHECK(ep->input_to_sim);
+}
+
+TEST_CASE("IPC reduced-perf telltale: default is false / not received",
+          "[ExternalSim][IPC]") {
+    ExternalSimConnector c;
+    CHECK_FALSE(c.GetIpcReducedPerfTelltale());
+    CHECK_FALSE(c.HasReceivedIpcReducedPerfTelltale());
+}
+
+TEST_CASE("IPC reduced-perf telltale: inject ON then OFF",
+          "[ExternalSim][IPC]") {
+    ExternalSimConnector c;
+    c.DebugInjectU8(4144, 1u);
+    CHECK(c.GetIpcReducedPerfTelltale());
+    CHECK(c.HasReceivedIpcReducedPerfTelltale());
+    c.DebugInjectU8(4144, 0u);
+    CHECK_FALSE(c.GetIpcReducedPerfTelltale());
+    CHECK(c.HasReceivedIpcReducedPerfTelltale());
+}
+
+TEST_CASE("IPC reduced-perf telltale: FindEndpoint returns correct metadata (4144)",
+          "[ExternalSim][IPC]") {
+    const auto* ep = ExternalSimConnector::FindEndpoint(4144);
+    REQUIRE(ep != nullptr);
+    CHECK(std::string(ep->qualified_name) == "vehicle.ipc.reduced_perf_telltale");
+    CHECK(std::string(ep->short_name)     == "ipc_reduced_perf_telltale");
+    CHECK(ep->input_to_sim);
+}
+
+TEST_CASE("IPC check-tire-press telltale: default is false / not received",
+          "[ExternalSim][IPC]") {
+    ExternalSimConnector c;
+    CHECK_FALSE(c.GetIpcCheckTirePressTelltale());
+    CHECK_FALSE(c.HasReceivedIpcCheckTirePressTelltale());
+}
+
+TEST_CASE("IPC check-tire-press telltale: inject ON then OFF",
+          "[ExternalSim][IPC]") {
+    ExternalSimConnector c;
+    c.DebugInjectU8(4145, 1u);
+    CHECK(c.GetIpcCheckTirePressTelltale());
+    CHECK(c.HasReceivedIpcCheckTirePressTelltale());
+    c.DebugInjectU8(4145, 0u);
+    CHECK_FALSE(c.GetIpcCheckTirePressTelltale());
+    CHECK(c.HasReceivedIpcCheckTirePressTelltale());
+}
+
+TEST_CASE("IPC check-tire-press telltale: FindEndpoint returns correct metadata (4145)",
+          "[ExternalSim][IPC]") {
+    const auto* ep = ExternalSimConnector::FindEndpoint(4145);
+    REQUIRE(ep != nullptr);
+    CHECK(std::string(ep->qualified_name) == "vehicle.ipc.check_tire_press_telltale");
+    CHECK(std::string(ep->short_name)     == "ipc_check_tire_press_telltale");
+    CHECK(ep->input_to_sim);
+}
+
+TEST_CASE("IPC extra telltales: all six ON simultaneously (4140-4145)",
+          "[ExternalSim][IPC]") {
+    ExternalSimConnector c;
+    c.DebugInjectU8(4140, 1u);
+    c.DebugInjectU8(4141, 1u);
+    c.DebugInjectU8(4142, 1u);
+    c.DebugInjectU8(4143, 1u);
+    c.DebugInjectU8(4144, 1u);
+    c.DebugInjectU8(4145, 1u);
+    CHECK(c.GetIpcServiceNowTelltale());
+    CHECK(c.GetIpcCheckMessagesTelltale());
+    CHECK(c.GetIpcTempTelltale());
+    CHECK(c.GetIpcBatteryLifeTelltale());
+    CHECK(c.GetIpcReducedPerfTelltale());
+    CHECK(c.GetIpcCheckTirePressTelltale());
+    CHECK(c.HasReceivedIpcServiceNowTelltale());
+    CHECK(c.HasReceivedIpcCheckMessagesTelltale());
+    CHECK(c.HasReceivedIpcTempTelltale());
+    CHECK(c.HasReceivedIpcBatteryLifeTelltale());
+    CHECK(c.HasReceivedIpcReducedPerfTelltale());
+    CHECK(c.HasReceivedIpcCheckTirePressTelltale());
 }

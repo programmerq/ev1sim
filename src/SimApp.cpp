@@ -470,6 +470,79 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                 },
                 []() {});   // no-op: display-only row
 
+            // --- IPC extra LCD telltales (display-only; chassis bus 4140-4145) ---
+            // Subscribes to kSigChassisIpcServiceNowTelltale (4140).
+            // Driven by SERVICE_NOW DTCs 31/33/35 (HTCM/PCM/BPM telltale requests).
+            // Shows "Service Now: ON / OFF / ---".
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatIpcTelltaleLampLabel(
+                        L"Service Now",
+                        m_external_sim->GetIpcServiceNowTelltale(),
+                        m_external_sim->HasReceivedIpcServiceNowTelltale());
+                },
+                []() {});   // no-op: display-only row
+
+            // Subscribes to kSigChassisIpcCheckMessagesTelltale (4141).
+            // Aggregate: any comm-loss DTC, any telltale-request DTC, or any BTCM indicator DTC.
+            // Shows "CheckMsg: ON / OFF / ---".
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatIpcTelltaleLampLabel(
+                        L"CheckMsg",
+                        m_external_sim->GetIpcCheckMessagesTelltale(),
+                        m_external_sim->HasReceivedIpcCheckMessagesTelltale());
+                },
+                []() {});   // no-op: display-only row
+
+            // Subscribes to kSigChassisIpcTempTelltale (4142).
+            // Driven by TEMP DTCs 32/34/36 (HTCM/PCM/BPM telltale requests).
+            // Shows "Temp: ON / OFF / ---".
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatIpcTelltaleLampLabel(
+                        L"Temp",
+                        m_external_sim->GetIpcTempTelltale(),
+                        m_external_sim->HasReceivedIpcTempTelltale());
+                },
+                []() {});   // no-op: display-only row
+
+            // Subscribes to kSigChassisIpcBatteryLifeTelltale (4143).
+            // Driven by DTC 38 via IPC_REQ_BATTERY_LIFE_FROM_BPM.
+            // Shows "BattLife: ON / OFF / ---".
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatIpcTelltaleLampLabel(
+                        L"BattLife",
+                        m_external_sim->GetIpcBatteryLifeTelltale(),
+                        m_external_sim->HasReceivedIpcBatteryLifeTelltale());
+                },
+                []() {});   // no-op: display-only row
+
+            // Subscribes to kSigChassisIpcReducedPerfTelltale (4144).
+            // Driven by DTC 37 via IPC_REQ_REDUCED_PERF_FROM_PCM.
+            // Shows "RedPerf: ON / OFF / ---".
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatIpcTelltaleLampLabel(
+                        L"RedPerf",
+                        m_external_sim->GetIpcReducedPerfTelltale(),
+                        m_external_sim->HasReceivedIpcReducedPerfTelltale());
+                },
+                []() {});   // no-op: display-only row
+
+            // Subscribes to kSigChassisIpcCheckTirePressTelltale (4145).
+            // Driven by DTC 39 via IPC_REQ_CHECK_TIRE_PRESS_FROM_RSA.
+            // Shows "TirePress: ON / OFF / ---".
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatIpcTelltaleLampLabel(
+                        L"TirePress",
+                        m_external_sim->GetIpcCheckTirePressTelltale(),
+                        m_external_sim->HasReceivedIpcCheckTirePressTelltale());
+                },
+                []() {});   // no-op: display-only row
+
             // --- RSA shift-blocked cue (display-only; chassis bus 4088) ---
             // Subscribes to kSigChassisRsaShiftBlocked (4088) published by RSA.
             // Shows "Shift: BRAKE TO SHIFT" when a P→non-P shift is refused,

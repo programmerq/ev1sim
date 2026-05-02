@@ -274,6 +274,23 @@ constexpr std::uint32_t kSigIpcLowTracTelltale   = 4137U;
 constexpr std::uint32_t kSigIpcAirBagTelltale    = 4138U;
 constexpr int           kNumIpcBtcmTelltaleSignals = 5;
 
+// IPC extra LCD telltale outputs (electricsim/IPC → ev1sim, chassis segment).
+//   4140  vehicle.ipc.service_now_telltale      uint8 bool: 0=off, 1=on (DTCs 31/33/35 via HTCM/PCM/BPM)
+//   4141  vehicle.ipc.check_messages_telltale   uint8 bool: 0=off, 1=on (aggregate: any comm-loss/req/BTCM)
+//   4142  vehicle.ipc.temp_telltale             uint8 bool: 0=off, 1=on (DTCs 32/34/36 via HTCM/PCM/BPM)
+//   4143  vehicle.ipc.battery_life_telltale     uint8 bool: 0=off, 1=on (DTC 38 via IPC_REQ_BATTERY_LIFE_FROM_BPM)
+//   4144  vehicle.ipc.reduced_perf_telltale     uint8 bool: 0=off, 1=on (DTC 37 via IPC_REQ_REDUCED_PERF_FROM_PCM)
+//   4145  vehicle.ipc.check_tire_press_telltale uint8 bool: 0=off, 1=on (DTC 39 via IPC_REQ_CHECK_TIRE_PRESS_FROM_RSA)
+// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// kSigChassisIpcServiceNowTelltale=4140 .. kSigChassisIpcCheckTirePressTelltale=4145.
+constexpr std::uint32_t kSigIpcServiceNowTelltale     = 4140U;
+constexpr std::uint32_t kSigIpcCheckMessagesTelltale  = 4141U;
+constexpr std::uint32_t kSigIpcTempTelltale           = 4142U;
+constexpr std::uint32_t kSigIpcBatteryLifeTelltale    = 4143U;
+constexpr std::uint32_t kSigIpcReducedPerfTelltale    = 4144U;
+constexpr std::uint32_t kSigIpcCheckTirePressTelltale = 4145U;
+constexpr int           kNumIpcExtraTelltaleSignals   = 6;
+
 // Door lock commands (electricsim/RSA → ev1sim, chassis segment).
 //   4084  vehicle.body.door_lock_cmd.driver    uint8: 0=unlocked, 1=locked
 //   4085  vehicle.body.door_lock_cmd.passenger uint8: 0=unlocked, 1=locked
@@ -448,12 +465,14 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // +kNumIpcTelltaleSignals for IPC seatbelt telltales (4130/4131) — IPC → ev1sim.
 // +kNumIpcTripDistSignals for IPC trip distance (4132) — IPC → ev1sim.
 // +kNumIpcBtcmTelltaleSignals for IPC BTCM/airbag telltales (4134–4138) — IPC → ev1sim.
+// +kNumIpcExtraTelltaleSignals for IPC extra LCD telltales (4140–4145) — IPC → ev1sim.
 constexpr int kNumEndpoints =
     NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumCombSw + 1 /*charge_coupler*/ +
     kNumPrndSelector + kNumMotorSignals + kNumThrottleCmdSignals +
     kNumBrakeSignals + kNumWiperSignals + kNumHvacSignals +
     kNumAmbientSignals + kNumDoorLockPwSignals + kNumRsaShiftBlockedSignals +
     kNumIpcTelltaleSignals + kNumIpcTripDistSignals + kNumIpcBtcmTelltaleSignals +
+    kNumIpcExtraTelltaleSignals +
     kNumDynamics + kNumDriverInputs;
 
 std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
@@ -550,6 +569,26 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     out[i++] = {kSigIpcAirBagTelltale,
                 "vehicle.ipc.air_bag_telltale",
                 "ipc_air_bag_telltale", true};
+    // IPC extra LCD telltales (IPC → ev1sim, chassis segment, input_to_sim=true).
+    // Encoding: uint8 bool — 0=lamp off, 1=lamp on.
+    out[i++] = {kSigIpcServiceNowTelltale,
+                "vehicle.ipc.service_now_telltale",
+                "ipc_service_now_telltale", true};
+    out[i++] = {kSigIpcCheckMessagesTelltale,
+                "vehicle.ipc.check_messages_telltale",
+                "ipc_check_messages_telltale", true};
+    out[i++] = {kSigIpcTempTelltale,
+                "vehicle.ipc.temp_telltale",
+                "ipc_temp_telltale", true};
+    out[i++] = {kSigIpcBatteryLifeTelltale,
+                "vehicle.ipc.battery_life_telltale",
+                "ipc_battery_life_telltale", true};
+    out[i++] = {kSigIpcReducedPerfTelltale,
+                "vehicle.ipc.reduced_perf_telltale",
+                "ipc_reduced_perf_telltale", true};
+    out[i++] = {kSigIpcCheckTirePressTelltale,
+                "vehicle.ipc.check_tire_press_telltale",
+                "ipc_check_tire_press_telltale", true};
     // Door lock commands (RSA → ev1sim, chassis segment, input_to_sim=true).
     out[i++] = {kSigDoorLockCmdDriver,
                 "vehicle.body.door_lock_cmd.driver",
@@ -869,6 +908,21 @@ struct ExternalSimConnector::State {
     bool          ipc_air_bag_telltale            = false;
     bool          has_ipc_air_bag_telltale        = false;
 
+    // IPC extra LCD telltales (IDs 4140–4145, chassis segment) — received from IPC.
+    // bool: false=lamp off, true=lamp on.
+    bool          ipc_service_now_telltale            = false;
+    bool          has_ipc_service_now_telltale        = false;
+    bool          ipc_check_messages_telltale         = false;
+    bool          has_ipc_check_messages_telltale     = false;
+    bool          ipc_temp_telltale                   = false;
+    bool          has_ipc_temp_telltale               = false;
+    bool          ipc_battery_life_telltale           = false;
+    bool          has_ipc_battery_life_telltale       = false;
+    bool          ipc_reduced_perf_telltale           = false;
+    bool          has_ipc_reduced_perf_telltale       = false;
+    bool          ipc_check_tire_press_telltale       = false;
+    bool          has_ipc_check_tire_press_telltale   = false;
+
     // Door lock commands (IDs 4084/4085, chassis segment) — received from RSA.
     // 0=unlocked, 1=locked.  0xFF = never received.
     std::uint8_t  door_lock_cmd[2]        = {0xFFu, 0xFFu};  // [0]=driver, [1]=passenger
@@ -1173,6 +1227,48 @@ bool ExternalSimConnector::GetIpcAirBagTelltale() const {
 }
 bool ExternalSimConnector::HasReceivedIpcAirBagTelltale() const {
     return m_state->has_ipc_air_bag_telltale;
+}
+
+bool ExternalSimConnector::GetIpcServiceNowTelltale() const {
+    return m_state->ipc_service_now_telltale;
+}
+bool ExternalSimConnector::HasReceivedIpcServiceNowTelltale() const {
+    return m_state->has_ipc_service_now_telltale;
+}
+
+bool ExternalSimConnector::GetIpcCheckMessagesTelltale() const {
+    return m_state->ipc_check_messages_telltale;
+}
+bool ExternalSimConnector::HasReceivedIpcCheckMessagesTelltale() const {
+    return m_state->has_ipc_check_messages_telltale;
+}
+
+bool ExternalSimConnector::GetIpcTempTelltale() const {
+    return m_state->ipc_temp_telltale;
+}
+bool ExternalSimConnector::HasReceivedIpcTempTelltale() const {
+    return m_state->has_ipc_temp_telltale;
+}
+
+bool ExternalSimConnector::GetIpcBatteryLifeTelltale() const {
+    return m_state->ipc_battery_life_telltale;
+}
+bool ExternalSimConnector::HasReceivedIpcBatteryLifeTelltale() const {
+    return m_state->has_ipc_battery_life_telltale;
+}
+
+bool ExternalSimConnector::GetIpcReducedPerfTelltale() const {
+    return m_state->ipc_reduced_perf_telltale;
+}
+bool ExternalSimConnector::HasReceivedIpcReducedPerfTelltale() const {
+    return m_state->has_ipc_reduced_perf_telltale;
+}
+
+bool ExternalSimConnector::GetIpcCheckTirePressTelltale() const {
+    return m_state->ipc_check_tire_press_telltale;
+}
+bool ExternalSimConnector::HasReceivedIpcCheckTirePressTelltale() const {
+    return m_state->has_ipc_check_tire_press_telltale;
 }
 
 bool ExternalSimConnector::GetPimCruiseActive() const {
@@ -1577,6 +1673,24 @@ void ExternalSimConnector::DebugInjectU8(std::uint32_t signal_id,
     } else if (signal_id == kSigIpcAirBagTelltale) {
         m_state->ipc_air_bag_telltale     = (value != 0u);
         m_state->has_ipc_air_bag_telltale = true;
+    } else if (signal_id == kSigIpcServiceNowTelltale) {
+        m_state->ipc_service_now_telltale     = (value != 0u);
+        m_state->has_ipc_service_now_telltale = true;
+    } else if (signal_id == kSigIpcCheckMessagesTelltale) {
+        m_state->ipc_check_messages_telltale     = (value != 0u);
+        m_state->has_ipc_check_messages_telltale = true;
+    } else if (signal_id == kSigIpcTempTelltale) {
+        m_state->ipc_temp_telltale     = (value != 0u);
+        m_state->has_ipc_temp_telltale = true;
+    } else if (signal_id == kSigIpcBatteryLifeTelltale) {
+        m_state->ipc_battery_life_telltale     = (value != 0u);
+        m_state->has_ipc_battery_life_telltale = true;
+    } else if (signal_id == kSigIpcReducedPerfTelltale) {
+        m_state->ipc_reduced_perf_telltale     = (value != 0u);
+        m_state->has_ipc_reduced_perf_telltale = true;
+    } else if (signal_id == kSigIpcCheckTirePressTelltale) {
+        m_state->ipc_check_tire_press_telltale     = (value != 0u);
+        m_state->has_ipc_check_tire_press_telltale = true;
     } else if (signal_id == kSigRsaShiftBlocked) {
         m_state->rsa_shift_blocked     = (value != 0u);
         m_state->has_rsa_shift_blocked = true;
@@ -1764,7 +1878,13 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                 d.signal_id == kSigIpcParkBrakeTelltale ||
                 d.signal_id == kSigIpcAntilockTelltale ||
                 d.signal_id == kSigIpcLowTracTelltale  ||
-                d.signal_id == kSigIpcAirBagTelltale) {
+                d.signal_id == kSigIpcAirBagTelltale   ||
+                d.signal_id == kSigIpcServiceNowTelltale    ||
+                d.signal_id == kSigIpcCheckMessagesTelltale ||
+                d.signal_id == kSigIpcTempTelltale          ||
+                d.signal_id == kSigIpcBatteryLifeTelltale   ||
+                d.signal_id == kSigIpcReducedPerfTelltale   ||
+                d.signal_id == kSigIpcCheckTirePressTelltale) {
                 DebugInjectU8(d.signal_id, d.payload[0]);
             } else {
                 // All other inbound signals are boolean (bool) — decode LSB.
