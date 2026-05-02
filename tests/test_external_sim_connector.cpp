@@ -15,18 +15,20 @@ using Catch::Matchers::WithinAbs;
 // ---------------------------------------------------------------------------
 
 TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
-    constexpr int kNumDynamics    = 18;  // 10 chassis/actuator + 4 wheel_omega + 4 slip_ratio
-    constexpr int kNumCombSw      = 3;   // combination switch: low_beam, flash_to_pass, park_headlamp
-    constexpr int kNumChargeCplr  = 1;   // charge coupler present (4060, stub)
-    constexpr int kNumPrnd        = 4;   // PRND selector lines (4050-4053)
-    constexpr int kNumMotor       = 2;   // motor_rpm (4070), motor_torque_nm (4071)
-    constexpr int kNumThrottleCmd = 1;   // throttle_cmd_q8 (4073) — PIM → ev1sim
-    constexpr int kNumBrake       = 1;   // master_cylinder_pressure_kpa (4074) — ev1sim → BTCM
-    constexpr int kNumWiper       = 2;   // wiper_motor_command (4080), washer_pump_command (4081)
-    constexpr int kNumHvac        = 2;   // hvac_blower_level (4082), defrost_grid_active (4083)
-    constexpr int kNumAmbient     = 2;   // ambient_temp_c (4090), ambient_humidity_pct (4091)
-    constexpr int kNumDoorLockPw  = 4;   // door_lock_cmd driver/passenger (4084/4085)
-                                         // + power_window_motor driver/passenger (4086/4087)
+    constexpr int kNumDynamics      = 18;  // 10 chassis/actuator + 4 wheel_omega + 4 slip_ratio
+    constexpr int kNumCombSw        = 3;   // combination switch: low_beam, flash_to_pass, park_headlamp
+    constexpr int kNumChargeCplr    = 1;   // charge coupler present (4060, stub)
+    constexpr int kNumPrnd          = 4;   // PRND selector lines (4050-4053)
+    constexpr int kNumMotor         = 2;   // motor_rpm (4070), motor_torque_nm (4071)
+    constexpr int kNumThrottleCmd   = 1;   // throttle_cmd_q8 (4073) — PIM → ev1sim
+    constexpr int kNumBrake         = 1;   // master_cylinder_pressure_kpa (4074) — ev1sim → BTCM
+    constexpr int kNumWiper         = 2;   // wiper_motor_command (4080), washer_pump_command (4081)
+    constexpr int kNumHvac          = 2;   // hvac_blower_level (4082), defrost_grid_active (4083)
+    constexpr int kNumAmbient       = 2;   // ambient_temp_c (4090), ambient_humidity_pct (4091)
+    constexpr int kNumDoorLockPw    = 4;   // door_lock_cmd driver/passenger (4084/4085)
+                                           // + power_window_motor driver/passenger (4086/4087)
+    constexpr int kNumIpcTelltale   = 2;   // ipc_seatbelt_telltale_driver (4130),
+                                           // ipc_seatbelt_telltale_passenger (4131)
     // Driver inputs on the main harness segment (electricsim_ev1_bus), output
     // from ev1sim: brake_pedal_q8 (6900), steering_deg_q8 (6901),
     // gear_selector (6902), throttle_q8 (6903), brake_switch (6904),
@@ -50,7 +52,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
                          kNumCombSw + kNumChargeCplr + kNumPrnd + kNumMotor +
                          kNumThrottleCmd + kNumBrake + kNumWiper +
                          kNumHvac + kNumAmbient + kNumDoorLockPw +
-                         kNumDynamics + kNumDriverInputs;
+                         kNumIpcTelltale + kNumDynamics + kNumDriverInputs;
     REQUIRE(ExternalSimConnector::EndpointCount() == expected);
 
     // Unique signal IDs and names.
@@ -66,6 +68,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     int dynamics_count       = 0;   // includes motor_rpm + motor_torque_nm
     int hvac_count           = 0;   // hvac_blower_level (4082) + defrost_grid_active (4083)
     int door_lock_pw_count   = 0;   // door lock cmds (4084/4085) + pw motor cmds (4086/4087)
+    int ipc_telltale_count   = 0;   // IPC seatbelt telltales (4130/4131)
     int driver_input_count   = 0;
 
     const auto* eps = ExternalSimConnector::Endpoints();
@@ -111,6 +114,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
         } else if (e.signal_id >= 4084 && e.signal_id <= 4087) {
             CHECK(e.input_to_sim);          // door lock cmds (4084/4085) + pw motor cmds (4086/4087) flow into ev1sim
             ++door_lock_pw_count;
+        } else if (e.signal_id == 4130 || e.signal_id == 4131) {
+            CHECK(e.input_to_sim);          // IPC seatbelt telltales flow into ev1sim
+            ++ipc_telltale_count;
         } else if (e.signal_id == 4090 || e.signal_id == 4091) {
             CHECK_FALSE(e.input_to_sim);    // ambient temp + humidity are outputs from ev1sim
             ++dynamics_count;
@@ -165,6 +171,8 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     CHECK(hvac_count           == kNumHvac);
     // door_lock_pw_count: door lock cmds (4084/4085) + power window motor cmds (4086/4087).
     CHECK(door_lock_pw_count   == kNumDoorLockPw);
+    // ipc_telltale_count: driver seatbelt telltale (4130) + passenger (4131) — from IPC.
+    CHECK(ipc_telltale_count   == kNumIpcTelltale);
     CHECK(driver_input_count   == kNumDriverInputs);
 }
 
@@ -901,4 +909,77 @@ TEST_CASE("HVAC defrost grid subscription: FindEndpoint returns correct metadata
     CHECK(std::string(ep->qualified_name) == "vehicle.hvac.defrost_grid_active");
     CHECK(std::string(ep->short_name)     == "hvac_defrost_grid_active");
     CHECK(ep->input_to_sim);   // HTCM publishes → ev1sim subscribes
+}
+
+// ---------------------------------------------------------------------------
+// IPC seatbelt telltale subscription (chassis bus 4130/4131)
+// ---------------------------------------------------------------------------
+
+TEST_CASE("IPC seatbelt telltale subscription: default never-received / off",
+          "[ExternalSim][IPC]") {
+    ExternalSimConnector c;
+    CHECK_FALSE(c.HasReceivedIpcSeatbeltTelltaleDriver());
+    CHECK_FALSE(c.GetIpcSeatbeltTelltaleDriver());    // default false (lamp off)
+    CHECK_FALSE(c.HasReceivedIpcSeatbeltTelltalePassenger());
+    CHECK_FALSE(c.GetIpcSeatbeltTelltalePassenger());
+}
+
+TEST_CASE("IPC seatbelt telltale subscription: DebugInjectU8 turns driver lamp on",
+          "[ExternalSim][IPC]") {
+    ExternalSimConnector c;
+    c.DebugInjectU8(4130, 1u);  // 4130 = kSigChassisIpcSeatbeltTelltaleDriver, 1=lamp on
+    CHECK(c.HasReceivedIpcSeatbeltTelltaleDriver());
+    CHECK(c.GetIpcSeatbeltTelltaleDriver());
+    // Passenger unaffected.
+    CHECK_FALSE(c.HasReceivedIpcSeatbeltTelltalePassenger());
+    CHECK_FALSE(c.GetIpcSeatbeltTelltalePassenger());
+}
+
+TEST_CASE("IPC seatbelt telltale subscription: DebugInjectU8 turns driver lamp off",
+          "[ExternalSim][IPC]") {
+    ExternalSimConnector c;
+    c.DebugInjectU8(4130, 1u);
+    CHECK(c.GetIpcSeatbeltTelltaleDriver());
+    c.DebugInjectU8(4130, 0u);  // 0=lamp off
+    CHECK(c.HasReceivedIpcSeatbeltTelltaleDriver());
+    CHECK_FALSE(c.GetIpcSeatbeltTelltaleDriver());
+}
+
+TEST_CASE("IPC seatbelt telltale subscription: DebugInjectU8 turns passenger lamp on",
+          "[ExternalSim][IPC]") {
+    ExternalSimConnector c;
+    c.DebugInjectU8(4131, 1u);  // 4131 = kSigChassisIpcSeatbeltTelltalePassenger, 1=lamp on
+    CHECK(c.HasReceivedIpcSeatbeltTelltalePassenger());
+    CHECK(c.GetIpcSeatbeltTelltalePassenger());
+    // Driver unaffected.
+    CHECK_FALSE(c.HasReceivedIpcSeatbeltTelltaleDriver());
+    CHECK_FALSE(c.GetIpcSeatbeltTelltaleDriver());
+}
+
+TEST_CASE("IPC seatbelt telltale subscription: DebugInjectU8 turns passenger lamp off",
+          "[ExternalSim][IPC]") {
+    ExternalSimConnector c;
+    c.DebugInjectU8(4131, 1u);
+    CHECK(c.GetIpcSeatbeltTelltalePassenger());
+    c.DebugInjectU8(4131, 0u);  // 0=lamp off
+    CHECK(c.HasReceivedIpcSeatbeltTelltalePassenger());
+    CHECK_FALSE(c.GetIpcSeatbeltTelltalePassenger());
+}
+
+TEST_CASE("IPC seatbelt telltale subscription: FindEndpoint returns driver metadata",
+          "[ExternalSim][IPC]") {
+    const auto* ep = ExternalSimConnector::FindEndpoint(4130);
+    REQUIRE(ep != nullptr);
+    CHECK(std::string(ep->qualified_name) == "vehicle.ipc.seatbelt_telltale_driver");
+    CHECK(std::string(ep->short_name)     == "ipc_seatbelt_telltale_driver");
+    CHECK(ep->input_to_sim);   // IPC publishes → ev1sim subscribes
+}
+
+TEST_CASE("IPC seatbelt telltale subscription: FindEndpoint returns passenger metadata",
+          "[ExternalSim][IPC]") {
+    const auto* ep = ExternalSimConnector::FindEndpoint(4131);
+    REQUIRE(ep != nullptr);
+    CHECK(std::string(ep->qualified_name) == "vehicle.ipc.seatbelt_telltale_passenger");
+    CHECK(std::string(ep->short_name)     == "ipc_seatbelt_telltale_passenger");
+    CHECK(ep->input_to_sim);   // IPC publishes → ev1sim subscribes
 }

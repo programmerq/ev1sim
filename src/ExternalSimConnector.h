@@ -386,6 +386,20 @@ public:
     bool GetDefrostGridActive() const;
     bool HasReceivedDefrostGridActive() const;
 
+    /// Incoming IPC seatbelt telltale — driver seat (ID 4130, chassis segment).
+    /// Published by IPC when the driver seat is unbuckled AND speed > ~8 km/h.
+    /// bool: true = lamp on (unbuckled at speed), false = lamp off.
+    /// Returns false if never received.
+    bool GetIpcSeatbeltTelltaleDriver() const;
+    bool HasReceivedIpcSeatbeltTelltaleDriver() const;
+
+    /// Incoming IPC seatbelt telltale — passenger seat (ID 4131, chassis segment).
+    /// Published by IPC when the passenger seat is unbuckled AND speed > ~8 km/h.
+    /// bool: true = lamp on (unbuckled at speed), false = lamp off.
+    /// Returns false if never received.
+    bool GetIpcSeatbeltTelltalePassenger() const;
+    bool HasReceivedIpcSeatbeltTelltalePassenger() const;
+
     // ---------------------------------------------------------------------
     // Test hooks — feed the connector synthetic delta records as though they
     // arrived over the bus.  Used by unit tests; not part of the runtime path.

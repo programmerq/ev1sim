@@ -239,6 +239,17 @@ constexpr std::uint32_t kSigHvacBlowerLevel  = 4082U;
 constexpr std::uint32_t kSigDefrostGridActive = 4083U;
 constexpr int           kNumHvacSignals       = 2;
 
+// IPC LCD seatbelt telltale outputs (electricsim/IPC → ev1sim, chassis segment).
+//   4130  vehicle.ipc.seatbelt_telltale_driver    uint8 bool: 0=lamp off, 1=lamp on
+//   4131  vehicle.ipc.seatbelt_telltale_passenger uint8 bool: 0=lamp off, 1=lamp on
+// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// kSigChassisIpcSeatbeltTelltaleDriver = 4130,
+// kSigChassisIpcSeatbeltTelltalePassenger = 4131.
+// Lit when the corresponding seat is unbuckled AND vehicle speed > ~8 km/h.
+constexpr std::uint32_t kSigIpcSeatbeltTelltaleDriver    = 4130U;
+constexpr std::uint32_t kSigIpcSeatbeltTelltalePassenger = 4131U;
+constexpr int           kNumIpcTelltaleSignals           = 2;
+
 // Door lock commands (electricsim/RSA → ev1sim, chassis segment).
 //   4084  vehicle.body.door_lock_cmd.driver    uint8: 0=unlocked, 1=locked
 //   4085  vehicle.body.door_lock_cmd.passenger uint8: 0=unlocked, 1=locked
@@ -392,11 +403,13 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // +kNumHvacSignals for hvac_blower_level (4082) + defrost_grid_active (4083).
 // +kNumAmbientSignals for ambient temp (4090) + ambient humidity (4091).
 // +kNumDoorLockPwSignals for door lock cmds (4084/4085) + power window motor cmds (4086/4087).
+// +kNumIpcTelltaleSignals for IPC seatbelt telltales (4130/4131) — IPC → ev1sim.
 constexpr int kNumEndpoints =
     NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumCombSw + 1 /*charge_coupler*/ +
     kNumPrndSelector + kNumMotorSignals + kNumThrottleCmdSignals +
     kNumBrakeSignals + kNumWiperSignals + kNumHvacSignals +
-    kNumAmbientSignals + kNumDoorLockPwSignals + kNumDynamics + kNumDriverInputs;
+    kNumAmbientSignals + kNumDoorLockPwSignals + kNumIpcTelltaleSignals +
+    kNumDynamics + kNumDriverInputs;
 
 std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     std::array<ExternalSimConnector::Endpoint, kNumEndpoints> out{};
@@ -461,6 +474,15 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.hvac.blower_level", "hvac_blower_level", true};
     out[i++] = {kSigDefrostGridActive,
                 "vehicle.hvac.defrost_grid_active", "hvac_defrost_grid_active", true};
+    // IPC LCD seatbelt telltales (IPC → ev1sim, chassis segment, input_to_sim=true).
+    // Encoding: uint8 bool — 0=lamp off, 1=lamp on.
+    // Lit when seat is unbuckled AND speed > ~8 km/h (IPC supervisor threshold).
+    out[i++] = {kSigIpcSeatbeltTelltaleDriver,
+                "vehicle.ipc.seatbelt_telltale_driver",
+                "ipc_seatbelt_telltale_driver", true};
+    out[i++] = {kSigIpcSeatbeltTelltalePassenger,
+                "vehicle.ipc.seatbelt_telltale_passenger",
+                "ipc_seatbelt_telltale_passenger", true};
     // Door lock commands (RSA → ev1sim, chassis segment, input_to_sim=true).
     out[i++] = {kSigDoorLockCmdDriver,
                 "vehicle.body.door_lock_cmd.driver",
@@ -749,6 +771,13 @@ struct ExternalSimConnector::State {
     bool          hvac_defrost_grid_active     = false;
     bool          has_hvac_defrost_grid_active = false;
 
+    // IPC LCD seatbelt telltales (IDs 4130/4131, chassis segment) — received from IPC.
+    // bool: false=lamp off, true=lamp on.  Lit when seat unbuckled AND speed > ~8 km/h.
+    bool          ipc_seatbelt_telltale_driver         = false;
+    bool          has_ipc_seatbelt_telltale_driver     = false;
+    bool          ipc_seatbelt_telltale_passenger      = false;
+    bool          has_ipc_seatbelt_telltale_passenger  = false;
+
     // Door lock commands (IDs 4084/4085, chassis segment) — received from RSA.
     // 0=unlocked, 1=locked.  0xFF = never received.
     std::uint8_t  door_lock_cmd[2]        = {0xFFu, 0xFFu};  // [0]=driver, [1]=passenger
@@ -976,6 +1005,20 @@ bool ExternalSimConnector::GetDefrostGridActive() const {
 }
 bool ExternalSimConnector::HasReceivedDefrostGridActive() const {
     return m_state->has_hvac_defrost_grid_active;
+}
+
+bool ExternalSimConnector::GetIpcSeatbeltTelltaleDriver() const {
+    return m_state->ipc_seatbelt_telltale_driver;
+}
+bool ExternalSimConnector::HasReceivedIpcSeatbeltTelltaleDriver() const {
+    return m_state->has_ipc_seatbelt_telltale_driver;
+}
+
+bool ExternalSimConnector::GetIpcSeatbeltTelltalePassenger() const {
+    return m_state->ipc_seatbelt_telltale_passenger;
+}
+bool ExternalSimConnector::HasReceivedIpcSeatbeltTelltalePassenger() const {
+    return m_state->has_ipc_seatbelt_telltale_passenger;
 }
 
 void ExternalSimConnector::SetPanelSensor(PanelID panel, bool ajar) {
@@ -1339,6 +1382,12 @@ void ExternalSimConnector::DebugInjectU8(std::uint32_t signal_id,
     } else if (signal_id == kSigDefrostGridActive) {
         m_state->hvac_defrost_grid_active     = (value != 0u);
         m_state->has_hvac_defrost_grid_active = true;
+    } else if (signal_id == kSigIpcSeatbeltTelltaleDriver) {
+        m_state->ipc_seatbelt_telltale_driver     = (value != 0u);
+        m_state->has_ipc_seatbelt_telltale_driver = true;
+    } else if (signal_id == kSigIpcSeatbeltTelltalePassenger) {
+        m_state->ipc_seatbelt_telltale_passenger     = (value != 0u);
+        m_state->has_ipc_seatbelt_telltale_passenger = true;
     }
     // All other uint8 signals are not currently subscribed as inputs.
 }
@@ -1501,7 +1550,9 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                 d.signal_id == kSigPowerWindowMotorDriver ||
                 d.signal_id == kSigPowerWindowMotorPassenger ||
                 d.signal_id == kSigHvacBlowerLevel     ||
-                d.signal_id == kSigDefrostGridActive) {
+                d.signal_id == kSigDefrostGridActive   ||
+                d.signal_id == kSigIpcSeatbeltTelltaleDriver ||
+                d.signal_id == kSigIpcSeatbeltTelltalePassenger) {
                 DebugInjectU8(d.signal_id, d.payload[0]);
             } else {
                 // All other inbound signals are boolean (bool) — decode LSB.
