@@ -31,8 +31,8 @@ set -euo pipefail
 
 TEST="${1:-high_mu}"
 case "$TEST" in
-    high_mu|low_mu|mu_jump|split_mu|brake_and_steer) ;;
-    *) echo "[abs] unknown test '$TEST' — use high_mu | low_mu | mu_jump | split_mu | brake_and_steer" >&2; exit 1 ;;
+    high_mu|low_mu|mu_jump|split_mu|brake_and_steer|diagonal_mu) ;;
+    *) echo "[abs] unknown test '$TEST' — use high_mu | low_mu | mu_jump | split_mu | brake_and_steer | diagonal_mu" >&2; exit 1 ;;
 esac
 
 EV1SIM_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -150,6 +150,7 @@ run_scenario() {
         mu_jump)         sc_name="abs_mu_jump"          ;;
         split_mu)        sc_name="abs_split_mu"         ;;
         brake_and_steer) sc_name="abs_brake_and_steer"  ;;
+        diagonal_mu)     sc_name="abs_diagonal_mu"      ;;
     esac
     local default_csv="$EV1SIM_DIR/scenario_${sc_name}.csv"
     if [[ -f "$default_csv" ]]; then
