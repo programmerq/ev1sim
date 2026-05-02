@@ -1,6 +1,6 @@
 # EV1 ABS validation — engineering report
 
-_Generated 2026-05-02 00:41 by `scripts/abs_report.py`._
+_Generated 2026-05-02 01:52 by `scripts/abs_report.py`._
 
 This report aggregates the four standard ABS validation
 scenarios.  Each scenario gets its own section with setup,
@@ -17,10 +17,10 @@ script.
 
 | Test | BTCM-on stop | BTCM-off stop | Δ stop dist | ABS events FL/FR | yaw drift (on / off) |
 |---|---|---|---:|---:|---|
-| high_mu | 149.95 m / 9.89 s | 148.52 m / 9.47 s | +1.4 m | 77 / 66 | +0.24° / +0.07° |
-| low_mu | didn't stop, v\_f = 2.91 m/s | didn't stop, v\_f = 1.57 m/s | — | 149 / 132 | -0.25° / +3.54° |
-| mu_jump | didn't stop, v\_f = 4.10 m/s | didn't stop, v\_f = 3.65 m/s | — | 248 / 149 | -1.03° / -1.00° |
-| split_mu | 74.10 m / 7.01 s | 72.49 m / 6.53 s | +1.6 m | 72 / 78 | +0.02° / +0.09° |
+| high_mu | 150.18 m / 9.92 s | 148.52 m / 9.47 s | +1.7 m | 71 / 76 | +0.00° / +0.07° |
+| low_mu | didn't stop, v\_f = 2.91 m/s | didn't stop, v\_f = 1.57 m/s | — | 116 / 107 | +0.13° / +3.54° |
+| mu_jump | didn't stop, v\_f = 3.95 m/s | didn't stop, v\_f = 3.65 m/s | — | 204 / 176 | +3.36° / -1.00° |
+| split_mu | 74.74 m / 7.14 s | 72.49 m / 6.53 s | +2.2 m | 73 / 78 | -0.72° / +0.09° |
 
 Δ stop dist > 0 means BTCM-on took *longer* than BTCM-off.
 Yaw drift > 0 = car rotated counter-clockwise (toward driver
@@ -43,26 +43,26 @@ left).  On `split_mu` the car drifts toward the asphalt side
 | Metric | BTCM-on | BTCM-off |
 |---|---|---|
 | Brake-on at | t = 14.10 s, v = 30.06 m/s | t = 14.10 s, v = 30.06 m/s |
-| Stop result | 149.95 m / 9.89 s | 148.52 m / 9.47 s |
-| FL events | 77 | 0 |
-| FR events | 66 | 0 |
-| Yaw drift over brake | +0.24° | +0.07° |
+| Stop result | 150.18 m / 9.92 s | 148.52 m / 9.47 s |
+| FL events | 71 | 0 |
+| FR events | 76 | 0 |
+| Yaw drift over brake | +0.00° | +0.07° |
 
 ### Per-wheel slip statistics (BTCM-on)
 
 | Wheel | peak | mean | time-locked |
 |---|---:|---:|---:|
-| FL | 0.708 | 0.064 | 0.0% |
-| FR | 0.639 | 0.065 | 0.0% |
-| RL | 0.851 | 0.068 | 0.0% |
-| RR | 0.794 | 0.068 | 0.0% |
+| FL | 0.635 | 0.062 | 0.0% |
+| FR | 0.553 | 0.063 | 0.0% |
+| RL | 0.604 | 0.065 | 0.0% |
+| RR | 0.638 | 0.067 | 0.0% |
 
 ### Front ABS phase distribution during brake event (BTCM-on)
 
 | Wheel | APPLY | HOLD | DUMP | stale | phase transitions |
 |---|---:|---:|---:|---:|---:|
-| FL | 24.6% | 6.7% | 13.7% | 55.0% | 89 |
-| FR | 21.1% | 7.3% | 13.7% | 57.9% | 81 |
+| FL | 21.6% | 8.8% | 13.2% | 56.4% | 80 |
+| FR | 18.4% | 8.8% | 13.7% | 59.1% | 87 |
 
 ### Charts
 
@@ -168,25 +168,25 @@ would see if the firmware was rebuilt with the gate on.
 |---|---|---|
 | Brake-on at | t = 38.29 s, v = 15.01 m/s | t = 38.29 s, v = 15.01 m/s |
 | Stop result | didn't stop, v\_f = 2.91 m/s | didn't stop, v\_f = 1.57 m/s |
-| FL events | 149 | 0 |
-| FR events | 132 | 0 |
-| Yaw drift over brake | -0.25° | +3.54° |
+| FL events | 116 | 0 |
+| FR events | 107 | 0 |
+| Yaw drift over brake | +0.13° | +3.54° |
 
 ### Per-wheel slip statistics (BTCM-on)
 
 | Wheel | peak | mean | time-locked |
 |---|---:|---:|---:|
-| FL | 1.000 | 0.467 | 38.2% |
-| FR | 1.000 | 0.475 | 39.4% |
-| RL | 0.437 | 0.065 | 0.0% |
-| RR | 0.419 | 0.062 | 0.0% |
+| FL | 1.000 | 0.465 | 38.3% |
+| FR | 1.000 | 0.476 | 39.7% |
+| RL | 0.437 | 0.064 | 0.0% |
+| RR | 0.418 | 0.062 | 0.0% |
 
 ### Front ABS phase distribution during brake event (BTCM-on)
 
 | Wheel | APPLY | HOLD | DUMP | stale | phase transitions |
 |---|---:|---:|---:|---:|---:|
-| FL | 47.8% | 11.9% | 6.1% | 34.2% | 149 |
-| FR | 47.4% | 9.9% | 5.0% | 37.7% | 131 |
+| FL | 47.8% | 10.3% | 5.4% | 36.5% | 115 |
+| FR | 49.9% | 9.8% | 3.8% | 36.5% | 107 |
 
 ### Charts
 
@@ -291,26 +291,26 @@ would see if the firmware was rebuilt with the gate on.
 | Metric | BTCM-on | BTCM-off |
 |---|---|---|
 | Brake-on at | t = 7.76 s, v = 15.01 m/s | t = 7.76 s, v = 15.01 m/s |
-| Stop result | didn't stop, v\_f = 4.10 m/s | didn't stop, v\_f = 3.65 m/s |
-| FL events | 248 | 0 |
-| FR events | 149 | 0 |
-| Yaw drift over brake | -1.03° | -1.00° |
+| Stop result | didn't stop, v\_f = 3.95 m/s | didn't stop, v\_f = 3.65 m/s |
+| FL events | 204 | 0 |
+| FR events | 176 | 0 |
+| Yaw drift over brake | +3.36° | -1.00° |
 
 ### Per-wheel slip statistics (BTCM-on)
 
 | Wheel | peak | mean | time-locked |
 |---|---:|---:|---:|
-| FL | 1.000 | 0.415 | 8.9% |
-| FR | 1.000 | 0.519 | 26.2% |
-| RL | 0.567 | 0.016 | 0.0% |
-| RR | 0.573 | 0.013 | 0.0% |
+| FL | 1.000 | 0.436 | 22.2% |
+| FR | 1.000 | 0.574 | 24.6% |
+| RL | 0.579 | 0.013 | 0.0% |
+| RR | 0.573 | 0.016 | 0.0% |
 
 ### Front ABS phase distribution during brake event (BTCM-on)
 
 | Wheel | APPLY | HOLD | DUMP | stale | phase transitions |
 |---|---:|---:|---:|---:|---:|
-| FL | 5.9% | 32.8% | 50.9% | 10.4% | 248 |
-| FR | 6.9% | 16.9% | 53.9% | 22.4% | 149 |
+| FL | 5.2% | 27.0% | 46.5% | 21.3% | 204 |
+| FR | 5.7% | 23.9% | 50.6% | 19.8% | 176 |
 
 ### Charts
 
@@ -415,26 +415,26 @@ would see if the firmware was rebuilt with the gate on.
 | Metric | BTCM-on | BTCM-off |
 |---|---|---|
 | Brake-on at | t = 12.02 s, v = 20.86 m/s | t = 12.02 s, v = 20.86 m/s |
-| Stop result | 74.10 m / 7.01 s | 72.49 m / 6.53 s |
-| FL events | 72 | 0 |
+| Stop result | 74.74 m / 7.14 s | 72.49 m / 6.53 s |
+| FL events | 73 | 0 |
 | FR events | 78 | 0 |
-| Yaw drift over brake | +0.02° | +0.09° |
+| Yaw drift over brake | -0.72° | +0.09° |
 
 ### Per-wheel slip statistics (BTCM-on)
 
 | Wheel | peak | mean | time-locked |
 |---|---:|---:|---:|
-| FL | 0.654 | 0.079 | 0.0% |
-| FR | 0.636 | 0.086 | 0.0% |
-| RL | 0.760 | 0.094 | 0.0% |
-| RR | 0.697 | 0.092 | 0.0% |
+| FL | 0.729 | 0.085 | 0.0% |
+| FR | 0.615 | 0.090 | 0.0% |
+| RL | 0.562 | 0.090 | 0.0% |
+| RR | 0.734 | 0.090 | 0.0% |
 
 ### Front ABS phase distribution during brake event (BTCM-on)
 
 | Wheel | APPLY | HOLD | DUMP | stale | phase transitions |
 |---|---:|---:|---:|---:|---:|
-| FL | 32.4% | 8.1% | 32.7% | 26.8% | 157 |
-| FR | 33.2% | 7.9% | 34.2% | 24.8% | 166 |
+| FL | 31.0% | 9.1% | 33.2% | 26.8% | 161 |
+| FR | 34.6% | 7.6% | 33.2% | 24.6% | 171 |
 
 ### Charts
 
