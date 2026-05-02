@@ -145,6 +145,20 @@ std::wstring FormatHeadlampStatusLabel(bool low, bool high, bool ever_received);
 std::wstring FormatTurnSignalStatusLabel(const wchar_t* side, bool active,
                                          bool ever_received);
 
+// Vehicle speed label helper (display-only, not a button).
+/// Format vehicle speed as "Speed: N.N m/s (NN km/h)" or "Speed: ---" if not received.
+/// speed_mps: forward vehicle speed in m/s (from ev1sim physics, VehicleState snapshot).
+/// ever_received: false before the first SetVehicleState() call (shows "Speed: ---").
+/// Locale-independent formatting (period decimal, no thousand separators).
+std::wstring FormatVehicleSpeedLabel(bool ever_received, float speed_mps);
+
+// BPM pack voltage label helper (display-only, not a button).
+/// Format BPM pack voltage as "PackVolt: NNN.N V" or "PackVolt: ---" if not received.
+/// pack_voltage_mv: raw millivolt value from kSigChassisBpmPackVoltageMv (4139).
+/// ever_received: false before the first BPM publish (shows "PackVolt: ---").
+/// Converts mV → V with one decimal place.  Locale-independent formatting.
+std::wstring FormatBpmPackVoltageLabel(bool ever_received, std::uint32_t pack_voltage_mv);
+
 // ---------------------------------------------------------------------------
 class FloatingUiPanel : public irr::IEventReceiver {
 public:

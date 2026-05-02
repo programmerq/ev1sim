@@ -633,6 +633,31 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                         m_external_sim->HasReceivedBulbData());
                 },
                 []() {});   // no-op: display-only row
+
+            // --- Vehicle speed (display-only; local VehicleState snapshot, ID 4100) ---
+            // Reads ev1sim's own published speed (kSigChassisSpeedMps = 4100) via the
+            // VehicleState snapshot that SimApp writes each tick via SetVehicleState().
+            // No additional bus subscription needed — ev1sim is the publisher.
+            // Shows "Speed: 12.3 m/s (44 km/h)" or "Speed: ---" before first physics tick.
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatVehicleSpeedLabel(
+                        m_external_sim->HasVehicleSpeed(),
+                        m_external_sim->GetVehicleSpeedMps());
+                },
+                []() {});   // no-op: display-only row
+
+            // --- BPM pack voltage (display-only; chassis bus 4139) ---
+            // Subscribes to kSigChassisBpmPackVoltageMv (4139) published by BPM on change
+            // (epsilon ~50 mV) while key-on.  Converts uint32 mV → V for display.
+            // Shows "PackVolt: 312.0 V" or "PackVolt: ---" before first BPM frame arrives.
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatBpmPackVoltageLabel(
+                        m_external_sim->HasReceivedBpmPackVoltage(),
+                        m_external_sim->GetBpmPackVoltageMv());
+                },
+                []() {});   // no-op: display-only row
         }
     }
 

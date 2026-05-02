@@ -695,3 +695,72 @@ TEST_CASE("FormatTurnSignalStatusLabel: right received and active shows ON",
     CHECK(FormatTurnSignalStatusLabel(L"R", true, /*ever_received=*/true)
           == L"R Turn: ON");
 }
+
+// ---------------------------------------------------------------------------
+// Vehicle speed label helper (FormatVehicleSpeedLabel)
+// Source: ev1sim VehicleState.speed_mps (ev1sim publishes kSigChassisSpeedMps=4100).
+// ever_received=false shows "Speed: ---".
+// Format: "Speed: N.N m/s (NN km/h)" — one decimal for m/s, integer km/h.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("FormatVehicleSpeedLabel: never-received shows placeholder",
+          "[FloatingUI][Speed]") {
+    CHECK(FormatVehicleSpeedLabel(/*ever_received=*/false, 0.0f)
+          == L"Speed: ---");
+    // even with a non-zero speed, never-received takes priority
+    CHECK(FormatVehicleSpeedLabel(/*ever_received=*/false, 27.78f)
+          == L"Speed: ---");
+}
+
+TEST_CASE("FormatVehicleSpeedLabel: zero speed shows 0.0 m/s and 0 km/h",
+          "[FloatingUI][Speed]") {
+    CHECK(FormatVehicleSpeedLabel(/*ever_received=*/true, 0.0f)
+          == L"Speed: 0.0 m/s (0 km/h)");
+}
+
+TEST_CASE("FormatVehicleSpeedLabel: 100 km/h = 27.78 m/s",
+          "[FloatingUI][Speed]") {
+    // 100 km/h = 100/3.6 ≈ 27.777... m/s → "27.8 m/s (100 km/h)"
+    CHECK(FormatVehicleSpeedLabel(/*ever_received=*/true, 100.0f / 3.6f)
+          == L"Speed: 27.8 m/s (100 km/h)");
+}
+
+TEST_CASE("FormatVehicleSpeedLabel: 50 km/h = 13.89 m/s",
+          "[FloatingUI][Speed]") {
+    // 50 km/h = 50/3.6 ≈ 13.888... m/s → "13.9 m/s (50 km/h)"
+    CHECK(FormatVehicleSpeedLabel(/*ever_received=*/true, 50.0f / 3.6f)
+          == L"Speed: 13.9 m/s (50 km/h)");
+}
+
+// ---------------------------------------------------------------------------
+// BPM pack voltage label helper (FormatBpmPackVoltageLabel)
+// Source: kSigChassisBpmPackVoltageMv (4139), uint32 LE mV from BPM.
+// ever_received=false shows "PackVolt: ---".
+// Format: "PackVolt: NNN.N V" — mV divided by 1000, one decimal place.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("FormatBpmPackVoltageLabel: never-received shows placeholder",
+          "[FloatingUI][PackVolt]") {
+    CHECK(FormatBpmPackVoltageLabel(/*ever_received=*/false, 0u)
+          == L"PackVolt: ---");
+    CHECK(FormatBpmPackVoltageLabel(/*ever_received=*/false, 312000u)
+          == L"PackVolt: ---");
+}
+
+TEST_CASE("FormatBpmPackVoltageLabel: nominal 312 V = 312000 mV",
+          "[FloatingUI][PackVolt]") {
+    CHECK(FormatBpmPackVoltageLabel(/*ever_received=*/true, 312000u)
+          == L"PackVolt: 312.0 V");
+}
+
+TEST_CASE("FormatBpmPackVoltageLabel: partial voltage 285.5 V = 285500 mV",
+          "[FloatingUI][PackVolt]") {
+    CHECK(FormatBpmPackVoltageLabel(/*ever_received=*/true, 285500u)
+          == L"PackVolt: 285.5 V");
+}
+
+TEST_CASE("FormatBpmPackVoltageLabel: zero voltage shows 0.0 V",
+          "[FloatingUI][PackVolt]") {
+    CHECK(FormatBpmPackVoltageLabel(/*ever_received=*/true, 0u)
+          == L"PackVolt: 0.0 V");
+}

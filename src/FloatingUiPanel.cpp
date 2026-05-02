@@ -195,6 +195,35 @@ std::wstring FormatTurnSignalStatusLabel(const wchar_t* side, bool active,
     return label;
 }
 
+std::wstring FormatVehicleSpeedLabel(bool ever_received, float speed_mps) {
+    if (!ever_received) {
+        return L"Speed: ---";
+    }
+    // km/h = m/s × 3.6; round to nearest integer.
+    const double mps  = static_cast<double>(speed_mps);
+    const double kmh  = mps * 3.6;
+    const int    kmh_int = static_cast<int>(kmh + 0.5);
+    // "Speed: 12.3 m/s (44 km/h)"
+    wchar_t buf[80];
+    std::swprintf(buf, sizeof(buf) / sizeof(buf[0]),
+                  L"Speed: %.1f m/s (%d km/h)",
+                  mps, kmh_int);
+    return buf;
+}
+
+std::wstring FormatBpmPackVoltageLabel(bool ever_received, std::uint32_t pack_voltage_mv) {
+    if (!ever_received) {
+        return L"PackVolt: ---";
+    }
+    // Convert mV → V with one decimal place.
+    const double volts = static_cast<double>(pack_voltage_mv) / 1000.0;
+    // "PackVolt: 312.0 V"
+    wchar_t buf[64];
+    std::swprintf(buf, sizeof(buf) / sizeof(buf[0]),
+                  L"PackVolt: %.1f V", volts);
+    return buf;
+}
+
 std::wstring FormatPedalPercentLabel(const char* name, double value_0_to_1) {
     // Build a wide-character version of the name.
     wchar_t wname[64] = {};
