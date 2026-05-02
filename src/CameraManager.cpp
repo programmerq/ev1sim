@@ -163,6 +163,11 @@ void CameraManager::ApplyFreeLook(const VehiclePose& p) {
 // Mouse event handling (free-look only)
 // ---------------------------------------------------------------------------
 bool CameraManager::OnEvent(const irr::SEvent& event) {
+    // While in UI mode (grabbing disabled) pass all mouse events through so
+    // the Irrlicht GUI environment can handle button clicks.
+    if (!m_grabbing_mouse)
+        return false;
+
     if (event.EventType != irr::EET_MOUSE_INPUT_EVENT)
         return false;
 

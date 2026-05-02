@@ -178,6 +178,12 @@ DriverCommand KeyboardInputController::Update(double dt) {
         m_snapshot_toggle = true;
     m_z_prev = z_now;
 
+    // --- UI mode toggle (TAB one-shot, consumed via ConsumeUiModeToggle) ---
+    bool tab_now = m_keys[irr::KEY_TAB];
+    if (tab_now && !m_tab_prev)
+        m_ui_mode_toggle = true;
+    m_tab_prev = tab_now;
+
     // --- Panel toggles (F=hood, T=trunk, [=doorL, ]=doorR) ---
     {
         static const irr::EKEY_CODE panel_keys[4] = {
@@ -330,6 +336,12 @@ bool KeyboardInputController::ConsumeWiperWash() {
 bool KeyboardInputController::ConsumeSnapshotToggle() {
     bool v = m_snapshot_toggle;
     m_snapshot_toggle = false;
+    return v;
+}
+
+bool KeyboardInputController::ConsumeUiModeToggle() {
+    bool v = m_ui_mode_toggle;
+    m_ui_mode_toggle = false;
     return v;
 }
 

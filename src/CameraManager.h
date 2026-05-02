@@ -29,6 +29,10 @@ public:
     // Set the initial mode from a config string.
     void SetModeFromString(const std::string& name);
 
+    // When false the camera ignores all mouse events (UI mode).
+    // SimApp calls this when toggling TAB UI mode.
+    void SetGrabbingMouse(bool grabbing) { m_grabbing_mouse = grabbing; }
+
 private:
     irr::scene::ICameraSceneNode* m_camera;
     CameraMode m_mode = CameraMode::Chase;
@@ -48,6 +52,9 @@ private:
     // Mouse tracking
     int  m_last_mx = 0, m_last_my = 0;
     bool m_dragging = false;
+
+    // When false, OnEvent ignores all mouse input (UI panel mode).
+    bool m_grabbing_mouse = true;
 
     void ApplyChase(const VehiclePose& p);
     void ApplyHood(const VehiclePose& p);

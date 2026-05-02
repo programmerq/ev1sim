@@ -97,6 +97,11 @@ public:
     // the [ / ] door bindings nearby are ajar-only (open/close), not lock state.
     bool ConsumeSnapshotToggle();
 
+    // True once after TAB was tapped — toggle UI mode (release mouse to panel).
+    // When UI mode is ON, CameraManager stops consuming mouse events and the
+    // cursor becomes visible so the user can click floating-UI buttons.
+    bool ConsumeUiModeToggle();
+
     // True if Esc was pressed.
     bool QuitRequested() const { return m_quit; }
 
@@ -131,6 +136,7 @@ private:
     bool m_v_prev      = false;   // wiper cycle
     bool m_m_prev      = false;   // wiper wash
     bool m_z_prev      = false;   // snapshot overlay toggle
+    bool m_tab_prev    = false;   // UI mode toggle
     bool m_camera_cycle       = false;
     bool m_pause_toggle       = false;
     bool m_headlight_toggle   = false;
@@ -150,6 +156,7 @@ private:
     bool m_wiper_cycle        = false;
     bool m_wiper_wash         = false;
     bool m_snapshot_toggle    = false;
+    bool m_ui_mode_toggle     = false;
 
     // Panel toggle keys: KEY_KEY_1 through KEY_KEY_4
     bool m_panel_prev[4]   = {};
