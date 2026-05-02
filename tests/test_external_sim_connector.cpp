@@ -31,6 +31,8 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     constexpr int kNumIpcTelltale   = 2;   // ipc_seatbelt_telltale_driver (4130),
                                            // ipc_seatbelt_telltale_passenger (4131)
     constexpr int kNumIpcTripDist   = 1;   // ipc_trip_distance_m (4132)
+    constexpr int kNumIpcBtcmTelltale = 5; // ipc_brake_telltale (4134), park_brake (4135),
+                                           // antilock (4136), low_trac (4137), air_bag (4138)
     // Driver inputs on the main harness segment (electricsim_ev1_bus), output
     // from ev1sim: brake_pedal_q8 (6900), steering_deg_q8 (6901),
     // gear_selector (6902), throttle_q8 (6903), brake_switch (6904),
@@ -55,7 +57,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
                          kNumThrottleCmd + kNumBrake + kNumWiper +
                          kNumHvac + kNumAmbient + kNumDoorLockPw +
                          kNumRsaShiftBlocked +
-                         kNumIpcTelltale + kNumIpcTripDist +
+                         kNumIpcTelltale + kNumIpcTripDist + kNumIpcBtcmTelltale +
                          kNumDynamics + kNumDriverInputs;
     REQUIRE(ExternalSimConnector::EndpointCount() == expected);
 
@@ -73,9 +75,10 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     int hvac_count            = 0;   // hvac_blower_level (4082) + defrost_grid_active (4083)
     int door_lock_pw_count    = 0;   // door lock cmds (4084/4085) + pw motor cmds (4086/4087)
     int rsa_shift_blocked_count = 0; // rsa_shift_blocked (4088)
-    int ipc_telltale_count    = 0;   // IPC seatbelt telltales (4130/4131)
-    int ipc_trip_dist_count   = 0;   // IPC trip distance (4132)
-    int driver_input_count    = 0;
+    int ipc_telltale_count        = 0;   // IPC seatbelt telltales (4130/4131)
+    int ipc_trip_dist_count       = 0;   // IPC trip distance (4132)
+    int ipc_btcm_telltale_count   = 0;   // IPC BTCM/airbag telltales (4134–4138)
+    int driver_input_count        = 0;
 
     const auto* eps = ExternalSimConnector::Endpoints();
     for (int i = 0; i < ExternalSimConnector::EndpointCount(); ++i) {
@@ -129,6 +132,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
         } else if (e.signal_id == 4132) {
             CHECK(e.input_to_sim);          // IPC trip distance flows into ev1sim
             ++ipc_trip_dist_count;
+        } else if (e.signal_id >= 4134 && e.signal_id <= 4138) {
+            CHECK(e.input_to_sim);          // IPC BTCM/airbag telltales flow into ev1sim
+            ++ipc_btcm_telltale_count;
         } else if (e.signal_id == 4090 || e.signal_id == 4091) {
             CHECK_FALSE(e.input_to_sim);    // ambient temp + humidity are outputs from ev1sim
             ++dynamics_count;
@@ -189,6 +195,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     CHECK(ipc_telltale_count      == kNumIpcTelltale);
     // ipc_trip_dist_count: trip distance (4132) — from IPC.
     CHECK(ipc_trip_dist_count     == kNumIpcTripDist);
+    // ipc_btcm_telltale_count: brake (4134) + park_brake (4135) + antilock (4136)
+    //                          + low_trac (4137) + air_bag (4138) — from IPC.
+    CHECK(ipc_btcm_telltale_count == kNumIpcBtcmTelltale);
     CHECK(driver_input_count   == kNumDriverInputs);
 }
 
@@ -1141,4 +1150,142 @@ TEST_CASE("IPC trip distance subscription: FindEndpoint returns correct metadata
     CHECK(std::string(ep->qualified_name) == "vehicle.ipc.trip_distance_m");
     CHECK(std::string(ep->short_name)     == "ipc_trip_distance_m");
     CHECK(ep->input_to_sim);   // IPC publishes → ev1sim subscribes
+}
+
+// ---------------------------------------------------------------------------
+// IPC BTCM / airbag telltale subscription (chassis bus 4134–4138)
+// ---------------------------------------------------------------------------
+
+TEST_CASE("IPC BTCM telltales: default never-received / off",
+          "[ExternalSim][IPC]") {
+    ExternalSimConnector c;
+    CHECK_FALSE(c.HasReceivedIpcBrakeTelltale());
+    CHECK_FALSE(c.GetIpcBrakeTelltale());
+    CHECK_FALSE(c.HasReceivedIpcParkBrakeTelltale());
+    CHECK_FALSE(c.GetIpcParkBrakeTelltale());
+    CHECK_FALSE(c.HasReceivedIpcAntilockTelltale());
+    CHECK_FALSE(c.GetIpcAntilockTelltale());
+    CHECK_FALSE(c.HasReceivedIpcLowTracTelltale());
+    CHECK_FALSE(c.GetIpcLowTracTelltale());
+    CHECK_FALSE(c.HasReceivedIpcAirBagTelltale());
+    CHECK_FALSE(c.GetIpcAirBagTelltale());
+}
+
+TEST_CASE("IPC brake telltale: DebugInjectU8 turns lamp on/off (4134)",
+          "[ExternalSim][IPC]") {
+    ExternalSimConnector c;
+    c.DebugInjectU8(4134, 1u);  // 4134 = kSigChassisIpcBrakeTelltale, 1=lamp on
+    CHECK(c.HasReceivedIpcBrakeTelltale());
+    CHECK(c.GetIpcBrakeTelltale());
+    // Others unaffected.
+    CHECK_FALSE(c.HasReceivedIpcParkBrakeTelltale());
+    CHECK_FALSE(c.HasReceivedIpcAntilockTelltale());
+    // Turn off.
+    c.DebugInjectU8(4134, 0u);
+    CHECK(c.HasReceivedIpcBrakeTelltale());
+    CHECK_FALSE(c.GetIpcBrakeTelltale());
+}
+
+TEST_CASE("IPC park brake telltale: DebugInjectU8 turns lamp on/off (4135)",
+          "[ExternalSim][IPC]") {
+    ExternalSimConnector c;
+    c.DebugInjectU8(4135, 1u);  // 4135 = kSigChassisIpcParkBrakeTelltale
+    CHECK(c.HasReceivedIpcParkBrakeTelltale());
+    CHECK(c.GetIpcParkBrakeTelltale());
+    CHECK_FALSE(c.HasReceivedIpcBrakeTelltale());
+    c.DebugInjectU8(4135, 0u);
+    CHECK_FALSE(c.GetIpcParkBrakeTelltale());
+}
+
+TEST_CASE("IPC antilock telltale: DebugInjectU8 turns lamp on/off (4136)",
+          "[ExternalSim][IPC]") {
+    ExternalSimConnector c;
+    c.DebugInjectU8(4136, 1u);  // 4136 = kSigChassisIpcAntilockTelltale
+    CHECK(c.HasReceivedIpcAntilockTelltale());
+    CHECK(c.GetIpcAntilockTelltale());
+    CHECK_FALSE(c.HasReceivedIpcLowTracTelltale());
+    c.DebugInjectU8(4136, 0u);
+    CHECK_FALSE(c.GetIpcAntilockTelltale());
+}
+
+TEST_CASE("IPC low-trac telltale: DebugInjectU8 turns lamp on/off (4137)",
+          "[ExternalSim][IPC]") {
+    ExternalSimConnector c;
+    c.DebugInjectU8(4137, 1u);  // 4137 = kSigChassisIpcLowTracTelltale
+    CHECK(c.HasReceivedIpcLowTracTelltale());
+    CHECK(c.GetIpcLowTracTelltale());
+    CHECK_FALSE(c.HasReceivedIpcAirBagTelltale());
+    c.DebugInjectU8(4137, 0u);
+    CHECK_FALSE(c.GetIpcLowTracTelltale());
+}
+
+TEST_CASE("IPC airbag telltale: DebugInjectU8 turns lamp on/off (4138)",
+          "[ExternalSim][IPC]") {
+    ExternalSimConnector c;
+    c.DebugInjectU8(4138, 1u);  // 4138 = kSigChassisIpcAirBagTelltale
+    CHECK(c.HasReceivedIpcAirBagTelltale());
+    CHECK(c.GetIpcAirBagTelltale());
+    CHECK_FALSE(c.HasReceivedIpcBrakeTelltale());
+    c.DebugInjectU8(4138, 0u);
+    CHECK_FALSE(c.GetIpcAirBagTelltale());
+}
+
+TEST_CASE("IPC BTCM telltales: all five turn on independently",
+          "[ExternalSim][IPC]") {
+    ExternalSimConnector c;
+    c.DebugInjectU8(4134, 1u);
+    c.DebugInjectU8(4135, 1u);
+    c.DebugInjectU8(4136, 1u);
+    c.DebugInjectU8(4137, 1u);
+    c.DebugInjectU8(4138, 1u);
+    CHECK(c.GetIpcBrakeTelltale());
+    CHECK(c.GetIpcParkBrakeTelltale());
+    CHECK(c.GetIpcAntilockTelltale());
+    CHECK(c.GetIpcLowTracTelltale());
+    CHECK(c.GetIpcAirBagTelltale());
+}
+
+TEST_CASE("IPC brake telltale: FindEndpoint returns correct metadata (4134)",
+          "[ExternalSim][IPC]") {
+    const auto* ep = ExternalSimConnector::FindEndpoint(4134);
+    REQUIRE(ep != nullptr);
+    CHECK(std::string(ep->qualified_name) == "vehicle.ipc.brake_telltale");
+    CHECK(std::string(ep->short_name)     == "ipc_brake_telltale");
+    CHECK(ep->input_to_sim);
+}
+
+TEST_CASE("IPC park brake telltale: FindEndpoint returns correct metadata (4135)",
+          "[ExternalSim][IPC]") {
+    const auto* ep = ExternalSimConnector::FindEndpoint(4135);
+    REQUIRE(ep != nullptr);
+    CHECK(std::string(ep->qualified_name) == "vehicle.ipc.park_brake_telltale");
+    CHECK(std::string(ep->short_name)     == "ipc_park_brake_telltale");
+    CHECK(ep->input_to_sim);
+}
+
+TEST_CASE("IPC antilock telltale: FindEndpoint returns correct metadata (4136)",
+          "[ExternalSim][IPC]") {
+    const auto* ep = ExternalSimConnector::FindEndpoint(4136);
+    REQUIRE(ep != nullptr);
+    CHECK(std::string(ep->qualified_name) == "vehicle.ipc.antilock_telltale");
+    CHECK(std::string(ep->short_name)     == "ipc_antilock_telltale");
+    CHECK(ep->input_to_sim);
+}
+
+TEST_CASE("IPC low-trac telltale: FindEndpoint returns correct metadata (4137)",
+          "[ExternalSim][IPC]") {
+    const auto* ep = ExternalSimConnector::FindEndpoint(4137);
+    REQUIRE(ep != nullptr);
+    CHECK(std::string(ep->qualified_name) == "vehicle.ipc.low_trac_telltale");
+    CHECK(std::string(ep->short_name)     == "ipc_low_trac_telltale");
+    CHECK(ep->input_to_sim);
+}
+
+TEST_CASE("IPC airbag telltale: FindEndpoint returns correct metadata (4138)",
+          "[ExternalSim][IPC]") {
+    const auto* ep = ExternalSimConnector::FindEndpoint(4138);
+    REQUIRE(ep != nullptr);
+    CHECK(std::string(ep->qualified_name) == "vehicle.ipc.air_bag_telltale");
+    CHECK(std::string(ep->short_name)     == "ipc_air_bag_telltale");
+    CHECK(ep->input_to_sim);
 }

@@ -344,6 +344,60 @@ TEST_CASE("FormatIpcSeatbeltTelltaleLabel: passenger never-received shows placeh
 }
 
 // ---------------------------------------------------------------------------
+// IPC BTCM / airbag telltale label helper (FormatIpcTelltaleLampLabel)
+// Chassis bus signals 4134–4138.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("FormatIpcTelltaleLampLabel: lamp off (received)",
+          "[FloatingUI][IPC]") {
+    CHECK(FormatIpcTelltaleLampLabel(L"Brake", false, /*ever_received=*/true)
+          == L"Brake: OFF");
+}
+
+TEST_CASE("FormatIpcTelltaleLampLabel: lamp on (received)",
+          "[FloatingUI][IPC]") {
+    CHECK(FormatIpcTelltaleLampLabel(L"Brake", true, /*ever_received=*/true)
+          == L"Brake: ON");
+}
+
+TEST_CASE("FormatIpcTelltaleLampLabel: never-received shows placeholder",
+          "[FloatingUI][IPC]") {
+    // lamp_on is irrelevant when ever_received=false.
+    CHECK(FormatIpcTelltaleLampLabel(L"Brake", false, /*ever_received=*/false)
+          == L"Brake: ---");
+    CHECK(FormatIpcTelltaleLampLabel(L"Brake", true, /*ever_received=*/false)
+          == L"Brake: ---");
+}
+
+TEST_CASE("FormatIpcTelltaleLampLabel: ParkBrake name works",
+          "[FloatingUI][IPC]") {
+    CHECK(FormatIpcTelltaleLampLabel(L"ParkBrake", true,  true) == L"ParkBrake: ON");
+    CHECK(FormatIpcTelltaleLampLabel(L"ParkBrake", false, true) == L"ParkBrake: OFF");
+    CHECK(FormatIpcTelltaleLampLabel(L"ParkBrake", false, false) == L"ParkBrake: ---");
+}
+
+TEST_CASE("FormatIpcTelltaleLampLabel: ABS name works",
+          "[FloatingUI][IPC]") {
+    CHECK(FormatIpcTelltaleLampLabel(L"ABS", true,  true) == L"ABS: ON");
+    CHECK(FormatIpcTelltaleLampLabel(L"ABS", false, true) == L"ABS: OFF");
+    CHECK(FormatIpcTelltaleLampLabel(L"ABS", false, false) == L"ABS: ---");
+}
+
+TEST_CASE("FormatIpcTelltaleLampLabel: LowTrac name works",
+          "[FloatingUI][IPC]") {
+    CHECK(FormatIpcTelltaleLampLabel(L"LowTrac", true,  true) == L"LowTrac: ON");
+    CHECK(FormatIpcTelltaleLampLabel(L"LowTrac", false, true) == L"LowTrac: OFF");
+    CHECK(FormatIpcTelltaleLampLabel(L"LowTrac", false, false) == L"LowTrac: ---");
+}
+
+TEST_CASE("FormatIpcTelltaleLampLabel: AirBag name works",
+          "[FloatingUI][IPC]") {
+    CHECK(FormatIpcTelltaleLampLabel(L"AirBag", true,  true) == L"AirBag: ON");
+    CHECK(FormatIpcTelltaleLampLabel(L"AirBag", false, true) == L"AirBag: OFF");
+    CHECK(FormatIpcTelltaleLampLabel(L"AirBag", false, false) == L"AirBag: ---");
+}
+
+// ---------------------------------------------------------------------------
 // RSA shift-blocked cue label helper (FormatRsaShiftBlockedLabel)
 // Chassis bus signal 4088; 0=not blocked, 1=shift blocked this tick.
 // ---------------------------------------------------------------------------
