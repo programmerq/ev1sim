@@ -25,6 +25,19 @@ std::wstring FormatCouplerLabel(bool present) {
     return present ? L"Coupler: PLUGGED" : L"Coupler: UNPLUGGED";
 }
 
+std::wstring FormatExtKeypadButtonLabel(int button_idx) {
+    // Labels mirror EV1 exterior pillar keypad keycaps.
+    static const wchar_t* kLabels[] = { L"[1/2]", L"[3/4]", L"[5/6]", L"[7/8]", L"[9/0]" };
+    if (button_idx < 0 || button_idx >= 5) return L"[?]";
+    return kLabels[button_idx];
+}
+
+std::wstring FormatDoorHandleLabel(const wchar_t* door_name) {
+    std::wstring label = L"Handle: ";
+    label += door_name;
+    return label;
+}
+
 // ---------------------------------------------------------------------------
 // FloatingUiPanel
 // ---------------------------------------------------------------------------

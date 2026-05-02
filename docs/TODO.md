@@ -26,8 +26,12 @@ future-UI input on one side, chassis-segment signal publishing on the other.
 - [x] **IPC trip-reset button** — single momentary on the cluster.  I key.
   Publishes kSigDriverIpcTripResetButton (6952).  Consumer wiring (IPC
   odometer reset) is a TODO on the electricsim side.
-- [ ] **RSA exterior keypad** — door-pillar 5-button (1/2, 3/4, 5/6, 7/8,
-  9/0) for keyless entry.
+- [x] **RSA exterior keypad** — `RsaExteriorKeypad` component in
+  `PhysicalWorld`.  5 mouse-clickable buttons (1/2, 3/4, 5/6, 7/8, 9/0)
+  in FloatingUiPanel with hover state via Irrlicht button skin (color-only).
+  Convenience macro button "Enter 111111" queues a full 6-digit sequence.
+  Publishes `kSigDriverRsaExteriorKeypad[1..5]` (6985-6989) each tick.
+  Consumer-side RSA wiring is a TODO (see electricsim/docs/TODO.md).
 - [ ] **RSA interior buttons** — PRND select, EPB switch, power window
   switches.  These are RSA's internal HMI; ev1sim simulates the user
   pressing them and publishes the resulting signals to RSA.
@@ -73,6 +77,17 @@ future-UI input on one side, chassis-segment signal publishing on the other.
 - [ ] HVAC blower (audio + load).
 - [ ] Door lock solenoid (audio + visual click).
 - [ ] Trunk animation (T key already toggles state; no visual today).
+
+## Door handles + exterior keypad follow-up
+
+- [ ] **Hover-magnify polish for keypad buttons** — currently uses Irrlicht
+  button hover state which is hover-color only (no geometric scale-up). A
+  geometric magnify would require custom IGUIElement drawing or a separate
+  overlay node; deferred.
+- [ ] **Door handle test scenarios** — config flag `auto_unlock_at_start: true`
+  is already de facto since DoorLocks defaults to UNLOCKED.  Expose an
+  explicit config or scenario JSON option to set initial lock state so
+  user-interactive tests that need to iterate don't have to unlock first.
 
 ## Floating UI panel
 - [x] **Mouse capture / camera escape (DONE).**  TAB toggles UI mode.

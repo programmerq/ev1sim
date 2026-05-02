@@ -611,6 +611,93 @@ const char* RsaKeypadDriver::expected_state_name() const {
 }
 
 // ---------------------------------------------------------------------------
+// RsaExteriorKeypad
+// ---------------------------------------------------------------------------
+
+void RsaExteriorKeypad::press_button(int button_idx, bool long_press) {
+    if (button_idx < 0 || button_idx >= 5) return;
+    m_tap_value[button_idx] = static_cast<std::uint8_t>(long_press ? 2u : 1u);
+}
+
+std::uint8_t RsaExteriorKeypad::button_value(int idx) const {
+    if (idx < 0 || idx >= 5) return 0;
+    return m_tap_value[idx];
+}
+
+void RsaExteriorKeypad::clear_oneshots() {
+    for (int i = 0; i < 5; ++i) m_tap_value[i] = 0;
+}
+
+// Digit-to-button+long_press mapping (same as interior keypad notation):
+//   tap digits (lower):         1->btn0, 3->btn1, 5->btn2, 7->btn3, 9->btn4
+//   long-press digits (higher): 2->btn0, 4->btn1, 6->btn2, 8->btn3, 0->btn4
+static void ext_keypad_digit_to_entry_(char c, int& btn_out, bool& long_out) {
+    switch (c) {
+        case '1': btn_out = 0; long_out = false; break;
+        case '2': btn_out = 0; long_out = true;  break;
+        case '3': btn_out = 1; long_out = false; break;
+        case '4': btn_out = 1; long_out = true;  break;
+        case '5': btn_out = 2; long_out = false; break;
+        case '6': btn_out = 2; long_out = true;  break;
+        case '7': btn_out = 3; long_out = false; break;
+        case '8': btn_out = 3; long_out = true;  break;
+        case '9': btn_out = 4; long_out = false; break;
+        case '0': btn_out = 4; long_out = true;  break;
+        default:  btn_out = 0; long_out = false; break;
+    }
+}
+
+void RsaExteriorKeypad::enter_code_sequence(const char* code_str) {
+    if (!code_str) return;
+    int len = 0;
+    while (code_str[len] != '\0' && len <= kMaxCodeLen) ++len;
+    if (len != kMaxCodeLen) return;
+
+    m_seq_len   = kMaxCodeLen;
+    m_seq_pos   = 0;
+    m_seq_timer = 0.0;  // first digit fires on the very next tick
+    m_seq_active = true;
+    for (int i = 0; i < kMaxCodeLen; ++i) {
+        int btn = 0;
+        bool lp = false;
+        ext_keypad_digit_to_entry_(code_str[i], btn, lp);
+        m_seq[i].button_idx = static_cast<std::uint8_t>(btn);
+        m_seq[i].long_press = lp;
+    }
+}
+
+void RsaExteriorKeypad::update(double dt_s) {
+    if (!m_seq_active) return;
+    m_seq_timer -= dt_s;
+    // timer <= 0 means fire immediately (including first digit at t=0)
+}
+
+bool RsaExteriorKeypad::consume_sequence_fire() {
+    if (!m_seq_active) return false;
+    if (m_seq_timer > 0.0) return false;
+
+    // Fire the current digit.
+    const auto& e = m_seq[m_seq_pos];
+    m_tap_value[e.button_idx] = static_cast<std::uint8_t>(e.long_press ? 2u : 1u);
+
+    ++m_seq_pos;
+    if (m_seq_pos >= m_seq_len) {
+        m_seq_active = false;
+        m_seq_len    = 0;
+        m_seq_pos    = 0;
+    } else {
+        // Schedule next digit after 100 ms.
+        static constexpr double kSeqIntervalS = 0.100;
+        m_seq_timer = kSeqIntervalS;
+    }
+    return true;
+}
+
+bool RsaExteriorKeypad::sequence_in_progress() const {
+    return m_seq_active;
+}
+
+// ---------------------------------------------------------------------------
 // AmbientTempSensor
 // ---------------------------------------------------------------------------
 

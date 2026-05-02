@@ -156,13 +156,30 @@ constexpr std::uint32_t kSigDriverPowerWindowPassengerUp   = 6982U;
 constexpr std::uint32_t kSigDriverPowerWindowPassengerDown = 6983U;
 constexpr int           kNumPowerWindowInputs              = 4;
 
+// RSA exterior pillar keypad signals (momentary uint8, 0=idle/1=tap/2=long).
+// Locked in lockstep with electricsim kSigDriverRsaExteriorKeypad[1..5] = 6985-6989.
+// Same Option A encoding as interior keypad (6975-6979).
+// consumer = RSA exterior keypad logic, future round.
+constexpr std::uint32_t kSigDriverRsaExteriorKeypad1 = 6985U;
+constexpr std::uint32_t kSigDriverRsaExteriorKeypad2 = 6986U;
+constexpr std::uint32_t kSigDriverRsaExteriorKeypad3 = 6987U;
+constexpr std::uint32_t kSigDriverRsaExteriorKeypad4 = 6988U;
+constexpr std::uint32_t kSigDriverRsaExteriorKeypad5 = 6989U;
+// Door handle pull attempt signals (momentary bool 0=idle, 1=pulled this tick).
+// Locked in lockstep with electricsim kSigDriverDoorHandleAttempt{Driver,Passenger}
+// = 6990-6991.  consumer = RSA (decides if door unlocks).
+constexpr std::uint32_t kSigDriverDoorHandleAttemptDriver    = 6990U;
+constexpr std::uint32_t kSigDriverDoorHandleAttemptPassenger = 6991U;
+constexpr int           kNumExteriorKeypadInputs             = 7;  // 5 buttons + 2 handles
+
 // Number of driver-input endpoints on the main harness segment.
 // 6900, 6901, 6902, 6903, 6904, 6944, 6948, 6949, 6964,
 // 6971, 6975, 6976, 6977, 6978, 6979,
 // 6952, 6953, 6954, 6955, 6956, 6957, 6958, 6959,
-// 6980, 6981, 6982, 6983 = 27 total.
+// 6980, 6981, 6982, 6983,
+// 6985, 6986, 6987, 6988, 6989, 6990, 6991 = 34 total.
 // (6970 is reserved; not registered as an endpoint.)
-constexpr int           kNumDriverInputs = 15 + kNumNewDriverInputs + kNumPowerWindowInputs;
+constexpr int           kNumDriverInputs = 15 + kNumNewDriverInputs + kNumPowerWindowInputs + kNumExteriorKeypadInputs;
 
 // Motor state signals on the chassis segment (ev1sim → electricsim, float32 LE).
 //   4070  vehicle.dynamics.motor_rpm        motor shaft RPM
@@ -440,6 +457,26 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     out[i++] = {kSigDriverPowerWindowPassengerDown,
                 "vehicle.driver.power_window_passenger_down",
                 "power_window_passenger_down", false};
+    // RSA exterior pillar keypad (6985-6989) — momentary uint8 Option A encoding.
+    // consumer = RSA exterior keypad logic, future round.
+    out[i++] = {kSigDriverRsaExteriorKeypad1,
+                "vehicle.driver.rsa_exterior_keypad1", "rsa_exterior_keypad1", false};
+    out[i++] = {kSigDriverRsaExteriorKeypad2,
+                "vehicle.driver.rsa_exterior_keypad2", "rsa_exterior_keypad2", false};
+    out[i++] = {kSigDriverRsaExteriorKeypad3,
+                "vehicle.driver.rsa_exterior_keypad3", "rsa_exterior_keypad3", false};
+    out[i++] = {kSigDriverRsaExteriorKeypad4,
+                "vehicle.driver.rsa_exterior_keypad4", "rsa_exterior_keypad4", false};
+    out[i++] = {kSigDriverRsaExteriorKeypad5,
+                "vehicle.driver.rsa_exterior_keypad5", "rsa_exterior_keypad5", false};
+    // Door handle pull attempt signals (6990-6991) — momentary bool.
+    // consumer = RSA (decides if door unlocks), future round.
+    out[i++] = {kSigDriverDoorHandleAttemptDriver,
+                "vehicle.driver.door_handle_attempt_driver",
+                "door_handle_attempt_driver", false};
+    out[i++] = {kSigDriverDoorHandleAttemptPassenger,
+                "vehicle.driver.door_handle_attempt_passenger",
+                "door_handle_attempt_passenger", false};
     return out;
 }
 
@@ -561,6 +598,19 @@ struct ExternalSimConnector::State {
     std::int8_t   driver_pw_driver_down_pub   = -1;
     std::int8_t   driver_pw_passenger_up_pub  = -1;
     std::int8_t   driver_pw_passenger_down_pub = -1;
+
+    // RSA exterior pillar keypad (IDs 6985-6989, main harness segment).
+    // Momentary uint8 (0=idle, 1=tap, 2=long-press).
+    // consumer = RSA exterior keypad logic, future round.
+    std::uint8_t  driver_ext_keypad[5]     = {};
+    std::int8_t   driver_ext_keypad_pub[5] = {-1,-1,-1,-1,-1};
+
+    // Door handle attempt signals (IDs 6990-6991, main harness segment).
+    // Momentary bool (0=idle, 1=handle pulled this tick).
+    bool          driver_door_handle_driver         = false;
+    bool          driver_door_handle_passenger      = false;
+    std::int8_t   driver_door_handle_driver_pub     = -1;
+    std::int8_t   driver_door_handle_passenger_pub  = -1;
 
     // Motor state (IDs 4070-4071, chassis segment).
     // Publish-on-change with small epsilon thresholds.
@@ -877,6 +927,34 @@ void ExternalSimConnector::SetDriverPowerWindowPassengerUp(bool held) {
 
 void ExternalSimConnector::SetDriverPowerWindowPassengerDown(bool held) {
     m_state->driver_pw_passenger_down = held;
+}
+
+void ExternalSimConnector::SetDriverRsaExteriorKeypad1(std::uint8_t value) {
+    m_state->driver_ext_keypad[0] = value;
+}
+
+void ExternalSimConnector::SetDriverRsaExteriorKeypad2(std::uint8_t value) {
+    m_state->driver_ext_keypad[1] = value;
+}
+
+void ExternalSimConnector::SetDriverRsaExteriorKeypad3(std::uint8_t value) {
+    m_state->driver_ext_keypad[2] = value;
+}
+
+void ExternalSimConnector::SetDriverRsaExteriorKeypad4(std::uint8_t value) {
+    m_state->driver_ext_keypad[3] = value;
+}
+
+void ExternalSimConnector::SetDriverRsaExteriorKeypad5(std::uint8_t value) {
+    m_state->driver_ext_keypad[4] = value;
+}
+
+void ExternalSimConnector::SetDriverDoorHandleAttemptDriver(bool attempted) {
+    m_state->driver_door_handle_driver = attempted;
+}
+
+void ExternalSimConnector::SetDriverDoorHandleAttemptPassenger(bool attempted) {
+    m_state->driver_door_handle_passenger = attempted;
 }
 
 void ExternalSimConnector::SetMotorRpm(float rpm) {
@@ -1282,6 +1360,9 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             st.driver_pw_driver_down_pub    = -1;
             st.driver_pw_passenger_up_pub   = -1;
             st.driver_pw_passenger_down_pub = -1;
+            for (int ei = 0; ei < 5; ++ei) st.driver_ext_keypad_pub[ei] = -1;
+            st.driver_door_handle_driver_pub    = -1;
+            st.driver_door_handle_passenger_pub = -1;
             std::cout << "[ExternalSim] connected to main harness bus '"
                       << m_opts.main_harness_bus_name << "'\n";
         }
@@ -1438,6 +1519,26 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                             st.driver_pw_passenger_up,  st.driver_pw_passenger_up_pub);
         publish_bool_change(kSigDriverPowerWindowPassengerDown,
                             st.driver_pw_passenger_down, st.driver_pw_passenger_down_pub);
+        // RSA exterior keypad (6985-6989) — uint8 Option A encoding.
+        {
+            constexpr std::uint32_t kExtIds[5] = {
+                kSigDriverRsaExteriorKeypad1, kSigDriverRsaExteriorKeypad2,
+                kSigDriverRsaExteriorKeypad3, kSigDriverRsaExteriorKeypad4,
+                kSigDriverRsaExteriorKeypad5,
+            };
+            for (int bi = 0; bi < 5; ++bi) {
+                const std::int8_t bval = static_cast<std::int8_t>(st.driver_ext_keypad[bi]);
+                if (st.driver_ext_keypad_pub[bi] < 0 || bval != st.driver_ext_keypad_pub[bi]) {
+                    drv.push_back(MakeU8Delta(kExtIds[bi], st.driver_ext_keypad[bi]));
+                    st.driver_ext_keypad_pub[bi] = bval;
+                }
+            }
+        }
+        // Door handle attempt signals (6990-6991) — momentary bool.
+        publish_bool_change(kSigDriverDoorHandleAttemptDriver,
+                            st.driver_door_handle_driver,    st.driver_door_handle_driver_pub);
+        publish_bool_change(kSigDriverDoorHandleAttemptPassenger,
+                            st.driver_door_handle_passenger, st.driver_door_handle_passenger_pub);
         if (!drv.empty()) {
             Frame mf{};
             mf.header.type              = FrameType::DeltaBatch;

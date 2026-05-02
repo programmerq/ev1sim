@@ -165,6 +165,60 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                               << (m_physical->charge_coupler().present()
                                       ? "PLUGGED" : "UNPLUGGED") << "\n";
                 });
+
+            // --- Exterior Keypad section: 5 buttons (tap = lower digit) ---
+            // Button labels are static; clicking sends a tap (value=1).
+            for (int ki = 0; ki < 5; ++ki) {
+                m_floating_ui->AddButton(
+                    [ki]() -> std::wstring {
+                        return FormatExtKeypadButtonLabel(ki);
+                    },
+                    [this, ki]() {
+                        m_physical->rsa_exterior_keypad().press_button(ki, /*long_press=*/false);
+                        static const char* kDigits[] = {"1","3","5","7","9"};
+                        std::cout << "[UI] Ext keypad: btn" << (ki+1)
+                                  << " tap (digit " << kDigits[ki] << ")\n";
+                    });
+            }
+
+            // --- Exterior Keypad convenience macro: Enter "111111" ---
+            m_floating_ui->AddButton(
+                []() -> std::wstring { return L"[Enter \"111111\"]"; },
+                [this]() {
+                    m_physical->rsa_exterior_keypad().enter_code_sequence("111111");
+                    std::cout << "[UI] Ext keypad: enter_code_sequence(\"111111\") queued\n";
+                });
+
+            // --- Door Handles ---
+            m_floating_ui->AddButton(
+                []() -> std::wstring { return FormatDoorHandleLabel(L"Driver"); },
+                [this]() {
+                    m_physical->door_handles().attempt_driver();
+                    using S = ev1sim::DoorLocks::State;
+                    if (m_physical->door_locks().driver() == S::LOCKED) {
+                        std::cout << "[SimApp] Door driver: LOCKED — try keypad code\n";
+                    } else {
+                        m_panels->Toggle(PanelID::DOOR_LEFT);
+                        std::cout << "[SimApp] Door driver: UNLOCKED — "
+                                  << (m_panels->IsOpen(PanelID::DOOR_LEFT) ? "ajar" : "closed")
+                                  << "\n";
+                    }
+                });
+
+            m_floating_ui->AddButton(
+                []() -> std::wstring { return FormatDoorHandleLabel(L"Passenger"); },
+                [this]() {
+                    m_physical->door_handles().attempt_passenger();
+                    using S = ev1sim::DoorLocks::State;
+                    if (m_physical->door_locks().passenger() == S::LOCKED) {
+                        std::cout << "[SimApp] Door passenger: LOCKED — try keypad code\n";
+                    } else {
+                        m_panels->Toggle(PanelID::DOOR_RIGHT);
+                        std::cout << "[SimApp] Door passenger: UNLOCKED — "
+                                  << (m_panels->IsOpen(PanelID::DOOR_RIGHT) ? "ajar" : "closed")
+                                  << "\n";
+                    }
+                });
         }
     }
 
@@ -634,6 +688,35 @@ int SimApp::RunWithVisualization() {
                 static_cast<std::uint8_t>(m_physical->wiper_stalk().position()));
             m_external_sim->SetDriverWiperWashRequest(
                 m_physical->wiper_stalk().consume_wash());
+            // Power window switches (6980-6983) — no keyboard source;
+            // floating UI panel will call press()/release() when expanded.
+            {
+                const auto& pw = m_physical->power_windows();
+                m_external_sim->SetDriverPowerWindowDriverUp(pw.driver_up());
+                m_external_sim->SetDriverPowerWindowDriverDown(pw.driver_down());
+                m_external_sim->SetDriverPowerWindowPassengerUp(pw.passenger_up());
+                m_external_sim->SetDriverPowerWindowPassengerDown(pw.passenger_down());
+            }
+            // RSA exterior keypad (6985-6989) and door handle attempts (6990-6991).
+            // Tick the sequence emitter then consume any pending fires.
+            m_physical->rsa_exterior_keypad().update(render_dt);
+            m_physical->rsa_exterior_keypad().consume_sequence_fire();
+            m_external_sim->SetDriverRsaExteriorKeypad1(
+                m_physical->rsa_exterior_keypad().button_value(0));
+            m_external_sim->SetDriverRsaExteriorKeypad2(
+                m_physical->rsa_exterior_keypad().button_value(1));
+            m_external_sim->SetDriverRsaExteriorKeypad3(
+                m_physical->rsa_exterior_keypad().button_value(2));
+            m_external_sim->SetDriverRsaExteriorKeypad4(
+                m_physical->rsa_exterior_keypad().button_value(3));
+            m_external_sim->SetDriverRsaExteriorKeypad5(
+                m_physical->rsa_exterior_keypad().button_value(4));
+            m_physical->rsa_exterior_keypad().clear_oneshots();
+            m_external_sim->SetDriverDoorHandleAttemptDriver(
+                m_physical->door_handles().driver_attempt());
+            m_external_sim->SetDriverDoorHandleAttemptPassenger(
+                m_physical->door_handles().passenger_attempt());
+            m_physical->door_handles().clear_oneshots();
         }
         // Ambient temp + humidity (chassis bus 4090-4091).
         // Time-of-day from system clock → local time → fractional hours.
@@ -1022,8 +1105,8 @@ int SimApp::RunHeadless() {
                 static_cast<std::uint8_t>(m_physical->wiper_stalk().position()));
             m_external_sim->SetDriverWiperWashRequest(
                 m_physical->wiper_stalk().consume_wash());
-            // Power window switches (6980-6983) — no input source today;
-            // floating UI will call press()/release() when it lands.
+            // Power window switches (6980-6983) — no keyboard source;
+            // floating UI panel will call press()/release() when expanded.
             {
                 const auto& pw = m_physical->power_windows();
                 m_external_sim->SetDriverPowerWindowDriverUp(pw.driver_up());
@@ -1031,6 +1114,26 @@ int SimApp::RunHeadless() {
                 m_external_sim->SetDriverPowerWindowPassengerUp(pw.passenger_up());
                 m_external_sim->SetDriverPowerWindowPassengerDown(pw.passenger_down());
             }
+            // RSA exterior keypad (6985-6989) and door handle attempts (6990-6991).
+            // Headless: no UI source; tick the sequence emitter and publish zeros.
+            m_physical->rsa_exterior_keypad().update(tick_dt);
+            m_physical->rsa_exterior_keypad().consume_sequence_fire();
+            m_external_sim->SetDriverRsaExteriorKeypad1(
+                m_physical->rsa_exterior_keypad().button_value(0));
+            m_external_sim->SetDriverRsaExteriorKeypad2(
+                m_physical->rsa_exterior_keypad().button_value(1));
+            m_external_sim->SetDriverRsaExteriorKeypad3(
+                m_physical->rsa_exterior_keypad().button_value(2));
+            m_external_sim->SetDriverRsaExteriorKeypad4(
+                m_physical->rsa_exterior_keypad().button_value(3));
+            m_external_sim->SetDriverRsaExteriorKeypad5(
+                m_physical->rsa_exterior_keypad().button_value(4));
+            m_physical->rsa_exterior_keypad().clear_oneshots();
+            m_external_sim->SetDriverDoorHandleAttemptDriver(
+                m_physical->door_handles().driver_attempt());
+            m_external_sim->SetDriverDoorHandleAttemptPassenger(
+                m_physical->door_handles().passenger_attempt());
+            m_physical->door_handles().clear_oneshots();
         }
         // Ambient temp + humidity (chassis bus 4090-4091).
         {

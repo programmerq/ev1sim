@@ -45,6 +45,24 @@ TEST_CASE("FormatCouplerLabel: PLUGGED when present", "[FloatingUI]") {
     CHECK(FormatCouplerLabel(true) == L"Coupler: PLUGGED");
 }
 
+TEST_CASE("FormatExtKeypadButtonLabel: all five buttons", "[FloatingUI]") {
+    CHECK(FormatExtKeypadButtonLabel(0) == L"[1/2]");
+    CHECK(FormatExtKeypadButtonLabel(1) == L"[3/4]");
+    CHECK(FormatExtKeypadButtonLabel(2) == L"[5/6]");
+    CHECK(FormatExtKeypadButtonLabel(3) == L"[7/8]");
+    CHECK(FormatExtKeypadButtonLabel(4) == L"[9/0]");
+}
+
+TEST_CASE("FormatExtKeypadButtonLabel: out-of-range returns fallback", "[FloatingUI]") {
+    CHECK(FormatExtKeypadButtonLabel(-1) == L"[?]");
+    CHECK(FormatExtKeypadButtonLabel(5)  == L"[?]");
+}
+
+TEST_CASE("FormatDoorHandleLabel: driver and passenger", "[FloatingUI]") {
+    CHECK(FormatDoorHandleLabel(L"Driver")    == L"Handle: Driver");
+    CHECK(FormatDoorHandleLabel(L"Passenger") == L"Handle: Passenger");
+}
+
 // ---------------------------------------------------------------------------
 // Callback invocation tests — use real PhysicalWorld objects
 // ---------------------------------------------------------------------------

@@ -41,6 +41,8 @@ std::wstring FormatHazardLabel(bool on);
 std::wstring FormatLockAllLabel(bool any_locked);
 std::wstring FormatDoorLabel(const wchar_t* door_name, bool locked);
 std::wstring FormatCouplerLabel(bool present);
+std::wstring FormatExtKeypadButtonLabel(int button_idx);
+std::wstring FormatDoorHandleLabel(const wchar_t* door_name);
 
 // ---------------------------------------------------------------------------
 class FloatingUiPanel : public irr::IEventReceiver {

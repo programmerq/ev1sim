@@ -31,9 +31,13 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     // cruise_cancel (6955), cruise_speed_up (6956), cruise_speed_down (6957),
     // wiper_switch (6958), wiper_wash_request (6959),
     // power_window_driver_up (6980), power_window_driver_down (6981),
-    // power_window_passenger_up (6982), power_window_passenger_down (6983).
+    // power_window_passenger_up (6982), power_window_passenger_down (6983),
+    // rsa_exterior_keypad1 (6985), rsa_exterior_keypad2 (6986),
+    // rsa_exterior_keypad3 (6987), rsa_exterior_keypad4 (6988),
+    // rsa_exterior_keypad5 (6989),
+    // door_handle_attempt_driver (6990), door_handle_attempt_passenger (6991).
     // (6970 is reserved — not registered as an endpoint.)
-    constexpr int kNumDriverInputs = 27;
+    constexpr int kNumDriverInputs = 34;
     const int expected = NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS +
                          kNumCombSw + kNumChargeCplr + kNumPrnd + kNumMotor +
                          kNumWiper + kNumAmbient + kNumDynamics + kNumDriverInputs;
@@ -99,7 +103,8 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
                    e.signal_id == 6971 ||
                    (e.signal_id >= 6975 && e.signal_id <= 6979) ||
                    (e.signal_id >= 6952 && e.signal_id <= 6959) ||
-                   (e.signal_id >= 6980 && e.signal_id <= 6983)) {
+                   (e.signal_id >= 6980 && e.signal_id <= 6983) ||
+                   (e.signal_id >= 6985 && e.signal_id <= 6991)) {
             // Driver inputs on the main harness segment — outputs from ev1sim.
             // 6900=brake_pedal_q8  6901=steering_deg_q8  6902=gear_selector
             // 6903=throttle_q8     6904=brake_switch
@@ -111,6 +116,8 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
             // 6975..6979=rsa_keypad_button[1..5]  (6970 reserved; not registered)
             // 6980=power_window_driver_up   6981=power_window_driver_down
             // 6982=power_window_passenger_up  6983=power_window_passenger_down
+            // 6985..6989=rsa_exterior_keypad[1..5]
+            // 6990=door_handle_attempt_driver  6991=door_handle_attempt_passenger
             CHECK_FALSE(e.input_to_sim);
             ++driver_input_count;
         } else {

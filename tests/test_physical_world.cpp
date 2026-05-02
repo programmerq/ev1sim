@@ -699,3 +699,155 @@ TEST_CASE("test_power_windows_independent_per_window", "[PhysicalWorld][PowerWin
     CHECK(pw.state(W::DRIVER)    == D::UP);
     CHECK(pw.state(W::PASSENGER) == D::DOWN);
 }
+
+// ---------------------------------------------------------------------------
+// RsaExteriorKeypad
+// ---------------------------------------------------------------------------
+
+TEST_CASE("test_rsa_exterior_keypad_button_press", "[PhysicalWorld][RsaExteriorKeypad]") {
+    RsaExteriorKeypad kp;
+
+    // Default: all idle.
+    for (int i = 0; i < 5; ++i) {
+        CHECK(kp.button_value(i) == 0);
+        CHECK_FALSE(kp.button_tap(i));
+        CHECK_FALSE(kp.button_long(i));
+    }
+
+    // Press button 0 (tap).
+    kp.press_button(0, /*long_press=*/false);
+    CHECK(kp.button_value(0) == 1);
+    CHECK(kp.button_tap(0));
+    CHECK_FALSE(kp.button_long(0));
+    // Other buttons unaffected.
+    for (int i = 1; i < 5; ++i)
+        CHECK(kp.button_value(i) == 0);
+
+    // clear_oneshots resets all to idle.
+    kp.clear_oneshots();
+    for (int i = 0; i < 5; ++i)
+        CHECK(kp.button_value(i) == 0);
+}
+
+TEST_CASE("test_rsa_exterior_keypad_long_press", "[PhysicalWorld][RsaExteriorKeypad]") {
+    RsaExteriorKeypad kp;
+
+    kp.press_button(2, /*long_press=*/true);
+    CHECK(kp.button_value(2) == 2);
+    CHECK_FALSE(kp.button_tap(2));
+    CHECK(kp.button_long(2));
+
+    kp.clear_oneshots();
+    CHECK(kp.button_value(2) == 0);
+}
+
+TEST_CASE("test_rsa_exterior_keypad_enter_code_sequence", "[PhysicalWorld][RsaExteriorKeypad]") {
+    RsaExteriorKeypad kp;
+
+    // "111111" = six taps of button 0.
+    kp.enter_code_sequence("111111");
+    CHECK(kp.sequence_in_progress());
+
+    // First fire: timer=0, should fire immediately.
+    kp.update(0.0);
+    bool fired = kp.consume_sequence_fire();
+    CHECK(fired);
+    // button 0 should be tap (value=1).
+    CHECK(kp.button_value(0) == 1);
+    kp.clear_oneshots();
+
+    // Sequence still in progress (5 more digits).
+    CHECK(kp.sequence_in_progress());
+
+    // Advance through remaining 5 digits.
+    for (int i = 0; i < 5; ++i) {
+        // Advance time past 100ms interval.
+        kp.update(0.11);
+        bool f = kp.consume_sequence_fire();
+        CHECK(f);
+        kp.clear_oneshots();
+    }
+
+    // All 6 digits consumed — sequence done.
+    CHECK_FALSE(kp.sequence_in_progress());
+}
+
+TEST_CASE("test_rsa_exterior_keypad_out_of_range_button_ignored", "[PhysicalWorld][RsaExteriorKeypad]") {
+    RsaExteriorKeypad kp;
+    // button_idx out of range — should not crash, returns 0.
+    kp.press_button(-1, false);
+    kp.press_button(5, false);
+    for (int i = 0; i < 5; ++i)
+        CHECK(kp.button_value(i) == 0);
+    CHECK(kp.button_value(-1) == 0);
+    CHECK(kp.button_value(5) == 0);
+}
+
+// ---------------------------------------------------------------------------
+// DoorHandles
+// ---------------------------------------------------------------------------
+
+TEST_CASE("test_door_handles_default_no_attempt", "[PhysicalWorld][DoorHandles]") {
+    DoorHandles dh;
+    CHECK_FALSE(dh.driver_attempt());
+    CHECK_FALSE(dh.passenger_attempt());
+}
+
+TEST_CASE("test_door_handles_driver_attempt_one_shot", "[PhysicalWorld][DoorHandles]") {
+    DoorHandles dh;
+    dh.attempt_driver();
+    CHECK(dh.driver_attempt());
+    CHECK_FALSE(dh.passenger_attempt());  // unaffected
+
+    dh.clear_oneshots();
+    CHECK_FALSE(dh.driver_attempt());
+    CHECK_FALSE(dh.passenger_attempt());
+}
+
+TEST_CASE("test_door_handles_passenger_attempt_one_shot", "[PhysicalWorld][DoorHandles]") {
+    DoorHandles dh;
+    dh.attempt_passenger();
+    CHECK_FALSE(dh.driver_attempt());
+    CHECK(dh.passenger_attempt());
+
+    dh.clear_oneshots();
+    CHECK_FALSE(dh.driver_attempt());
+    CHECK_FALSE(dh.passenger_attempt());
+}
+
+TEST_CASE("test_door_handles_attempt_when_locked_does_not_change_panel",
+          "[PhysicalWorld][DoorHandles]") {
+    // Model: door locked → pull attempt sets the flag (for signal publish)
+    // but the caller (SimApp) does NOT open the panel.
+    // We verify DoorHandles itself doesn't touch panel state — that logic is in SimApp.
+    DoorHandles dh;
+    DoorLocks   locks;
+    locks.lock_all();
+
+    dh.attempt_driver();
+    // DoorHandles::driver_attempt() is true regardless of lock state;
+    // it is SimApp's job to check lock before toggling panel.
+    CHECK(dh.driver_attempt());
+    CHECK(locks.driver() == DoorLocks::State::LOCKED);
+    // Panel state would not change — but we have no VehiclePanels here.
+    // Just confirm DoorHandles doesn't mutate lock state.
+    CHECK(locks.driver() == DoorLocks::State::LOCKED);
+}
+
+TEST_CASE("test_door_handles_attempt_when_unlocked_opens_panel",
+          "[PhysicalWorld][DoorHandles]") {
+    // Model: door unlocked → pull attempt sets the flag and SimApp opens the door.
+    // We confirm DoorHandles + DoorLocks interaction at the model level.
+    DoorHandles dh;
+    DoorLocks   locks;  // default: all unlocked
+
+    dh.attempt_driver();
+    CHECK(dh.driver_attempt());
+    CHECK(locks.driver() == DoorLocks::State::UNLOCKED);
+    // In the real SimApp path: since driver == UNLOCKED, SimApp would call
+    // m_panels->Toggle(PanelID::DOOR_LEFT).  We just confirm the flag and state.
+    dh.clear_oneshots();
+    CHECK_FALSE(dh.driver_attempt());
+    // Lock state should be unchanged (handle pull doesn't auto-unlock).
+    CHECK(locks.driver() == DoorLocks::State::UNLOCKED);
+}

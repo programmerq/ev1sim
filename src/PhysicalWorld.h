@@ -521,6 +521,98 @@ private:
     double m_humidity_pct = 55.0;
 };
 
+/// RSA exterior pillar keypad (5 buttons: 1/2, 3/4, 5/6, 7/8, 9/0).
+///
+/// Mirrors the encoding of the interior RsaKeypadDriver but driven directly
+/// by the floating-UI panel (mouse-clickable) rather than the K key scheduler.
+///
+/// Long-press encoding (Option A, same as interior):
+///   0 = idle, 1 = tap (lower digit), 2 = long-press (higher digit)
+///
+/// press_button(idx, long_press) queues a momentary value for the next tick.
+/// clear_oneshots() resets all button values to idle after they are consumed.
+/// enter_code_sequence(code_str) queues a sequence of individual taps/longs
+/// that fire one per tick — used by the "Enter 111111" convenience button.
+class RsaExteriorKeypad {
+public:
+    /// Queue a momentary button press on button idx (0..4).
+    /// If long_press=false, sets value=1 (tap); if true, sets value=2 (long-press).
+    void press_button(int button_idx, bool long_press);
+
+    /// Read current value for button idx (0=idle, 1=tap, 2=long-press).
+    std::uint8_t button_value(int idx) const;
+
+    /// Convenience: true if button idx has a tap queued.
+    bool button_tap(int idx) const  { return button_value(idx) == 1; }
+    /// Convenience: true if button idx has a long-press queued.
+    bool button_long(int idx) const { return button_value(idx) == 2; }
+
+    /// Reset all button values to idle (call after consuming them each tick).
+    void clear_oneshots();
+
+    /// Queue the full 6-digit code as a sequence of button presses.
+    /// code_str must be exactly 6 digit characters (0-9).
+    /// Digits map to buttons: 1→btn0 tap, 2→btn0 long, 3→btn1 tap,
+    /// 4→btn1 long, 5→btn2 tap, 6→btn2 long, 7→btn3 tap, 8→btn3 long,
+    /// 9→btn4 tap, 0→btn4 long.
+    /// Each press fires on a separate tick driven by tick_sequence()/
+    /// consume_sequence_fires() below.
+    void enter_code_sequence(const char* code_str);
+
+    /// Tick the sequence emitter by dt_s seconds (100 ms between digits).
+    void update(double dt_s);
+
+    /// Consume any sequence fires for this tick — merges into pending button values.
+    /// Returns true if a sequence digit fired this tick.
+    bool consume_sequence_fire();
+
+    /// True if a code sequence is currently in progress.
+    bool sequence_in_progress() const;
+
+private:
+    // Per-button momentary values (0=idle, 1=tap, 2=long).
+    std::uint8_t m_tap_value[5] = {};
+
+    // Sequence emitter (for enter_code_sequence).
+    static constexpr int kMaxCodeLen = 6;
+    struct SeqEntry { std::uint8_t button_idx; bool long_press; };
+    SeqEntry m_seq[kMaxCodeLen];
+    int      m_seq_len    = 0;
+    int      m_seq_pos    = 0;
+    double   m_seq_timer  = 0.0;  // seconds until next digit fires
+    bool     m_seq_active = false;
+};
+
+/// Door handle pull attempts (driver door + passenger door).
+///
+/// Momentary one-shot events — each tick the attempt flag is set, consumed by
+/// SimApp which checks DoorLocks state and decides what to do.
+///
+/// Behavior when consumed (SimApp integration):
+///   - If the corresponding door is LOCKED: emit log "Door X: LOCKED — try keypad code"
+///     and publish the attempt signal (6990/6991) momentarily.
+///   - If the corresponding door is UNLOCKED: open the door (toggle VehiclePanels
+///     ajar state) and publish the attempt signal momentarily.
+class DoorHandles {
+public:
+    /// Queue a momentary driver-door handle pull attempt.
+    void attempt_driver()    { m_driver    = true; }
+    /// Queue a momentary passenger-door handle pull attempt.
+    void attempt_passenger() { m_passenger = true; }
+
+    /// True if a driver-door attempt is queued.
+    bool driver_attempt()    const { return m_driver;    }
+    /// True if a passenger-door attempt is queued.
+    bool passenger_attempt() const { return m_passenger; }
+
+    /// Reset both attempt flags (call after consuming them each tick).
+    void clear_oneshots() { m_driver = false; m_passenger = false; }
+
+private:
+    bool m_driver    = false;
+    bool m_passenger = false;
+};
+
 /// Container for all physical-world input components.
 class PhysicalWorld {
 public:
@@ -563,6 +655,12 @@ public:
     PowerWindows&       power_windows()       { return m_power_windows; }
     const PowerWindows& power_windows() const { return m_power_windows; }
 
+    RsaExteriorKeypad&       rsa_exterior_keypad()       { return m_rsa_ext_keypad; }
+    const RsaExteriorKeypad& rsa_exterior_keypad() const { return m_rsa_ext_keypad; }
+
+    DoorHandles&       door_handles()       { return m_door_handles; }
+    const DoorHandles& door_handles() const { return m_door_handles; }
+
     /// Draw HUD overlays for: key state, combination switch, PRND selector,
     /// and turn signals/hazard.  Call between BeginScene and EndScene.
     /// rsa_run_mode: most recently received RSA run mode (0=OFF,1=ACC,2=RUN;
@@ -598,6 +696,8 @@ private:
     DoorLocks          m_door_locks;
     AmbientTempSensor  m_ambient_temp;
     PowerWindows       m_power_windows;
+    RsaExteriorKeypad  m_rsa_ext_keypad;
+    DoorHandles        m_door_handles;
 };
 
 }  // namespace ev1sim

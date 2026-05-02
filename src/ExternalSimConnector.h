@@ -238,6 +238,28 @@ public:
     void SetDriverPowerWindowPassengerUp(bool held);
     void SetDriverPowerWindowPassengerDown(bool held);
 
+    /// Outgoing RSA exterior pillar keypad button signals (IDs 6985-6989, main harness).
+    /// Same Option A encoding as interior keypad (6975-6979):
+    ///   0 = idle, 1 = tap (lower digit), 2 = long-press (higher digit)
+    ///   ExteriorKeypad1 (6985): "1/2" button
+    ///   ExteriorKeypad2 (6986): "3/4" button
+    ///   ExteriorKeypad3 (6987): "5/6" button
+    ///   ExteriorKeypad4 (6988): "7/8" button
+    ///   ExteriorKeypad5 (6989): "9/0" button
+    /// Consumer = RSA exterior keypad logic (future round).
+    void SetDriverRsaExteriorKeypad1(std::uint8_t value);
+    void SetDriverRsaExteriorKeypad2(std::uint8_t value);
+    void SetDriverRsaExteriorKeypad3(std::uint8_t value);
+    void SetDriverRsaExteriorKeypad4(std::uint8_t value);
+    void SetDriverRsaExteriorKeypad5(std::uint8_t value);
+
+    /// Outgoing door handle pull attempt signals (IDs 6990-6991, main harness).
+    /// Momentary 1-byte uint8 bool (0=idle, 1=handle pulled this tick).
+    /// ev1sim publishes these when the floating-UI door handle buttons are clicked.
+    /// Consumer = RSA (decides whether to unlock based on authorization state).
+    void SetDriverDoorHandleAttemptDriver(bool attempted);
+    void SetDriverDoorHandleAttemptPassenger(bool attempted);
+
     /// Outgoing motor RPM (ID 4070, chassis segment, float32 LE).
     /// Motor shaft speed in RPM (positive forward).
     void SetMotorRpm(float rpm);
