@@ -375,6 +375,31 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                         m_external_sim->HasReceivedIpcSeatbeltTelltalePassenger());
                 },
                 []() {});   // no-op: display-only row
+
+            // --- PRND gear selector (display-only; read from local PhysicalWorld) ---
+            // Reads m_physical->prnd_selector().position() directly — ev1sim is the
+            // source of truth.  No bus subscription required.
+            // Shows "Gear: P / R / N / D" based on current selector position.
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatPrndGearLabel(
+                        static_cast<int>(m_physical->prnd_selector().position()));
+                },
+                []() {});   // no-op: display-only row
+
+            // --- PIM cruise-control status (display-only; main harness bus 5860/5861) ---
+            // Subscribes to PIM signals kSigPimCruiseActive (5860) and
+            // kSigPimCruiseSetpointMps (5861) on the main harness segment.
+            // Shows "Cruise: OFF", "Cruise: 23.5 m/s ON", or "Cruise: ---" before
+            // first frame arrives.  Labels update each frame via UpdateLabels().
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatPimCruiseStatusLabel(
+                        m_external_sim->HasReceivedPimCruiseActive(),
+                        m_external_sim->GetPimCruiseActive(),
+                        m_external_sim->GetPimCruiseSetpointMps());
+                },
+                []() {});   // no-op: display-only row
         }
     }
 

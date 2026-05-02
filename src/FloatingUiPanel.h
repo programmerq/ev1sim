@@ -73,6 +73,21 @@ std::wstring FormatIpcSeatbeltTelltaleLabel(const wchar_t* seat_name,
                                             bool lamp_on,
                                             bool ever_received);
 
+// PRND gear selector status label helper (display-only, not a button).
+/// Format PRND gear selector label from PrndSelector::Position enum index.
+/// pos: 0=P, 1=R, 2=N, 3=D (matches PrndSelector::Position cast to int).
+/// Shows "Gear: P / R / N / D" accordingly.
+std::wstring FormatPrndGearLabel(int pos);
+
+// PIM cruise-control status label helper (display-only, not a button).
+/// Format PIM cruise active + setpoint label.
+/// ever_received_active:  false if no cruise-active frame received yet (shows "---").
+/// active: true = cruise ACTIVE (engaged); false = OFF or STANDBY.
+/// setpoint_mps: target speed in m/s (shown only when active=true).
+std::wstring FormatPimCruiseStatusLabel(bool ever_received_active,
+                                        bool active,
+                                        float setpoint_mps);
+
 // ---------------------------------------------------------------------------
 class FloatingUiPanel : public irr::IEventReceiver {
 public:

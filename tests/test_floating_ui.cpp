@@ -340,3 +340,79 @@ TEST_CASE("FormatIpcSeatbeltTelltaleLabel: passenger never-received shows placeh
     CHECK(FormatIpcSeatbeltTelltaleLabel(L"P", false, /*ever_received=*/false)
           == L"Seatbelt (P): ---");
 }
+
+// ---------------------------------------------------------------------------
+// PRND gear selector label helper (FormatPrndGearLabel)
+// ---------------------------------------------------------------------------
+
+TEST_CASE("FormatPrndGearLabel: all four positions", "[FloatingUI][PRND]") {
+    // PrndSelector::Position: 0=P, 1=R, 2=N, 3=D
+    CHECK(FormatPrndGearLabel(0) == L"Gear: P");
+    CHECK(FormatPrndGearLabel(1) == L"Gear: R");
+    CHECK(FormatPrndGearLabel(2) == L"Gear: N");
+    CHECK(FormatPrndGearLabel(3) == L"Gear: D");
+}
+
+TEST_CASE("FormatPrndGearLabel: out-of-range returns fallback", "[FloatingUI][PRND]") {
+    CHECK(FormatPrndGearLabel(-1) == L"Gear: ?");
+    CHECK(FormatPrndGearLabel(4)  == L"Gear: ?");
+}
+
+TEST_CASE("FormatPrndGearLabel: reflects PhysicalWorld default position (P)",
+          "[FloatingUI][PRND]") {
+    ev1sim::PhysicalWorld world;
+    // Default PRND is P (position 0).
+    const int pos = static_cast<int>(world.prnd_selector().position());
+    CHECK(pos == 0);
+    CHECK(FormatPrndGearLabel(pos) == L"Gear: P");
+}
+
+TEST_CASE("FormatPrndGearLabel: reflects PhysicalWorld cycle_up to D",
+          "[FloatingUI][PRND]") {
+    ev1sim::PhysicalWorld world;
+    // Cycle P → R → N → D.
+    world.prnd_selector().cycle_up();
+    CHECK(FormatPrndGearLabel(static_cast<int>(world.prnd_selector().position()))
+          == L"Gear: R");
+    world.prnd_selector().cycle_up();
+    CHECK(FormatPrndGearLabel(static_cast<int>(world.prnd_selector().position()))
+          == L"Gear: N");
+    world.prnd_selector().cycle_up();
+    CHECK(FormatPrndGearLabel(static_cast<int>(world.prnd_selector().position()))
+          == L"Gear: D");
+}
+
+// ---------------------------------------------------------------------------
+// PIM cruise status label helper (FormatPimCruiseStatusLabel)
+// ---------------------------------------------------------------------------
+
+TEST_CASE("FormatPimCruiseStatusLabel: never-received shows placeholder",
+          "[FloatingUI][Cruise]") {
+    // lamp_on and setpoint are ignored when ever_received_active is false.
+    CHECK(FormatPimCruiseStatusLabel(/*ever_received=*/false, false, 0.0f)
+          == L"Cruise: ---");
+    CHECK(FormatPimCruiseStatusLabel(/*ever_received=*/false, true,  25.0f)
+          == L"Cruise: ---");
+}
+
+TEST_CASE("FormatPimCruiseStatusLabel: received and inactive shows OFF",
+          "[FloatingUI][Cruise]") {
+    CHECK(FormatPimCruiseStatusLabel(/*ever_received=*/true, /*active=*/false, 0.0f)
+          == L"Cruise: OFF");
+    // Setpoint is ignored when cruise is not active.
+    CHECK(FormatPimCruiseStatusLabel(/*ever_received=*/true, /*active=*/false, 20.0f)
+          == L"Cruise: OFF");
+}
+
+TEST_CASE("FormatPimCruiseStatusLabel: active with setpoint shows speed and ON",
+          "[FloatingUI][Cruise]") {
+    // "Cruise: 23.5 m/s ON"
+    CHECK(FormatPimCruiseStatusLabel(/*ever_received=*/true, /*active=*/true, 23.5f)
+          == L"Cruise: 23.5 m/s ON");
+}
+
+TEST_CASE("FormatPimCruiseStatusLabel: active with zero setpoint (edge case)",
+          "[FloatingUI][Cruise]") {
+    CHECK(FormatPimCruiseStatusLabel(/*ever_received=*/true, /*active=*/true, 0.0f)
+          == L"Cruise: 0.0 m/s ON");
+}

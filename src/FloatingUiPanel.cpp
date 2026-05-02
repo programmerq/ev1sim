@@ -2,6 +2,8 @@
 
 #include <cassert>
 #include <cstdint>
+#include <cwchar>
+#include <cstdio>
 
 // ---------------------------------------------------------------------------
 // Pure label-format helpers
@@ -96,6 +98,29 @@ std::wstring FormatIpcSeatbeltTelltaleLabel(const wchar_t* seat_name,
         label += lamp_on ? L"ON" : L"OFF";
     }
     return label;
+}
+
+std::wstring FormatPrndGearLabel(int pos) {
+    const wchar_t* names[] = { L"P", L"R", L"N", L"D" };
+    std::wstring label = L"Gear: ";
+    label += (pos >= 0 && pos <= 3) ? names[pos] : L"?";
+    return label;
+}
+
+std::wstring FormatPimCruiseStatusLabel(bool ever_received_active,
+                                        bool active,
+                                        float setpoint_mps) {
+    if (!ever_received_active) {
+        return L"Cruise: ---";
+    }
+    if (!active) {
+        return L"Cruise: OFF";
+    }
+    // "Cruise: 23.5 m/s ON"
+    wchar_t buf[64];
+    std::swprintf(buf, sizeof(buf) / sizeof(buf[0]),
+                  L"Cruise: %.1f m/s ON", static_cast<double>(setpoint_mps));
+    return buf;
 }
 
 // ---------------------------------------------------------------------------
