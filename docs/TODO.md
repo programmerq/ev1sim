@@ -36,12 +36,20 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   replacement with an actual cycle).  When RSA's solenoid blocks the
   shift (e.g. shift-out-of-Park without brake), ev1sim shows an
   unobtrusive cue.
+- [x] **Power windows** — `PhysicalWorld::PowerWindows` models driver +
+  passenger window × up/down (4 momentary bools).  Signals 6980-6983 pinned
+  and published on the main harness segment.  PowerWindows have no keyboard
+  binding; floating UI panel will drive them when its widget set expands.
 - [ ] **Seatbelt sensors** (driver, passenger) — reed switches in the
   buckles.  Defer keyboard binding; needs floating UI panel.
-- [ ] **Ambient temp sensor** — pull current outdoor temp from a free
-  weather API at startup; fall back to 68°F ± 5–10°F variance based on
-  time of day.  Future: read from a real temp sensor on the physical sim
-  rig.
+- [x] **Ambient temp sensor** — naive almanac-style diurnal sinusoid model
+  (`AmbientTempSensor` in `PhysicalWorld`).  Publishes `kSigChassisAmbientTempC`
+  (4090) and `kSigChassisAmbientHumidityPct` (4091) on the chassis bus each tick
+  (epsilon-gated).  Time-of-day from system clock; fully deterministic for a
+  given run time with the default config (mean 18°C, ±8°C swing, peak at 14h).
+  No live weather API this round — see follow-up below.
+- [ ] **Live weather API integration** (free service, with naive-almanac fallback
+  if API is down) — current implementation is naive-almanac only.
 - [ ] **HVAC controls** — temp setpoint, fan speed, mode selector, AC
   button, defrost button.
 
@@ -67,12 +75,31 @@ future-UI input on one side, chassis-segment signal publishing on the other.
 - [ ] Trunk animation (T key already toggles state; no visual today).
 
 ## Floating UI panel
-- [ ] **Mouse capture / camera escape.** Need a way to release the camera
-  to interact with floating UI elements.
-- [ ] **Switch-list overlay** — clickable panel listing each PhysicalWorld
-  component's current state, with click-to-toggle.  Unblocks hazard, door
-  locks, key fob, seatbelt sensors and any other low-frequency input that
-  doesn't deserve a keybind.
+- [x] **Mouse capture / camera escape (DONE).**  TAB toggles UI mode.
+  `CameraManager::SetGrabbingMouse(false)` early-returns from `OnEvent`
+  when UI mode is active so mouse clicks reach the Irrlicht GUI.
+  Cursor shown/hidden via `ICursorControl::setVisible()`.
+- [x] **Infrastructure landed.**  `FloatingUiPanel` module (vertical button
+  column, translucent background, label-fn + click-callback per button).
+  Three first instances live on the panel:
+  - Hazard toggle (X keyboard path still works in parallel)
+  - Door locks: Lock All/Unlock All + Driver/Passenger/Trunk individual toggles
+  - Charge coupler: PLUGGED/UNPLUGGED (replaces stub-false)
+- [ ] **Wave 2 UI candidates** — each of these will get one or more panel
+  buttons in future rounds:
+  - Wiper speed / wash
+  - Trunk open/close (T key covers it but panel would be friendlier)
+  - Hood open/close
+  - Power windows (driver, passenger)
+  - IPC LCD/LED brightness
+  - RSA LEDs / exterior keypad entry (separate Wave 2 agent)
+  - Exterior keypad (5-button door-pillar)
+  - Seatbelt buckle sensors (driver, passenger)
+  - HVAC: temp setpoint, fan speed, mode, AC, defrost
+  - Steering rack position override
+  - Brake calipers / solenoids test mode
+  - Shifter (PRND) — currently keyboard-only
+  - RSA exterior keypad (door-pillar, 5 buttons)
 
 ## Bus-mediated physics
 - [x] **Front-brake torque from BTCM ABS solenoid state (DONE).** ev1sim
