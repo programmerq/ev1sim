@@ -283,6 +283,11 @@ public:
     /// (epsilon-gated).  Inversely correlated with temperature by the diurnal model.
     void SetAmbientHumidityPct(float humidity_pct);
 
+    /// Outgoing brake master cylinder pressure (ID 4074, chassis segment, float32 LE).
+    /// Computed by BrakePedal from pedal travel; consumed by BTCM as the
+    /// primary brake-effort input.  Units: kPa.
+    void SetBrakeMasterPressureKpa(float pressure_kpa);
+
     /// Incoming RSA run-mode broadcast (ID 5711, main harness segment).
     /// uint8 enum: 0=OFF, 1=ACC, 2=RUN.  RSA publishes this on every tick.
     /// Returns the most recently received value, or 0xFF if never received.
@@ -314,6 +319,19 @@ public:
     AbsPhaseFront GetAbsPhaseFront(
         std::chrono::milliseconds freshness_window) const;
 
+    /// Rear EMB motor commands from BTCM (kSigRearMotorLR/RR = 5014/5015,
+    /// main harness segment).  Float in [-1, +1]: +1=apply, 0=idle, -1=release.
+    /// fresh = true when the last update arrived within freshness_window.
+    /// Stale-fallback in SimApp::ApplyRearEmbBrake when BTCM is not connected.
+    struct RearEmbCmd {
+        float lr        = 0.0f;
+        float rr        = 0.0f;
+        bool  lr_fresh  = false;
+        bool  rr_fresh  = false;
+    };
+    RearEmbCmd GetRearEmbCmd(
+        std::chrono::milliseconds freshness_window) const;
+
     // ---------------------------------------------------------------------
     // Endpoint registry (static — stable across instances)
     // ---------------------------------------------------------------------
@@ -326,6 +344,20 @@ public:
     /// Returns 0xFF if never received.
     std::uint8_t GetWiperMotorCommand() const;
     bool         HasReceivedWiperMotorCommand() const;
+
+    /// Throttle command from PIM (ID 4073, chassis segment) — q8 throttle.
+    /// q8=0 → zero throttle, q8=255 → full throttle.
+    /// fresh = true when the last update arrived within freshness_window.
+    /// ever_received = true after the first message; false on a cold start.
+    /// Used by SimApp::ApplyElectronicsThrottle() to decide whether to
+    /// override the local pedal in "electronics" drive mode.
+    struct ThrottleCmd {
+        std::uint8_t q8            = 0xFFu;
+        bool         fresh         = false;
+        bool         ever_received = false;
+    };
+    ThrottleCmd GetThrottleCmd(
+        std::chrono::milliseconds freshness_window) const;
 
     /// Incoming washer pump command (ID 4081, chassis segment).
     /// Received from RHJB. true = pump active, false = idle.
@@ -363,6 +395,11 @@ public:
     /// Inject a uint8 signal value (e.g. wiper motor command).
     /// Used by unit tests; not part of the runtime path.
     void DebugInjectU8(std::uint32_t signal_id, std::uint8_t value);
+
+    /// Inject a float signal value (rear EMB motor commands, etc.).
+    /// Updates the corresponding state field + timestamp so the
+    /// freshness-window logic in GetRearEmbCmd works.  Used by unit tests.
+    void DebugInjectFloat(std::uint32_t signal_id, float value);
 
 private:
     Options m_opts;

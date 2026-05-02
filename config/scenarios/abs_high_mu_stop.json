@@ -1,0 +1,37 @@
+{
+  "//": "Straight-line ABS stop on dry asphalt (high mu surface).",
+  "//1": "What automotive validation calls a 'high-mu stop' or 'dry-pavement",
+  "//2": "stop' — friction is already near its limit, so ABS gives only a",
+  "//3": "small stopping-distance improvement.  The headline benefit is",
+  "//4": "vehicle stability under braking, not raw stopping distance.",
+  "//5": "",
+  "//6": "Pair with config/abs_high_mu.json (rigid-plane asphalt friction 0.9).",
+
+  "name": "abs_high_mu_stop",
+  "driver_mode": "local",
+  "max_time_s": 30.0,
+  "events": [
+    {"at_time_s": 0.30, "action": "key_on_cycle"},
+    {"at_time_s": 0.60, "action": "key_on_cycle"},
+    {"at_time_s": 0.90, "action": "prnd_up"},
+    {"at_time_s": 1.10, "action": "prnd_up"},
+    {"at_time_s": 1.30, "action": "prnd_up"},
+    {"at_time_s": 1.50, "action": "set_throttle", "value": 1.0},
+    {"at_time_s": 5.00, "action": "wait_for_speed", "value": 30.0},
+    {"at_time_s": 5.00, "action": "set_throttle", "value": 0.0},
+    {"at_time_s": 7.00, "action": "set_brake",   "value": 1.0},
+    {"at_time_s": 25.0, "action": "set_brake",   "value": 0.0}
+  ],
+  "stats": {
+    "output_csv": "scenario_abs_high_mu_stop.csv",
+    "sample_period_s": 0.02,
+    "fields": [
+      "sim_time_s", "speed_mps", "pos_x", "pos_y", "yaw_rate", "yaw_deg",
+      "applied_front_brake", "applied_rear_brake",
+      "wheel_omega_fl", "wheel_omega_fr", "wheel_omega_rl", "wheel_omega_rr",
+      "slip_ratio_fl", "slip_ratio_fr", "slip_ratio_rl", "slip_ratio_rr",
+      "abs_phase_fl", "abs_phase_fr", "emb_cmd_lr", "emb_cmd_rr",
+      "front_brake_pressure", "rear_brake_position"
+    ]
+  }
+}

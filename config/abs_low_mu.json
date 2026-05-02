@@ -1,0 +1,23 @@
+{
+  "//": "Config wrapper for the low-mu (uniform-ice) ABS stop.  Friction 0.10",
+  "//1": "is intermediate between packed snow (0.15) and pure ice (0.05).",
+
+  "vehicle_model": "ev1",
+  "terrain": {
+    "type": "rigid_plane",
+    "surface": "ice",
+    "friction": 0.10,
+    "length_m": 800.0,
+    "width_m":  200.0
+  },
+  "simulation": {
+    "step_size_s": 0.002,
+    "render_fps": 60,
+    "realtime": true,
+    "headless": true
+  },
+  "telemetry": { "log_to_file": false, "show_hud": false },
+  "external_sim": { "enabled": true },
+  "vehicle_dynamics": { "start_propulsion_enabled": true },
+  "scenario": { "path": "config/scenarios/abs_low_mu_stop.json" }
+}

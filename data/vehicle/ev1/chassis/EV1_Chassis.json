@@ -10,7 +10,11 @@
                               "Location":    [0.09, 0, 0.49],
                               "Orientation": [1, 0, 0, 0]
                             },
-     "Mass":                1217,
+     "//":                  "Target Gen 2 NiMH curb weight 1281 kg.  Chrono adds ~82 kg",
+     "//1":                 "of accessories (4× wheel 8 + 4× tire 7.5 + 4× susp ~4.5 +",
+     "//2":                 "steering 1.6).  Chassis = 1281 - 82 = 1199 kg.",
+     "//3":                 "Inertia tensor unchanged — order-of-magnitude sane (Ixx 130 / Iyy 600 / Izz 680).",
+     "Mass":                1199,
      "Moments of Inertia":  [130.0, 600.0, 680.0],
      "Products of Inertia": [0, 0, 0],
      "Void":                false

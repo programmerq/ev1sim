@@ -1,4 +1,5 @@
 #include "SimApp.h"
+#include "BrakeDrum.h"
 #include "MacOSPlatform.h"
 
 #include "chrono_vehicle/ChEngine.h"
@@ -28,6 +29,33 @@ extern "C" void HeadlessSigintHandler(int) {
 // ---------------------------------------------------------------------------
 SimApp::SimApp(const Config& config) : m_config(config) {
     const bool headless = m_config.simulation.headless;
+
+    // Vehicle dynamics authority (config knob).  Validated already in
+    // Config::ApplyCliOverrides; defensively normalize unknown values to
+    // "local" so a typo never wedges the car.
+    m_driver_mode = m_config.vehicle_dynamics.driver;
+    if (m_driver_mode != "local" && m_driver_mode != "electronics") {
+        std::cerr << "[SimApp] unknown vehicle_dynamics.driver='"
+                  << m_driver_mode << "' — falling back to 'local'\n";
+        m_driver_mode = "local";
+    }
+    m_throttle_freshness_window = std::chrono::milliseconds(
+        static_cast<int>(m_config.vehicle_dynamics.throttle_freshness_window_ms));
+    if (m_driver_mode == "electronics") {
+        std::cout << "[SimApp] Vehicle driver = electronics "
+                     "(throttle from PIM via kSigChassisThrottleCmdQ8 4073, "
+                     "fallback window "
+                  << m_config.vehicle_dynamics.throttle_freshness_window_ms
+                  << " ms)\n";
+    }
+    // Bypass the RSA propulsion gate when explicitly opted in (scenario
+    // smoke tests / standalone runs without electricsim).  Default behavior
+    // requires RSA to broadcast RUN before propulsion engages.
+    if (m_config.vehicle_dynamics.start_propulsion_enabled) {
+        m_propulsion_enabled = true;
+        std::cout << "[SimApp] Propulsion gate bypassed at startup "
+                     "(vehicle_dynamics.start_propulsion_enabled=true)\n";
+    }
 
     // 1. Physics world.
     m_world = std::make_unique<VehicleWorld>(m_config);
@@ -347,6 +375,36 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                   << m_external_sim->StatusString() << ")\n";
     }
 
+    // Data-driven scenario harness — JSON file with timed events + stats
+    // capture.  Wins over the built-in ScriptedDriver if both are configured.
+    if (!m_config.scenario.path.empty()) {
+        auto loaded = ev1sim::Scenario::LoadFromFile(m_config.scenario.path);
+        if (loaded) {
+            m_scenario = std::make_unique<ev1sim::Scenario>(std::move(*loaded));
+            // Scenario file's driver_mode + max_time_s override config defaults
+            // unless the config field is non-trivial (already set by the user).
+            if (!m_scenario->driver_mode().empty() &&
+                m_config.vehicle_dynamics.driver == "local") {
+                m_driver_mode = m_scenario->driver_mode();
+                if (m_driver_mode != "local" && m_driver_mode != "electronics") {
+                    std::cerr << "[SimApp] scenario driver_mode='"
+                              << m_driver_mode << "' invalid — using 'local'\n";
+                    m_driver_mode = "local";
+                }
+            }
+            if (m_scenario->max_time_s() > 0.0 &&
+                m_config.simulation.max_time_s == 0.0) {
+                m_config.simulation.max_time_s = m_scenario->max_time_s();
+            }
+            m_scenario->OpenStats();
+            if (m_config.scripted.enabled) {
+                std::cerr << "[SimApp] scenario file overrides scripted "
+                             "driver — disabling scripted\n";
+                m_config.scripted.enabled = false;
+            }
+        }
+    }
+
     // Scripted driver (optional).  Currently one built-in scenario:
     // accel → hold → brake → done.
     if (m_config.scripted.enabled) {
@@ -363,6 +421,32 @@ SimApp::SimApp(const Config& config) : m_config(config) {
 
     // Startup banner — always printed regardless of headless/interactive mode.
     std::cout << "[SimApp] Vehicle: KEY OFF — press K to cycle RSA state (OFF→RUN→ACC→OFF)\n";
+
+    // Warn loudly when an external-sim scenario runs without realtime
+    // pacing.  ev1sim and the electricsim controllers (BTCM, PIM, RSA)
+    // each run on their own simulated clocks: ev1sim ticks chrono
+    // physics, BTCM advances the simavr-emulated AVR.  When ev1sim is
+    // unpaced (`realtime: false`) it can run many times faster than the
+    // BTCM, and the brake event finishes in BTCM-wall-clock-seconds
+    // long before the firmware has had a chance to engage ABS.  Setting
+    // `realtime: true` paces ev1sim against wall clock so both sides
+    // see the same event durations.  The headline ABS-test scenarios
+    // depend on this — without it, results are unreliable.
+    if (m_config.external_sim.enabled &&
+        m_scenario && m_scenario->has_stats() &&
+        !m_config.simulation.realtime) {
+        std::cerr << "\n";
+        std::cerr << "[SimApp] WARNING: scenario has stats logging and "
+                     "external_sim is enabled, but simulation.realtime is "
+                     "false.\n";
+        std::cerr << "[SimApp]          ev1sim will run as fast as the host "
+                     "allows while electricsim controllers (BTCM/PIM/RSA)\n";
+        std::cerr << "[SimApp]          run on their own simavr clocks — "
+                     "the two sides will see different event durations\n";
+        std::cerr << "[SimApp]          and ABS results will be unreliable.  "
+                     "Set \"simulation.realtime\": true.\n";
+        std::cerr << "\n";
+    }
 
     if (headless) {
         std::cout << "[SimApp] Headless mode — no window.  Exits ";
@@ -427,7 +511,8 @@ void SimApp::SetupVisualization() {
 }
 
 // ---------------------------------------------------------------------------
-void SimApp::ApplyAbsFrontBrake(double time, double local_front_brake) {
+void SimApp::ApplyAbsFrontBrake(double time, double dt_s,
+                                double local_front_brake) {
     using Phase = ExternalSimConnector::AbsPhaseFront::Phase;
 
     const auto abs_phase = m_external_sim->GetAbsPhaseFront(kAbsFreshnessWindow);
@@ -448,9 +533,13 @@ void SimApp::ApplyAbsFrontBrake(double time, double local_front_brake) {
         m_abs_fr_was_fresh = abs_phase.fr_fresh;
     }
 
-    // If neither wheel has fresh BTCM data, the symmetric front_pressure from
-    // CommandDriver::ApplyBrakes() (called inside VehicleWorld::Synchronize) is
-    // already in effect — nothing to do.
+    // BTCM-off / stale path: the EV1's front brake hydraulic line bypasses
+    // the BTCM modulator when the controller is unpowered — the iso/dump
+    // solenoids are normally-open / normally-closed so without current the
+    // master cylinder pressure flows directly to the front calipers.  We
+    // model that here by leaving the symmetric front_pressure from
+    // CommandDriver::ApplyBrakes() (set inside VehicleWorld::Synchronize)
+    // in effect.  Nothing to do.
     if (!abs_phase.fl_fresh && !abs_phase.fr_fresh) {
         // Keep prev values in sync with local so HOLD doesn't freeze at stale values.
         m_abs_fl_prev = local_front_brake;
@@ -458,12 +547,30 @@ void SimApp::ApplyAbsFrontBrake(double time, double local_front_brake) {
         return;
     }
 
-    // Compute per-wheel modulated brake ratio.
+    // Finite-rate hydraulic model.  Real ABS valves are flow-limited: a
+    // single dump pulse takes ~30 ms to bleed pressure to a third, not
+    // an instantaneous step to zero.  Modeling APPLY as exponential
+    // rise toward MC pressure and DUMP as exponential decay toward 0
+    // matches the published service-bay numbers and avoids the
+    // pathological behavior of the old step-function model (which
+    // dropped pressure to 0.2 × MC every dump tick — effectively
+    // "open-circuit" braking through the ABS unit during long DUMP
+    // sequences).
+    //
+    // Time constants are first-pass estimates — refined in future
+    // tuning passes once we have GM EV1 hardware reference data.
+    const double tau_apply = 0.005;  // s, caliper-fill time constant
+    const double tau_dump  = 0.060;  // s, dump-valve release time constant
+    const double alpha_apply =
+        dt_s >= tau_apply ? 1.0 : (1.0 - std::exp(-dt_s / tau_apply));
+    const double alpha_dump  =
+        dt_s >= tau_dump  ? 1.0 : (1.0 - std::exp(-dt_s / tau_dump));
+
     auto modulate = [&](Phase phase, double prev, double local) -> double {
         switch (phase) {
-            case Phase::APPLY: return local;
+            case Phase::APPLY: return prev + alpha_apply * (local - prev);
             case Phase::HOLD:  return prev;
-            case Phase::DUMP:  return 0.2 * local;
+            case Phase::DUMP:  return prev * (1.0 - alpha_dump);
         }
         return local;  // unreachable
     };
@@ -476,8 +583,89 @@ void SimApp::ApplyAbsFrontBrake(double time, double local_front_brake) {
 
     // Apply per-wheel front brakes via Chrono API, overriding the symmetric
     // front_pressure CommandDriver::ApplyBrakes() already set in Synchronize().
-    // TODO: rear EMB clamp-position model needed for full rear-wheel modulation.
     m_world->ApplyFrontBrakePerWheel(time, fl, fr);
+}
+
+// ---------------------------------------------------------------------------
+void SimApp::ApplyRearEmbBrake(double time, double /*local_rear_brake*/) {
+    // BTCM-failure model: real EV1 rear brakes are PURELY electromechanical.
+    // There's no hydraulic backup line from the master cylinder, unlike the
+    // front calipers.  When the BTCM is not commanding the rear motors —
+    // either powered down or signals stale — the rear shoes free-roll and
+    // contribute zero brake force.  This is the safety design we model
+    // here, even though it's an unexpected operating state.  The unused
+    // `local_rear_brake` arg is intentional; we never fall back to it.
+
+    const auto cmd = m_external_sim->GetRearEmbCmd(kAbsFreshnessWindow);
+
+    if (cmd.lr_fresh != m_rear_lr_was_fresh) {
+        std::cout << (cmd.lr_fresh
+                          ? "[SimApp] rear-brake from BTCM (live) wheel=RL\n"
+                          : "[SimApp] rear-brake INACTIVE (BTCM stale) wheel=RL — "
+                            "no hydraulic backup\n");
+        m_rear_lr_was_fresh = cmd.lr_fresh;
+    }
+    if (cmd.rr_fresh != m_rear_rr_was_fresh) {
+        std::cout << (cmd.rr_fresh
+                          ? "[SimApp] rear-brake from BTCM (live) wheel=RR\n"
+                          : "[SimApp] rear-brake INACTIVE (BTCM stale) wheel=RR — "
+                            "no hydraulic backup\n");
+        m_rear_rr_was_fresh = cmd.rr_fresh;
+    }
+
+    // Convert the [-1, +1] motor command to a clamping force.  +1 = full apply
+    // (max shoe force), 0 or negative = no force (motor idling or retracting).
+    const ev1sim::BrakeDrum::Params drum;
+    auto cmd_to_force = [&drum](float c) {
+        const double clipped = c < 0.0f ? 0.0 : (c > 1.0f ? 1.0 : double{c});
+        return clipped * drum.max_shoe_force_n;
+    };
+
+    // Wheel angular velocity needed for the self-energizing factor.
+    // VehicleState.wheel_omega is indexed FL, FR, RL, RR.
+    const auto state = m_world->GetState();
+    const double omega_rl = state.wheel_omega[2];
+    const double omega_rr = state.wheel_omega[3];
+
+    auto torque_to_ratio = [&](double torque_nm) {
+        const double ratio = torque_nm / kBrakeSimpleMaxTorqueNm;
+        return ratio < 0.0 ? 0.0 : (ratio > 1.0 ? 1.0 : ratio);
+    };
+
+    // Per-wheel: BTCM command if fresh, else 0 (rear has no hydraulic
+    // fallback path).  Always call ApplyRearBrakePerWheel so we actively
+    // zero the rear when BTCM is off — otherwise Chrono would carry the
+    // last value forever.
+    const double rl_ratio = cmd.lr_fresh
+        ? torque_to_ratio(ev1sim::BrakeDrum::torque_magnitude_nm(
+              cmd_to_force(cmd.lr), omega_rl, drum))
+        : 0.0;
+    const double rr_ratio = cmd.rr_fresh
+        ? torque_to_ratio(ev1sim::BrakeDrum::torque_magnitude_nm(
+              cmd_to_force(cmd.rr), omega_rr, drum))
+        : 0.0;
+    m_world->ApplyRearBrakePerWheel(time, rl_ratio, rr_ratio);
+}
+
+// ---------------------------------------------------------------------------
+void SimApp::ApplyElectronicsThrottle(DriverCommand& cmd) {
+    if (m_driver_mode != "electronics") return;
+
+    const auto bus = m_external_sim->GetThrottleCmd(m_throttle_freshness_window);
+
+    if (bus.fresh != m_throttle_bus_was_fresh) {
+        if (bus.fresh) {
+            std::cout << "[SimApp] throttle from PIM (live) q8="
+                      << static_cast<int>(bus.q8) << "\n";
+        } else {
+            std::cout << "[SimApp] throttle fallback (PIM stale) — "
+                         "using local pedal\n";
+        }
+        m_throttle_bus_was_fresh = bus.fresh;
+    }
+
+    if (!bus.fresh) return;
+    cmd.throttle = static_cast<double>(bus.q8) / 255.0;
 }
 
 // ---------------------------------------------------------------------------
@@ -488,11 +676,12 @@ int SimApp::Run() {
         // default for CI.  Require at least one way to exit automatically.
         const bool has_max_time = m_config.simulation.max_time_s > 0.0;
         const bool has_scripted = m_config.scripted.enabled;
-        if (!has_max_time && !has_scripted) {
+        const bool has_scenario = m_scenario != nullptr;
+        if (!has_max_time && !has_scripted && !has_scenario) {
             std::cerr << "[SimApp] --headless requires at least one of "
-                         "--max-time <s> or a scripted scenario "
-                         "(e.g. --scripted-accel-brake).  Otherwise the "
-                         "run can only be ended by SIGINT.\n";
+                         "--max-time <s>, --scenario <file>, or a scripted "
+                         "scenario (e.g. --scripted-accel-brake).  Otherwise "
+                         "the run can only be ended by SIGINT.\n";
             return kExitUsage;
         }
         return RunHeadless();
@@ -515,6 +704,19 @@ int SimApp::RunWithVisualization() {
         DriverCommand cmd = m_keyboard->Update(render_dt);
         if (m_scripted && !m_paused)
             cmd = m_scripted->Update(m_world->GetState());
+
+        // Scenario harness — fires timed events + holds set_throttle/brake
+        // overrides.  Runs before the bus-throttle override so the bus
+        // value (PIM-computed) wins when in electronics mode.
+        if (m_scenario && !m_paused) {
+            m_scenario->Tick(m_world->GetSimTime(),
+                              m_world->GetState(), *this, cmd);
+        }
+
+        // --- Bus-mediated throttle override (electronics drive mode) ---
+        // No-op in "local" mode.  Must run before the propulsion gate so
+        // a stale-fallback to the local pedal still respects KEY OFF.
+        ApplyElectronicsThrottle(cmd);
 
         // --- Propulsion enable gate (KEY OFF override) ---
         // While m_propulsion_enabled is false, clamp brakes at full and zero
@@ -670,7 +872,11 @@ int SimApp::RunWithVisualization() {
                 // Per-wheel BTCM ABS modulation (front axle).
                 // Must follow Synchronize() (which calls ApplyBrakes internally)
                 // so we can override the symmetric front pressure when BTCM is live.
-                ApplyAbsFrontBrake(t, cmd.front_brake);
+                ApplyAbsFrontBrake(t, step, cmd.front_brake);
+                // Per-wheel BTCM rear EMB integration.  Mirror pattern;
+                // converts motor cmd → shoe force → drum torque per wheel
+                // and applies to axle 1 via VehicleWorld::ApplyRearBrakePerWheel.
+                ApplyRearEmbBrake(t, cmd.rear_brake);
                 m_world->Advance(step);
             }
         }
@@ -751,6 +957,12 @@ int SimApp::RunWithVisualization() {
             // Brake switch (6904): derive from brake travel with hysteresis.
             bool brake_sw = m_physical->brake_switch().update(cmd.front_brake);
             m_external_sim->SetDriverBrakeSwitch(brake_sw);
+            // Master cylinder pressure (4074): two-stage curve from pedal travel.
+            // Drives BTCM brake-effort + the new rear EMB consumer.
+            const double pressure_kpa =
+                m_physical->brake_pedal().update(cmd.front_brake);
+            m_external_sim->SetBrakeMasterPressureKpa(
+                static_cast<float>(pressure_kpa));
             // Seatbelt driver (6964) + passenger (6965): driven by
             // PhysicalWorld::Seatbelts; default buckled, toggleable via UI.
             m_external_sim->SetDriverSeatbeltBuckled(
@@ -1060,6 +1272,13 @@ int SimApp::RunWithVisualization() {
         // --- Telemetry logging ---
         m_telemetry->Record(m_world->GetState(), render_dt);
 
+        // --- Scenario stats sampling ---
+        if (m_scenario) {
+            m_scenario->MaybeSampleStats(m_world->GetSimTime(),
+                                          m_world->GetState(),
+                                          *m_external_sim, cmd);
+        }
+
         // --- Realtime pacing ---
         if (m_config.simulation.realtime)
             m_realtime_timer.Spin(step * steps_per_frame);
@@ -1068,7 +1287,20 @@ int SimApp::RunWithVisualization() {
         if (m_scripted && m_scripted->IsDone()) {
             std::cout << "[SimApp] Scripted scenario complete at t="
                       << m_world->GetSimTime() << "s — exiting.\n";
+            if (m_scenario) m_scenario->Close();
             return kExitSuccess;
+        }
+
+        // --- Scenario complete (data-driven) ---
+        if (m_scenario && m_scenario->IsDone(m_world->GetSimTime())) {
+            const bool failed = m_scenario->IsScenarioFailed();
+            std::cout << "[SimApp] Scenario complete at t="
+                      << m_world->GetSimTime() << "s "
+                      << "(asserts: " << m_scenario->PassedAssertions()
+                      << " passed, "  << m_scenario->FailedAssertions()
+                      << " failed) — exiting.\n";
+            m_scenario->Close();
+            return failed ? kExitScenarioAssertion : kExitSuccess;
         }
 
         // --- Max-time exit (shared with headless) ---
@@ -1081,10 +1313,12 @@ int SimApp::RunWithVisualization() {
                 return kExitTimeout;
             }
             std::cout << "[SimApp] max_time_s reached — exiting.\n";
+            if (m_scenario) m_scenario->Close();
             return kExitSuccess;
         }
     }
     // Window closed / Esc pressed — normal exit.
+    if (m_scenario) m_scenario->Close();
     return kExitSuccess;
 }
 
@@ -1125,6 +1359,19 @@ int SimApp::RunHeadless() {
             cmd = m_scripted->Update(m_world->GetState());
         }
 
+        // Scenario harness — fires timed events + holds set_throttle/brake
+        // overrides.  Headless paths don't pause, so always tick.
+        if (m_scenario) {
+            m_scenario->Tick(m_world->GetSimTime(),
+                              m_world->GetState(), *this, cmd);
+        }
+
+        // --- Bus-mediated throttle override (electronics drive mode) ---
+        // In headless mode there is no keyboard pedal, so the local
+        // fallback is the scripted driver (or zero throttle).  When the
+        // bus is fresh, PIM's commanded throttle replaces the local value.
+        ApplyElectronicsThrottle(cmd);
+
         // --- Propulsion enable gate (KEY OFF override) ---
         // In headless mode no keyboard presses cycle the RSA state.
         // Propulsion is enabled only if RSA broadcasts RUN on the bus.
@@ -1149,7 +1396,9 @@ int SimApp::RunHeadless() {
             // Per-wheel BTCM ABS modulation (front axle).
             // Must follow Synchronize() so we override the symmetric front
             // pressure when BTCM is live.
-            ApplyAbsFrontBrake(t, cmd.front_brake);
+            ApplyAbsFrontBrake(t, step, cmd.front_brake);
+            // Per-wheel BTCM rear EMB integration.
+            ApplyRearEmbBrake(t, cmd.rear_brake);
             m_world->Advance(step);
         }
 
@@ -1200,6 +1449,12 @@ int SimApp::RunHeadless() {
             // Brake switch (6904): derive from brake travel with hysteresis.
             bool brake_sw = m_physical->brake_switch().update(cmd.front_brake);
             m_external_sim->SetDriverBrakeSwitch(brake_sw);
+            // Master cylinder pressure (4074): two-stage curve from pedal travel.
+            // Drives BTCM brake-effort + the new rear EMB consumer.
+            const double pressure_kpa =
+                m_physical->brake_pedal().update(cmd.front_brake);
+            m_external_sim->SetBrakeMasterPressureKpa(
+                static_cast<float>(pressure_kpa));
             // Seatbelt driver (6964) + passenger (6965): driven by
             // PhysicalWorld::Seatbelts; default buckled.  No UI toggle in
             // headless mode — state stays at default (both buckled).
@@ -1383,12 +1638,32 @@ int SimApp::RunHeadless() {
             std::this_thread::sleep_until(target);
         }
 
+        // --- Scenario stats sampling ---
+        if (m_scenario) {
+            m_scenario->MaybeSampleStats(t, m_world->GetState(),
+                                          *m_external_sim, cmd);
+        }
+
         // --- Scripted-scenario complete ---
         if (m_scripted && m_scripted->IsDone()) {
             std::cout << "[SimApp] Scripted scenario complete at t="
                       << t << "s — exiting.\n";
+            if (m_scenario) m_scenario->Close();
             sigaction(SIGINT, &old_sa, nullptr);
             return kExitSuccess;
+        }
+
+        // --- Scenario complete (data-driven) ---
+        if (m_scenario && m_scenario->IsDone(t)) {
+            const bool failed = m_scenario->IsScenarioFailed();
+            std::cout << "[SimApp] Scenario complete at t="
+                      << t << "s "
+                      << "(asserts: " << m_scenario->PassedAssertions()
+                      << " passed, "  << m_scenario->FailedAssertions()
+                      << " failed) — exiting.\n";
+            m_scenario->Close();
+            sigaction(SIGINT, &old_sa, nullptr);
+            return failed ? kExitScenarioAssertion : kExitSuccess;
         }
 
         // --- Max-time exit ---
@@ -1402,6 +1677,7 @@ int SimApp::RunHeadless() {
                 return kExitTimeout;
             }
             std::cout << "[SimApp] max_time_s reached — exiting.\n";
+            if (m_scenario) m_scenario->Close();
             sigaction(SIGINT, &old_sa, nullptr);
             return kExitSuccess;
         }
@@ -1409,6 +1685,53 @@ int SimApp::RunHeadless() {
 
     // Fell out of the loop -> SIGINT was the only possible cause.
     std::cout << "[SimApp] SIGINT — exiting.\n";
+    if (m_scenario) m_scenario->Close();
     sigaction(SIGINT, &old_sa, nullptr);
     return kExitInterrupted;
+}
+
+// ---------------------------------------------------------------------------
+// Scenario hooks — dispatch physical-world events from a loaded Scenario.
+// All hooks are no-ops when m_physical is null (shouldn't happen — SimApp
+// always constructs PhysicalWorld), but defensive null-checks make these
+// safe in tests that mock SimApp.
+// ---------------------------------------------------------------------------
+void SimApp::KeyOnCycle() {
+    if (m_physical) m_physical->rsa_keypad().cycle_k();
+}
+void SimApp::HeadlightCycle() {
+    if (m_physical) m_physical->combination_switch().cycle_h();
+}
+void SimApp::PrndUp() {
+    if (m_physical) m_physical->prnd_selector().cycle_up();
+}
+void SimApp::PrndDown() {
+    if (m_physical) m_physical->prnd_selector().cycle_down();
+}
+void SimApp::TurnSignalLeft() {
+    if (m_physical) m_physical->turn_signal_stalk().toggle_left();
+}
+void SimApp::TurnSignalRight() {
+    if (m_physical) m_physical->turn_signal_stalk().toggle_right();
+}
+void SimApp::HazardToggle() {
+    if (m_physical) m_physical->hazard_switch().toggle();
+}
+void SimApp::IpcTripResetPress() {
+    if (m_physical) m_physical->ipc_trip_reset().press();
+}
+void SimApp::CruiseSet() {
+    if (m_physical) m_physical->cruise_stalk().press_set();
+}
+void SimApp::CruiseResume() {
+    if (m_physical) m_physical->cruise_stalk().press_resume();
+}
+void SimApp::CruiseCancel() {
+    if (m_physical) m_physical->cruise_stalk().press_cancel();
+}
+void SimApp::CruiseSpeedUp() {
+    if (m_physical) m_physical->cruise_stalk().press_speed_up();
+}
+void SimApp::CruiseSpeedDown() {
+    if (m_physical) m_physical->cruise_stalk().press_speed_down();
 }

@@ -3,26 +3,69 @@
   "Type": "Tire",
   "Template": "TMeasyTire",
 
+  "//": "Full parameterization, NOT bearing-capacity shortcut.",
+  "//1": "Reasons we use the longer form:",
+  "//2": " 1. Bearing-capacity path calls GuessPassCar70Par which silently",
+  "//3": "    overwrites m_unloaded_radius and m_rim_radius — and there's a",
+  "//4": "    Chrono quirk where the call site passes radius into a parameter",
+  "//5": "    expecting diameter, leaving the tire ~30 % undersized.  Full",
+  "//6": "    parameterization keeps the Design block radii authoritative.",
+  "//7": " 2. Direct control over longitudinal slip stiffness (dFx/dsx) lets",
+  "//8": "    us calibrate coastdown dissipation against published EV1 specs.",
+  "//9": "",
+  "//10": "Numerical defaults below are Pacejka-derived passenger-car values",
+  "//11": "from Chrono's GuessPassCar70Par (ChTMeasyTire.cpp), evaluated at",
+  "//12": "pn = 0.5 × 4750 = 2375 N (half the bearing capacity = nominal load).",
+  "//13": "Longitudinal slip parameters reduced for EV1 LRR tires + observed",
+  "//14": "coastdown excess; see docs/ev1_chrono_audit.md §13 for tuning history.",
+
   "Design": {
     "Unloaded Radius [m]": 0.2915,
-    "Mass [kg]": 7.5,
-    "Inertia [kg.m2]": [ 0.081, 0.353, 0.081 ],
-    "Width [m]": 0.175,
-    "Rim Radius [m]": 0.1778
+    "Mass [kg]":            7.5,
+    "Inertia [kg.m2]":     [0.081, 0.353, 0.081],
+    "Width [m]":            0.175,
+    "Rim Radius [m]":       0.1778
   },
 
-  "Coefficient of Friction": 0.8,
+  "Coefficient of Friction":         0.8,
+  "Rolling Resistance Coefficient":  0.008,
 
-  "Rolling Resistance Coefficient": 0.008,
-
-  "Vehicle Type": "Passenger",
-
-  "Load Index": 82,
-
-  "Maximum Bearing Capacity [N]": 4750,
+  "Parameters": {
+    "Vertical": {
+      "//": "CZ = pn / defl_max where defl_max = 0.16 × tire-section-height",
+      "//1": "(0.16 × 0.175 × 0.65 = 0.01820 m); DZ = 2 × 0.5 × sqrt(CZ × m).",
+      "Nominal Vertical Force [N]":   2375,
+      "Maximum Vertical Force [N]":   8312.5,
+      "Vertical Tire Stiffness [N/m]": 261000.0,
+      "Tire Vertical Damping [Ns/m]": 1400.0
+    },
+    "Longitudinal": {
+      "//": "Initial slope dFx/dsx = slip stiffness — the dominant driver of",
+      "//1": "rolling/slip dissipation at near-zero slip.  Default 43638 N/wheel",
+      "//2": "produces ~3× excess F_rr in coastdown; future tuning should reduce",
+      "//3": "these to bring sim closer to published EV1 LRR-tire characteristics.",
+      "Initial Slopes dFx/dsx [N]":     [43638.0, 92468.0],
+      "Maximum Fx Load [N]":            [2682.0,   5176.0],
+      "Sliding Fx Load [N]":            [1903.5,   3653.6],
+      "Slip sx at Maximum Fx":          [0.13913,  0.13913],
+      "Slip sx where sliding begins":   [0.66667,  0.66667]
+    },
+    "Lateral": {
+      "Initial Slopes dFy/dsy [N]":     [37958.0, 61042.0],
+      "Maximum Fy Load [N]":            [2377.0,   4340.0],
+      "Sliding Fy Load [N]":            [1980.0,   3673.0],
+      "Slip sy at Maximum Fy":          [0.14852,  0.18504],
+      "Slip sy where sliding begins":   [0.96524,  1.0714]
+    },
+    "Aligning": {
+      "Normalized Trail at Zero Slip sy": [0.178,   0.190],
+      "Slip sy where Trail Changes Sign": [0.16337, 0.20355],
+      "Slip sy where Trail Tends to Zero":[0.96524, 1.0714]
+    }
+  },
 
   "Visualization": {
-    "Mesh Filename Left": "ev1/ev1_tire.obj",
+    "Mesh Filename Left":  "ev1/ev1_tire.obj",
     "Mesh Filename Right": "ev1/ev1_tire.obj"
   }
 }

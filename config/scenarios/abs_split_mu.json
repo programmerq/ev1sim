@@ -1,0 +1,43 @@
+{
+  "//": "'Split-mu' braking — left wheels on dry asphalt, right wheels on ice.",
+  "//1": "Standard automotive validation test for ABS yaw stability.  Without",
+  "//2": "individual-wheel ABS control, the asphalt-side wheels grip while",
+  "//3": "the ice-side wheels lock — net result is a yawing moment that pulls",
+  "//4": "the car toward the high-mu side.  Per-wheel ABS modulation lets",
+  "//5": "each side use its own friction limit.",
+  "//6": "",
+  "//7": "Watch the yaw_rate column in the CSV.  BTCM-on should keep yaw",
+  "//8": "near zero (car stays straight); BTCM-off should drift positive",
+  "//9": "(left rear slips, car yaws left).",
+  "//10": "",
+  "//11": "Pair with config/abs_split_mu.json (loads level/flat_split_mu.json:",
+  "//12": "left half asphalt 0.9, right half ice 0.08).",
+
+  "name": "abs_split_mu",
+  "driver_mode": "local",
+  "max_time_s": 30.0,
+  "events": [
+    {"at_time_s": 0.30, "action": "key_on_cycle"},
+    {"at_time_s": 0.60, "action": "key_on_cycle"},
+    {"at_time_s": 0.90, "action": "prnd_up"},
+    {"at_time_s": 1.10, "action": "prnd_up"},
+    {"at_time_s": 1.30, "action": "prnd_up"},
+    {"at_time_s": 1.50, "action": "set_throttle", "value": 1.0},
+    {"at_time_s": 5.00, "action": "wait_for_speed", "value": 20.0},
+    {"at_time_s": 5.00, "action": "set_throttle", "value": 0.0},
+    {"at_time_s": 12.0, "action": "set_brake",   "value": 1.0},
+    {"at_time_s": 25.0, "action": "set_brake",   "value": 0.0}
+  ],
+  "stats": {
+    "output_csv": "scenario_abs_split_mu.csv",
+    "sample_period_s": 0.02,
+    "fields": [
+      "sim_time_s", "speed_mps", "pos_x", "pos_y", "yaw_rate", "yaw_deg",
+      "applied_front_brake", "applied_rear_brake",
+      "wheel_omega_fl", "wheel_omega_fr", "wheel_omega_rl", "wheel_omega_rr",
+      "slip_ratio_fl", "slip_ratio_fr", "slip_ratio_rl", "slip_ratio_rr",
+      "abs_phase_fl", "abs_phase_fr", "emb_cmd_lr", "emb_cmd_rr",
+      "front_brake_pressure", "rear_brake_position"
+    ]
+  }
+}

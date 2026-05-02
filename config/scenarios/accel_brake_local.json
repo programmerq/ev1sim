@@ -1,0 +1,44 @@
+{
+  "//": "Local-driver accel/brake demo using the data-driven scenario harness.",
+  "//1": "Drop-in replacement for the legacy --scripted-accel-brake mode,",
+  "//2": "expressed as scheduled events with stats capture.  No PIM controller",
+  "//3": "required — runs from this repo alone:",
+  "//4": "    ./build/ev1sim --headless --max-time 25 \\",
+  "//5": "        --scenario config/scenarios/accel_brake_local.json",
+  "//6": "",
+  "//7": "Output: scenario_accel_brake_local.csv (in the launch directory).",
+
+  "name": "accel_brake_local",
+  "driver_mode": "local",
+  "max_time_s": 22.0,
+  "events": [
+    {"//": "Cycle K twice to drive RSA to RUN (OFF→ACC→RUN)."},
+    {"at_time_s": 0.50, "action": "key_on_cycle"},
+    {"at_time_s": 0.80, "action": "key_on_cycle"},
+
+    {"//": "Shift to D (P→R→N→D)."},
+    {"at_time_s": 1.00, "action": "prnd_up"},
+    {"at_time_s": 1.10, "action": "prnd_up"},
+    {"at_time_s": 1.20, "action": "prnd_up"},
+
+    {"//": "Hold throttle 0.7 until ~9 s, then coast."},
+    {"at_time_s": 1.50, "action": "set_throttle", "value": 0.7},
+    {"at_time_s": 9.00, "action": "set_throttle", "value": 0.0},
+
+    {"//": "Brake to a stop."},
+    {"at_time_s": 12.0, "action": "set_brake",    "value": 0.6},
+    {"at_time_s": 19.0, "action": "set_brake",    "value": 0.0}
+  ],
+  "stats": {
+    "output_csv": "scenario_accel_brake_local.csv",
+    "sample_period_s": 0.05,
+    "fields": [
+      "sim_time_s",
+      "speed_mps",
+      "applied_throttle",
+      "applied_front_brake",
+      "front_brake_pressure",
+      "rear_brake_position"
+    ]
+  }
+}

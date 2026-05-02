@@ -89,6 +89,32 @@ struct Config {
         double      reconnect_period_s = 1.0;
     } external_sim;
 
+    // Vehicle dynamics authority — selects whether Chrono's powertrain is
+    // driven from the local pedal (default; legacy behavior) or from the
+    // electronics-side commanded throttle on the chassis bus.
+    //
+    //   "local"        — direct keyboard / scripted-driver pedal input.
+    //   "electronics"  — subscribe to kSigChassisThrottleCmdQ8 (4073) from PIM
+    //                    and override the local pedal when the bus value is
+    //                    fresh (within throttle_freshness_window_ms).
+    //
+    // The freshness fallback is critical: when ev1sim runs in "electronics"
+    // mode but PIM is not running (e.g. no controller spawned, or it crashes
+    // mid-run), the local pedal still drives the car so the user can recover.
+    struct VehicleDynamics {
+        std::string driver = "local";
+        double      throttle_freshness_window_ms = 200.0;
+
+        // Standalone-test escape hatch: skip the RSA-broadcast propulsion
+        // gate and start with propulsion enabled.  When false (default),
+        // ev1sim waits for kSigRunModeBroadcast == RUN before unclamping
+        // brakes / allowing throttle — required when running paired with
+        // electricsim.  When true, the brakes/throttle clamp is lifted at
+        // startup so a scenario can drive the car without the controller
+        // suite running.  Recommended only with external_sim.enabled=false.
+        bool        start_propulsion_enabled = false;
+    } vehicle_dynamics;
+
     // Built-in accel-hold-brake scripted scenario.  Only active when
     // enabled == true (usually paired with --headless for CI use).
     struct Scripted {
@@ -97,6 +123,16 @@ struct Config {
         double hold_time_s        = 1.0;
         double stop_threshold_mps = 0.1;
     } scripted;
+
+    // Data-driven scenario harness — load timed events + stats capture
+    // from a JSON file.  When `path` is non-empty SimApp loads the file at
+    // construction, applies driver_mode + max_time_s overrides, and runs
+    // the scenario in place of (or alongside) the built-in scripted driver.
+    // Mutually exclusive with `scripted.enabled` — if both are set the
+    // scenario file wins and a warning is logged.
+    struct Scenario {
+        std::string path;
+    } scenario;
 
     bool start_paused = false;
 

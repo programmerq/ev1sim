@@ -1,0 +1,44 @@
+{
+  "//": "ABS validation: brake-and-steer (steerability under maximum brake).",
+  "//1": "Standard automotive validation test: drive straight, brake hard,",
+  "//2": "and demand a steering input simultaneously.  Without ABS the front",
+  "//3": "wheels lock; locked tires can't generate lateral force, so the car",
+  "//4": "plows straight regardless of steering input.  With ABS the fronts",
+  "//5": "modulate, retain enough lateral grip to follow the steering input,",
+  "//6": "and the car curves.  This is the scenario where ABS earns its keep",
+  "//7": "from a STEERING perspective rather than a stopping-distance one.",
+  "//8": "",
+  "//9": "Pair with config/abs_brake_and_steer.json (uniform asphalt μ=0.9).",
+  "//10": "Reads yaw_drift_deg and pos_y in the report to quantify how much",
+  "//11": "the car actually turned.",
+
+  "name": "abs_brake_and_steer",
+  "driver_mode": "local",
+  "max_time_s": 30.0,
+  "events": [
+    {"at_time_s":  0.30, "action": "key_on_cycle"},
+    {"at_time_s":  0.60, "action": "key_on_cycle"},
+    {"at_time_s":  0.90, "action": "prnd_up"},
+    {"at_time_s":  1.10, "action": "prnd_up"},
+    {"at_time_s":  1.30, "action": "prnd_up"},
+    {"at_time_s":  1.50, "action": "set_throttle",     "value": 1.0},
+    {"at_time_s":  5.00, "action": "wait_for_speed",   "value": 25.0},
+    {"at_time_s":  5.00, "action": "set_throttle",     "value": 0.0},
+    {"at_time_s":  6.00, "action": "set_brake",        "value": 1.0},
+    {"at_time_s":  6.30, "action": "set_steering",     "value": 0.4},
+    {"at_time_s": 25.00, "action": "set_brake",        "value": 0.0}
+  ],
+  "stats": {
+    "output_csv": "scenario_abs_brake_and_steer.csv",
+    "sample_period_s": 0.02,
+    "fields": [
+      "sim_time_s", "speed_mps", "pos_x", "pos_y", "yaw_rate", "yaw_deg",
+      "applied_throttle", "applied_front_brake", "applied_rear_brake",
+      "applied_steering",
+      "wheel_omega_fl", "wheel_omega_fr", "wheel_omega_rl", "wheel_omega_rr",
+      "slip_ratio_fl", "slip_ratio_fr", "slip_ratio_rl", "slip_ratio_rr",
+      "abs_phase_fl", "abs_phase_fr", "emb_cmd_lr", "emb_cmd_rr",
+      "front_brake_pressure", "rear_brake_position"
+    ]
+  }
+}

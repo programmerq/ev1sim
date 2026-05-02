@@ -142,12 +142,24 @@ Config Config::LoadFromFile(const std::string& path) {
         read_if(x, "reconnect_period_s", cfg.external_sim.reconnect_period_s);
     }
 
+    if (j.contains("vehicle_dynamics")) {
+        auto& v = j["vehicle_dynamics"];
+        read_if(v, "driver",                       cfg.vehicle_dynamics.driver);
+        read_if(v, "throttle_freshness_window_ms", cfg.vehicle_dynamics.throttle_freshness_window_ms);
+        read_if(v, "start_propulsion_enabled",     cfg.vehicle_dynamics.start_propulsion_enabled);
+    }
+
     if (j.contains("scripted")) {
         auto& sc = j["scripted"];
         read_if(sc, "enabled",            cfg.scripted.enabled);
         read_if(sc, "target_speed_kph",   cfg.scripted.target_speed_kph);
         read_if(sc, "hold_time_s",        cfg.scripted.hold_time_s);
         read_if(sc, "stop_threshold_mps", cfg.scripted.stop_threshold_mps);
+    }
+
+    if (j.contains("scenario")) {
+        auto& sc = j["scenario"];
+        read_if(sc, "path", cfg.scenario.path);
     }
 
     return cfg;
@@ -240,6 +252,20 @@ void Config::ApplyCliOverrides(int argc, char* argv[]) {
         } else if (arg == "--external-sim-bus") {
             auto v = next();
             if (!v.empty()) external_sim.bus_name = v;
+        } else if (arg == "--driver-mode") {
+            auto v = next();
+            if (v == "local" || v == "electronics") {
+                vehicle_dynamics.driver = v;
+            } else if (!v.empty()) {
+                std::cerr << "[Config] Unknown --driver-mode: " << v
+                          << " (expected: local | electronics)\n";
+            }
+        } else if (arg == "--scenario") {
+            auto v = next();
+            if (!v.empty()) scenario.path = v;
+        } else if (arg == "--start-propulsion-enabled") {
+            // No value — presence of the flag turns it on.
+            vehicle_dynamics.start_propulsion_enabled = true;
         } else if (arg == "--lights-demo") {
             auto v = next();
             if (v == "true" || v == "1" || v == "on")      lights.demo_mode = "blink";

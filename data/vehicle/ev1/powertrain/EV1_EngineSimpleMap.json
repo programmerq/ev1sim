@@ -3,6 +3,14 @@
   "Type": "Engine",
   "Template": "EngineSimpleMap",
 
+  "//": "Real EV1 has minimal coast torque without commanded regen —",
+  "//1": "bearing friction + windage only.  Map Zero Throttle values are",
+  "//2": "the residual drag scaled to motor RPM.  Coastdown calibration",
+  "//3": "(2026-04-30) showed engine coast contributes < 10 % of total drag",
+  "//4": "at typical speeds; the bulk lives in TMeasy slip dynamics.  See",
+  "//5": "docs/ev1_chrono_audit.md §11 for the calibration history and",
+  "//6": "scripts/fit_coastdown.py for the analysis tool.",
+
   "Maximal Engine Speed RPM": 13000,
   "Map Full Throttle": [
     [-100.0, 150.0],

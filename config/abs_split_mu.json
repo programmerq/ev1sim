@@ -1,0 +1,22 @@
+{
+  "//": "Config wrapper for the split-mu (asphalt one side, ice the other) ABS",
+  "//1": "test.  Uses level/flat_split_mu.json: vehicle straddles the seam, so",
+  "//2": "left wheels run on asphalt (friction 0.9) and right wheels on ice",
+  "//3": "(friction 0.08).",
+
+  "vehicle_model": "ev1",
+  "terrain": {
+    "type": "level",
+    "level_file": "level/flat_split_mu.json"
+  },
+  "simulation": {
+    "step_size_s": 0.002,
+    "render_fps": 60,
+    "realtime": true,
+    "headless": true
+  },
+  "telemetry": { "log_to_file": false, "show_hud": false },
+  "external_sim": { "enabled": true },
+  "vehicle_dynamics": { "start_propulsion_enabled": true },
+  "scenario": { "path": "config/scenarios/abs_split_mu.json" }
+}

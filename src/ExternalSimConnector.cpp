@@ -202,6 +202,22 @@ constexpr std::uint32_t kSigAmbientTempC       = 4090U;
 constexpr std::uint32_t kSigAmbientHumidityPct = 4091U;
 constexpr int           kNumAmbientSignals      = 2;
 
+// Brake master cylinder pressure (ev1sim → electricsim, chassis segment).
+//   4074  vehicle.brake.master_cylinder_pressure_kpa   float32 LE, kPa
+// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// kSigChassisBrakeMasterPressureKpa = 4074.  Computed by BrakePedal's
+// two-stage curve from normalized pedal travel each tick.
+constexpr std::uint32_t kSigBrakeMasterPressureKpa = 4074U;
+constexpr int           kNumBrakeSignals           = 1;
+
+// Throttle command (electricsim/PIM → ev1sim, chassis segment).
+//   4073  vehicle.dynamics.throttle_cmd_q8   uint8 q8: 0=zero, 255=full
+// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// kSigChassisThrottleCmdQ8 = 4073.  Subscribed when running in
+// "electronics" drive mode; ignored in "local" mode.
+constexpr std::uint32_t kSigThrottleCmdQ8     = 4073U;
+constexpr int           kNumThrottleCmdSignals = 1;
+
 // Wiper motor command (electricsim/RHJB → ev1sim, chassis segment).
 //   4080  vehicle.body.wiper_motor.command  uint8 enum: 0=OFF, 1=INT, 2=LOW, 3=HIGH
 //   4081  vehicle.body.washer_pump.command  uint8 bool: 0=idle, 1=pump active
@@ -255,6 +271,14 @@ constexpr std::uint32_t kSigSolFL_ISO = 5010U;
 constexpr std::uint32_t kSigSolFL_DMP = 5011U;
 constexpr std::uint32_t kSigSolFR_ISO = 5012U;
 constexpr std::uint32_t kSigSolFR_DMP = 5013U;
+
+// BTCM rear EMB motor commands — published by BTCM on the main harness segment.
+// Float in [-1, +1]: +1=apply, 0=hold/idle, -1=release.  ev1sim consumes
+// these to drive the BrakeDrum self-energizing model and apply per-wheel
+// rear brake torque to Chrono.  Not registered as a published endpoint.
+//   kSigRearMotorLR = 5014, kSigRearMotorRR = 5015
+constexpr std::uint32_t kSigRearMotorLR = 5014U;
+constexpr std::uint32_t kSigRearMotorRR = 5015U;
 
 // Mapping from signal slot (kBulbCmdBase + slot) to LightID.  Order must stay
 // locked to the electric sim's LightIdx enum for the first 17 entries.
@@ -370,7 +394,8 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // +kNumDoorLockPwSignals for door lock cmds (4084/4085) + power window motor cmds (4086/4087).
 constexpr int kNumEndpoints =
     NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumCombSw + 1 /*charge_coupler*/ +
-    kNumPrndSelector + kNumMotorSignals + kNumWiperSignals + kNumHvacSignals +
+    kNumPrndSelector + kNumMotorSignals + kNumThrottleCmdSignals +
+    kNumBrakeSignals + kNumWiperSignals + kNumHvacSignals +
     kNumAmbientSignals + kNumDoorLockPwSignals + kNumDynamics + kNumDriverInputs;
 
 std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
@@ -418,6 +443,13 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.environment.ambient_temp_c", "ambient_temp_c", false};
     out[i++] = {kSigAmbientHumidityPct,
                 "vehicle.environment.ambient_humidity_pct", "ambient_humidity_pct", false};
+    // Throttle command (PIM → ev1sim, chassis segment).
+    out[i++] = {kSigThrottleCmdQ8,
+                "vehicle.dynamics.throttle_cmd_q8", "throttle_cmd_q8", true};
+    // Brake master cylinder pressure (ev1sim → electricsim, chassis segment).
+    out[i++] = {kSigBrakeMasterPressureKpa,
+                "vehicle.brake.master_cylinder_pressure_kpa",
+                "brake_master_pressure_kpa", false};
     // Wiper motor command + washer pump command (RHJB → ev1sim, chassis segment).
     out[i++] = {kSigWiperMotorCommand,
                 "vehicle.body.wiper_motor.command", "wiper_motor_command", true};
@@ -687,6 +719,18 @@ struct ExternalSimConnector::State {
     float         ambient_temp_pub        = -9999.0f;   // sentinel: always publish first
     float         ambient_humidity_pub    = -9999.0f;
 
+    // Brake master cylinder pressure (ID 4074, chassis segment, kPa).
+    // Computed by BrakePedal from pedal travel.  Publish-on-change.
+    float         brake_master_pressure_kpa     = 0.0f;
+    float         brake_master_pressure_pub_kpa = -9999.0f;  // sentinel
+
+    // Throttle command (ID 4073, chassis segment) — received from PIM.
+    // 0xFF = never received; valid values 0..255 q8.  last_update_ns tracks
+    // freshness for the stale-fallback path in SimApp::ApplyElectronicsThrottle.
+    std::uint8_t  throttle_cmd_q8         = 0xFFu;
+    bool          has_throttle_cmd        = false;
+    std::uint64_t throttle_cmd_ns         = 0;
+
     // Wiper motor command (ID 4080, chassis segment) — received from RHJB.
     // 0xFF = never received; valid values 0=OFF, 1=INT, 2=LOW, 3=HIGH.
     std::uint8_t  wiper_motor_cmd         = 0xFFu;
@@ -731,6 +775,15 @@ struct ExternalSimConnector::State {
     std::uint64_t sol_fr_iso_ns          = 0;
     std::uint64_t sol_fr_dmp_ns          = 0;
 
+    // Rear EMB motor commands (IDs 5014-5015, main harness segment).
+    // Float in [-1, +1]: +1=apply, 0=idle, -1=release.  Freshness tracked
+    // via last-update timestamps so the consumer can fall back if BTCM is
+    // not connected (mirrors the front ABS pattern).
+    float         rear_motor_lr           = 0.0f;
+    float         rear_motor_rr           = 0.0f;
+    std::uint64_t rear_motor_lr_ns        = 0;
+    std::uint64_t rear_motor_rr_ns        = 0;
+
     // Charge coupler presence (ID 4060, chassis segment).
     // Stubbed false; future floating-UI panel or charge-door animation updates this.
     bool          charge_coupler_present     = false;
@@ -751,6 +804,14 @@ struct ExternalSimConnector::State {
     // Timers (sim_time_s based).
     double next_presence_time  = 0.0;
     double next_reconnect_time = 0.0;
+    // Heartbeat re-publish for brake-state signals.  ev1sim publishes
+    // these on change only — so a controller that connects to the bus
+    // *after* the brake-pedal edge (e.g. BTCM startup hits the chassis
+    // bus 100 ms after the driver presses the pedal) never sees the
+    // transition and runs as if the pedal stays at 0 forever.
+    // Re-emitting every 200 ms guarantees a late-joining consumer
+    // picks up the current state within one heartbeat interval.
+    double next_brake_heartbeat = 0.0;
 
 #if EV1SIM_HAVE_EXTERNAL_SIM
     std::unique_ptr<electricsim::io::SharedMemoryTransport> transport;
@@ -852,6 +913,24 @@ bool ExternalSimConnector::GetHornHighCmd() const { return m_state->horn_high; }
 
 bool ExternalSimConnector::HasReceivedBulbData() const {
     return m_state->received_any_bulb;
+}
+
+ExternalSimConnector::ThrottleCmd ExternalSimConnector::GetThrottleCmd(
+    std::chrono::milliseconds freshness_window) const {
+    ThrottleCmd r{};
+    r.q8            = m_state->throttle_cmd_q8;
+    r.ever_received = m_state->has_throttle_cmd;
+    if (!r.ever_received) {
+        r.fresh = false;
+        return r;
+    }
+    const auto now_ns = static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
+    const auto window_ns = static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(freshness_window).count());
+    r.fresh = (now_ns - m_state->throttle_cmd_ns) <= window_ns;
+    return r;
 }
 
 std::uint8_t ExternalSimConnector::GetWiperMotorCommand() const {
@@ -1089,6 +1168,10 @@ void ExternalSimConnector::SetAmbientHumidityPct(float humidity_pct) {
     m_state->ambient_humidity_pct = humidity_pct;
 }
 
+void ExternalSimConnector::SetBrakeMasterPressureKpa(float pressure_kpa) {
+    m_state->brake_master_pressure_kpa = pressure_kpa;
+}
+
 std::uint8_t ExternalSimConnector::GetRsaRunMode() const {
     return m_state->rsa_run_mode;
 }
@@ -1109,8 +1192,15 @@ ExternalSimConnector::AbsPhaseFront ExternalSimConnector::GetAbsPhaseFront(
     // guard) so freshness works correctly in both real and stub builds.
     const std::uint64_t now_ns = NowNs();
 
-    // A wheel's data is fresh when *both* iso and dump have been received
-    // recently.  If either timestamp is 0 (never received), fresh = false.
+    // A wheel's data is fresh when we know each pin's value (both
+    // timestamps non-zero) AND we've heard from at least one of them
+    // recently.  Solenoid signals publish on change only — during a long
+    // HOLD↔DUMP cycle the iso pin doesn't toggle (stays at 1), so its
+    // timestamp doesn't refresh.  Requiring *both* ages within the window
+    // would mark such cycles stale even though BTCM is actively
+    // modulating.  ORing the ages is correct: any recent activity proves
+    // the producer is alive, and the last-known value of each pin is
+    // still valid.
     auto is_fresh = [&](std::uint64_t ts_iso, std::uint64_t ts_dmp) -> bool {
         if (ts_iso == 0 || ts_dmp == 0) return false;
         if (now_ns < ts_iso || now_ns < ts_dmp) return false; // clock wrap guard
@@ -1119,7 +1209,7 @@ ExternalSimConnector::AbsPhaseFront ExternalSimConnector::GetAbsPhaseFront(
         // Strict-less-than so a zero-length window means "must be from the
         // past" — i.e. always stale.  Otherwise an inject + check that
         // happen within the same nanosecond would erroneously pass as fresh.
-        return age_iso < window_ns && age_dmp < window_ns;
+        return age_iso < window_ns || age_dmp < window_ns;
     };
 
     auto decode_phase = [](bool iso, bool dmp) -> AbsPhaseFront::Phase {
@@ -1141,6 +1231,27 @@ ExternalSimConnector::AbsPhaseFront ExternalSimConnector::GetAbsPhaseFront(
                     : AbsPhaseFront::Phase::APPLY;
 
     return result;
+}
+
+ExternalSimConnector::RearEmbCmd ExternalSimConnector::GetRearEmbCmd(
+    std::chrono::milliseconds freshness_window) const {
+    RearEmbCmd r{};
+    const auto& st = *m_state;
+    const std::uint64_t window_ns =
+        static_cast<std::uint64_t>(freshness_window.count()) * 1'000'000ULL;
+    const std::uint64_t now_ns = NowNs();
+
+    auto is_fresh_single = [&](std::uint64_t ts) -> bool {
+        if (ts == 0) return false;
+        if (now_ns < ts) return false;  // clock wrap guard
+        return (now_ns - ts) < window_ns;
+    };
+
+    r.lr        = st.rear_motor_lr;
+    r.rr        = st.rear_motor_rr;
+    r.lr_fresh  = is_fresh_single(st.rear_motor_lr_ns);
+    r.rr_fresh  = is_fresh_single(st.rear_motor_rr_ns);
+    return r;
 }
 
 // ---------------------------------------------------------------------------
@@ -1182,9 +1293,29 @@ void ExternalSimConnector::DebugInjectDelta(std::uint32_t signal_id, bool value)
     // Panel-sensor signals are outputs — ignore inbound.
 }
 
+void ExternalSimConnector::DebugInjectFloat(std::uint32_t signal_id, float value) {
+    const std::uint64_t now_ns = static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
+    if (signal_id == kSigRearMotorLR) {
+        m_state->rear_motor_lr    = value;
+        m_state->rear_motor_lr_ns = now_ns;
+    } else if (signal_id == kSigRearMotorRR) {
+        m_state->rear_motor_rr    = value;
+        m_state->rear_motor_rr_ns = now_ns;
+    }
+    // Other float signals are not currently subscribed as inputs.
+}
+
 void ExternalSimConnector::DebugInjectU8(std::uint32_t signal_id,
                                           std::uint8_t value) {
-    if (signal_id == kSigWiperMotorCommand) {
+    if (signal_id == kSigThrottleCmdQ8) {
+        m_state->throttle_cmd_q8 = value;
+        m_state->has_throttle_cmd = true;
+        m_state->throttle_cmd_ns = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count());
+    } else if (signal_id == kSigWiperMotorCommand) {
         m_state->wiper_motor_cmd     = value;
         m_state->has_wiper_motor_cmd = true;
     } else if (signal_id == kSigWasherPumpCommand) {
@@ -1289,6 +1420,20 @@ void ExternalSimConnector::Tick(double sim_time_s) {
     if (!m_opts.enabled) return;
     auto& st = *m_state;
 
+    // Brake-state heartbeat: every 200 ms, force a re-publish of the
+    // brake-pedal Q8 (main bus) and master-cylinder pressure (chassis
+    // bus) signals even if their values haven't changed.  ev1sim
+    // normally publishes both on-change-only — so a controller that
+    // connects to the bus *after* a brake transition fires never sees
+    // it, and behaves as if the pedal were still at zero.  Re-emitting
+    // periodically guarantees a late-joining consumer picks up the
+    // current state within one heartbeat interval.  Declared here at
+    // outer Tick scope so both publish paths (in two different inner
+    // scopes below) can consult the same flag and the timer advances
+    // exactly once per heartbeat.
+    constexpr double kBrakeHeartbeatPeriodS = 0.200;
+    const bool brake_heartbeat_due = sim_time_s >= st.next_brake_heartbeat;
+
     // 1. Open transport if we don't have one (reconnect logic).
     //    SharedMemoryTransport's ctor silently no-ops on failure, so we
     //    verify by round-tripping a heartbeat frame and fall back into
@@ -1347,8 +1492,10 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             const Endpoint* ep = FindEndpoint(d.signal_id);
             if (!ep || !ep->input_to_sim) continue;
             if (d.payload.empty()) continue;
-            // Uint8 enum signals — decode as raw byte.
-            if (d.signal_id == kSigWiperMotorCommand   ||
+            // uint8 chassis-bus signals — decode as raw byte.
+            if (d.signal_id == kSigThrottleCmdQ8 ||
+                d.signal_id == kSigWiperMotorCommand ||
+                d.signal_id == kSigWasherPumpCommand ||
                 d.signal_id == kSigDoorLockCmdDriver   ||
                 d.signal_id == kSigDoorLockCmdPassenger ||
                 d.signal_id == kSigPowerWindowMotorDriver ||
@@ -1548,12 +1695,36 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                     st.sol_fr_dmp_ns  = polled.frame.header.monotonic_time_ns
                                         ? polled.frame.header.monotonic_time_ns
                                         : NowNs();
+                } else if ((d.signal_id == kSigRearMotorLR ||
+                            d.signal_id == kSigRearMotorRR) &&
+                           d.payload.size() >= 4) {
+                    // Float32 LE in [-1, +1].
+                    std::uint32_t bits = 0;
+                    for (int b = 0; b < 4; ++b)
+                        bits |= static_cast<std::uint32_t>(d.payload[b]) << (b * 8);
+                    float v;
+                    std::memcpy(&v, &bits, 4);
+                    const std::uint64_t now_ns =
+                        polled.frame.header.monotonic_time_ns
+                            ? polled.frame.header.monotonic_time_ns
+                            : NowNs();
+                    if (d.signal_id == kSigRearMotorLR) {
+                        st.rear_motor_lr    = v;
+                        st.rear_motor_lr_ns = now_ns;
+                    } else {
+                        st.rear_motor_rr    = v;
+                        st.rear_motor_rr_ns = now_ns;
+                    }
                 }
             }
         }
 
         std::vector<DeltaRecord> drv;
-        if (st.driver_brake_q8    != st.driver_brake_pub ||
+        // Heartbeat-due flag: see Tick() outer-scope decl for rationale.
+        // When true, force-publish driver-input + chassis brake pressure
+        // even though the change-detection thresholds wouldn't fire.
+        if (brake_heartbeat_due ||
+            st.driver_brake_q8    != st.driver_brake_pub ||
             st.driver_steering_q8 != st.driver_steering_pub ||
             st.driver_gear        != st.driver_gear_pub ||
             st.driver_throttle_q8 != st.driver_throttle_pub) {
@@ -1766,6 +1937,47 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                 return;
             }
         }
+    }
+
+    // 5d. Publish brake master cylinder pressure (chassis segment).
+    // Same heartbeat rationale as kSigDriverBrakePedalQ8 — BTCM uses
+    // this signal as its primary brake-effort input.  Without periodic
+    // re-publish a late-joining consumer never learns the pedal is
+    // pressed.
+    {
+        constexpr float kPressureEps = 1.0f;  // 1 kPa quantum is plenty
+        if (brake_heartbeat_due ||
+            std::abs(st.brake_master_pressure_kpa -
+                     st.brake_master_pressure_pub_kpa) > kPressureEps) {
+            std::vector<DeltaRecord> bdyn;
+            bdyn.push_back(MakeFloatDelta(kSigBrakeMasterPressureKpa,
+                                          st.brake_master_pressure_kpa));
+            st.brake_master_pressure_pub_kpa = st.brake_master_pressure_kpa;
+
+            Frame bf{};
+            bf.header.type              = FrameType::DeltaBatch;
+            bf.header.stream_id         = kStreamEv1Sim;
+            bf.header.sequence          = st.sequence++;
+            bf.header.monotonic_time_ns = NowNs();
+            bf.deltas                   = std::move(bdyn);
+            if (!st.transport->publish_frame(bf)) {
+                std::cerr << "[ExternalSim] publish_frame (brake pressure) "
+                             "failed — reconnecting\n";
+                st.transport.reset();
+                st.status = Status::Connecting;
+                st.next_reconnect_time = sim_time_s + m_opts.reconnect_period_s;
+                return;
+            }
+        }
+    }
+
+    // Now that both brake-state heartbeat consumers have evaluated, roll
+    // the timer forward.  Doing this here (rather than inside either
+    // branch) guarantees both paths fire on the same tick when the
+    // heartbeat is due, instead of one consuming the slot and the other
+    // missing it.
+    if (brake_heartbeat_due) {
+        st.next_brake_heartbeat = sim_time_s + kBrakeHeartbeatPeriodS;
     }
 
     // 6. Announce our endpoints periodically so other bus peers can discover us.

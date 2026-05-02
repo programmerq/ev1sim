@@ -17,7 +17,9 @@
 
   "Gear Ratio":
   {
-    "Conical Gear":             0.1
+    "//":                       "Real EV1 single-speed reduction is 10.946:1 (output/input).",
+    "//1":                      "Conical Gear = 1 / 10.946 ≈ 0.09135.",
+    "Conical Gear":             0.09135
   },
 
   "Axle Differential Locking Limit":  100
