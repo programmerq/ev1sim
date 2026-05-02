@@ -110,6 +110,7 @@ add_executable(ev1sim
     src/VehiclePanels.cpp
     src/WiperRenderer.cpp
     src/PhysicalWorld.cpp
+    src/FloatingUiPanel.cpp
     src/ExternalSimConnector.cpp
     ${MACOS_PLATFORM_SRC}
 )
@@ -169,6 +170,7 @@ if(BUILD_TESTS)
         tests/test_vehicle_lights.cpp
         tests/test_physical_world.cpp
         tests/test_wiper_renderer.cpp
+        tests/test_floating_ui.cpp
         src/Config.cpp
         src/KeyboardInputController.cpp
         src/ExternalSimConnector.cpp
@@ -176,6 +178,7 @@ if(BUILD_TESTS)
         src/VehicleLights.cpp
         src/WiperRenderer.cpp
         src/PhysicalWorld.cpp
+        src/FloatingUiPanel.cpp
     )
 
     target_include_directories(ev1sim_tests PRIVATE src)
