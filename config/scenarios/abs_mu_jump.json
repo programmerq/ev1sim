@@ -22,7 +22,7 @@
     {"at_time_s": 1.10, "action": "prnd_up"},
     {"at_time_s": 1.30, "action": "prnd_up"},
     {"at_time_s": 1.50, "action": "set_throttle", "value": 1.0},
-    {"at_time_s": 5.00, "action": "wait_for_speed", "value": 20.0},
+    {"at_time_s": 5.00, "action": "wait_for_speed", "value": 15.0},
     {"at_time_s": 5.00, "action": "set_throttle", "value": 0.0},
     {"at_time_s": 6.00, "action": "set_brake",   "value": 1.0},
     {"at_time_s": 25.0, "action": "set_brake",   "value": 0.0}

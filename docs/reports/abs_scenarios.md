@@ -1,6 +1,6 @@
 # EV1 ABS validation — engineering report
 
-_Generated 2026-05-01 15:24 by `scripts/abs_report.py`._
+_Generated 2026-05-01 23:50 by `scripts/abs_report.py`._
 
 This report aggregates the four standard ABS validation
 scenarios.  Each scenario gets its own section with setup,
@@ -19,7 +19,7 @@ script.
 |---|---|---|---:|---:|---|
 | high_mu | 150.30 m / 9.98 s | 148.52 m / 9.47 s | +1.8 m | 69 / 70 | +0.01° / +0.07° |
 | low_mu | didn't stop, v\_f = 3.11 m/s | didn't stop, v\_f = 1.57 m/s | — | 142 / 130 | -0.53° / +3.54° |
-| mu_jump | didn't stop, v\_f = 18.61 m/s | didn't stop, v\_f = 18.60 m/s | — | 10 / 19 | +0.15° / +0.24° |
+| mu_jump | didn't stop, v\_f = 4.19 m/s | didn't stop, v\_f = 3.65 m/s | — | 239 / 266 | +1.24° / -1.00° |
 | split_mu | 74.20 m / 6.98 s | 72.49 m / 6.53 s | +1.7 m | 71 / 66 | +0.09° / +0.09° |
 
 Δ stop dist > 0 means BTCM-on took *longer* than BTCM-off.
@@ -286,27 +286,27 @@ would see if the firmware was rebuilt with the gate on.
 
 | Metric | BTCM-on | BTCM-off |
 |---|---|---|
-| Brake-on at | t = 19.95 s, v = 20.01 m/s | t = 19.95 s, v = 20.01 m/s |
-| Stop result | didn't stop, v\_f = 18.61 m/s | didn't stop, v\_f = 18.60 m/s |
-| FL events | 10 | 0 |
-| FR events | 19 | 0 |
-| Yaw drift over brake | +0.15° | +0.24° |
+| Brake-on at | t = 7.76 s, v = 15.01 m/s | t = 7.76 s, v = 15.01 m/s |
+| Stop result | didn't stop, v\_f = 4.19 m/s | didn't stop, v\_f = 3.65 m/s |
+| FL events | 239 | 0 |
+| FR events | 266 | 0 |
+| Yaw drift over brake | +1.24° | -1.00° |
 
 ### Per-wheel slip statistics (BTCM-on)
 
 | Wheel | peak | mean | time-locked |
 |---|---:|---:|---:|
-| FL | 1.000 | 0.355 | 21.0% |
-| FR | 1.000 | 0.427 | 23.2% |
-| RL | 0.174 | 0.013 | 0.0% |
-| RR | 0.161 | 0.013 | 0.0% |
+| FL | 1.000 | 0.520 | 10.1% |
+| FR | 1.000 | 0.344 | 3.3% |
+| RL | 0.562 | 0.015 | 0.0% |
+| RR | 0.559 | 0.014 | 0.0% |
 
 ### Front ABS phase distribution during brake event (BTCM-on)
 
 | Wheel | APPLY | HOLD | DUMP | stale | phase transitions |
 |---|---:|---:|---:|---:|---:|
-| FL | 45.3% | 1.3% | 5.7% | 47.8% | 10 |
-| FR | 44.7% | 6.9% | 3.1% | 45.3% | 19 |
+| FL | 6.1% | 23.5% | 60.2% | 10.2% | 239 |
+| FR | 5.2% | 28.0% | 60.2% | 6.7% | 266 |
 
 ### Charts
 
