@@ -605,3 +605,93 @@ TEST_CASE("FormatPedalPercentLabel: rounding — 0.474 rounds to 47, 0.475 round
     CHECK(FormatPedalPercentLabel("Throttle", 0.474) == L"Throttle: 47%");
     CHECK(FormatPedalPercentLabel("Throttle", 0.475) == L"Throttle: 48%");
 }
+
+// ---------------------------------------------------------------------------
+// Headlamp status label helper (FormatHeadlampStatusLabel)
+// Derived from bulb feed line cache: LLBH/RLBH = low beam, LHBH/RHBH = high beam.
+// Priority: HIGH > LOW > OFF.  ever_received=false shows "---".
+// ---------------------------------------------------------------------------
+
+TEST_CASE("FormatHeadlampStatusLabel: never-received shows placeholder",
+          "[FloatingUI][Headlamp]") {
+    // ever_received=false; low/high values are irrelevant.
+    CHECK(FormatHeadlampStatusLabel(false, false, /*ever_received=*/false)
+          == L"Headlamps: ---");
+    CHECK(FormatHeadlampStatusLabel(true,  false, /*ever_received=*/false)
+          == L"Headlamps: ---");
+    CHECK(FormatHeadlampStatusLabel(false, true,  /*ever_received=*/false)
+          == L"Headlamps: ---");
+    CHECK(FormatHeadlampStatusLabel(true,  true,  /*ever_received=*/false)
+          == L"Headlamps: ---");
+}
+
+TEST_CASE("FormatHeadlampStatusLabel: received and both off shows OFF",
+          "[FloatingUI][Headlamp]") {
+    CHECK(FormatHeadlampStatusLabel(false, false, /*ever_received=*/true)
+          == L"Headlamps: OFF");
+}
+
+TEST_CASE("FormatHeadlampStatusLabel: received and low only shows LOW",
+          "[FloatingUI][Headlamp]") {
+    CHECK(FormatHeadlampStatusLabel(true,  false, /*ever_received=*/true)
+          == L"Headlamps: LOW");
+}
+
+TEST_CASE("FormatHeadlampStatusLabel: received and high only shows HIGH",
+          "[FloatingUI][Headlamp]") {
+    CHECK(FormatHeadlampStatusLabel(false, true,  /*ever_received=*/true)
+          == L"Headlamps: HIGH");
+}
+
+TEST_CASE("FormatHeadlampStatusLabel: received and both on shows HIGH (priority)",
+          "[FloatingUI][Headlamp]") {
+    // High beam takes priority over low when both report on.
+    CHECK(FormatHeadlampStatusLabel(true,  true,  /*ever_received=*/true)
+          == L"Headlamps: HIGH");
+}
+
+// ---------------------------------------------------------------------------
+// Turn-signal status label helper (FormatTurnSignalStatusLabel)
+// Derived from bulb feed line cache: LFTS|LRTS = left, RFTS|RRTS = right.
+// ever_received=false shows "---".  Flashes ON/OFF each half-cycle (expected).
+// ---------------------------------------------------------------------------
+
+TEST_CASE("FormatTurnSignalStatusLabel: left never-received shows placeholder",
+          "[FloatingUI][TurnSignal]") {
+    CHECK(FormatTurnSignalStatusLabel(L"L", false, /*ever_received=*/false)
+          == L"L Turn: ---");
+    CHECK(FormatTurnSignalStatusLabel(L"L", true,  /*ever_received=*/false)
+          == L"L Turn: ---");
+}
+
+TEST_CASE("FormatTurnSignalStatusLabel: right never-received shows placeholder",
+          "[FloatingUI][TurnSignal]") {
+    CHECK(FormatTurnSignalStatusLabel(L"R", false, /*ever_received=*/false)
+          == L"R Turn: ---");
+    CHECK(FormatTurnSignalStatusLabel(L"R", true,  /*ever_received=*/false)
+          == L"R Turn: ---");
+}
+
+TEST_CASE("FormatTurnSignalStatusLabel: left received and inactive shows OFF",
+          "[FloatingUI][TurnSignal]") {
+    CHECK(FormatTurnSignalStatusLabel(L"L", false, /*ever_received=*/true)
+          == L"L Turn: OFF");
+}
+
+TEST_CASE("FormatTurnSignalStatusLabel: left received and active shows ON",
+          "[FloatingUI][TurnSignal]") {
+    CHECK(FormatTurnSignalStatusLabel(L"L", true, /*ever_received=*/true)
+          == L"L Turn: ON");
+}
+
+TEST_CASE("FormatTurnSignalStatusLabel: right received and inactive shows OFF",
+          "[FloatingUI][TurnSignal]") {
+    CHECK(FormatTurnSignalStatusLabel(L"R", false, /*ever_received=*/true)
+          == L"R Turn: OFF");
+}
+
+TEST_CASE("FormatTurnSignalStatusLabel: right received and active shows ON",
+          "[FloatingUI][TurnSignal]") {
+    CHECK(FormatTurnSignalStatusLabel(L"R", true, /*ever_received=*/true)
+          == L"R Turn: ON");
+}

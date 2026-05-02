@@ -176,6 +176,25 @@ std::wstring FormatIpcTelltaleLampLabel(const wchar_t* name,
     return label;
 }
 
+std::wstring FormatHeadlampStatusLabel(bool low, bool high, bool ever_received) {
+    if (!ever_received) return L"Headlamps: ---";
+    if (high)          return L"Headlamps: HIGH";
+    if (low)           return L"Headlamps: LOW";
+    return L"Headlamps: OFF";
+}
+
+std::wstring FormatTurnSignalStatusLabel(const wchar_t* side, bool active,
+                                         bool ever_received) {
+    std::wstring label = side;
+    label += L" Turn: ";
+    if (!ever_received) {
+        label += L"---";
+    } else {
+        label += active ? L"ON" : L"OFF";
+    }
+    return label;
+}
+
 std::wstring FormatPedalPercentLabel(const char* name, double value_0_to_1) {
     // Build a wide-character version of the name.
     wchar_t wname[64] = {};

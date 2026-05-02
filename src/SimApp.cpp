@@ -587,6 +587,52 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                     return FormatPedalPercentLabel("Brake", m_last_cmd.front_brake);
                 },
                 []() {});   // no-op: display-only row
+
+            // --- Headlamp status (display-only; bulb feed line cache) ---
+            // Reads GetBulbCmd for low-beam bulbs (LLBH, RLBH) and high-beam
+            // bulbs (LHBH, RHBH) from the electricsim bulb-feed-line cache.
+            // No new bus subscription — bulb states are already received as part
+            // of the 4000-block signals.  Priority: HIGH > LOW > OFF.
+            // Shows "Headlamps: OFF / LOW / HIGH / ---" (--- before first bulb frame).
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    const bool low  = m_external_sim->GetBulbCmd(LightID::LLBH)
+                                   || m_external_sim->GetBulbCmd(LightID::RLBH);
+                    const bool high = m_external_sim->GetBulbCmd(LightID::LHBH)
+                                   || m_external_sim->GetBulbCmd(LightID::RHBH);
+                    return FormatHeadlampStatusLabel(low, high,
+                        m_external_sim->HasReceivedBulbData());
+                },
+                []() {});   // no-op: display-only row
+
+            // --- Left turn-signal status (display-only; bulb feed line cache) ---
+            // Reads GetBulbCmd for LFTS (left front turn signal) and LRTS (left
+            // rear turn signal) from the electricsim bulb-feed-line cache.
+            // No new bus subscription.  Turn signal flashes ~1 Hz so the label
+            // alternates ON/OFF rapidly — the user can see the flash visually.
+            // Shows "L Turn: ON / OFF / ---" (--- before first bulb frame).
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    const bool active = m_external_sim->GetBulbCmd(LightID::LFTS)
+                                     || m_external_sim->GetBulbCmd(LightID::LRTS);
+                    return FormatTurnSignalStatusLabel(L"L", active,
+                        m_external_sim->HasReceivedBulbData());
+                },
+                []() {});   // no-op: display-only row
+
+            // --- Right turn-signal status (display-only; bulb feed line cache) ---
+            // Reads GetBulbCmd for RFTS (right front turn signal) and RRTS (right
+            // rear turn signal) from the electricsim bulb-feed-line cache.
+            // No new bus subscription.  Same flash-visible pattern as left.
+            // Shows "R Turn: ON / OFF / ---" (--- before first bulb frame).
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    const bool active = m_external_sim->GetBulbCmd(LightID::RFTS)
+                                     || m_external_sim->GetBulbCmd(LightID::RRTS);
+                    return FormatTurnSignalStatusLabel(L"R", active,
+                        m_external_sim->HasReceivedBulbData());
+                },
+                []() {});   // no-op: display-only row
         }
     }
 

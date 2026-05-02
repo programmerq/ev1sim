@@ -128,6 +128,23 @@ std::wstring FormatIpcTelltaleLampLabel(const wchar_t* name,
 /// Shows e.g. "Throttle: 47%" (no trailing decimal, locale-independent).
 std::wstring FormatPedalPercentLabel(const char* name, double value_0_to_1);
 
+// Headlamp status label helper (display-only, not a button).
+/// Format headlamp state label from low-beam and high-beam bulb states.
+/// low:  true if either LLBH or RLBH (low-beam bulbs) is on.
+/// high: true if either LHBH or RHBH (high-beam bulbs) is on.
+/// ever_received: false if no bulb data has arrived yet (shows "Headlamps: ---").
+/// Priority: HIGH > LOW > OFF.  Shows "Headlamps: OFF / LOW / HIGH".
+std::wstring FormatHeadlampStatusLabel(bool low, bool high, bool ever_received);
+
+// Turn-signal status label helper (display-only, not a button).
+/// Format turn-signal state label for one side.
+/// side: display prefix, e.g. L"L" (left) or L"R" (right).
+/// active: true if either the front or rear turn-signal bulb is on this tick.
+/// ever_received: false if no bulb data has arrived yet (shows e.g. "L Turn: ---").
+/// Shows "L Turn: ON" or "L Turn: OFF" once data is received.
+std::wstring FormatTurnSignalStatusLabel(const wchar_t* side, bool active,
+                                         bool ever_received);
+
 // ---------------------------------------------------------------------------
 class FloatingUiPanel : public irr::IEventReceiver {
 public:
