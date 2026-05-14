@@ -341,6 +341,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
             // 4083 (defrost grid).  Labels update each frame via UpdateLabels().
             m_floating_ui->AddButton(
                 [this]() -> std::wstring {
+                    if (!m_external_sim) return L"Blower: n/a";
                     return FormatHvacBlowerLabel(
                         m_external_sim->GetHvacBlowerLevel());
                 },
@@ -348,6 +349,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
 
             m_floating_ui->AddButton(
                 [this]() -> std::wstring {
+                    if (!m_external_sim) return L"Defrost: n/a";
                     return FormatDefrostGridLabel(
                         m_external_sim->GetDefrostGridActive());
                 },
@@ -360,6 +362,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
             // Labels update each frame via UpdateLabels().
             m_floating_ui->AddButton(
                 [this]() -> std::wstring {
+                    if (!m_external_sim) return L"Seatbelt (D): n/a";
                     return FormatIpcSeatbeltTelltaleLabel(
                         L"D",
                         m_external_sim->GetIpcSeatbeltTelltaleDriver(),
@@ -369,6 +372,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
 
             m_floating_ui->AddButton(
                 [this]() -> std::wstring {
+                    if (!m_external_sim) return L"Seatbelt (P): n/a";
                     return FormatIpcSeatbeltTelltaleLabel(
                         L"P",
                         m_external_sim->GetIpcSeatbeltTelltalePassenger(),
@@ -394,6 +398,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
             // first frame arrives.  Labels update each frame via UpdateLabels().
             m_floating_ui->AddButton(
                 [this]() -> std::wstring {
+                    if (!m_external_sim) return L"Cruise: n/a";
                     return FormatPimCruiseStatusLabel(
                         m_external_sim->HasReceivedPimCruiseActive(),
                         m_external_sim->GetPimCruiseActive(),
@@ -407,6 +412,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
             // Shows "Trip: 12.3 km" or "Trip: ---" before first frame arrives.
             m_floating_ui->AddButton(
                 [this]() -> std::wstring {
+                    if (!m_external_sim) return L"Trip: n/a";
                     return FormatIpcTripDistanceLabel(
                         m_external_sim->HasReceivedIpcTripDistance(),
                         m_external_sim->GetIpcTripDistanceM());
@@ -418,6 +424,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
             // Driven by BTCM brake_ind (DTC 42).  Shows "Brake: ON / OFF / ---".
             m_floating_ui->AddButton(
                 [this]() -> std::wstring {
+                    if (!m_external_sim) return L"Brake: n/a";
                     return FormatIpcTelltaleLampLabel(
                         L"Brake",
                         m_external_sim->GetIpcBrakeTelltale(),
@@ -429,6 +436,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
             // Driven by BTCM park_brake_ind (DTC 44).  Shows "ParkBrake: ON / OFF / ---".
             m_floating_ui->AddButton(
                 [this]() -> std::wstring {
+                    if (!m_external_sim) return L"ParkBrake: n/a";
                     return FormatIpcTelltaleLampLabel(
                         L"ParkBrake",
                         m_external_sim->GetIpcParkBrakeTelltale(),
@@ -440,6 +448,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
             // Driven by BTCM antilock_ind (DTC 41).  Shows "ABS: ON / OFF / ---".
             m_floating_ui->AddButton(
                 [this]() -> std::wstring {
+                    if (!m_external_sim) return L"ABS: n/a";
                     return FormatIpcTelltaleLampLabel(
                         L"ABS",
                         m_external_sim->GetIpcAntilockTelltale(),
@@ -451,6 +460,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
             // Driven by BTCM low_trac_ind (DTC 43).  Shows "LowTrac: ON / OFF / ---".
             m_floating_ui->AddButton(
                 [this]() -> std::wstring {
+                    if (!m_external_sim) return L"LowTrac: n/a";
                     return FormatIpcTelltaleLampLabel(
                         L"LowTrac",
                         m_external_sim->GetIpcLowTracTelltale(),
@@ -463,6 +473,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
             // Shows "AirBag: ON / OFF / ---".
             m_floating_ui->AddButton(
                 [this]() -> std::wstring {
+                    if (!m_external_sim) return L"AirBag: n/a";
                     return FormatIpcTelltaleLampLabel(
                         L"AirBag",
                         m_external_sim->GetIpcAirBagTelltale(),
@@ -476,6 +487,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
             // Shows "Service Now: ON / OFF / ---".
             m_floating_ui->AddButton(
                 [this]() -> std::wstring {
+                    if (!m_external_sim) return L"Service Now: n/a";
                     return FormatIpcTelltaleLampLabel(
                         L"Service Now",
                         m_external_sim->GetIpcServiceNowTelltale(),
@@ -488,6 +500,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
             // Shows "CheckMsg: ON / OFF / ---".
             m_floating_ui->AddButton(
                 [this]() -> std::wstring {
+                    if (!m_external_sim) return L"CheckMsg: n/a";
                     return FormatIpcTelltaleLampLabel(
                         L"CheckMsg",
                         m_external_sim->GetIpcCheckMessagesTelltale(),
@@ -500,6 +513,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
             // Shows "Temp: ON / OFF / ---".
             m_floating_ui->AddButton(
                 [this]() -> std::wstring {
+                    if (!m_external_sim) return L"Temp: n/a";
                     return FormatIpcTelltaleLampLabel(
                         L"Temp",
                         m_external_sim->GetIpcTempTelltale(),
@@ -512,6 +526,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
             // Shows "BattLife: ON / OFF / ---".
             m_floating_ui->AddButton(
                 [this]() -> std::wstring {
+                    if (!m_external_sim) return L"BattLife: n/a";
                     return FormatIpcTelltaleLampLabel(
                         L"BattLife",
                         m_external_sim->GetIpcBatteryLifeTelltale(),
@@ -524,6 +539,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
             // Shows "RedPerf: ON / OFF / ---".
             m_floating_ui->AddButton(
                 [this]() -> std::wstring {
+                    if (!m_external_sim) return L"RedPerf: n/a";
                     return FormatIpcTelltaleLampLabel(
                         L"RedPerf",
                         m_external_sim->GetIpcReducedPerfTelltale(),
@@ -536,6 +552,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
             // Shows "TirePress: ON / OFF / ---".
             m_floating_ui->AddButton(
                 [this]() -> std::wstring {
+                    if (!m_external_sim) return L"TirePress: n/a";
                     return FormatIpcTelltaleLampLabel(
                         L"TirePress",
                         m_external_sim->GetIpcCheckTirePressTelltale(),
@@ -549,6 +566,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
             // "Shift: OK" when no block is active, "Shift: ---" before first frame.
             m_floating_ui->AddButton(
                 [this]() -> std::wstring {
+                    if (!m_external_sim) return L"Shift: n/a";
                     return FormatRsaShiftBlockedLabel(
                         m_external_sim->GetRsaShiftBlocked(),
                         m_external_sim->HasReceivedRsaShiftBlocked());
@@ -562,6 +580,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
             // enum from the mode-button input (6971) never appears on the broadcast.
             m_floating_ui->AddButton(
                 [this]() -> std::wstring {
+                    if (!m_external_sim) return L"Mode: n/a";
                     return FormatRsaRunModeLabel(
                         m_external_sim->GetRsaRunMode(),
                         m_external_sim->HasReceivedRunMode());
@@ -596,6 +615,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
             // Shows "Headlamps: OFF / LOW / HIGH / ---" (--- before first bulb frame).
             m_floating_ui->AddButton(
                 [this]() -> std::wstring {
+                    if (!m_external_sim) return L"Headlamps: n/a";
                     const bool low  = m_external_sim->GetBulbCmd(LightID::LLBH)
                                    || m_external_sim->GetBulbCmd(LightID::RLBH);
                     const bool high = m_external_sim->GetBulbCmd(LightID::LHBH)
@@ -613,6 +633,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
             // Shows "L Turn: ON / OFF / ---" (--- before first bulb frame).
             m_floating_ui->AddButton(
                 [this]() -> std::wstring {
+                    if (!m_external_sim) return L"L Turn: n/a";
                     const bool active = m_external_sim->GetBulbCmd(LightID::LFTS)
                                      || m_external_sim->GetBulbCmd(LightID::LRTS);
                     return FormatTurnSignalStatusLabel(L"L", active,
@@ -627,6 +648,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
             // Shows "R Turn: ON / OFF / ---" (--- before first bulb frame).
             m_floating_ui->AddButton(
                 [this]() -> std::wstring {
+                    if (!m_external_sim) return L"R Turn: n/a";
                     const bool active = m_external_sim->GetBulbCmd(LightID::RFTS)
                                      || m_external_sim->GetBulbCmd(LightID::RRTS);
                     return FormatTurnSignalStatusLabel(L"R", active,
@@ -641,6 +663,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
             // Shows "Speed: 12.3 m/s (44 km/h)" or "Speed: ---" before first physics tick.
             m_floating_ui->AddButton(
                 [this]() -> std::wstring {
+                    if (!m_external_sim) return L"Speed: n/a";
                     return FormatVehicleSpeedLabel(
                         m_external_sim->HasVehicleSpeed(),
                         m_external_sim->GetVehicleSpeedMps());
@@ -653,6 +676,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
             // Shows "PackVolt: 312.0 V" or "PackVolt: ---" before first BPM frame arrives.
             m_floating_ui->AddButton(
                 [this]() -> std::wstring {
+                    if (!m_external_sim) return L"PackVolt: n/a";
                     return FormatBpmPackVoltageLabel(
                         m_external_sim->HasReceivedBpmPackVoltage(),
                         m_external_sim->GetBpmPackVoltageMv());
