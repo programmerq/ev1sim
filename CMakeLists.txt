@@ -53,6 +53,45 @@ FetchContent_MakeAvailable(json)
 # -DELECTRICSIM_DIR=<path>), we build a small static library from its I/O
 # sources (no simavr / libelf / firmware needed) and link the main executable
 # against it.  Otherwise we fall back to a stub so --external-sim is a no-op.
+
+# Source files we need from the electricsim tree.  Used both as a stale-path
+# probe and as the actual library inputs below — keep these two lists in sync.
+set(_electricsim_sources
+    "src/io/signal_catalog.cpp"
+    "src/io/protocol.cpp"
+    "src/io/shm_transport.cpp"
+    "src/io/bridge_adapter.cpp")
+
+# Helper: returns TRUE in ${_out_var} if every required source exists under
+# ${_root}.  Probing every source (not just the header) catches partially-
+# deleted trees — e.g. a git worktree that was removed while CMake's cache
+# still pointed at it — that would otherwise pass a single-file check at
+# configure time only to fail later at compile time.
+function(_ev1sim_check_electricsim_tree _root _out_var)
+    foreach(_src IN LISTS _electricsim_sources)
+        if(NOT EXISTS "${_root}/${_src}")
+            set(${_out_var} FALSE PARENT_SCOPE)
+            return()
+        endif()
+    endforeach()
+    set(${_out_var} TRUE PARENT_SCOPE)
+endfunction()
+
+# Stale-cache guard: if ELECTRICSIM_DIR is set (typically from a prior
+# -D… persisted in CMakeCache.txt) but no longer points at a usable tree,
+# warn loudly and clear it so the search below can pick a valid candidate.
+if(ELECTRICSIM_DIR)
+    _ev1sim_check_electricsim_tree("${ELECTRICSIM_DIR}" _ev1sim_dir_ok)
+    if(NOT _ev1sim_dir_ok)
+        message(WARNING
+            "ELECTRICSIM_DIR='${ELECTRICSIM_DIR}' is stale "
+            "(required sources missing) — clearing and re-searching. "
+            "Pass -DELECTRICSIM_DIR=<path> to pin a specific tree.")
+        unset(ELECTRICSIM_DIR CACHE)
+        unset(ELECTRICSIM_DIR)
+    endif()
+endif()
+
 if(NOT ELECTRICSIM_DIR)
     # Walk up a few levels — handles both the main checkout and the
     # .claude/worktrees/<name> case where the worktree lives several
@@ -63,7 +102,8 @@ if(NOT ELECTRICSIM_DIR)
             "${CMAKE_SOURCE_DIR}/../../../electricsim"
             "${CMAKE_SOURCE_DIR}/../../../../electricsim"
             "${CMAKE_SOURCE_DIR}/../../../../../electricsim")
-        if(EXISTS "${_cand}/src/io/shm_transport.hpp")
+        _ev1sim_check_electricsim_tree("${_cand}" _ev1sim_cand_ok)
+        if(_ev1sim_cand_ok)
             get_filename_component(ELECTRICSIM_DIR "${_cand}" ABSOLUTE)
             break()
         endif()
@@ -73,11 +113,11 @@ endif()
 set(EV1SIM_HAVE_EXTERNAL_SIM FALSE)
 if(ELECTRICSIM_DIR AND EXISTS "${ELECTRICSIM_DIR}/src/io/shm_transport.hpp")
     message(STATUS "electricsim connector: ${ELECTRICSIM_DIR}")
-    add_library(electricsim_connector STATIC
-        "${ELECTRICSIM_DIR}/src/io/signal_catalog.cpp"
-        "${ELECTRICSIM_DIR}/src/io/protocol.cpp"
-        "${ELECTRICSIM_DIR}/src/io/shm_transport.cpp"
-        "${ELECTRICSIM_DIR}/src/io/bridge_adapter.cpp")
+    set(_electricsim_sources_abs "")
+    foreach(_src IN LISTS _electricsim_sources)
+        list(APPEND _electricsim_sources_abs "${ELECTRICSIM_DIR}/${_src}")
+    endforeach()
+    add_library(electricsim_connector STATIC ${_electricsim_sources_abs})
     target_include_directories(electricsim_connector PUBLIC
         "${ELECTRICSIM_DIR}/src/io")
     set(EV1SIM_HAVE_EXTERNAL_SIM TRUE)

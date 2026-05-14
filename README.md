@@ -41,21 +41,86 @@ The install directory (`$HOME/chrono-install`) will contain a `lib/cmake/Chrono/
 
 ## Building ev1sim
 
+The recommended path is via [CMake presets](CMakePresets.json) (requires CMake 3.21+):
+
 ```bash
 cd /path/to/ev1sim
-mkdir build && cd build
+cmake --preset default                         # configure into build/
+cmake --build --preset default -j$(sysctl -n hw.ncpu)
+```
 
+Available configure presets: `default` (Release → `build/`), `debug` (Debug → `build-debug/`), `relwithdebinfo` (RelWithDebInfo → `build-relwithdebinfo/`).  Each one lives in its own binary dir, so they don't fight over a shared cache.
+
+If you need to pin a different electricsim tree or Chrono install, drop a **`CMakeUserPresets.json`** next to `CMakePresets.json` (gitignored — local-only) and inherit from `default`.  See [Sibling-repo worktrees](#sibling-repo-worktrees) below for the common case.
+
+On first configure, CMake fetches **nlohmann/json** and **Catch2** (for tests) automatically via FetchContent.
+
+### Bare-cmake invocation (no presets)
+
+```bash
+mkdir build && cd build
 cmake .. -DChrono_DIR=$HOME/chrono-install/lib/cmake/Chrono
 cmake --build . -j$(sysctl -n hw.ncpu)
 ```
 
-On first configure, CMake will also fetch **nlohmann/json** and **Catch2** (for tests) automatically via FetchContent.
-
 ### Disable tests (faster build)
 
 ```bash
+cmake --preset default -DBUILD_TESTS=OFF
+# or bare:
 cmake .. -DChrono_DIR=... -DBUILD_TESTS=OFF
 ```
+
+### Sibling-repo worktrees
+
+ev1sim's external-sim connector links against sources from the [electricsim](https://github.com/…/electricsim) repo.  CMake searches for it relative to `${CMAKE_SOURCE_DIR}` (`../electricsim`, `../../electricsim`, etc.) and picks the first tree that contains the required `src/io/*.cpp` files.  The default preset pins this to `${sourceDir}/../electricsim`.
+
+If you keep multiple electricsim git worktrees side-by-side (the typical pattern when running parallel Claude Code agents under `.claude/worktrees/<name>/`), use `CMakeUserPresets.json` to pin a build of ev1sim against a specific worktree.
+
+#### Setup: new worktree
+
+When you spin up a fresh electricsim worktree and want an ev1sim build pinned to it:
+
+1. Create or extend `CMakeUserPresets.json` in the ev1sim repo root (gitignored):
+   ```json
+   {
+     "version": 3,
+     "configurePresets": [
+       {
+         "name": "wt-feature-foo",
+         "inherits": "default",
+         "binaryDir": "${sourceDir}/build-wt-feature-foo",
+         "cacheVariables": {
+           "ELECTRICSIM_DIR": "/abs/path/to/electricsim/.claude/worktrees/feature-foo"
+         }
+       }
+     ],
+     "buildPresets": [
+       { "name": "wt-feature-foo", "configurePreset": "wt-feature-foo" }
+     ]
+   }
+   ```
+2. Configure and build:
+   ```bash
+   cmake --preset wt-feature-foo
+   cmake --build --preset wt-feature-foo -j$(sysctl -n hw.ncpu)
+   ```
+
+The isolated `binaryDir` keeps this build from clobbering `build/`, so you can switch between worktrees without reconfiguring.
+
+#### Teardown: removed worktree
+
+When you delete an electricsim worktree, any ev1sim build that still points at it has a stale `ELECTRICSIM_DIR` in its CMake cache.  Two cleanup paths:
+
+- **If you want to discard that build entirely:**  `rm -rf build-wt-feature-foo` and delete the matching block from `CMakeUserPresets.json`.
+- **If you want to keep the build dir but re-target another tree:**  edit the `ELECTRICSIM_DIR` value in `CMakeUserPresets.json` and rerun `cmake --preset wt-feature-foo`.  No need to nuke the cache — `CMakeLists.txt` detects the stale path, emits a `CMake Warning`, and falls back to the relative-path search list automatically.  You'll see:
+  ```
+  CMake Warning: ELECTRICSIM_DIR='…' is stale (required sources missing) —
+                 clearing and re-searching.
+  -- electricsim connector: /abs/path/to/another/electricsim
+  ```
+
+The stale-cache self-heal is the safety net — but for repeatable builds, prefer keeping `CMakeUserPresets.json` in sync with which worktrees actually exist.
 
 ## Running
 
