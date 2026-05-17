@@ -352,6 +352,14 @@ constexpr std::uint32_t kSigSolFL_DMP = 5011U;
 constexpr std::uint32_t kSigSolFR_ISO = 5012U;
 constexpr std::uint32_t kSigSolFR_DMP = 5013U;
 
+// BTCM canonical-frame heartbeat — supervisor broadcasts a 16-byte
+// status frame at 5 Hz regardless of ABS modulation state.  Used
+// as the "BTCM alive" liveness signal, separate from the iso/dump-pin
+// state (which encodes commanded valve position, not liveness).
+// Locked in lockstep with electricsim/ev1/btcm/btcm_signals.hpp:
+//   kSigBtcmUartFrame = 5050
+constexpr std::uint32_t kSigBtcmUartFrame = 5050U;
+
 // BTCM rear EMB motor commands — published by BTCM on the main harness segment.
 // Float in [-1, +1]: +1=apply, 0=hold/idle, -1=release.  ev1sim consumes
 // these to drive the BrakeDrum self-energizing model and apply per-wheel
@@ -975,7 +983,13 @@ struct ExternalSimConnector::State {
     bool          has_pim_cruise_setpoint_mps  = false;
 
     // BTCM front ABS solenoid states (IDs 5010-5013, main harness segment).
-    // Subscribed from BTCM.  last_update_ns tracks freshness; 0 = never received.
+    // Subscribed from BTCM.  Cached as persistent commanded-state — the
+    // BTCM publishes on-change only, so a sustained HOLD or DUMP phase
+    // keeps the last-known iso/dump values authoritative even when no
+    // new delta has arrived in a while.  Liveness is tracked separately
+    // via btcm_uart_frame_ns (the 5 Hz canonical-frame heartbeat).  See
+    // electricsim docs/btcm_deferred_todos.md §8 for the mu_jump
+    // regression that motivated this split.
     bool          sol_fl_iso              = false;
     bool          sol_fl_dmp             = false;
     bool          sol_fr_iso              = false;
@@ -984,6 +998,15 @@ struct ExternalSimConnector::State {
     std::uint64_t sol_fl_dmp_ns          = 0;
     std::uint64_t sol_fr_iso_ns          = 0;
     std::uint64_t sol_fr_dmp_ns          = 0;
+
+    // BTCM canonical-frame heartbeat (kSigBtcmUartFrame = 5050).  The
+    // BTCM supervisor broadcasts this at 5 Hz (200 ms cadence per the
+    // BTCM_UART_FRAME_BROADCAST_PERIOD_MS contract) regardless of ABS
+    // modulation state.  Used as the "BTCM alive" check, separate
+    // from the iso/dump-pin state which encodes commanded valve
+    // position rather than liveness.  0 = never received (BTCM never
+    // came up).
+    std::uint64_t btcm_uart_frame_ns      = 0;
 
     // Rear EMB motor commands (IDs 5014-5015, main harness segment).
     // Float in [-1, +1]: +1=apply, 0=idle, -1=release.  Freshness tracked
@@ -1537,24 +1560,36 @@ ExternalSimConnector::AbsPhaseFront ExternalSimConnector::GetAbsPhaseFront(
     // guard) so freshness works correctly in both real and stub builds.
     const std::uint64_t now_ns = NowNs();
 
-    // A wheel's data is fresh when we know each pin's value (both
-    // timestamps non-zero) AND we've heard from at least one of them
-    // recently.  Solenoid signals publish on change only — during a long
-    // HOLD↔DUMP cycle the iso pin doesn't toggle (stays at 1), so its
-    // timestamp doesn't refresh.  Requiring *both* ages within the window
-    // would mark such cycles stale even though BTCM is actively
-    // modulating.  ORing the ages is correct: any recent activity proves
-    // the producer is alive, and the last-known value of each pin is
-    // still valid.
-    auto is_fresh = [&](std::uint64_t ts_iso, std::uint64_t ts_dmp) -> bool {
-        if (ts_iso == 0 || ts_dmp == 0) return false;
-        if (now_ns < ts_iso || now_ns < ts_dmp) return false; // clock wrap guard
-        const std::uint64_t age_iso = now_ns - ts_iso;
-        const std::uint64_t age_dmp = now_ns - ts_dmp;
-        // Strict-less-than so a zero-length window means "must be from the
-        // past" — i.e. always stale.  Otherwise an inject + check that
-        // happen within the same nanosecond would erroneously pass as fresh.
-        return age_iso < window_ns || age_dmp < window_ns;
+    // Freshness model — see electricsim docs/btcm_deferred_todos.md §8
+    // for the full investigation.
+    //
+    // Liveness comes from the BTCM's 5 Hz canonical-frame heartbeat
+    // (kSigBtcmUartFrame, signal 5050).  The BTCM supervisor
+    // broadcasts this frame every 200 ms regardless of ABS modulation
+    // state — see ev1/btcm/controller.cpp publish_supervisor_uart_frame.
+    // That makes it the authoritative "BTCM is alive" signal,
+    // independent of whether the algorithm has changed phase recently.
+    //
+    // Iso/dump pin states are *commanded state* (on-change publish),
+    // not edge events.  We cache the latest values indefinitely while
+    // the BTCM is alive and use them as the authoritative phase
+    // decode.  No per-pin freshness check — only the per-pin
+    // "have-ever-seen" gate (ts != 0) so the chassis doesn't trust
+    // phase data before any has arrived.
+    //
+    // The freshness_window parameter is the multi-second peer-side
+    // liveness tolerance (3 s per the EV1 electrical service manual
+    // IPC DTC 015, the tightest spec in the corpus).  After 3 s of
+    // no UART frame, the chassis declares BTCM dead and falls back
+    // to local hydraulic (the manual's hydraulic-backup behavior).
+    const bool btcm_alive = [&]() -> bool {
+        if (st.btcm_uart_frame_ns == 0) return false;
+        if (now_ns < st.btcm_uart_frame_ns) return false;  // clock-wrap guard
+        return (now_ns - st.btcm_uart_frame_ns) < window_ns;
+    }();
+
+    auto pin_ever_seen = [&](std::uint64_t ts_iso, std::uint64_t ts_dmp) -> bool {
+        return ts_iso != 0 && ts_dmp != 0;
     };
 
     auto decode_phase = [](bool iso, bool dmp) -> AbsPhaseFront::Phase {
@@ -1565,8 +1600,10 @@ ExternalSimConnector::AbsPhaseFront ExternalSimConnector::GetAbsPhaseFront(
         return AbsPhaseFront::Phase::APPLY;
     };
 
-    result.fl_fresh = is_fresh(st.sol_fl_iso_ns, st.sol_fl_dmp_ns);
-    result.fr_fresh = is_fresh(st.sol_fr_iso_ns, st.sol_fr_dmp_ns);
+    result.fl_fresh = btcm_alive &&
+                      pin_ever_seen(st.sol_fl_iso_ns, st.sol_fl_dmp_ns);
+    result.fr_fresh = btcm_alive &&
+                      pin_ever_seen(st.sol_fr_iso_ns, st.sol_fr_dmp_ns);
 
     result.fl = result.fl_fresh
                     ? decode_phase(st.sol_fl_iso, st.sol_fl_dmp)
@@ -1586,16 +1623,26 @@ ExternalSimConnector::RearEmbCmd ExternalSimConnector::GetRearEmbCmd(
         static_cast<std::uint64_t>(freshness_window.count()) * 1'000'000ULL;
     const std::uint64_t now_ns = NowNs();
 
-    auto is_fresh_single = [&](std::uint64_t ts) -> bool {
-        if (ts == 0) return false;
-        if (now_ns < ts) return false;  // clock wrap guard
-        return (now_ns - ts) < window_ns;
-    };
+    // Heartbeat-based liveness — same pattern as GetAbsPhaseFront.
+    // kSigRearMotorLR/RR publish on-change only and a steady-state
+    // EMB command (sustained APPLY or RELEASE) holds the same float
+    // value for hundreds of ms, so the per-signal timestamp doesn't
+    // refresh.  The 5 Hz kSigBtcmUartFrame heartbeat is the
+    // authoritative "BTCM alive" signal; cached motor-cmd values
+    // stay valid as long as the producer is alive.  See
+    // electricsim docs/btcm_deferred_todos.md §8.
+    const bool btcm_alive = [&]() -> bool {
+        if (st.btcm_uart_frame_ns == 0) return false;
+        if (now_ns < st.btcm_uart_frame_ns) return false;  // clock-wrap guard
+        return (now_ns - st.btcm_uart_frame_ns) < window_ns;
+    }();
+
+    auto ever_seen = [&](std::uint64_t ts) -> bool { return ts != 0; };
 
     r.lr        = st.rear_motor_lr;
     r.rr        = st.rear_motor_rr;
-    r.lr_fresh  = is_fresh_single(st.rear_motor_lr_ns);
-    r.rr_fresh  = is_fresh_single(st.rear_motor_rr_ns);
+    r.lr_fresh  = btcm_alive && ever_seen(st.rear_motor_lr_ns);
+    r.rr_fresh  = btcm_alive && ever_seen(st.rear_motor_rr_ns);
     return r;
 }
 
@@ -2125,6 +2172,15 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                         bits |= static_cast<std::uint32_t>(d.payload[b]) << (b * 8);
                     std::memcpy(&st.pim_cruise_setpoint_mps, &bits, 4);
                     st.has_pim_cruise_setpoint_mps = true;
+                } else if (d.signal_id == kSigBtcmUartFrame && !d.payload.empty()) {
+                    // BTCM 5 Hz canonical-frame heartbeat.  Record the
+                    // arrival timestamp; payload itself (the 16-byte
+                    // status frame) is consumed elsewhere (e.g. IPC
+                    // frame decoder).  See SimApp.h::kAbsFreshnessWindow
+                    // for the consumer-side liveness check.
+                    st.btcm_uart_frame_ns = polled.frame.header.monotonic_time_ns
+                                            ? polled.frame.header.monotonic_time_ns
+                                            : NowNs();
                 } else if (d.signal_id == kSigSolFL_ISO && !d.payload.empty()) {
                     st.sol_fl_iso     = (d.payload[0] & 1u) != 0;
                     st.sol_fl_iso_ns  = polled.frame.header.monotonic_time_ns
