@@ -109,6 +109,17 @@ not, it falls back to a stub that reports `Status::Unavailable` and
 silently drops frames — every caller site in the codebase already
 handles this, so `--external-sim on` without electricsim is harmless.
 
+**Protocol-level boundary.**  The connector trades exclusively in
+`(signal_id, value)` deltas over the shared-memory bus.  Anything
+below that — wire framing, CRC, register maps, the bit-level layout
+of any serial bus the external simulator uses internally to drive
+its own ECUs — lives entirely inside the external simulator and is
+**not** mirrored here.  This file and the source tree refer to
+signals only by numeric ID and high-level semantics (speed, voltage,
+telltale active/inactive, per-corner solenoid open/closed); the
+transport is deliberately opaque to anything more specific.  Keep it
+that way when adding endpoints.
+
 ## Run modes
 
 `SimApp::Run()` dispatches on `Config::simulation.headless`:
