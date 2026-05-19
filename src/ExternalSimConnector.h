@@ -296,11 +296,20 @@ public:
     /// Returns true if we have received at least one RSA run-mode broadcast.
     bool HasReceivedRunMode() const;
 
-    /// ABS phase decoded from BTCM front solenoid (iso, dump) tuples.
-    /// BTCM publishes kSigSolFL_ISO (5010), kSigSolFL_DMP (5011),
-    /// kSigSolFR_ISO (5012), kSigSolFR_DMP (5013) on the main harness segment.
+    /// ABS phase decoded from BTCM front solenoid (iso_close, dump_open) tuples.
     ///
-    /// Decoding table:
+    /// The connector subscribes to two parallel publications of the same
+    /// actuator state:
+    ///   * Chassis-bus segment (preferred): IDs 4147-4150
+    ///       4147 iso_close FL, 4148 iso_close FR, 4149 dump_open FL,
+    ///       4150 dump_open FR (all uint8 bool, "1" = closed/open).
+    ///   * Main-harness segment (legacy fallback): IDs 5010-5013
+    ///       kSigSolFL_ISO/DMP and kSigSolFR_ISO/DMP.
+    /// Whichever source first delivers data for a given wheel becomes
+    /// authoritative for that wheel; if a chassis-bus update has ever
+    /// arrived for a wheel it is preferred over the main-harness value.
+    ///
+    /// Decoding table (iso=iso_close, dump=dump_open):
     ///   iso=0, dump=0 → APPLY  (full local brake)
     ///   iso=1, dump=0 → HOLD   (freeze previous brake torque)
     ///   iso=1, dump=1 → DUMP   (release toward zero — 0.2× local brake)
@@ -319,10 +328,14 @@ public:
     AbsPhaseFront GetAbsPhaseFront(
         std::chrono::milliseconds freshness_window) const;
 
-    /// Rear EMB motor commands from BTCM (kSigRearMotorLR/RR = 5014/5015,
-    /// main harness segment).  Float in [-1, +1]: +1=apply, 0=idle, -1=release.
-    /// fresh = true when the last update arrived within freshness_window.
-    /// Stale-fallback in SimApp::ApplyRearEmbBrake when BTCM is not connected.
+    /// Rear EMB motor commands from BTCM, subscribed in parallel on two segments:
+    ///   * Chassis-bus (preferred): IDs 4151 (LR) / 4152 (RR), float32 LE.
+    ///   * Main harness (legacy fallback): kSigRearMotorLR/RR = 5014/5015.
+    /// Float in [-1, +1]: +1=apply, 0=idle, -1=release.  Whichever source
+    /// has ever delivered a value for a given wheel becomes authoritative;
+    /// if a chassis-bus value has ever arrived it is preferred.
+    /// fresh = true when the producer is alive (per the BTCM canonical-frame
+    /// heartbeat freshness_window).
     struct RearEmbCmd {
         float lr        = 0.0f;
         float rr        = 0.0f;
@@ -330,6 +343,24 @@ public:
         bool  rr_fresh  = false;
     };
     RearEmbCmd GetRearEmbCmd(
+        std::chrono::milliseconds freshness_window) const;
+
+    /// Per-front-wheel cylinder pressure published by BTCM on the chassis
+    /// bus (IDs 4153 FL / 4154 FR, float32 LE, kPa).  This is the
+    /// post-modulator pressure measured downstream of the iso/dump
+    /// solenoid pair — distinct from the master-cylinder pressure
+    /// (kSigChassisBrakeMasterPressureKpa = 4074) that ev1sim itself
+    /// publishes upstream.  Use it for instrumentation/HUD or for a
+    /// future pressure-driven brake plant; the existing brake plant
+    /// gates torque on AbsPhaseFront and does not need this directly.
+    /// fresh = true when the BTCM is alive per the freshness_window.
+    struct FrontWheelCylinderPressures {
+        float fl_kpa  = 0.0f;
+        float fr_kpa  = 0.0f;
+        bool  fl_fresh = false;
+        bool  fr_fresh = false;
+    };
+    FrontWheelCylinderPressures GetFrontWheelCylinderPressuresKpa(
         std::chrono::milliseconds freshness_window) const;
 
     // ---------------------------------------------------------------------

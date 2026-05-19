@@ -368,6 +368,23 @@ constexpr std::uint32_t kSigBtcmUartFrame = 5050U;
 constexpr std::uint32_t kSigRearMotorLR = 5014U;
 constexpr std::uint32_t kSigRearMotorRR = 5015U;
 
+// BTCM per-wheel actuator state published on the chassis bus (IDs 4147-4154).
+// These mirror the legacy main-harness publications above but live on the
+// public chassis-bus segment that is ev1sim's primary input fabric.  Both
+// sources stream in parallel; the consumers in this file prefer chassis-bus
+// values whenever they have ever been observed for a given wheel, and fall
+// back to the main-harness equivalents otherwise.  Registered as input
+// endpoints so the standard chassis-bus drain picks them up via FindEndpoint.
+constexpr std::uint32_t kSigChassisBtcmIsoCloseFL        = 4147U;
+constexpr std::uint32_t kSigChassisBtcmIsoCloseFR        = 4148U;
+constexpr std::uint32_t kSigChassisBtcmDumpOpenFL        = 4149U;
+constexpr std::uint32_t kSigChassisBtcmDumpOpenFR        = 4150U;
+constexpr std::uint32_t kSigChassisBtcmEmbMotorCmdLR     = 4151U;
+constexpr std::uint32_t kSigChassisBtcmEmbMotorCmdRR     = 4152U;
+constexpr std::uint32_t kSigChassisBtcmCylPressureFL_kPa = 4153U;
+constexpr std::uint32_t kSigChassisBtcmCylPressureFR_kPa = 4154U;
+constexpr int kNumBtcmActuatorChassisSignals = 8;
+
 // Mapping from signal slot (kBulbCmdBase + slot) to LightID.  Order must stay
 // locked to the electric sim's LightIdx enum for the first 17 entries.
 constexpr LightID kBulbOrder[NUM_LIGHTS] = {
@@ -486,6 +503,9 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // +kNumIpcBtcmTelltaleSignals for IPC BTCM/airbag telltales (4134–4138) — IPC → ev1sim.
 // +kNumIpcExtraTelltaleSignals for IPC extra LCD telltales (4140–4145) — IPC → ev1sim.
 // +kNumBpmPackVoltageSignals for BPM pack voltage (4139) — BPM → ev1sim.
+// +kNumBtcmActuatorChassisSignals for the BTCM per-wheel actuator state
+//   on the chassis bus (4147-4154) — BTCM → ev1sim, parallel to the
+//   legacy main-harness 5010-5015 path.
 constexpr int kNumEndpoints =
     NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumCombSw + 1 /*charge_coupler*/ +
     kNumPrndSelector + kNumMotorSignals + kNumThrottleCmdSignals +
@@ -493,6 +513,7 @@ constexpr int kNumEndpoints =
     kNumAmbientSignals + kNumDoorLockPwSignals + kNumRsaShiftBlockedSignals +
     kNumIpcTelltaleSignals + kNumIpcTripDistSignals + kNumIpcBtcmTelltaleSignals +
     kNumIpcExtraTelltaleSignals + kNumBpmPackVoltageSignals +
+    kNumBtcmActuatorChassisSignals +
     kNumDynamics + kNumDriverInputs;
 
 std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
@@ -633,6 +654,34 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     out[i++] = {kSigRsaShiftBlocked,
                 "vehicle.body.rsa.shift_blocked",
                 "rsa_shift_blocked", true};
+    // BTCM per-wheel actuator state (BTCM → ev1sim, chassis segment, input_to_sim=true).
+    // Mirror of the legacy main-harness publications 5010-5015 plus two
+    // new per-wheel cylinder pressure measurements (4153/4154) with no
+    // main-harness equivalent.
+    out[i++] = {kSigChassisBtcmIsoCloseFL,
+                "vehicle.btcm.iso_close.fl",
+                "btcm_iso_close_fl", true};
+    out[i++] = {kSigChassisBtcmIsoCloseFR,
+                "vehicle.btcm.iso_close.fr",
+                "btcm_iso_close_fr", true};
+    out[i++] = {kSigChassisBtcmDumpOpenFL,
+                "vehicle.btcm.dump_open.fl",
+                "btcm_dump_open_fl", true};
+    out[i++] = {kSigChassisBtcmDumpOpenFR,
+                "vehicle.btcm.dump_open.fr",
+                "btcm_dump_open_fr", true};
+    out[i++] = {kSigChassisBtcmEmbMotorCmdLR,
+                "vehicle.btcm.emb_motor_cmd.lr",
+                "btcm_emb_motor_cmd_lr", true};
+    out[i++] = {kSigChassisBtcmEmbMotorCmdRR,
+                "vehicle.btcm.emb_motor_cmd.rr",
+                "btcm_emb_motor_cmd_rr", true};
+    out[i++] = {kSigChassisBtcmCylPressureFL_kPa,
+                "vehicle.btcm.cyl_pressure.fl_kpa",
+                "btcm_cyl_pressure_fl_kpa", true};
+    out[i++] = {kSigChassisBtcmCylPressureFR_kPa,
+                "vehicle.btcm.cyl_pressure.fr_kpa",
+                "btcm_cyl_pressure_fr_kpa", true};
     for (int d = 0; d < kNumDynamics; ++d, ++i) {
         out[i] = {kDynamicsBase + kDynamicsNames[d].offset,
                   kDynamicsNames[d].qualified, kDynamicsNames[d].shortname,
@@ -1016,6 +1065,33 @@ struct ExternalSimConnector::State {
     float         rear_motor_rr           = 0.0f;
     std::uint64_t rear_motor_lr_ns        = 0;
     std::uint64_t rear_motor_rr_ns        = 0;
+
+    // BTCM per-wheel actuator state on the chassis bus (IDs 4147-4154).
+    // Parallel to the main-harness 5010-5015 publications above.  When
+    // the chassis-bus value has ever been observed for a given wheel
+    // (chassis_*_ns != 0), the AbsPhaseFront / RearEmbCmd consumers
+    // prefer it over the main-harness equivalent.  Liveness is still
+    // gated by the BTCM canonical-frame heartbeat (5050) because the
+    // chassis-bus signals are also on-change publications.
+    //
+    // 4153/4154 (cylinder pressure FL/FR, kPa) have no main-harness
+    // equivalent; they are exposed via GetFrontWheelCylinderPressuresKpa.
+    bool          chassis_btcm_iso_close_fl    = false;
+    bool          chassis_btcm_iso_close_fr    = false;
+    bool          chassis_btcm_dump_open_fl    = false;
+    bool          chassis_btcm_dump_open_fr    = false;
+    float         chassis_btcm_emb_motor_lr    = 0.0f;
+    float         chassis_btcm_emb_motor_rr    = 0.0f;
+    float         chassis_btcm_cyl_press_fl_kpa = 0.0f;
+    float         chassis_btcm_cyl_press_fr_kpa = 0.0f;
+    std::uint64_t chassis_btcm_iso_close_fl_ns = 0;
+    std::uint64_t chassis_btcm_iso_close_fr_ns = 0;
+    std::uint64_t chassis_btcm_dump_open_fl_ns = 0;
+    std::uint64_t chassis_btcm_dump_open_fr_ns = 0;
+    std::uint64_t chassis_btcm_emb_motor_lr_ns = 0;
+    std::uint64_t chassis_btcm_emb_motor_rr_ns = 0;
+    std::uint64_t chassis_btcm_cyl_press_fl_ns = 0;
+    std::uint64_t chassis_btcm_cyl_press_fr_ns = 0;
 
     // Charge coupler presence (ID 4060, chassis segment).
     // Stubbed false; future floating-UI panel or charge-door animation updates this.
@@ -1577,6 +1653,15 @@ ExternalSimConnector::AbsPhaseFront ExternalSimConnector::GetAbsPhaseFront(
     // "have-ever-seen" gate (ts != 0) so the chassis doesn't trust
     // phase data before any has arrived.
     //
+    // Source preference: BTCM publishes the same actuator state on
+    // two segments — chassis bus (4147-4150) and main harness
+    // (5010-5013).  We prefer chassis-bus values per-wheel: if any
+    // chassis-bus update has arrived for that wheel (either iso or
+    // dump timestamp != 0), the chassis source is authoritative.
+    // Otherwise, fall back to the main-harness source.  This lets
+    // the public chassis-bus path become primary as the producer
+    // rolls out, without breaking deployments that haven't migrated.
+    //
     // The freshness_window parameter is the multi-second peer-side
     // liveness tolerance (3 s per the EV1 electrical service manual
     // IPC DTC 015, the tightest spec in the corpus).  After 3 s of
@@ -1600,17 +1685,46 @@ ExternalSimConnector::AbsPhaseFront ExternalSimConnector::GetAbsPhaseFront(
         return AbsPhaseFront::Phase::APPLY;
     };
 
-    result.fl_fresh = btcm_alive &&
-                      pin_ever_seen(st.sol_fl_iso_ns, st.sol_fl_dmp_ns);
-    result.fr_fresh = btcm_alive &&
-                      pin_ever_seen(st.sol_fr_iso_ns, st.sol_fr_dmp_ns);
+    // Per-wheel source selection.  "ever-seen on chassis" wins; otherwise
+    // try main-harness; otherwise stale-APPLY.
+    const bool fl_chassis_seen =
+        (st.chassis_btcm_iso_close_fl_ns != 0) ||
+        (st.chassis_btcm_dump_open_fl_ns != 0);
+    const bool fr_chassis_seen =
+        (st.chassis_btcm_iso_close_fr_ns != 0) ||
+        (st.chassis_btcm_dump_open_fr_ns != 0);
 
-    result.fl = result.fl_fresh
-                    ? decode_phase(st.sol_fl_iso, st.sol_fl_dmp)
-                    : AbsPhaseFront::Phase::APPLY;
-    result.fr = result.fr_fresh
-                    ? decode_phase(st.sol_fr_iso, st.sol_fr_dmp)
-                    : AbsPhaseFront::Phase::APPLY;
+    const bool fl_main_seen =
+        pin_ever_seen(st.sol_fl_iso_ns, st.sol_fl_dmp_ns);
+    const bool fr_main_seen =
+        pin_ever_seen(st.sol_fr_iso_ns, st.sol_fr_dmp_ns);
+
+    result.fl_fresh = btcm_alive && (fl_chassis_seen || fl_main_seen);
+    result.fr_fresh = btcm_alive && (fr_chassis_seen || fr_main_seen);
+
+    auto decode_fl = [&]() -> AbsPhaseFront::Phase {
+        if (fl_chassis_seen) {
+            return decode_phase(st.chassis_btcm_iso_close_fl,
+                                st.chassis_btcm_dump_open_fl);
+        }
+        if (fl_main_seen) {
+            return decode_phase(st.sol_fl_iso, st.sol_fl_dmp);
+        }
+        return AbsPhaseFront::Phase::APPLY;
+    };
+    auto decode_fr = [&]() -> AbsPhaseFront::Phase {
+        if (fr_chassis_seen) {
+            return decode_phase(st.chassis_btcm_iso_close_fr,
+                                st.chassis_btcm_dump_open_fr);
+        }
+        if (fr_main_seen) {
+            return decode_phase(st.sol_fr_iso, st.sol_fr_dmp);
+        }
+        return AbsPhaseFront::Phase::APPLY;
+    };
+
+    result.fl = result.fl_fresh ? decode_fl() : AbsPhaseFront::Phase::APPLY;
+    result.fr = result.fr_fresh ? decode_fr() : AbsPhaseFront::Phase::APPLY;
 
     return result;
 }
@@ -1631,6 +1745,12 @@ ExternalSimConnector::RearEmbCmd ExternalSimConnector::GetRearEmbCmd(
     // authoritative "BTCM alive" signal; cached motor-cmd values
     // stay valid as long as the producer is alive.  See
     // electricsim docs/btcm_deferred_todos.md §8.
+    //
+    // Source preference (per wheel): chassis-bus value (4151/4152) wins
+    // when ever-seen; otherwise main-harness value (5014/5015).  Same
+    // rationale as GetAbsPhaseFront — keep both paths live so the
+    // public chassis-bus subscription can become primary without
+    // breaking older producers.
     const bool btcm_alive = [&]() -> bool {
         if (st.btcm_uart_frame_ns == 0) return false;
         if (now_ns < st.btcm_uart_frame_ns) return false;  // clock-wrap guard
@@ -1639,11 +1759,42 @@ ExternalSimConnector::RearEmbCmd ExternalSimConnector::GetRearEmbCmd(
 
     auto ever_seen = [&](std::uint64_t ts) -> bool { return ts != 0; };
 
-    r.lr        = st.rear_motor_lr;
-    r.rr        = st.rear_motor_rr;
-    r.lr_fresh  = btcm_alive && ever_seen(st.rear_motor_lr_ns);
-    r.rr_fresh  = btcm_alive && ever_seen(st.rear_motor_rr_ns);
+    const bool lr_chassis_seen = ever_seen(st.chassis_btcm_emb_motor_lr_ns);
+    const bool rr_chassis_seen = ever_seen(st.chassis_btcm_emb_motor_rr_ns);
+    const bool lr_main_seen    = ever_seen(st.rear_motor_lr_ns);
+    const bool rr_main_seen    = ever_seen(st.rear_motor_rr_ns);
+
+    r.lr = lr_chassis_seen ? st.chassis_btcm_emb_motor_lr : st.rear_motor_lr;
+    r.rr = rr_chassis_seen ? st.chassis_btcm_emb_motor_rr : st.rear_motor_rr;
+    r.lr_fresh = btcm_alive && (lr_chassis_seen || lr_main_seen);
+    r.rr_fresh = btcm_alive && (rr_chassis_seen || rr_main_seen);
     return r;
+}
+
+ExternalSimConnector::FrontWheelCylinderPressures
+ExternalSimConnector::GetFrontWheelCylinderPressuresKpa(
+    std::chrono::milliseconds freshness_window) const {
+    FrontWheelCylinderPressures p{};
+    const auto& st = *m_state;
+    const std::uint64_t window_ns =
+        static_cast<std::uint64_t>(freshness_window.count()) * 1'000'000ULL;
+    const std::uint64_t now_ns = NowNs();
+
+    // Liveness via the BTCM heartbeat — cylinder pressure (4153/4154)
+    // is published on-change with an epsilon gate just like the
+    // iso/dump signals, so per-signal staleness is not meaningful for
+    // a sustained-pressure regime.
+    const bool btcm_alive = [&]() -> bool {
+        if (st.btcm_uart_frame_ns == 0) return false;
+        if (now_ns < st.btcm_uart_frame_ns) return false;  // clock-wrap guard
+        return (now_ns - st.btcm_uart_frame_ns) < window_ns;
+    }();
+
+    p.fl_kpa   = st.chassis_btcm_cyl_press_fl_kpa;
+    p.fr_kpa   = st.chassis_btcm_cyl_press_fr_kpa;
+    p.fl_fresh = btcm_alive && (st.chassis_btcm_cyl_press_fl_ns != 0);
+    p.fr_fresh = btcm_alive && (st.chassis_btcm_cyl_press_fr_ns != 0);
+    return p;
 }
 
 // ---------------------------------------------------------------------------
@@ -1681,6 +1832,45 @@ void ExternalSimConnector::DebugInjectDelta(std::uint32_t signal_id, bool value)
         m_state->sol_fr_dmp_ns = static_cast<std::uint64_t>(
             std::chrono::duration_cast<std::chrono::nanoseconds>(
                 std::chrono::steady_clock::now().time_since_epoch()).count());
+    } else if (signal_id == kSigBtcmUartFrame) {
+        // Test helper: simulate a BTCM canonical-frame heartbeat arrival.
+        // The bool argument is ignored — the heartbeat is purely a
+        // "timestamp received" event — but the dispatch convention is
+        // bool-per-signal so we accept it.  In production this is set
+        // in DrainInbound when the heartbeat frame arrives.
+        (void)value;
+        m_state->btcm_uart_frame_ns = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count());
+    } else if (signal_id == kSigChassisBtcmIsoCloseFL ||
+               signal_id == kSigChassisBtcmIsoCloseFR ||
+               signal_id == kSigChassisBtcmDumpOpenFL ||
+               signal_id == kSigChassisBtcmDumpOpenFR) {
+        // Chassis-bus mirror of the BTCM iso/dump solenoid state.
+        // See struct State and GetAbsPhaseFront for the per-wheel
+        // source-preference rule.
+        const std::uint64_t now_ns = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count());
+        switch (signal_id) {
+            case kSigChassisBtcmIsoCloseFL:
+                m_state->chassis_btcm_iso_close_fl    = value;
+                m_state->chassis_btcm_iso_close_fl_ns = now_ns;
+                break;
+            case kSigChassisBtcmIsoCloseFR:
+                m_state->chassis_btcm_iso_close_fr    = value;
+                m_state->chassis_btcm_iso_close_fr_ns = now_ns;
+                break;
+            case kSigChassisBtcmDumpOpenFL:
+                m_state->chassis_btcm_dump_open_fl    = value;
+                m_state->chassis_btcm_dump_open_fl_ns = now_ns;
+                break;
+            case kSigChassisBtcmDumpOpenFR:
+                m_state->chassis_btcm_dump_open_fr    = value;
+                m_state->chassis_btcm_dump_open_fr_ns = now_ns;
+                break;
+            default: break;
+        }
     }
     // Panel-sensor signals are outputs — ignore inbound.
 }
@@ -1701,6 +1891,18 @@ void ExternalSimConnector::DebugInjectFloat(std::uint32_t signal_id, float value
     } else if (signal_id == kSigIpcTripDistanceM) {
         m_state->ipc_trip_distance_m     = value;
         m_state->has_ipc_trip_distance_m = true;
+    } else if (signal_id == kSigChassisBtcmEmbMotorCmdLR) {
+        m_state->chassis_btcm_emb_motor_lr    = value;
+        m_state->chassis_btcm_emb_motor_lr_ns = now_ns;
+    } else if (signal_id == kSigChassisBtcmEmbMotorCmdRR) {
+        m_state->chassis_btcm_emb_motor_rr    = value;
+        m_state->chassis_btcm_emb_motor_rr_ns = now_ns;
+    } else if (signal_id == kSigChassisBtcmCylPressureFL_kPa) {
+        m_state->chassis_btcm_cyl_press_fl_kpa = value;
+        m_state->chassis_btcm_cyl_press_fl_ns  = now_ns;
+    } else if (signal_id == kSigChassisBtcmCylPressureFR_kPa) {
+        m_state->chassis_btcm_cyl_press_fr_kpa = value;
+        m_state->chassis_btcm_cyl_press_fr_ns  = now_ns;
     }
     // Other float signals are not currently subscribed as inputs.
 }
@@ -1945,7 +2147,11 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             if (!ep || !ep->input_to_sim) continue;
             if (d.payload.empty()) continue;
             // float32 LE chassis-bus signals — decode as 4-byte little-endian float.
-            if (d.signal_id == kSigIpcTripDistanceM) {
+            if (d.signal_id == kSigIpcTripDistanceM            ||
+                d.signal_id == kSigChassisBtcmEmbMotorCmdLR    ||
+                d.signal_id == kSigChassisBtcmEmbMotorCmdRR    ||
+                d.signal_id == kSigChassisBtcmCylPressureFL_kPa ||
+                d.signal_id == kSigChassisBtcmCylPressureFR_kPa) {
                 if (d.payload.size() >= 4) {
                     DebugInjectFloat(d.signal_id,
                         [&]() -> float {
