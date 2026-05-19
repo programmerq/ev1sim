@@ -1,0 +1,79 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate-configs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate JSON (config + level + vehicle data)
+        run: |
+          python3 - <<'PY'
+          import json, pathlib, sys
+          errs = 0
+          for p in sorted(pathlib.Path('.').rglob('*.json')):
+              if '.git' in p.parts or 'build' in p.parts or '_deps' in p.parts:
+                  continue
+              if 'deps' in p.parts or 'node_modules' in p.parts:
+                  continue
+              try:
+                  json.loads(p.read_text())
+              except Exception as e:
+                  print(f'BAD {p}: {e}')
+                  errs += 1
+          if errs:
+              print(f'{errs} invalid JSON file(s)')
+              sys.exit(1)
+          print('all JSON parses OK')
+          PY
+
+      - name: Validate scenario configs declare required fields
+        run: |
+          python3 - <<'PY'
+          import json, pathlib, sys
+          errs = 0
+          for p in sorted(pathlib.Path('config').glob('*.json')):
+              j = json.loads(p.read_text())
+              # Headless runs must declare a termination condition so CI can't hang.
+              sim = j.get('simulation', {})
+              if sim.get('headless'):
+                  has_max = sim.get('max_time_s', 0) > 0
+                  has_scripted = j.get('scripted', {}).get('enabled', False)
+                  if not (has_max or has_scripted):
+                      print(f'BAD {p}: headless requires max_time_s>0 or scripted.enabled')
+                      errs += 1
+          sys.exit(1 if errs else 0)
+          PY
+
+  repo-hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reject merge-conflict markers
+        run: |
+          if git grep -nE '^(<<<<<<<|=======|>>>>>>>) ' -- ':!*.md'; then
+            echo 'merge conflict markers found'
+            exit 1
+          fi
+
+      - name: Reject trailing whitespace in source
+        run: |
+          if git grep -nE ' +$' -- 'src/*.cpp' 'src/*.h' 'tests/*.cpp'; then
+            echo 'trailing whitespace in source files'
+            exit 1
+          fi
+
+  # Full build + test (ev1sim_tests) is not wired up here yet — Project Chrono
+  # must be built and cached first (30+ min cold, a few seconds warm).  Once a
+  # prebuilt Chrono image is available, add a job that:
+  #   - installs Irrlicht + Eigen3 via apt
+  #   - restores the Chrono install dir from cache (key on the Chrono release tag)
+  #   - runs `cmake -S . -B build -DChrono_DIR=...` and `ctest --test-dir build`
