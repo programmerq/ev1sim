@@ -889,6 +889,22 @@ void SimApp::ApplyAbsFrontBrake(double time, double dt_s,
     //
     // Time constants are first-pass estimates — refined in future
     // tuning passes once we have GM EV1 hardware reference data.
+    //
+    // **Known limitation (mu_jump, ~50% FL/FR time-locked).** With
+    // tau_dump = 60 ms the brake plant's pressure-decay rate during
+    // the asphalt→ice transition is slower than the wheel can lose
+    // rotation (the wheel reverses momentarily under brake + ice).
+    // The ABS firmware commands DUMP correctly, but plant pressure
+    // hasn't dropped enough by the next firmware tick.  See
+    // electricsim/docs/btcm_deferred_todos.md §8 "Remaining surface
+    // — chassis brake plant on ice" for the full investigation and
+    // the recommended tuning experiment (lower tau_dump toward
+    // ~27 ms, which is what the manual's "1/3 of pressure in 30 ms"
+    // claim implies analytically: tau = 30 ms / ln(3) ≈ 27.3 ms).
+    // Tuning requires the full ABS scenario sweep (high_mu, low_mu,
+    // split_mu, mu_jump, brake_and_steer, diagonal_mu) with
+    // electricsim attached, to confirm no regressions before
+    // committing a new value.
     const double tau_apply = 0.005;  // s, caliper-fill time constant
     const double tau_dump  = 0.060;  // s, dump-valve release time constant
     const double alpha_apply =
