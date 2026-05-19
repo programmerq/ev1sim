@@ -1,0 +1,27 @@
+{
+  "vehicle_model": "ev1",
+  "terrain": {
+    "type": "rigid_plane",
+    "surface": "asphalt",
+    "friction": 0.9,
+    "length_m": 200.0,
+    "width_m": 200.0
+  },
+  "simulation": {
+    "step_size_s": 0.002,
+    "render_fps": 60,
+    "realtime": true
+  },
+  "telemetry": {
+    "log_rate_hz": 10.0,
+    "log_to_file": false,
+    "show_hud": true
+  },
+  "lights": {
+    "demo_mode": "chase"
+  },
+  "external_sim": {
+    "enabled": false
+  },
+  "start_paused": true
+}
