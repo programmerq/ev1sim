@@ -890,23 +890,34 @@ void SimApp::ApplyAbsFrontBrake(double time, double dt_s,
     // Time constants are first-pass estimates — refined in future
     // tuning passes once we have GM EV1 hardware reference data.
     //
-    // **Known limitation (mu_jump, ~50% FL/FR time-locked).** With
-    // tau_dump = 60 ms the brake plant's pressure-decay rate during
-    // the asphalt→ice transition is slower than the wheel can lose
-    // rotation (the wheel reverses momentarily under brake + ice).
-    // The ABS firmware commands DUMP correctly, but plant pressure
-    // hasn't dropped enough by the next firmware tick.  See
-    // electricsim/docs/btcm_deferred_todos.md §8 "Remaining surface
-    // — chassis brake plant on ice" for the full investigation and
-    // the recommended tuning experiment (lower tau_dump toward
-    // ~27 ms, which is what the manual's "1/3 of pressure in 30 ms"
-    // claim implies analytically: tau = 30 ms / ln(3) ≈ 27.3 ms).
-    // Tuning requires the full ABS scenario sweep (high_mu, low_mu,
-    // split_mu, mu_jump, brake_and_steer, diagonal_mu) with
-    // electricsim attached, to confirm no regressions before
-    // committing a new value.
+    // **2026-05-18 tuning attempt — mu_jump (~50% FL/FR time-locked).**
+    // The prior tau_dump = 60 ms over-estimated the dump-valve bleed
+    // time, leaving plant pressure too high during the asphalt→ice
+    // transition: the wheel went negative-rotating before the
+    // pressure could fall, so the ABS algorithm couldn't see spin-up
+    // and the slip ratio pinned at 1.  Lowered tau_dump from 60 ms to
+    // 30 ms — close to the manual's "1/3 of pressure in 30 ms" claim
+    // (analytically tau = 30 ms / ln(3) ≈ 27.3 ms).  30 ms is a clean
+    // round number close to the analytic target.
+    //
+    // **Pre-push validation required.**  This value needs the full
+    // ABS scenario sweep before it's considered settled — high_mu,
+    // low_mu, split_mu, mu_jump, brake_and_steer, diagonal_mu, three
+    // runs each, against electricsim attached.  The headline metrics
+    // to confirm vs the 2026-05-17 dc63934 baseline:
+    //   - high_mu stop distance ~149.1 m, no lockup
+    //   - low_mu FL-locked fraction ~38.6%, 37 FL phases
+    //   - split_mu stop ~72.8 m, yaw within ±0.5°
+    //   - brake_and_steer stop ~61.2 m, yaw retains heading
+    //   - diagonal_mu FL-locked ~16-20%
+    //   - mu_jump FL/FR locked fraction: lower than the prior ~50%
+    // See electricsim/docs/btcm_deferred_todos.md §8 for the full
+    // tuning recipe.  If any other scenario regresses by more than
+    // ±10% of baseline, revert to 0.040 (33% reduction) or back to
+    // 0.060.
     const double tau_apply = 0.005;  // s, caliper-fill time constant
-    const double tau_dump  = 0.060;  // s, dump-valve release time constant
+    const double tau_dump  = 0.030;  // s, dump-valve release time constant
+                                     // (was 0.060; tuning attempt 2026-05-18)
     const double alpha_apply =
         dt_s >= tau_apply ? 1.0 : (1.0 - std::exp(-dt_s / tau_apply));
     const double alpha_dump  =
