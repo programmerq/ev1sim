@@ -371,10 +371,11 @@ constexpr std::uint32_t kSigRearMotorRR = 5015U;
 
 // 3D-sim integration contract — physics telemetry + cabin sensors published
 // on the main harness segment.  Locked to electricsim's docs/3d_sim_contract.md
-// reservations 6920-6939 (physics telemetry) and 6960-6979 (discrete sensors).
-// electricsim does not yet subscribe to these — publishing them locks the
-// wire format on the public side so the eventual subscriber doesn't have to
-// guess.  Cross-references the existing chassis-bus equivalents:
+// reservations 6920-6939 (physics telemetry), 6940-6959 (buttons), and
+// 6960-6979 (discrete sensors).  electricsim does not yet subscribe to most
+// of these — publishing them locks the wire format on the public side so
+// the eventual subscriber doesn't have to guess.  Cross-references the
+// existing chassis-bus equivalents:
 //   6920 vs 4100 (speed),  6921 vs 4101 (long accel),  6922 vs 4102 (lat accel)
 //   6960-6963 vs 4030-4033 (panel ajar sensors — same data, different segment)
 // Pose (6930-6932) is new; ev1sim does not publish it on the chassis bus.
@@ -384,11 +385,21 @@ constexpr std::uint32_t kSigExtAccelLateralMps2       = 6922U;
 constexpr std::uint32_t kSigExtVehiclePoseX           = 6930U;
 constexpr std::uint32_t kSigExtVehiclePoseY           = 6931U;
 constexpr std::uint32_t kSigExtVehiclePoseYawRad      = 6932U;
+// Buttons / discrete driver inputs — see docs/3d_sim_contract.md §1.3.
+constexpr std::uint32_t kSigDriverHornHighRequest     = 6940U;
+constexpr std::uint32_t kSigDriverHornLowRequest      = 6941U;
+constexpr std::uint32_t kSigDriverHeadlightSwitch     = 6942U;
+constexpr std::uint32_t kSigDriverHeadlightDimRequest = 6943U;
+constexpr std::uint32_t kSigDriverTelltaleTestRequest = 6945U;
+constexpr std::uint32_t kSigDriverParkBrakeSetRequest = 6946U;
+constexpr std::uint32_t kSigDriverParkBrakeReleaseRequest = 6947U;
+// Discrete sensors — see docs/3d_sim_contract.md §1.4.
 constexpr std::uint32_t kSigSensorDoorOpenDriver      = 6960U;
 constexpr std::uint32_t kSigSensorDoorOpenPassenger   = 6961U;
 constexpr std::uint32_t kSigSensorHoodOpen            = 6962U;
 constexpr std::uint32_t kSigSensorTrunkOpen           = 6963U;
-constexpr int kNumExtContractSignals = 10;
+constexpr std::uint32_t kSigSensorKeyPosition         = 6966U;
+constexpr int kNumExtContractSignals = 18;
 
 // BTCM per-wheel actuator state published on the chassis bus (IDs 4147-4154).
 // These mirror the legacy main-harness publications above but live on the
@@ -834,6 +845,32 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     out[i++] = {kSigSensorTrunkOpen,
                 "vehicle.sensor.trunk_open",
                 "sensor_trunk_open", false};
+    // Buttons / discrete driver inputs (3D-sim contract §1.3).
+    out[i++] = {kSigDriverHornHighRequest,
+                "vehicle.driver.horn_high_request",
+                "ext_horn_high_request", false};
+    out[i++] = {kSigDriverHornLowRequest,
+                "vehicle.driver.horn_low_request",
+                "ext_horn_low_request", false};
+    out[i++] = {kSigDriverHeadlightSwitch,
+                "vehicle.driver.headlight_switch",
+                "ext_headlight_switch", false};
+    out[i++] = {kSigDriverHeadlightDimRequest,
+                "vehicle.driver.headlight_dim_request",
+                "ext_headlight_dim_request", false};
+    out[i++] = {kSigDriverTelltaleTestRequest,
+                "vehicle.driver.telltale_test_request",
+                "ext_telltale_test_request", false};
+    out[i++] = {kSigDriverParkBrakeSetRequest,
+                "vehicle.driver.park_brake_set_request",
+                "ext_park_brake_set_request", false};
+    out[i++] = {kSigDriverParkBrakeReleaseRequest,
+                "vehicle.driver.park_brake_release_request",
+                "ext_park_brake_release_request", false};
+    // Discrete sensors (3D-sim contract §1.4) — key position.
+    out[i++] = {kSigSensorKeyPosition,
+                "vehicle.sensor.key_position",
+                "sensor_key_position", false};
     return out;
 }
 
@@ -881,6 +918,26 @@ struct ExternalSimConnector::State {
     std::int8_t sensor_door_open_passenger_pub = -1;
     std::int8_t sensor_hood_open_pub           = -1;
     std::int8_t sensor_trunk_open_pub          = -1;
+
+    // 3D-sim contract buttons/discretes (6940-6947, 6966).
+    // Values latched via the SetDriver*Request / SetSensor* setters and
+    // published on change in the main-harness Tick block.
+    bool         ext_horn_high_request          = false;
+    bool         ext_horn_low_request           = false;
+    std::uint8_t ext_headlight_switch           = 0;   // 0=OFF, 1=PARK, 2=ON, 3=HI
+    bool         ext_headlight_dim_request      = false;
+    bool         ext_telltale_test_request      = false;
+    bool         ext_park_brake_set_request     = false;
+    bool         ext_park_brake_release_request = false;
+    std::uint8_t ext_key_position               = 2;   // default RUN — see note in setter
+    std::int8_t  ext_horn_high_pub          = -1;
+    std::int8_t  ext_horn_low_pub           = -1;
+    std::int8_t  ext_headlight_switch_pub   = -1;
+    std::int8_t  ext_headlight_dim_pub      = -1;
+    std::int8_t  ext_telltale_test_pub      = -1;
+    std::int8_t  ext_park_brake_set_pub     = -1;
+    std::int8_t  ext_park_brake_release_pub = -1;
+    std::int8_t  ext_key_position_pub       = -1;
 
     // Combination switch pin outputs — latched by SetCombSwOutputs(), published
     // as wire-level booleans in Tick() when changed.
@@ -1617,6 +1674,35 @@ void ExternalSimConnector::SetDriverWiperSwitch(std::uint8_t position) {
 
 void ExternalSimConnector::SetDriverWiperWashRequest(bool pressed) {
     m_state->driver_wiper_wash = pressed;
+}
+
+// ---------------------------------------------------------------------------
+// 3D-sim contract buttons / discrete sensors (6940-6947, 6966).
+// ---------------------------------------------------------------------------
+void ExternalSimConnector::SetDriverHornHighRequest(bool pressed) {
+    m_state->ext_horn_high_request = pressed;
+}
+void ExternalSimConnector::SetDriverHornLowRequest(bool pressed) {
+    m_state->ext_horn_low_request = pressed;
+}
+void ExternalSimConnector::SetDriverHeadlightSwitch(std::uint8_t position) {
+    // Clamp to the 0..3 contract range; anything else is a programmer error.
+    m_state->ext_headlight_switch = (position <= 3) ? position : 0;
+}
+void ExternalSimConnector::SetDriverHeadlightDimRequest(bool held) {
+    m_state->ext_headlight_dim_request = held;
+}
+void ExternalSimConnector::SetDriverTelltaleTestRequest(bool pressed) {
+    m_state->ext_telltale_test_request = pressed;
+}
+void ExternalSimConnector::SetDriverParkBrakeSetRequest(bool pressed) {
+    m_state->ext_park_brake_set_request = pressed;
+}
+void ExternalSimConnector::SetDriverParkBrakeReleaseRequest(bool pressed) {
+    m_state->ext_park_brake_release_request = pressed;
+}
+void ExternalSimConnector::SetSensorKeyPosition(std::uint8_t position) {
+    m_state->ext_key_position = (position <= 3) ? position : 2;
 }
 
 void ExternalSimConnector::SetDriverPowerWindowDriverUp(bool held) {
@@ -2408,6 +2494,19 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             for (int ei = 0; ei < 5; ++ei) st.driver_ext_keypad_pub[ei] = -1;
             st.driver_door_handle_driver_pub    = -1;
             st.driver_door_handle_passenger_pub = -1;
+            // 3D-sim contract sentinels — force first-publish on reconnect.
+            st.sensor_door_open_driver_pub      = -1;
+            st.sensor_door_open_passenger_pub   = -1;
+            st.sensor_hood_open_pub             = -1;
+            st.sensor_trunk_open_pub            = -1;
+            st.ext_horn_high_pub                = -1;
+            st.ext_horn_low_pub                 = -1;
+            st.ext_headlight_switch_pub         = -1;
+            st.ext_headlight_dim_pub            = -1;
+            st.ext_telltale_test_pub            = -1;
+            st.ext_park_brake_set_pub           = -1;
+            st.ext_park_brake_release_pub       = -1;
+            st.ext_key_position_pub             = -1;
             std::cout << "[ExternalSim] connected to main harness bus '"
                       << m_opts.main_harness_bus_name << "'\n";
         }
@@ -2653,6 +2752,44 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         publish_bool_change(kSigSensorTrunkOpen,
                             st.panel[static_cast<int>(PanelID::TRUNK)],
                             st.sensor_trunk_open_pub);
+        // 3D-sim contract buttons + key position (6940-6947, 6966).
+        publish_bool_change(kSigDriverHornHighRequest,
+                            st.ext_horn_high_request,
+                            st.ext_horn_high_pub);
+        publish_bool_change(kSigDriverHornLowRequest,
+                            st.ext_horn_low_request,
+                            st.ext_horn_low_pub);
+        publish_bool_change(kSigDriverHeadlightDimRequest,
+                            st.ext_headlight_dim_request,
+                            st.ext_headlight_dim_pub);
+        publish_bool_change(kSigDriverTelltaleTestRequest,
+                            st.ext_telltale_test_request,
+                            st.ext_telltale_test_pub);
+        publish_bool_change(kSigDriverParkBrakeSetRequest,
+                            st.ext_park_brake_set_request,
+                            st.ext_park_brake_set_pub);
+        publish_bool_change(kSigDriverParkBrakeReleaseRequest,
+                            st.ext_park_brake_release_request,
+                            st.ext_park_brake_release_pub);
+        // Headlight switch + key position — uint8 enums.
+        {
+            const std::int8_t hsw_val =
+                static_cast<std::int8_t>(st.ext_headlight_switch);
+            if (st.ext_headlight_switch_pub < 0 ||
+                hsw_val != st.ext_headlight_switch_pub) {
+                drv.push_back(MakeU8Delta(kSigDriverHeadlightSwitch,
+                                          st.ext_headlight_switch));
+                st.ext_headlight_switch_pub = hsw_val;
+            }
+            const std::int8_t key_val =
+                static_cast<std::int8_t>(st.ext_key_position);
+            if (st.ext_key_position_pub < 0 ||
+                key_val != st.ext_key_position_pub) {
+                drv.push_back(MakeU8Delta(kSigSensorKeyPosition,
+                                          st.ext_key_position));
+                st.ext_key_position_pub = key_val;
+            }
+        }
         // 3D-sim contract physics telemetry (6920-6932) — every-tick floats,
         // not delta-gated.  Only sent when we have a VehicleState snapshot
         // (cold start emits nothing until the host calls SetVehicleState).

@@ -233,6 +233,46 @@ public:
     /// M key in ev1sim.
     void SetDriverWiperWashRequest(bool pressed);
 
+    /// 3D-sim integration contract — driver buttons and discrete sensors
+    /// (main harness segment).  See electricsim docs/3d_sim_contract.md
+    /// §1.3 (buttons) and §1.4 (discrete sensors).  All publish on change
+    /// with -1 sentinel for first-publish.
+    ///
+    /// Horn requests (6940/6941): mirror of DriverCommand.horn_high/low.
+    /// Distinct from the bulb-side horn drive lines (4020/4021) which
+    /// flow electric→ev1sim.  These flow ev1sim→electric as the
+    /// driver's button press.
+    void SetDriverHornHighRequest(bool pressed);
+    void SetDriverHornLowRequest(bool pressed);
+
+    /// Headlight switch position (6942): 0=OFF, 1=PARK, 2=ON (low beam),
+    /// 3=HI (high beam).  Mirror of CombinationSwitch::Position.
+    void SetDriverHeadlightSwitch(std::uint8_t position);
+
+    /// Headlight dim request (6943): momentary bool — the flash-to-pass
+    /// lever held state from CombinationSwitch::flash_to_pass_held().
+    void SetDriverHeadlightDimRequest(bool held);
+
+    /// Telltale-test request (6945): momentary bool.  No ev1sim UI source
+    /// yet — defaults to false.  Reserved for a future bulb-check button.
+    void SetDriverTelltaleTestRequest(bool pressed);
+
+    /// Park-brake set / release momentary requests (6946/6947).  These
+    /// are derived edge events from DriverCommand.parking_brake: a
+    /// false→true transition fires set; true→false fires release.
+    /// Both are one-tick pulses; the caller is responsible for emitting
+    /// exactly one set pulse per engage event and one release pulse per
+    /// disengage event.
+    void SetDriverParkBrakeSetRequest(bool pressed);
+    void SetDriverParkBrakeReleaseRequest(bool pressed);
+
+    /// Key position (6966): 0=OFF, 1=ACC, 2=RUN, 3=START.  ev1sim does
+    /// not model a key-cycle state machine — the simulator behaves as if
+    /// the vehicle is always RUN.  Default value is 2 (RUN); the setter
+    /// allows future host code to drive ACC/START transitions when key
+    /// modeling lands.
+    void SetSensorKeyPosition(std::uint8_t position);
+
     /// Outgoing power window switch states (IDs 6980-6983, main harness segment).
     /// Each is a 1-byte uint8 momentary bool (0=released, 1=held this tick).
     /// EV1 is a 2-seater: driver window (up/down) + passenger window (up/down).

@@ -1385,6 +1385,8 @@ int SimApp::RunWithVisualization() {
             m_external_sim->SetDriverDoorHandleAttemptPassenger(
                 m_physical->door_handles().passenger_attempt());
             m_physical->door_handles().clear_oneshots();
+            // 3D-sim contract buttons + key position (6940-6947, 6966).
+            PushExtContractDriverInputs(cmd);
         }
         // Ambient temp + humidity (chassis bus 4090-4091).
         // Time-of-day from system clock → local time → fractional hours.
@@ -1881,6 +1883,8 @@ int SimApp::RunHeadless() {
             m_external_sim->SetDriverDoorHandleAttemptPassenger(
                 m_physical->door_handles().passenger_attempt());
             m_physical->door_handles().clear_oneshots();
+            // 3D-sim contract buttons + key position (6940-6947, 6966).
+            PushExtContractDriverInputs(cmd);
         }
         // Ambient temp + humidity (chassis bus 4090-4091).
         {
@@ -2045,6 +2049,38 @@ int SimApp::RunHeadless() {
 // always constructs PhysicalWorld), but defensive null-checks make these
 // safe in tests that mock SimApp.
 // ---------------------------------------------------------------------------
+void SimApp::PushExtContractDriverInputs(const DriverCommand& cmd) {
+    if (!m_external_sim) return;
+    // Horn requests (6940/6941) — direct mirror of DriverCommand.
+    m_external_sim->SetDriverHornHighRequest(cmd.horn_high);
+    m_external_sim->SetDriverHornLowRequest(cmd.horn_low);
+    // Headlight switch (6942) — CombinationSwitch::Position maps cleanly:
+    //   OFF=0, PARK=1, ON=2, HI=3 — same numbering as the contract spec.
+    if (m_physical) {
+        m_external_sim->SetDriverHeadlightSwitch(static_cast<std::uint8_t>(
+            m_physical->combination_switch().position()));
+        // Headlight dim request (6943) — flash-to-pass lever held state.
+        m_external_sim->SetDriverHeadlightDimRequest(
+            m_physical->combination_switch().flash_to_pass_held());
+    }
+    // Telltale test (6945) — no UI source yet; stub at false.
+    m_external_sim->SetDriverTelltaleTestRequest(false);
+    // Park brake set/release (6946/6947) — edge-detect on the level
+    // state from DriverCommand.parking_brake.  A false→true transition
+    // fires the one-tick set request; true→false fires release.
+    const bool pb_now = cmd.parking_brake;
+    const bool pb_set_edge     = pb_now && !m_park_brake_prev;
+    const bool pb_release_edge = !pb_now &&  m_park_brake_prev;
+    m_external_sim->SetDriverParkBrakeSetRequest(pb_set_edge);
+    m_external_sim->SetDriverParkBrakeReleaseRequest(pb_release_edge);
+    m_park_brake_prev = pb_now;
+    // Key position (6966) — ev1sim does not model a key-cycle state
+    // machine; the simulator runs as if the vehicle is always RUN (2).
+    // Future work: derive ACC/START transitions when an ignition model
+    // lands in PhysicalWorld.
+    m_external_sim->SetSensorKeyPosition(2);
+}
+
 void SimApp::KeyOnCycle() {
     if (m_physical) m_physical->rsa_keypad().cycle_k();
 }

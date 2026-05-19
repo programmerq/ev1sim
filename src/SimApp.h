@@ -126,6 +126,21 @@ private:
     bool m_abs_fl_was_fresh = false;  ///< was FL fresh on the previous tick?
     bool m_abs_fr_was_fresh = false;  ///< was FR fresh on the previous tick?
 
+    /// Park-brake edge detector — drives the 3D-sim contract set/release
+    /// momentary signals (6946/6947).  Tracks the previous tick's level
+    /// state from DriverCommand.parking_brake; a false→true transition
+    /// emits a one-tick set request, true→false emits a one-tick release.
+    bool m_park_brake_prev = false;
+
+    /// Push 3D-sim integration contract driver-side inputs to the
+    /// external sim connector (6940-6947, 6966).  Pulls headlight switch
+    /// + dim from CombinationSwitch; horn and park-brake state from the
+    /// passed DriverCommand; telltale test + key position are stubbed
+    /// (no ev1sim UI source).  Park-brake set/release are edge-detected
+    /// using m_park_brake_prev; this method updates m_park_brake_prev
+    /// as a side effect.  Safe to call when m_external_sim is null.
+    void PushExtContractDriverInputs(const struct DriverCommand& cmd);
+
     // Freshness window for BTCM liveness signal (kSigBtcmUartFrame
     // heartbeat).  See ExternalSimConnector::GetAbsPhaseFront for the
     // architecture: liveness comes from the BTCM's 5 Hz
