@@ -1,6 +1,7 @@
 #include "ExternalSimConnector.h"
 
 #include <array>
+#include <cmath>
 #include <cstring>
 #include <iostream>
 #include <string>
@@ -368,6 +369,27 @@ constexpr std::uint32_t kSigBtcmUartFrame = 5050U;
 constexpr std::uint32_t kSigRearMotorLR = 5014U;
 constexpr std::uint32_t kSigRearMotorRR = 5015U;
 
+// 3D-sim integration contract — physics telemetry + cabin sensors published
+// on the main harness segment.  Locked to electricsim's docs/3d_sim_contract.md
+// reservations 6920-6939 (physics telemetry) and 6960-6979 (discrete sensors).
+// electricsim does not yet subscribe to these — publishing them locks the
+// wire format on the public side so the eventual subscriber doesn't have to
+// guess.  Cross-references the existing chassis-bus equivalents:
+//   6920 vs 4100 (speed),  6921 vs 4101 (long accel),  6922 vs 4102 (lat accel)
+//   6960-6963 vs 4030-4033 (panel ajar sensors — same data, different segment)
+// Pose (6930-6932) is new; ev1sim does not publish it on the chassis bus.
+constexpr std::uint32_t kSigExtBodyVelocityMps        = 6920U;
+constexpr std::uint32_t kSigExtAccelLongitudinalMps2  = 6921U;
+constexpr std::uint32_t kSigExtAccelLateralMps2       = 6922U;
+constexpr std::uint32_t kSigExtVehiclePoseX           = 6930U;
+constexpr std::uint32_t kSigExtVehiclePoseY           = 6931U;
+constexpr std::uint32_t kSigExtVehiclePoseYawRad      = 6932U;
+constexpr std::uint32_t kSigSensorDoorOpenDriver      = 6960U;
+constexpr std::uint32_t kSigSensorDoorOpenPassenger   = 6961U;
+constexpr std::uint32_t kSigSensorHoodOpen            = 6962U;
+constexpr std::uint32_t kSigSensorTrunkOpen           = 6963U;
+constexpr int kNumExtContractSignals = 10;
+
 // BTCM per-wheel actuator state published on the chassis bus (IDs 4147-4154).
 // These mirror the legacy main-harness publications above but live on the
 // public chassis-bus segment that is ev1sim's primary input fabric.  Both
@@ -506,6 +528,10 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // +kNumBtcmActuatorChassisSignals for the BTCM per-wheel actuator state
 //   on the chassis bus (4147-4154) — BTCM → ev1sim, parallel to the
 //   legacy main-harness 5010-5015 path.
+// +kNumExtContractSignals for the 3D-sim integration contract publish
+//   (6920-6932 physics telemetry + 6960-6963 cabin sensors) on the main
+//   harness — ev1sim → electricsim, locking the wire format for the
+//   eventual subscribers.
 constexpr int kNumEndpoints =
     NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumCombSw + 1 /*charge_coupler*/ +
     kNumPrndSelector + kNumMotorSignals + kNumThrottleCmdSignals +
@@ -513,7 +539,7 @@ constexpr int kNumEndpoints =
     kNumAmbientSignals + kNumDoorLockPwSignals + kNumRsaShiftBlockedSignals +
     kNumIpcTelltaleSignals + kNumIpcTripDistSignals + kNumIpcBtcmTelltaleSignals +
     kNumIpcExtraTelltaleSignals + kNumBpmPackVoltageSignals +
-    kNumBtcmActuatorChassisSignals +
+    kNumBtcmActuatorChassisSignals + kNumExtContractSignals +
     kNumDynamics + kNumDriverInputs;
 
 std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
@@ -775,6 +801,39 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     out[i++] = {kSigDriverDoorHandleAttemptPassenger,
                 "vehicle.driver.door_handle_attempt_passenger",
                 "door_handle_attempt_passenger", false};
+    // 3D-sim integration contract publishes — main harness segment,
+    // ev1sim → electricsim, all output (input_to_sim=false).
+    // PROPOSED in docs/3d_sim_contract.md; consumers TBD.
+    out[i++] = {kSigExtBodyVelocityMps,
+                "vehicle.dynamics.body_velocity_mps",
+                "ext_body_velocity_mps", false};
+    out[i++] = {kSigExtAccelLongitudinalMps2,
+                "vehicle.dynamics.accel_longitudinal_mps2",
+                "ext_accel_longitudinal_mps2", false};
+    out[i++] = {kSigExtAccelLateralMps2,
+                "vehicle.dynamics.accel_lateral_mps2",
+                "ext_accel_lateral_mps2", false};
+    out[i++] = {kSigExtVehiclePoseX,
+                "vehicle.pose.x_m",
+                "ext_vehicle_pose_x", false};
+    out[i++] = {kSigExtVehiclePoseY,
+                "vehicle.pose.y_m",
+                "ext_vehicle_pose_y", false};
+    out[i++] = {kSigExtVehiclePoseYawRad,
+                "vehicle.pose.yaw_rad",
+                "ext_vehicle_pose_yaw_rad", false};
+    out[i++] = {kSigSensorDoorOpenDriver,
+                "vehicle.sensor.door_open.driver",
+                "sensor_door_open_driver", false};
+    out[i++] = {kSigSensorDoorOpenPassenger,
+                "vehicle.sensor.door_open.passenger",
+                "sensor_door_open_passenger", false};
+    out[i++] = {kSigSensorHoodOpen,
+                "vehicle.sensor.hood_open",
+                "sensor_hood_open", false};
+    out[i++] = {kSigSensorTrunkOpen,
+                "vehicle.sensor.trunk_open",
+                "sensor_trunk_open", false};
     return out;
 }
 
@@ -814,6 +873,14 @@ struct ExternalSimConnector::State {
     bool panel[VehiclePanels::NUM_PANELS]      = {};
     bool panel_published[VehiclePanels::NUM_PANELS] = {};
     bool panel_ever_published                  = false;
+
+    // 3D-sim contract sensor-panel mirror (main harness, IDs 6960-6963).
+    // Parallel publication of the same panel-open data; -1 sentinel forces
+    // first publish, then delta-only.
+    std::int8_t sensor_door_open_driver_pub    = -1;
+    std::int8_t sensor_door_open_passenger_pub = -1;
+    std::int8_t sensor_hood_open_pub           = -1;
+    std::int8_t sensor_trunk_open_pub          = -1;
 
     // Combination switch pin outputs — latched by SetCombSwOutputs(), published
     // as wire-level booleans in Tick() when changed.
@@ -2569,6 +2636,50 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                             st.driver_door_handle_driver,    st.driver_door_handle_driver_pub);
         publish_bool_change(kSigDriverDoorHandleAttemptPassenger,
                             st.driver_door_handle_passenger, st.driver_door_handle_passenger_pub);
+        // 3D-sim contract panel-sensor mirrors (6960-6963) — parallel
+        // publication of the chassis-bus panel ajar sensors (4030-4033)
+        // on the main harness segment so consumers there don't need to
+        // bridge segments.  PanelID maps: DOOR_LEFT=driver in a US LHD
+        // EV1; DOOR_RIGHT=passenger.
+        publish_bool_change(kSigSensorDoorOpenDriver,
+                            st.panel[static_cast<int>(PanelID::DOOR_LEFT)],
+                            st.sensor_door_open_driver_pub);
+        publish_bool_change(kSigSensorDoorOpenPassenger,
+                            st.panel[static_cast<int>(PanelID::DOOR_RIGHT)],
+                            st.sensor_door_open_passenger_pub);
+        publish_bool_change(kSigSensorHoodOpen,
+                            st.panel[static_cast<int>(PanelID::HOOD)],
+                            st.sensor_hood_open_pub);
+        publish_bool_change(kSigSensorTrunkOpen,
+                            st.panel[static_cast<int>(PanelID::TRUNK)],
+                            st.sensor_trunk_open_pub);
+        // 3D-sim contract physics telemetry (6920-6932) — every-tick floats,
+        // not delta-gated.  Only sent when we have a VehicleState snapshot
+        // (cold start emits nothing until the host calls SetVehicleState).
+        if (st.has_vstate) {
+            const auto& vs = st.vstate;
+            // Wrap yaw_deg → rad in (-π, π].  yaw_deg is unbounded; wrap
+            // to a 2π window centred on 0, with +π exclusive to ensure
+            // canonical positive-π representation.
+            constexpr double kPi  = 3.141592653589793;
+            constexpr double kTau = 6.283185307179586;
+            double yaw_rad = vs.yaw_deg * (kPi / 180.0);
+            yaw_rad = std::fmod(yaw_rad + kPi, kTau);
+            if (yaw_rad < 0.0) yaw_rad += kTau;
+            yaw_rad -= kPi;
+            drv.push_back(MakeFloatDelta(kSigExtBodyVelocityMps,
+                                         static_cast<float>(vs.speed_mps)));
+            drv.push_back(MakeFloatDelta(kSigExtAccelLongitudinalMps2,
+                                         static_cast<float>(vs.accel_long)));
+            drv.push_back(MakeFloatDelta(kSigExtAccelLateralMps2,
+                                         static_cast<float>(vs.accel_lat)));
+            drv.push_back(MakeFloatDelta(kSigExtVehiclePoseX,
+                                         static_cast<float>(vs.pos_x)));
+            drv.push_back(MakeFloatDelta(kSigExtVehiclePoseY,
+                                         static_cast<float>(vs.pos_y)));
+            drv.push_back(MakeFloatDelta(kSigExtVehiclePoseYawRad,
+                                         static_cast<float>(yaw_rad)));
+        }
         if (!drv.empty()) {
             Frame mf{};
             mf.header.type              = FrameType::DeltaBatch;
