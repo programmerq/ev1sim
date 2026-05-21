@@ -268,12 +268,15 @@ future-UI input on one side, chassis-segment signal publishing on the other.
 
 ## Sim-time sync — ev1sim publisher side
 
-To unblock electricsim from running in lockstep with faster-than-realtime
-ev1sim runs, ev1sim should publish a sim-time tick on the chassis bus
-(`kSigChassisSimTimeNs`, suggested chassis ID 4070).  Cross-repo design
-lives in electricsim/docs/TODO.md under "Sim-time sync".  ev1sim's part:
-publish the current Chrono sim-time on every step, encoded as uint64_t
-little-endian nanoseconds, on the chassis segment.
+- [x] **Publish sim-time on the chassis bus (DONE).**  ev1sim publishes
+  `kSigChassisSimTimeNs` (chassis ID **4075** — *not* 4070, which is
+  already motor RPM; the old "suggested 4070" note here was wrong and
+  would have collided) every physics step as uint64 little-endian
+  nanoseconds, sourced from `VehicleWorld::GetSimTime()` and encoded via
+  `MakeU64Delta` in the per-tick chassis dynamics frame.  This unblocks
+  electricsim's `SimClock` master handoff — BTCM/PIM/IPC already
+  subscribe and stay in wall-clock mode until the first 4075 sample
+  arrives.  Cross-repo design: electricsim/docs/TODO.md "Sim-time sync".
 
 ## Future: physical sim rig
 - [ ] Adapt the user's physical driving sim rig with a lookalike RSA, seat
