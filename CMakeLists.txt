@@ -244,4 +244,39 @@ if(BUILD_TESTS)
     include(CTest)
     include(Catch)
     catch_discover_tests(ev1sim_tests)
+
+    # ── ABS integration gate (opt-in; needs a built electricsim) ─────────────
+    # The brake-plant ABS behaviour can only be validated with ev1sim AND
+    # electricsim running together over the shm bus — the unit suite above
+    # cannot exercise it (no moving plant under the ABS algorithm).
+    # scripts/abs_regression.sh runs the 6-scenario BTCM-on/off sweep and checks
+    # headline metrics against scripts/abs_baseline.txt (pinned electricsim
+    # commit).  Run it before merging anything that touches the brake plant.
+    #
+    #   make test-integration   # build ev1sim + run the gate
+    #   ctest -L integration    # same, when configured -DEV1SIM_INTEGRATION_TESTS=ON
+    #
+    # Deliberately kept out of the default `ctest` (slow, multi-process, and
+    # needs electricsim controllers built at ELECTRICSIM_DIR).
+    if(EV1SIM_HAVE_EXTERNAL_SIM)
+        add_custom_target(test-integration
+            COMMAND ${CMAKE_COMMAND} -E env "ELECTRICSIM_DIR=${ELECTRICSIM_DIR}"
+                    bash ${CMAKE_SOURCE_DIR}/scripts/abs_regression.sh
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            USES_TERMINAL
+            COMMENT "Running ABS regression gate (6-scenario sweep vs baseline)")
+        add_dependencies(test-integration ev1sim)
+
+        option(EV1SIM_INTEGRATION_TESTS
+               "Register the ABS regression sweep as a CTest (label: integration)" OFF)
+        if(EV1SIM_INTEGRATION_TESTS)
+            add_test(NAME abs_regression
+                     COMMAND bash ${CMAKE_SOURCE_DIR}/scripts/abs_regression.sh
+                     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+            set_tests_properties(abs_regression PROPERTIES
+                LABELS "integration"
+                ENVIRONMENT "ELECTRICSIM_DIR=${ELECTRICSIM_DIR}"
+                TIMEOUT 1800)
+        endif()
+    endif()
 endif()

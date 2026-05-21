@@ -248,17 +248,113 @@ def summarize(label: str, rows: list[dict]) -> tuple[int, int]:
     return brake_idx, stop_idx
 
 
+def compute_metrics(rows: list[dict]) -> dict[str, float]:
+    """Headline metrics for one (BTCM-on) run.  Reuses the same helpers as the
+    human summary so the two never diverge.  Keys cover every metric the ABS
+    regression baseline references (stop distance, time-locked %, ABS phase
+    counts, yaw drift)."""
+    brake_idx = find_brake_event(rows)
+    stop_idx = find_stop(rows, brake_idx) if brake_idx >= 0 else -1
+    end = stop_idx if stop_idx > 0 else len(rows) - 1
+    out: dict[str, float] = {}
+    out["brake_detected"] = 1 if brake_idx >= 0 else 0
+    out["stopped"] = 1 if stop_idx >= 0 else 0
+    if stop_idx >= 0:
+        out["stop_distance_m"] = round(stopping_distance(rows, brake_idx, stop_idx), 3)
+        out["stop_time_s"] = round(rows[stop_idx]["sim_time_s"]
+                                   - rows[brake_idx]["sim_time_s"], 3)
+    else:
+        out["final_speed_mps"] = round(rows[-1]["speed_mps"], 3)
+    out["yaw_deg"] = (round(yaw_drift_deg(rows, brake_idx, stop_idx), 3)
+                      if brake_idx >= 0 else float("nan"))
+    for wheel in ("fl", "fr", "rl", "rr"):
+        s = slip_stats(rows, brake_idx, end, wheel)
+        out[f"{wheel}_locked_pct"] = round(s["locked_pct"], 2)
+        out[f"{wheel}_peak_slip"] = round(s["peak"], 3)
+    abs_events = count_abs_events(rows, brake_idx, end)
+    out["fl_phases"] = abs_events.get("fl", 0)
+    out["fr_phases"] = abs_events.get("fr", 0)
+    return out
+
+
+def emit_metrics(rows: list[dict]) -> None:
+    """Print compute_metrics() as one key=value per line (machine-readable)."""
+    for k, v in compute_metrics(rows).items():
+        print(f"{k}={v}")
+
+
+def load_baseline_rules(path: Path, scenario: str) -> list[tuple]:
+    """Parse scripts/abs_baseline.txt rules for one scenario.  Each rule:
+        <scenario> <metric_key> <op> <value> [tol_frac]
+    op: ~ (within ±tol of value) | < | <= | > | >=.  '#' starts a comment."""
+    rules: list[tuple] = []
+    for raw in path.read_text().splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        parts = line.split()
+        if len(parts) < 4 or parts[0] != scenario:
+            continue
+        tol = float(parts[4]) if len(parts) > 4 else None
+        rules.append((parts[1], parts[2], float(parts[3]), tol))
+    return rules
+
+
+def run_check(rows: list[dict], baseline_path: Path, scenario: str) -> bool:
+    """Compare this run's metrics against the recorded baseline; print a
+    PASS/FAIL line per rule and return True iff all pass."""
+    metrics = compute_metrics(rows)
+    rules = load_baseline_rules(baseline_path, scenario)
+    if not rules:
+        print(f"  [WARN] no baseline rules for scenario '{scenario}'")
+        return True
+    all_ok = True
+    for key, op, val, tol in rules:
+        got = metrics.get(key)
+        if got is None or (isinstance(got, float) and got != got):
+            ok, detail = False, f"metric '{key}' missing/nan"
+        elif op == "~":
+            t = tol if tol is not None else 0.10
+            ok = abs(got - val) <= t * abs(val)
+            detail = f"{got} vs {val} ±{t*100:.0f}%"
+        elif op in ("<", "<=", ">", ">="):
+            ok = {"<": got < val, "<=": got <= val,
+                  ">": got > val, ">=": got >= val}[op]
+            detail = f"{got} {op} {val}"
+        else:
+            ok, detail = False, f"unknown op '{op}'"
+        print(f"  [{'PASS' if ok else 'FAIL'}] {scenario}: {key}  ({detail})")
+        all_ok = all_ok and ok
+    return all_ok
+
+
 def main(argv: list[str]) -> int:
-    if len(argv) != 3:
-        print("usage: compare_abs_runs.py <btcm_on.csv> <btcm_off.csv>",
-              file=sys.stderr)
+    rest = argv[1:]
+    check_args = None
+    if "--check" in rest:
+        i = rest.index("--check")
+        if len(rest) < i + 3:
+            print("usage: --check <baseline_file> <scenario>", file=sys.stderr)
+            return 1
+        check_args = (Path(rest[i + 1]), rest[i + 2])
+        rest = rest[:i] + rest[i + 3:]
+    metrics_only = "--metrics" in rest
+    args = [a for a in rest if a != "--metrics"]
+    if len(args) != 2:
+        print("usage: compare_abs_runs.py <btcm_on.csv> <btcm_off.csv> "
+              "[--metrics] [--check <baseline_file> <scenario>]", file=sys.stderr)
         return 1
-    on_path, off_path = Path(argv[1]), Path(argv[2])
+    on_path, off_path = Path(args[0]), Path(args[1])
     if not on_path.exists() or not off_path.exists():
         print(f"missing CSV: {on_path} or {off_path}", file=sys.stderr)
         return 1
 
     on_rows = load_csv(on_path)
+    if check_args is not None:
+        return 0 if run_check(on_rows, check_args[0], check_args[1]) else 1
+    if metrics_only:
+        emit_metrics(on_rows)
+        return 0
     off_rows = load_csv(off_path)
 
     print("ABS scenario comparison: BTCM-on vs BTCM-off\n")
