@@ -26,7 +26,14 @@ if [[ "${1:-}" == "--headless" ]]; then
 fi
 
 EV1SIM_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-ELECTRICSIM_DIR="$(cd "$EV1SIM_DIR/../electricsim" 2>/dev/null && pwd || true)"
+# Honor a pre-set ELECTRICSIM_DIR (e.g. running from a git worktree where
+# ../electricsim does not resolve) before falling back to the sibling default.
+# Mirrors scripts/run_abs_compare.sh.
+if [[ -n "${ELECTRICSIM_DIR:-}" ]]; then
+    ELECTRICSIM_DIR="$(cd "$ELECTRICSIM_DIR" 2>/dev/null && pwd || true)"
+else
+    ELECTRICSIM_DIR="$(cd "$EV1SIM_DIR/../electricsim" 2>/dev/null && pwd || true)"
+fi
 
 if [[ -z "$ELECTRICSIM_DIR" ]]; then
     echo "[demo] cannot find ../electricsim relative to ev1sim — set ELECTRICSIM_DIR env var" >&2
