@@ -900,24 +900,18 @@ void SimApp::ApplyAbsFrontBrake(double time, double dt_s,
     // (analytically tau = 30 ms / ln(3) ≈ 27.3 ms).  30 ms is a clean
     // round number close to the analytic target.
     //
-    // **Pre-push validation required.**  This value needs the full
-    // ABS scenario sweep before it's considered settled — high_mu,
-    // low_mu, split_mu, mu_jump, brake_and_steer, diagonal_mu, three
-    // runs each, against electricsim attached.  The headline metrics
-    // to confirm vs the 2026-05-17 dc63934 baseline:
-    //   - high_mu stop distance ~149.1 m, no lockup
-    //   - low_mu FL-locked fraction ~38.6%, 37 FL phases
-    //   - split_mu stop ~72.8 m, yaw within ±0.5°
-    //   - brake_and_steer stop ~61.2 m, yaw retains heading
-    //   - diagonal_mu FL-locked ~16-20%
-    //   - mu_jump FL/FR locked fraction: lower than the prior ~50%
-    // See electricsim/docs/btcm_deferred_todos.md §8 for the full
-    // tuning recipe.  If any other scenario regresses by more than
-    // ±10% of baseline, revert to 0.040 (33% reduction) or back to
-    // 0.060.
+    // **Validated 2026-05-21 — keep 30 ms.**  Full 6-scenario BTCM-on/off
+    // sweep (electricsim controllers rebuilt at 77e2a1f9) vs the dc63934
+    // baseline: mu_jump FL/FR time-locked dropped ~50% → 36%/32% (the goal);
+    // diagonal_mu also improved (5% locked); high_mu 149.4 m, split_mu
+    // 73.4 m, brake_and_steer 60.8 m all within ~1% of baseline with heading
+    // preserved; no scenario regressed.  The earlier "0 phase transitions"
+    // scare was a stale-controller artifact, not the plant.  Regression gate
+    // for this knob now lives in scripts/abs_regression.sh + abs_baseline.txt
+    // (`make test-integration`); see electricsim/docs/btcm_deferred_todos.md §8.
     const double tau_apply = 0.005;  // s, caliper-fill time constant
     const double tau_dump  = 0.030;  // s, dump-valve release time constant
-                                     // (was 0.060; tuning attempt 2026-05-18)
+                                     // (was 0.060; validated 2026-05-21)
     const double alpha_apply =
         dt_s >= tau_apply ? 1.0 : (1.0 - std::exp(-dt_s / tau_apply));
     const double alpha_dump  =

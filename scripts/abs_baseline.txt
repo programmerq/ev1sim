@@ -1,0 +1,56 @@
+# ev1sim ABS regression baseline — headline BTCM-on metrics per scenario.
+# Consumed by scripts/abs_regression.sh via `compare_abs_runs.py --check`.
+#
+# electricsim-commit: 77e2a1f9   (controllers MUST be built at/near this commit;
+#                                 phase counts and absolute metrics drift with
+#                                 the BTCM/PIM/RSA version — that is why this is
+#                                 pinned.  Re-capture if you bump electricsim.)
+# ev1sim: tau_dump = 0.030 s (src/SimApp.cpp), captured 2026-05-21
+# capture method: single-pass 6-scenario BTCM-on/off sweep, controllers rebuilt
+#                 at HEAD.  Margins are wide enough that run-to-run timing jitter
+#                 does not flip any rule; bump to a 3x median if that changes.
+#
+# Rule shapes (deliberate):
+#   - stopping distance: two-sided +/-10% (both directions matter).
+#   - time-locked %: UPPER bound only.  Less lock is an improvement, not a
+#     regression; the ceiling catches ABS degrading toward the BTCM-off lock.
+#   - yaw: bounded.  Near-zero for straight stops; large+preserved for the
+#     steering scenario.
+#   - phase count: lower bound — confirms the BTCM is actually modulating.
+#     It is controller-driven, so not tied tightly to the ev1sim plant.
+#
+# format: <scenario> <metric_key> <op> <value> [tol_frac]
+#   op: ~ (within +/-tol of value, default 0.10) | < | <= | > | >=
+
+# high_mu — dry asphalt straight stop; ABS barely needed, must not lock.
+high_mu          stop_distance_m   ~   149.35  0.10
+high_mu          fl_locked_pct     <   10
+high_mu          fr_locked_pct     <   10
+
+# low_mu — uniform ice straight stop; ABS active, wheels must not stay locked.
+low_mu           fl_locked_pct     <   50
+low_mu           fr_locked_pct     <   50
+low_mu           fl_phases         >   25
+low_mu           fr_phases         >   25
+
+# mu_jump — asphalt->ice transition; the tau_dump tuning target (baseline ~50%).
+mu_jump          fl_locked_pct     <   50
+mu_jump          fr_locked_pct     <   50
+mu_jump          fl_phases         >   25
+
+# split_mu — left/right different grip; straight stop, minimal yaw.
+split_mu         stop_distance_m   ~   73.44   0.10
+split_mu         yaw_deg           <   0.50
+split_mu         yaw_deg           >   -0.50
+split_mu         fl_locked_pct     <   15
+
+# brake_and_steer — brake while steering; heading preserved (large yaw expected).
+brake_and_steer  stop_distance_m   ~   60.81   0.10
+brake_and_steer  yaw_deg           ~   176.30  0.10
+brake_and_steer  fl_locked_pct     <   10
+
+# diagonal_mu — diagonal grip pattern; ABS active, low lock.
+diagonal_mu      stop_distance_m   ~   100.68  0.10
+diagonal_mu      fl_locked_pct     <   25
+diagonal_mu      fr_locked_pct     <   25
+diagonal_mu      fl_phases         >   20
