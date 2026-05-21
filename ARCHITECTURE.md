@@ -88,19 +88,27 @@ This is the interface to the external electric simulator.  It is a
 one-process wrapper over the electricsim shared-memory bus and is safe
 to drive every frame whether or not a peer is actually connected.
 
-**Endpoints** (see `ExternalSimConnector::Endpoints()`):
+**Endpoints — the registry lives in electricsim, not here.**  The
+authoritative, complete signal registry is electricsim's
+`docs/3d_sim_contract.md` (its cross-reference table) plus the
+`electricsim/src/io/ev1_*_signals.hpp` headers.  Do **not** treat this
+file as the registry: an earlier version of it listed only the
+4000..4033 bulb/horn/panel block and silently drifted behind reality as
+dozens of signals were added.  ev1sim's live list is whatever
+`ExternalSimConnector::Endpoints()` returns; the "covers every device
+exactly once" test pins the exact count.
 
-| Signal ID range | Direction         | Count | Purpose                       |
-|-----------------|-------------------|-------|-------------------------------|
-| 4000..4018      | electric → ev1sim | 19    | Per-bulb command (`LightID`)  |
-| 4020..4021      | electric → ev1sim | 2     | Horn low/high tones           |
-| 4030..4033      | ev1sim → electric | 4     | Panel ajar sensors (`PanelID`)|
+Signals fall into three ID blocks:
 
-The ID block starts at 4000 to stay clear of the electricsim harness
-example's 3000-block.  Bulb IDs 4000..4016 follow the electricsim
-`LightIdx` enum exactly; 4017..4018 extend the range for the two
-tail-filament bulbs (`LRTL`, `RRTL`) that ev1sim models but
-electricsim does not.
+| Block      | Segment      | What lives there                                    |
+|------------|--------------|-----------------------------------------------------|
+| 4000..4199 | chassis bus  | bulbs/horn (4000-4021), panel sensors (4030-4033), motor/throttle/brake/**sim-time** (4070-4075), wiper/HVAC/ambient (4080-4091), IPC telltales (4130-4145), BTCM actuators (4147-4154) |
+| 5000..5899 | main harness | per-module ECU signals **owned by electricsim** (BTCM 5000-5099, …) that ev1sim subscribes to |
+| 6900..6999 | main harness | driver inputs + 3D-sim-contract physics/sensors **ev1sim publishes** (6900-6991) |
+
+Bulb IDs 4000..4016 follow the electricsim `LightIdx` enum exactly;
+4017..4018 extend the range for the two tail-filament bulbs (`LRTL`,
+`RRTL`) that ev1sim models but electricsim does not.
 
 **Build-time optionality.**  If the electricsim repo is present next
 to this one (or pointed at via `-DELECTRICSIM_DIR=<path>`), the
@@ -153,10 +161,21 @@ These are meant to be consumed by CI.
 
 ## Adding a new electrical endpoint
 
-1. Append to the table in `ExternalSimConnector::Endpoints()` with a
-   unique 4000-range signal_id.
-2. Add get/set methods on the connector mirroring the existing bulb/
-   horn/panel patterns.
-3. Update [tests/test_external_sim_connector.cpp](tests/test_external_sim_connector.cpp)
+1. **Allocate the ID in the contract first.**  `electricsim/docs/3d_sim_contract.md`
+   plus the `electricsim/src/io/ev1_*_signals.hpp` headers are the single
+   source of truth.  Pick the right block (chassis 4000-range, module
+   main-harness 5000-range, or driver/3D-sim 6900-range) and a free ID;
+   never reuse one.  (4070 is motor RPM, **not** sim-time — that exact
+   mistake already shipped in a stale TODO note before this guard
+   existed.)
+2. Mirror the constant in `ExternalSimConnector.cpp` with a
+   `// Locked in lockstep with electricsim/src/io/...` comment.  For a
+   **chassis** signal, also add it to the `static_assert` block (gated on
+   `EV1SIM_HAVE_EXTERNAL_SIM`) that cross-checks every ev1sim chassis ID
+   against `electricsim::io::kSigChassis*` at compile time — drift then
+   becomes a build error, not a runtime mystery.
+3. Register it in `ExternalSimConnector::Endpoints()` and add get/set
+   methods mirroring the existing bulb/horn/panel patterns.
+4. Update [tests/test_external_sim_connector.cpp](tests/test_external_sim_connector.cpp)
    — the "covers every device exactly once" test will fail until the
    new endpoint is accounted for.
