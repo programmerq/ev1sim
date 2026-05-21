@@ -20,6 +20,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     constexpr int kNumChargeCplr    = 1;   // charge coupler present (4060, stub)
     constexpr int kNumPrnd          = 4;   // PRND selector lines (4050-4053)
     constexpr int kNumMotor         = 2;   // motor_rpm (4070), motor_torque_nm (4071)
+    constexpr int kNumSimTime       = 1;   // sim_time_ns (4075) — ev1sim → electricsim
     constexpr int kNumThrottleCmd   = 1;   // throttle_cmd_q8 (4073) — PIM → ev1sim
     constexpr int kNumBrake         = 1;   // master_cylinder_pressure_kpa (4074) — ev1sim → BTCM
     constexpr int kNumWiper         = 2;   // wiper_motor_command (4080), washer_pump_command (4081)
@@ -72,6 +73,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     constexpr int kNumDriverInputs = 35;  // +1 for passenger seatbelt (6965)
     const int expected = NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS +
                          kNumCombSw + kNumChargeCplr + kNumPrnd + kNumMotor +
+                         kNumSimTime +
                          kNumThrottleCmd + kNumBrake + kNumWiper +
                          kNumHvac + kNumAmbient + kNumDoorLockPw +
                          kNumRsaShiftBlocked +
@@ -131,6 +133,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
             ++charge_coupler_count;
         } else if (e.signal_id == 4070 || e.signal_id == 4071) {
             CHECK_FALSE(e.input_to_sim);    // motor RPM + torque are outputs
+            ++dynamics_count;
+        } else if (e.signal_id == 4075) {
+            CHECK_FALSE(e.input_to_sim);    // sim-time clock is an output (ev1sim → electricsim)
             ++dynamics_count;
         } else if (e.signal_id == 4073) {
             CHECK(e.input_to_sim);          // PIM throttle command flows into ev1sim
@@ -231,9 +236,10 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     CHECK(prnd_count           == kNumPrnd);
     CHECK(charge_coupler_count == kNumChargeCplr);
     // dynamics_count: 18 original dynamics + 2 motor (4070-4071)
-    // + throttle cmd (4073) + brake pressure (4074)
+    // + sim-time (4075) + throttle cmd (4073) + brake pressure (4074)
     // + 2 wiper (4080-4081) + 2 ambient env (4090-4091).
-    CHECK(dynamics_count       == kNumDynamics + kNumMotor + kNumThrottleCmd +
+    CHECK(dynamics_count       == kNumDynamics + kNumMotor + kNumSimTime +
+                                  kNumThrottleCmd +
                                   kNumBrake + kNumWiper + kNumAmbient);
     // hvac_count: blower level (4082) + defrost grid (4083) — from HTCM.
     CHECK(hvac_count           == kNumHvac);

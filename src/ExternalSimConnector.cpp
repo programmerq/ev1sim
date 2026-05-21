@@ -9,6 +9,7 @@
 #if EV1SIM_HAVE_EXTERNAL_SIM
 #  include "protocol.hpp"
 #  include "shm_transport.hpp"
+#  include "ev1_chassis_signals.hpp"  // canonical chassis IDs — drift guard below
 #  include <chrono>
 #endif
 
@@ -193,6 +194,16 @@ constexpr int kNumDriverInputs = 15 + kNumNewDriverInputs + kNumPowerWindowInput
 constexpr std::uint32_t kSigMotorRpm      = 4070U;
 constexpr std::uint32_t kSigMotorTorqueNm = 4071U;
 constexpr int           kNumMotorSignals  = 2;
+
+// Sim-time master clock (ev1sim → electricsim, chassis segment, uint64 LE ns).
+//   4075  vehicle.dynamics.sim_time_ns   monotonic Chrono sim-time, nanoseconds
+// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// kSigChassisSimTimeNs = 4075.  (NOT 4070 — that is motor RPM.)  Published
+// every physics step so electricsim's SimClock can switch from wall-clock to
+// sim-time-master mode (BTCM/PIM/IPC subscribe).  Must increase monotonically;
+// electricsim ignores non-increasing samples.
+constexpr std::uint32_t kSigSimTimeNs      = 4075U;
+constexpr int           kNumSimTimeSignals = 1;
 
 // Ambient environment sensors (ev1sim → electricsim, chassis segment, float32 LE).
 //   4090  vehicle.environment.ambient_temp_c          ambient air temperature (°C)
@@ -545,7 +556,7 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 //   eventual subscribers.
 constexpr int kNumEndpoints =
     NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumCombSw + 1 /*charge_coupler*/ +
-    kNumPrndSelector + kNumMotorSignals + kNumThrottleCmdSignals +
+    kNumPrndSelector + kNumMotorSignals + kNumSimTimeSignals + kNumThrottleCmdSignals +
     kNumBrakeSignals + kNumWiperSignals + kNumHvacSignals +
     kNumAmbientSignals + kNumDoorLockPwSignals + kNumRsaShiftBlockedSignals +
     kNumIpcTelltaleSignals + kNumIpcTripDistSignals + kNumIpcBtcmTelltaleSignals +
@@ -593,6 +604,9 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.dynamics.motor_rpm", "motor_rpm", false};
     out[i++] = {kSigMotorTorqueNm,
                 "vehicle.dynamics.motor_torque_nm", "motor_torque_nm", false};
+    // Sim-time master clock (chassis segment, ev1sim → electricsim, uint64 LE ns).
+    out[i++] = {kSigSimTimeNs,
+                "vehicle.dynamics.sim_time_ns", "sim_time_ns", false};
     // Ambient environment sensors (chassis segment, ev1sim → electricsim).
     out[i++] = {kSigAmbientTempC,
                 "vehicle.environment.ambient_temp_c", "ambient_temp_c", false};
@@ -2221,6 +2235,76 @@ DeltaRecord MakeI16Delta(std::uint32_t signal_id, std::int16_t value) {
     return d;
 }
 
+// uint64_t eight-byte unsigned little-endian payload (sim-time nanoseconds).
+// Matches electricsim's chassis-bus decode: sim_ns |= payload[i] << (8*i).
+DeltaRecord MakeU64Delta(std::uint32_t signal_id, std::uint64_t value) {
+    DeltaRecord d{};
+    d.signal_id = signal_id;
+    d.encoding  = SignalEncoding::Unsigned;
+    d.bit_width = 64;
+    for (int b = 0; b < 8; ++b)
+        d.payload.push_back(static_cast<std::uint8_t>((value >> (8 * b)) & 0xFFu));
+    return d;
+}
+
+// ── Cross-repo signal-ID drift guard ────────────────────────────────────────
+// ev1sim re-declares the chassis-bus signal IDs it shares with electricsim
+// (every "Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp"
+// constant above).  These static_asserts pin each one to electricsim's
+// canonical value, so any divergence is a compile error here rather than a
+// silent runtime mis-route.  The contract doc + ev1_chassis_signals.hpp stay
+// the single source of truth; this only enforces it.  Add a line whenever you
+// mirror a new chassis ID.  Only compiled when building against electricsim
+// (EV1SIM_HAVE_EXTERNAL_SIM), so the stub build is unaffected.
+#define EV1SIM_CHASSIS_ID_MATCHES(local_id, canonical)                       \
+    static_assert((local_id) == electricsim::io::canonical,                  \
+                  "ev1sim chassis ID " #local_id                             \
+                  " drifted from electricsim::io::" #canonical)
+
+EV1SIM_CHASSIS_ID_MATCHES(kSigMotorRpm,                  kSigChassisMotorRpm);
+EV1SIM_CHASSIS_ID_MATCHES(kSigMotorTorqueNm,             kSigChassisMotorTorqueNm);
+EV1SIM_CHASSIS_ID_MATCHES(kSigSimTimeNs,                 kSigChassisSimTimeNs);
+EV1SIM_CHASSIS_ID_MATCHES(kSigThrottleCmdQ8,             kSigChassisThrottleCmdQ8);
+EV1SIM_CHASSIS_ID_MATCHES(kSigBrakeMasterPressureKpa,    kSigChassisBrakeMasterPressureKpa);
+EV1SIM_CHASSIS_ID_MATCHES(kSigWiperMotorCommand,         kSigChassisWiperMotorCommand);
+EV1SIM_CHASSIS_ID_MATCHES(kSigWasherPumpCommand,         kSigChassisWasherPumpCommand);
+EV1SIM_CHASSIS_ID_MATCHES(kSigHvacBlowerLevel,           kSigChassisHvacBlowerLevel);
+EV1SIM_CHASSIS_ID_MATCHES(kSigDefrostGridActive,         kSigChassisDefrostGridActive);
+EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockCmdDriver,         kSigChassisDoorLockCmdDriver);
+EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockCmdPassenger,      kSigChassisDoorLockCmdPassenger);
+EV1SIM_CHASSIS_ID_MATCHES(kSigPowerWindowMotorDriver,    kSigChassisPowerWindowMotorDriver);
+EV1SIM_CHASSIS_ID_MATCHES(kSigPowerWindowMotorPassenger, kSigChassisPowerWindowMotorPassenger);
+EV1SIM_CHASSIS_ID_MATCHES(kSigRsaShiftBlocked,           kSigChassisRsaShiftBlocked);
+EV1SIM_CHASSIS_ID_MATCHES(kSigAmbientTempC,              kSigChassisAmbientTempC);
+EV1SIM_CHASSIS_ID_MATCHES(kSigAmbientHumidityPct,        kSigChassisAmbientHumidityPct);
+EV1SIM_CHASSIS_ID_MATCHES(kSigIpcSeatbeltTelltaleDriver,    kSigChassisIpcSeatbeltTelltaleDriver);
+EV1SIM_CHASSIS_ID_MATCHES(kSigIpcSeatbeltTelltalePassenger, kSigChassisIpcSeatbeltTelltalePassenger);
+EV1SIM_CHASSIS_ID_MATCHES(kSigIpcTripDistanceM,          kSigChassisIpcTripDistanceM);
+EV1SIM_CHASSIS_ID_MATCHES(kSigIpcBrakeTelltale,          kSigChassisIpcBrakeTelltale);
+EV1SIM_CHASSIS_ID_MATCHES(kSigIpcParkBrakeTelltale,      kSigChassisIpcParkBrakeTelltale);
+EV1SIM_CHASSIS_ID_MATCHES(kSigIpcAntilockTelltale,       kSigChassisIpcAntilockTelltale);
+EV1SIM_CHASSIS_ID_MATCHES(kSigIpcLowTracTelltale,        kSigChassisIpcLowTracTelltale);
+EV1SIM_CHASSIS_ID_MATCHES(kSigIpcAirBagTelltale,         kSigChassisIpcAirBagTelltale);
+EV1SIM_CHASSIS_ID_MATCHES(kSigBpmPackVoltageMv,          kSigChassisBpmPackVoltageMv);
+EV1SIM_CHASSIS_ID_MATCHES(kSigIpcServiceNowTelltale,     kSigChassisIpcServiceNowTelltale);
+EV1SIM_CHASSIS_ID_MATCHES(kSigIpcCheckMessagesTelltale,  kSigChassisIpcCheckMessagesTelltale);
+EV1SIM_CHASSIS_ID_MATCHES(kSigIpcTempTelltale,           kSigChassisIpcTempTelltale);
+EV1SIM_CHASSIS_ID_MATCHES(kSigIpcBatteryLifeTelltale,    kSigChassisIpcBatteryLifeTelltale);
+EV1SIM_CHASSIS_ID_MATCHES(kSigIpcReducedPerfTelltale,    kSigChassisIpcReducedPerfTelltale);
+EV1SIM_CHASSIS_ID_MATCHES(kSigIpcCheckTirePressTelltale, kSigChassisIpcCheckTirePressTelltale);
+EV1SIM_CHASSIS_ID_MATCHES(kSigChassisBtcmIsoCloseFL,     kSigChassisBtcmIsoCloseFL);
+EV1SIM_CHASSIS_ID_MATCHES(kSigChassisBtcmIsoCloseFR,     kSigChassisBtcmIsoCloseFR);
+EV1SIM_CHASSIS_ID_MATCHES(kSigChassisBtcmDumpOpenFL,     kSigChassisBtcmDumpOpenFL);
+EV1SIM_CHASSIS_ID_MATCHES(kSigChassisBtcmDumpOpenFR,     kSigChassisBtcmDumpOpenFR);
+EV1SIM_CHASSIS_ID_MATCHES(kSigChassisBtcmEmbMotorCmdLR,  kSigChassisBtcmEmbMotorCmdLR);
+EV1SIM_CHASSIS_ID_MATCHES(kSigChassisBtcmEmbMotorCmdRR,  kSigChassisBtcmEmbMotorCmdRR);
+EV1SIM_CHASSIS_ID_MATCHES(kSigChassisBtcmCylPressureFL_kPa, kSigChassisBtcmCylPressureFL_kPa);
+EV1SIM_CHASSIS_ID_MATCHES(kSigChassisBtcmCylPressureFR_kPa, kSigChassisBtcmCylPressureFR_kPa);
+// The 4100-range dynamics block publishes by literal offset from this base.
+EV1SIM_CHASSIS_ID_MATCHES(kDynamicsBase,                 kSigChassisSpeedMps);
+
+#undef EV1SIM_CHASSIS_ID_MATCHES
+
 } // namespace
 
 void ExternalSimConnector::Tick(double sim_time_s) {
@@ -2421,7 +2505,13 @@ void ExternalSimConnector::Tick(double sim_time_s) {
     if (st.has_vstate) {
         const auto& vs = st.vstate;
         std::vector<DeltaRecord> dyn;
-        dyn.reserve(static_cast<std::size_t>(kNumDynamics));
+        dyn.reserve(static_cast<std::size_t>(kNumDynamics + kNumSimTimeSignals));
+        // Sim-time master clock (chassis 4075, uint64 LE ns) — every tick,
+        // monotonic.  Lets electricsim's SimClock drive ECUs off sim-time
+        // instead of wall-clock; see kSigSimTimeNs.
+        dyn.push_back(MakeU64Delta(
+            kSigSimTimeNs,
+            static_cast<std::uint64_t>(vs.sim_time * 1.0e9)));
         dyn.push_back(MakeFloatDelta(4100, static_cast<float>(vs.speed_mps)));
         dyn.push_back(MakeFloatDelta(4101, static_cast<float>(vs.accel_long)));
         dyn.push_back(MakeFloatDelta(4102, static_cast<float>(vs.accel_lat)));
