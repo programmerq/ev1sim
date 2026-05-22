@@ -56,6 +56,8 @@ enum class InputAction {
     UiModeToggle,
     HelpToggle,
     Quit,
+
+    Count,  // sentinel — keep last; ties kInputActionCount to the enum below
 };
 
 namespace detail {
@@ -65,8 +67,9 @@ struct ActionName {
 };
 
 // Canonical snake_case names used in config/input_bindings.json.  Keep in sync
-// with InputAction above; the unit test asserts every enumerator (except None)
-// has exactly one name and round-trips.
+// with InputAction above — the static_assert below (via the InputAction::Count
+// sentinel) makes a forgotten entry a compile error, and the unit test checks
+// round-trip + uniqueness.
 inline constexpr ActionName kInputActionNames[] = {
     {InputAction::Horn,               "horn"},
     {InputAction::HeadlightCycle,     "headlight_cycle"},
@@ -98,6 +101,13 @@ inline constexpr ActionName kInputActionNames[] = {
 // Number of bindable named actions (excludes None).
 inline constexpr std::size_t kInputActionCount =
     sizeof(detail::kInputActionNames) / sizeof(detail::kInputActionNames[0]);
+
+// Every InputAction except None must have exactly one entry in the names table.
+// The Count sentinel ties the table size to the enum, so adding an enumerator
+// without giving it a name is a compile error rather than a silent round-trip
+// to "none".
+static_assert(kInputActionCount == static_cast<std::size_t>(InputAction::Count) - 1,
+              "add the new InputAction to detail::kInputActionNames");
 
 // Look up an action by its config name.  Returns std::nullopt for an unknown
 // name so config parsing can warn + skip rather than silently misbind a button.
