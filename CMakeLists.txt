@@ -1,9 +1,18 @@
 cmake_minimum_required(VERSION 3.18)
-project(ev1sim LANGUAGES CXX)
+project(ev1sim LANGUAGES C CXX)  # C is required by the vendored SDL3 (C library)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# Enable Objective-C++ up front — before any FetchContent that may enable OBJC
+# (SDL3 does, for its macOS joystick/haptic backend) — so the OBJCXX compile
+# rules are fully initialized for src/MacOSPlatform.mm regardless of subproject
+# language-enablement order.
+if(APPLE)
+    enable_language(OBJCXX)
+    set(CMAKE_OBJCXX_STANDARD 17)
+endif()
 
 
 # ── Chrono (must be pre-installed with Vehicle + Irrlicht modules) ──────────
@@ -47,6 +56,39 @@ FetchContent_Declare(json
     GIT_SHALLOW    TRUE
 )
 FetchContent_MakeAvailable(json)
+
+# ── SDL3 (wheel input + force feedback) — optional, compile-out-able ─────────
+# Prefer a system/Homebrew SDL3 (fast); otherwise vendor it via FetchContent
+# (matches the json/Catch2 pattern).  Only the joystick + haptic subsystems are
+# used — never video/audio — so SDL coexists with Irrlicht's window/GL context.
+option(EV1SIM_HAVE_WHEEL_IO "Build SDL3 wheel input + force feedback" ON)
+set(EV1SIM_WHEEL_IO_SRC "")
+set(_ev1sim_wheel_io FALSE)
+if(EV1SIM_HAVE_WHEEL_IO)
+    find_package(SDL3 QUIET CONFIG)
+    if(NOT SDL3_FOUND)
+        message(STATUS "SDL3: not found via find_package — vendoring via FetchContent")
+        set(SDL_SHARED       OFF CACHE BOOL "" FORCE)
+        set(SDL_STATIC       ON  CACHE BOOL "" FORCE)
+        set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
+        set(SDL_EXAMPLES     OFF CACHE BOOL "" FORCE)
+        # Build SDL with its default subsystems.  Disabling SDL_VIDEO in a static
+        # build leaves SDL_events.c referencing video-side symbols that are then
+        # undefined at link (SDL_PumpEventsInternal, ...).  We only *use*
+        # joystick + haptic at runtime; the unused backends are harmless in a
+        # static lib, and SDL3::SDL3 propagates the needed frameworks transitively.
+        FetchContent_Declare(SDL3
+            GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+            GIT_TAG        release-3.2.0
+            GIT_SHALLOW    TRUE
+        )
+        FetchContent_MakeAvailable(SDL3)
+    else()
+        message(STATUS "SDL3: using system package (${SDL3_DIR})")
+    endif()
+    set(EV1SIM_WHEEL_IO_SRC src/SdlContext.cpp)
+    set(_ev1sim_wheel_io TRUE)
+endif()
 
 # ── electricsim connector (optional) ────────────────────────────────────────
 # If the electricsim repo is checked out next to this one (or pointed at via
@@ -126,9 +168,9 @@ else()
 endif()
 
 # ── macOS Objective-C++ support ─────────────────────────────────────────────
+# (OBJCXX is enabled near the top, before FetchContent; here we only pick the
+#  platform source.)
 if(APPLE)
-    enable_language(OBJCXX)
-    set(CMAKE_OBJCXX_STANDARD 17)
     set(MACOS_PLATFORM_SRC src/MacOSPlatform.mm)
 else()
     set(MACOS_PLATFORM_SRC)
@@ -153,6 +195,7 @@ add_executable(ev1sim
     src/PhysicalWorld.cpp
     src/FloatingUiPanel.cpp
     src/ExternalSimConnector.cpp
+    ${EV1SIM_WHEEL_IO_SRC}
     ${MACOS_PLATFORM_SRC}
 )
 
@@ -164,6 +207,10 @@ target_link_libraries(ev1sim PRIVATE
 if(EV1SIM_HAVE_EXTERNAL_SIM)
     target_link_libraries(ev1sim PRIVATE electricsim_connector)
     target_compile_definitions(ev1sim PRIVATE EV1SIM_HAVE_EXTERNAL_SIM=1)
+endif()
+if(_ev1sim_wheel_io)
+    target_link_libraries(ev1sim PRIVATE SDL3::SDL3)
+    target_compile_definitions(ev1sim PRIVATE EV1SIM_HAVE_WHEEL_IO=1)
 endif()
 
 # Link macOS frameworks for platform fixes and audio.
@@ -225,6 +272,7 @@ if(BUILD_TESTS)
         src/WiperRenderer.cpp
         src/PhysicalWorld.cpp
         src/FloatingUiPanel.cpp
+        ${EV1SIM_WHEEL_IO_SRC}
     )
 
     target_include_directories(ev1sim_tests PRIVATE src)
@@ -239,6 +287,10 @@ if(BUILD_TESTS)
     if(EV1SIM_HAVE_EXTERNAL_SIM)
         target_link_libraries(ev1sim_tests PRIVATE electricsim_connector)
         target_compile_definitions(ev1sim_tests PRIVATE EV1SIM_HAVE_EXTERNAL_SIM=1)
+    endif()
+    if(_ev1sim_wheel_io)
+        target_link_libraries(ev1sim_tests PRIVATE SDL3::SDL3)
+        target_compile_definitions(ev1sim_tests PRIVATE EV1SIM_HAVE_WHEEL_IO=1)
     endif()
 
     include(CTest)
