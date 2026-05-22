@@ -1268,12 +1268,28 @@ int SimApp::RunWithVisualization() {
                                            m_panels->IsOpen(static_cast<PanelID>(i)));
         }
         m_external_sim->SetVehicleState(m_world->GetState());
-        // Combination switch wire-level outputs (chassis bus, IDs 4040-4042).
+        // Switch wire-level outputs on the chassis bus (cavity fidelity):
+        //   headlamp rotary    12084699  IDs 4040-4042
+        //   turn/hazard stalk  12092237  IDs 4043-4046 (incl. single horn cmd)
+        //   wiper/washer stalk 12092254  IDs 4054-4057
+        // Published here, before the wiper wash one-shot is consumed below.
         {
             const auto& cs = m_physical->combination_switch();
             m_external_sim->SetCombSwOutputs(cs.pin_low_beam_out(),
                                              cs.pin_flash_to_pass_out(),
                                              cs.pin_park_headlamp_out());
+            // Driver horn is a single contact (circuit 28); reflect the
+            // keyboard/HW horn into the switch object, then publish its cavity.
+            m_physical->horn_button().set_held(cmd.horn_low || cmd.horn_high);
+            const auto& ts = m_physical->turn_signal_stalk();
+            m_external_sim->SetTurnHazSwOutputs(
+                ts.pin_right_turn_out(), ts.pin_left_turn_out(),
+                m_physical->hazard_switch().pin_hazard_out(),
+                m_physical->horn_button().pin_horn_out());
+            const auto& ws = m_physical->wiper_stalk();
+            m_external_sim->SetWiperWasherSwOutputs(
+                ws.pin_delay_out(), ws.pin_request_out(),
+                ws.pin_hi_out(), ws.pin_washer_switch_out());
         }
         // Charge coupler presence (chassis bus, ID 4060).  Stubbed false until
         // a floating-UI panel or charge-door animation sets it.
@@ -1776,6 +1792,17 @@ int SimApp::RunHeadless() {
             m_external_sim->SetCombSwOutputs(cs.pin_low_beam_out(),
                                              cs.pin_flash_to_pass_out(),
                                              cs.pin_park_headlamp_out());
+            // Turn/hazard/horn (12092237) + wiper (12092254) output cavities.
+            m_physical->horn_button().set_held(cmd.horn_low || cmd.horn_high);
+            const auto& ts = m_physical->turn_signal_stalk();
+            m_external_sim->SetTurnHazSwOutputs(
+                ts.pin_right_turn_out(), ts.pin_left_turn_out(),
+                m_physical->hazard_switch().pin_hazard_out(),
+                m_physical->horn_button().pin_horn_out());
+            const auto& ws = m_physical->wiper_stalk();
+            m_external_sim->SetWiperWasherSwOutputs(
+                ws.pin_delay_out(), ws.pin_request_out(),
+                ws.pin_hi_out(), ws.pin_washer_switch_out());
         }
         // Charge coupler presence (chassis bus, ID 4060).  Stubbed false until
         // a floating-UI panel or charge-door animation sets it.
@@ -2056,9 +2083,9 @@ int SimApp::RunHeadless() {
 // ---------------------------------------------------------------------------
 void SimApp::PushExtContractDriverInputs(const DriverCommand& cmd) {
     if (!m_external_sim) return;
-    // Horn requests (6940/6941) — direct mirror of DriverCommand.
-    m_external_sim->SetDriverHornHighRequest(cmd.horn_high);
-    m_external_sim->SetDriverHornLowRequest(cmd.horn_low);
+    // (Horn 6940/6941 removed — the driver horn is a single contact (circuit
+    //  28), published as the chassis horn cavity 4046 alongside the turn/hazard
+    //  cavities in the render/headless publish blocks above.)
     // Headlight switch (6942) — CombinationSwitch::Position maps cleanly:
     //   OFF=0, PARK=1, ON=2, HI=3 — same numbering as the contract spec.
     if (m_physical) {

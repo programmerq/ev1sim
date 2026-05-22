@@ -16,7 +16,9 @@ using Catch::Matchers::WithinAbs;
 
 TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     constexpr int kNumDynamics      = 18;  // 10 chassis/actuator + 4 wheel_omega + 4 slip_ratio
-    constexpr int kNumCombSw        = 3;   // combination switch: low_beam, flash_to_pass, park_headlamp
+    constexpr int kNumCombSw        = 3;   // headlamp switch: low_beam, flash_to_pass, park_headlamp (4040-4042)
+    constexpr int kNumTurnHazSw     = 4;   // turn/hazard switch: right/left turn, hazard, horn (4043-4046)
+    constexpr int kNumWiperSw       = 4;   // wiper/washer switch: delay, request, hi, washer (4054-4057)
     constexpr int kNumChargeCplr    = 1;   // charge coupler present (4060, stub)
     constexpr int kNumPrnd          = 4;   // PRND selector lines (4050-4053)
     constexpr int kNumMotor         = 2;   // motor_rpm (4070), motor_torque_nm (4071)
@@ -43,15 +45,15 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
                                                //  4149 dump_open FL, 4150 dump_open FR,
                                                //  4151 EMB motor LR, 4152 EMB motor RR,
                                                //  4153 cyl press FL kPa, 4154 cyl press FR kPa)
-    constexpr int kNumExtContract = 18;        // 3D-sim contract publishes on main harness:
+    constexpr int kNumExtContract = 16;        // 3D-sim contract publishes on main harness:
                                                //  6920 body_velocity_mps, 6921/6922 long/lat accel,
                                                //  6930/6931 pose X/Y, 6932 pose yaw_rad,
-                                               //  6940/6941 horn high/low requests,
                                                //  6942 headlight switch, 6943 headlight dim,
                                                //  6945 telltale test, 6946/6947 park brake set/release,
                                                //  6960/6961 door open driver/passenger,
                                                //  6962 hood open, 6963 trunk open,
                                                //  6966 key position
+                                               //  (horn 6940/6941 removed — now chassis cavity 4046)
     // Driver inputs on the main harness segment (electricsim_ev1_bus), output
     // from ev1sim: brake_pedal_q8 (6900), steering_deg_q8 (6901),
     // gear_selector (6902), throttle_q8 (6903), brake_switch (6904),
@@ -72,7 +74,8 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     // (6970 is reserved — not registered as an endpoint.)
     constexpr int kNumDriverInputs = 35;  // +1 for passenger seatbelt (6965)
     const int expected = NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS +
-                         kNumCombSw + kNumChargeCplr + kNumPrnd + kNumMotor +
+                         kNumCombSw + kNumTurnHazSw + kNumWiperSw +
+                         kNumChargeCplr + kNumPrnd + kNumMotor +
                          kNumSimTime +
                          kNumThrottleCmd + kNumBrake + kNumWiper +
                          kNumHvac + kNumAmbient + kNumDoorLockPw +
@@ -91,6 +94,8 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     int horn_count           = 0;
     int panel_count          = 0;
     int comb_sw_count        = 0;
+    int turn_haz_count       = 0;   // turn/hazard switch cavities (4043-4046)
+    int wiper_sw_count       = 0;   // wiper/washer switch cavities (4054-4057)
     int charge_coupler_count = 0;
     int prnd_count           = 0;
     int dynamics_count       = 0;   // includes motor_rpm + motor_torque_nm
@@ -123,8 +128,14 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
             CHECK_FALSE(e.input_to_sim);    // panel sensors are outputs
             ++panel_count;
         } else if (e.signal_id >= 4040 && e.signal_id <= 4042) {
-            CHECK_FALSE(e.input_to_sim);    // combination switch outputs
+            CHECK_FALSE(e.input_to_sim);    // headlamp switch outputs
             ++comb_sw_count;
+        } else if (e.signal_id >= 4043 && e.signal_id <= 4046) {
+            CHECK_FALSE(e.input_to_sim);    // turn/hazard switch + horn cavities (outputs)
+            ++turn_haz_count;
+        } else if (e.signal_id >= 4054 && e.signal_id <= 4057) {
+            CHECK_FALSE(e.input_to_sim);    // wiper/washer switch cavities (outputs)
+            ++wiper_sw_count;
         } else if (e.signal_id >= 4050 && e.signal_id <= 4053) {
             CHECK_FALSE(e.input_to_sim);    // PRND selector lines are outputs
             ++prnd_count;
@@ -175,7 +186,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
             ++btcm_chassis_actuator_count;
         } else if ((e.signal_id >= 6920 && e.signal_id <= 6922) ||
                    (e.signal_id >= 6930 && e.signal_id <= 6932) ||
-                   (e.signal_id >= 6940 && e.signal_id <= 6943) ||
+                   (e.signal_id >= 6942 && e.signal_id <= 6943) ||
                     e.signal_id == 6945 ||
                    (e.signal_id >= 6946 && e.signal_id <= 6947) ||
                    (e.signal_id >= 6960 && e.signal_id <= 6963) ||
@@ -183,7 +194,6 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
             // 3D-sim contract publishes — main harness, ev1sim → electricsim.
             // 6920 body_velocity_mps, 6921/6922 long/lat accel,
             // 6930-6932 pose X/Y/yaw,
-            // 6940/6941 horn high/low requests,
             // 6942 headlight switch, 6943 headlight dim,
             // 6945 telltale test, 6946/6947 park brake set/release,
             // 6960-6963 door/hood/trunk open sensors,
@@ -233,6 +243,8 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     CHECK(horn_count           == 2);
     CHECK(panel_count          == VehiclePanels::NUM_PANELS);
     CHECK(comb_sw_count        == kNumCombSw);
+    CHECK(turn_haz_count       == kNumTurnHazSw);
+    CHECK(wiper_sw_count       == kNumWiperSw);
     CHECK(prnd_count           == kNumPrnd);
     CHECK(charge_coupler_count == kNumChargeCplr);
     // dynamics_count: 18 original dynamics + 2 motor (4070-4071)

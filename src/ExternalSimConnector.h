@@ -134,6 +134,13 @@ public:
     /// Published as wire-level booleans on the chassis bus (IDs 4040-4042).
     void SetCombSwOutputs(bool low_beam, bool flash_to_pass, bool park_headlamp);
 
+    /// Outgoing turn/hazard combination-switch (12092237) and wiper/washer
+    /// switch (12092254) pin states — published wire-level on the chassis bus.
+    /// Turn/hazard: right/left turn, hazard-active, single horn cmd (4043-4046).
+    /// Wiper: delay/request/hi/washer (4054-4057).
+    void SetTurnHazSwOutputs(bool right_turn, bool left_turn, bool hazard, bool horn);
+    void SetWiperWasherSwOutputs(bool delay, bool request, bool hi, bool washer);
+
     /// Outgoing driver inputs — published to the main harness segment
     /// (electricsim_ev1_bus, IDs 6900-6903).
     /// q8 values: brake/throttle 0..255 (normalized × 256), steering signed
@@ -238,12 +245,10 @@ public:
     /// §1.3 (buttons) and §1.4 (discrete sensors).  All publish on change
     /// with -1 sentinel for first-publish.
     ///
-    /// Horn requests (6940/6941): mirror of DriverCommand.horn_high/low.
-    /// Distinct from the bulb-side horn drive lines (4020/4021) which
-    /// flow electric→ev1sim.  These flow ev1sim→electric as the
-    /// driver's button press.
-    void SetDriverHornHighRequest(bool pressed);
-    void SetDriverHornLowRequest(bool pressed);
+    /// (Horn requests 6940/6941 removed — the driver horn is a single contact,
+    ///  circuit 28, now published as the chassis horn cavity 4046 via
+    ///  SetTurnHazSwOutputs.  The bulb-side horn drive lines 4020/4021 — the two
+    ///  sounders — are unchanged and still flow electric→ev1sim for audio.)
 
     /// Headlight switch position (6942): 0=OFF, 1=PARK, 2=ON (low beam),
     /// 3=HI (high beam).  Mirror of CombinationSwitch::Position.
