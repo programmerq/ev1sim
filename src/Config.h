@@ -2,6 +2,9 @@
 
 #include <string>
 
+#include "ForceFeedback.h"         // FfbConfig
+#include "WheelInputController.h"  // WheelConfig + axis/button bindings
+
 struct Config {
     std::string vehicle_model = "ev1";  // "ev1", "sedan", or "hmmwv"
 
@@ -51,6 +54,11 @@ struct Config {
         double steer_return_rate = 2.5;
         double throttle_rise_rate = 1.5;
         double brake_rise_rate   = 2.0;
+
+        // SDL3 wheel + force-feedback bindings (see config/input_bindings.json).
+        // Disabled by default; a bindings config enables and maps the device.
+        ev1sim::WheelConfig wheel;
+        ev1sim::FfbConfig   ffb;
     } input;
 
     struct Telemetry {
