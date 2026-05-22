@@ -83,6 +83,21 @@ constexpr std::uint32_t kCombSwFlashToPassOutId  = 4041;
 constexpr std::uint32_t kCombSwParkHeadlampOutId = 4042;
 constexpr int           kNumCombSw               = 3;
 
+// Turn/hazard combination switch outputs (ev1sim → electricsim, chassis segment).
+// Steering-column combination switch, connector 12092237 (DARK GRAY).
+// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// kSigTurnHazSw_* = 4043-4046.  Horn is a single command (circuit 28); there is
+// no hi/lo driver choice — LHJB drives both sounders (4020/4021) together.
+//   4043  vehicle.body.turn_haz_switch.right_turn_out   (pin B, DK BLU/WHT 1415)
+//   4044  vehicle.body.turn_haz_switch.left_turn_out    (pin C, LT BLU/WHT 1414)
+//   4045  vehicle.body.turn_haz_switch.hazard_out       (derived; cavity D 640H)
+//   4046  vehicle.body.turn_haz_switch.horn_out         (pin H, BLK 28)
+constexpr std::uint32_t kTurnHazSwRightTurnOutId = 4043;
+constexpr std::uint32_t kTurnHazSwLeftTurnOutId  = 4044;
+constexpr std::uint32_t kTurnHazSwHazardOutId    = 4045;
+constexpr std::uint32_t kTurnHazSwHornOutId      = 4046;
+constexpr int           kNumTurnHazSw            = 4;
+
 // Charge coupler presence (ev1sim → electricsim, chassis segment).
 //   4060  vehicle.body.charge_coupler.present
 //         True when the J1772/Avcon paddle is mated.  Stubbed false for now.
@@ -104,6 +119,20 @@ constexpr std::uint32_t kPrndSelectorBId = 4051;
 constexpr std::uint32_t kPrndSelectorCId = 4052;
 constexpr std::uint32_t kPrndSelectorDId = 4053;
 constexpr int           kNumPrndSelector = 4;
+
+// Wiper/washer switch outputs (ev1sim → electricsim, chassis segment).
+// Steering-column wiper/washer switch, connector 12092254 (BLACK).
+// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// kSigWiperSw_* = 4054-4057.  HI layers on the LOW "request" wire.
+//   4054  vehicle.body.wiper_washer_switch.delay_out         (pin B, GRA 112)
+//   4055  vehicle.body.wiper_washer_switch.request_out       (pin C, DK GRN 113)
+//   4056  vehicle.body.wiper_washer_switch.hi_out            (pin D, PPL 92)
+//   4057  vehicle.body.wiper_washer_switch.washer_switch_out (pin E, PNK 228C)
+constexpr std::uint32_t kWiperSwDelayOutId        = 4054;
+constexpr std::uint32_t kWiperSwRequestOutId      = 4055;
+constexpr std::uint32_t kWiperSwHiOutId           = 4056;
+constexpr std::uint32_t kWiperSwWasherSwitchOutId = 4057;
+constexpr int           kNumWiperSw               = 4;
 
 constexpr std::uint32_t kDynamicsBase   = 4100;
 

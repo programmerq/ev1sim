@@ -237,6 +237,15 @@ public:
     bool active_left()     const { return m_position == Position::LEFT;  }
     bool active_right()    const { return m_position == Position::RIGHT; }
 
+    // Combination-switch (connector 12092237) output cavities, published
+    // wire-level on the chassis bus.  Pure reflection of stalk position — as
+    // with CombinationSwitch's pins, run1/power gating is the consuming
+    // module's job (LHJB), not ours.
+    //   pin C, LT BLU/WHT 1414 "LEFT-TURN OUT"   (chassis ID 4044)
+    //   pin B, DK BLU/WHT 1415 "RIGHT-TURN OUT"  (chassis ID 4043)
+    bool pin_left_turn_out()  const { return active_left();  }
+    bool pin_right_turn_out() const { return active_right(); }
+
 private:
     /// Internal auto-cancel state machine states (per active signal direction).
     enum class AcState {
@@ -265,8 +274,34 @@ public:
     void toggle() { m_on = !m_on; }
     bool on() const { return m_on; }
 
+    // Combination-switch (12092237) cavity D is the 640H "HAZARD-SWITCH B+"
+    // supply *into* the switch; what crosses to the modules is the derived
+    // hazard-active state (chassis ID 4045), not the raw B+ probe — mirroring
+    // how CombinationSwitch publishes derived pin truth, never a supply pin.
+    bool pin_hazard_out() const { return m_on; }
+
 private:
     bool m_on = false;
+};
+
+/// Driver horn button (the horn pad on the wheel / steering column).
+///
+/// A single contact.  On the real EV1 it is circuit 28 "HORN OUT" (BLK),
+/// cavity H of the turn/hazard combination switch (connector 12092237),
+/// landing at LHJB J2-D16 "HORN COMMAND".  Held while pressed.  LHJB energizes
+/// BOTH the 400 Hz (low) and 500 Hz (high) sounders together — the hi/lo split
+/// lives only on the OUTPUT side (relay drives 4020/4021), it is not a driver
+/// choice.  (DriverCommand.horn_low/horn_high remain a keyboard-only debug aid.)
+class HornButton {
+public:
+    void set_held(bool held) { m_held = held; }
+    bool held() const { return m_held; }
+
+    // Cavity H, BLK 28 "HORN OUT" — single horn command wire (chassis ID 4046).
+    bool pin_horn_out() const { return m_held; }
+
+private:
+    bool m_held = false;
 };
 
 /// RSA interior keypad + mode-button simulator.
@@ -434,6 +469,23 @@ public:
     }
 
     Position position() const { return m_position; }
+
+    // Wiper/washer switch (connector 12092254) output cavities, published
+    // wire-level on the chassis bus.  HI layers on top of the LOW "request"
+    // wire so the consuming decode `hi?HIGH : request?LOW : delay?INT : OFF`
+    // is order-robust regardless of whether request is also asserted at HIGH.
+    //   pin B, GRA 112   "WIPER DELAY OUT"    INT only      (chassis ID 4054)
+    //   pin C, DK GRN 113 "REQUEST OUT"        LOW or HIGH   (chassis ID 4055)
+    //   pin D, PPL 92    "HI OUT"             HIGH only     (chassis ID 4056)
+    //   pin E, PNK 228C  "WASHER-SWITCH OUT"  wash pressed   (chassis ID 4057)
+    // TODO(verify): confirm the position->cavity truth table against EV1 ESM
+    // p.643; RHJB's decode must mirror exactly what lands here.
+    bool pin_delay_out()   const { return m_position == Position::INT; }
+    bool pin_request_out() const {
+        return m_position == Position::LOW || m_position == Position::HIGH;
+    }
+    bool pin_hi_out()            const { return m_position == Position::HIGH; }
+    bool pin_washer_switch_out() const { return m_wash; }
 
 private:
     Position m_position = Position::OFF;
@@ -731,6 +783,9 @@ public:
     HazardSwitch&       hazard_switch()       { return m_hazard_sw; }
     const HazardSwitch& hazard_switch() const { return m_hazard_sw; }
 
+    HornButton&       horn_button()       { return m_horn_button; }
+    const HornButton& horn_button() const { return m_horn_button; }
+
     RsaKeypadDriver&       rsa_keypad()       { return m_rsa_keypad; }
     const RsaKeypadDriver& rsa_keypad() const { return m_rsa_keypad; }
 
@@ -790,6 +845,7 @@ private:
     PrndSelector       m_prnd_sel;
     TurnSignalStalk    m_turn_stalk;
     HazardSwitch       m_hazard_sw;
+    HornButton         m_horn_button;
     RsaKeypadDriver    m_rsa_keypad;
     IpcTripResetButton m_ipc_trip_reset;
     CruiseStalk        m_cruise_stalk;
