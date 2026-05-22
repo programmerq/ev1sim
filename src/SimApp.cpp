@@ -79,11 +79,10 @@ SimApp::SimApp(const Config& config) : m_config(config) {
         if (m_sdl->ok()) {
             m_wheel = std::make_unique<ev1sim::WheelInputController>(
                 m_sdl.get(), m_config.input.wheel);
-            if (m_config.input.ffb.enabled && m_wheel->HasDevice()) {
-                m_ffb = std::make_unique<ev1sim::ForceFeedback>(
-                    m_wheel->JoystickHandle(), m_config.input.ffb);
-            }
         }
+        // ForceFeedback is attached lazily in the render loop once a wheel is
+        // actually present, so it works even when the wheel is hot-plugged
+        // after startup (and is dropped + re-attached across disconnects).
     }
 #endif
 
@@ -1077,12 +1076,19 @@ int SimApp::RunWithVisualization() {
         if (m_wheel) {
             DriverCommand w = m_wheel->Update(render_dt);
             if (m_wheel->HasDevice()) {
+                // Lazily attach force feedback on first connect / hot-plug.
+                if (!m_ffb && m_config.input.ffb.enabled) {
+                    m_ffb = std::make_unique<ev1sim::ForceFeedback>(
+                        m_wheel->JoystickHandle(), m_config.input.ffb);
+                }
                 cmd.steering    = w.steering;
                 cmd.throttle    = w.throttle;
                 cmd.front_brake = w.front_brake;
                 cmd.rear_brake  = w.rear_brake;
                 cmd.horn_low    = cmd.horn_low  || w.horn_low;
                 cmd.horn_high   = cmd.horn_high || w.horn_high;
+            } else if (m_ffb) {
+                m_ffb.reset();  // wheel gone — drop FFB so it re-attaches on reconnect
             }
             for (ev1sim::InputAction a : m_wheel->PendingActions()) DispatchAction(a);
             m_wheel->ClearPendingActions();
