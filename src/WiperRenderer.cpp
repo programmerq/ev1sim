@@ -4,6 +4,10 @@
 #include <cstring>
 #include <cwchar>
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 // Irrlicht headers — only needed for DrawHUD / ApplyToScene, both of which
 // are guarded by a device/node pointer check, so the headers compile fine in
 // headless unit-test builds too.

@@ -24,6 +24,27 @@ std::atomic<bool> g_stop_requested{false};
 extern "C" void HeadlessSigintHandler(int) {
     g_stop_requested.store(true, std::memory_order_relaxed);
 }
+
+// Cross-platform SIGINT install/restore.  POSIX uses sigaction so the previous
+// disposition can be restored exactly; MSVC's <csignal> only offers signal(),
+// which is sufficient for a Ctrl-C-to-quit handler.
+#ifdef _WIN32
+using SigintPrev = void (*)(int);
+inline SigintPrev InstallSigint(void (*handler)(int)) {
+    return std::signal(SIGINT, handler);
+}
+inline void RestoreSigint(SigintPrev prev) { std::signal(SIGINT, prev); }
+#else
+using SigintPrev = struct sigaction;
+inline SigintPrev InstallSigint(void (*handler)(int)) {
+    struct sigaction new_sa{}, old_sa{};
+    new_sa.sa_handler = handler;
+    sigemptyset(&new_sa.sa_mask);
+    sigaction(SIGINT, &new_sa, &old_sa);
+    return old_sa;
+}
+inline void RestoreSigint(SigintPrev prev) { sigaction(SIGINT, &prev, nullptr); }
+#endif
 }  // namespace
 
 // ---------------------------------------------------------------------------
@@ -1747,10 +1768,7 @@ int SimApp::RunWithVisualization() {
 int SimApp::RunHeadless() {
     // Install SIGINT handler so Ctrl-C breaks out of the loop cleanly.
     g_stop_requested.store(false, std::memory_order_relaxed);
-    struct sigaction new_sa{}, old_sa{};
-    new_sa.sa_handler = &HeadlessSigintHandler;
-    sigemptyset(&new_sa.sa_mask);
-    sigaction(SIGINT, &new_sa, &old_sa);
+    SigintPrev old_sa = InstallSigint(&HeadlessSigintHandler);
 
     const double step     = m_config.simulation.step_size_s;
     const double tick_dt  = 1.0 / std::max(1, m_config.simulation.render_fps);
@@ -2083,7 +2101,7 @@ int SimApp::RunHeadless() {
             std::cout << "[SimApp] Scripted scenario complete at t="
                       << t << "s — exiting.\n";
             if (m_scenario) m_scenario->Close();
-            sigaction(SIGINT, &old_sa, nullptr);
+            RestoreSigint(old_sa);
             return kExitSuccess;
         }
 
@@ -2096,7 +2114,7 @@ int SimApp::RunHeadless() {
                       << " passed, "  << m_scenario->FailedAssertions()
                       << " failed) — exiting.\n";
             m_scenario->Close();
-            sigaction(SIGINT, &old_sa, nullptr);
+            RestoreSigint(old_sa);
             return failed ? kExitScenarioAssertion : kExitSuccess;
         }
 
@@ -2107,12 +2125,12 @@ int SimApp::RunHeadless() {
                 std::cerr << "[SimApp] max_time_s reached with scripted "
                              "scenario still in phase '"
                           << m_scripted->PhaseName() << "' — timeout.\n";
-                sigaction(SIGINT, &old_sa, nullptr);
+                RestoreSigint(old_sa);
                 return kExitTimeout;
             }
             std::cout << "[SimApp] max_time_s reached — exiting.\n";
             if (m_scenario) m_scenario->Close();
-            sigaction(SIGINT, &old_sa, nullptr);
+            RestoreSigint(old_sa);
             return kExitSuccess;
         }
     }
@@ -2120,7 +2138,7 @@ int SimApp::RunHeadless() {
     // Fell out of the loop -> SIGINT was the only possible cause.
     std::cout << "[SimApp] SIGINT — exiting.\n";
     if (m_scenario) m_scenario->Close();
-    sigaction(SIGINT, &old_sa, nullptr);
+    RestoreSigint(old_sa);
     return kExitInterrupted;
 }
 

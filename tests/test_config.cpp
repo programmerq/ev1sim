@@ -3,9 +3,14 @@
 
 #include "Config.h"
 
+#include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
-#include <unistd.h>
+#ifdef _WIN32
+#include <process.h>   // _getpid
+#else
+#include <unistd.h>    // getpid
+#endif
 
 using Catch::Matchers::WithinAbs;
 
@@ -14,9 +19,15 @@ using Catch::Matchers::WithinAbs;
 // same /tmp filename — that race used to flake the JSON-loading tests.
 static std::string WriteTempJson(const std::string& content) {
     static int counter = 0;
-    std::string path = "/tmp/ev1sim_test_config_" +
-                       std::to_string(getpid()) + "_" +
-                       std::to_string(counter++) + ".json";
+#ifdef _WIN32
+    const auto pid = _getpid();
+#else
+    const auto pid = getpid();
+#endif
+    std::string path =
+        (std::filesystem::temp_directory_path() /
+         ("ev1sim_test_config_" + std::to_string(pid) + "_" +
+          std::to_string(counter++) + ".json")).string();
     std::ofstream f(path);
     f << content;
     return path;

@@ -3,6 +3,10 @@
 // macOS-specific platform fixes for Irrlicht.
 // All functions are no-ops on non-Apple platforms.
 
+#ifdef __APPLE__
+
+// Real implementations live in MacOSPlatform.mm (Objective-C++).
+
 /// Promote the process to a foreground application so the window
 /// can receive focus.  Call after the Irrlicht device is created.
 void macos_activate_app();
@@ -25,3 +29,14 @@ void macos_setup_menu_bar();
 
 /// Enable the green titlebar fullscreen button on the Irrlicht window.
 void macos_enable_fullscreen();
+
+#else
+
+// Non-Apple platforms: inline no-op stubs so callers link without the .mm.
+inline void macos_activate_app() {}
+inline void macos_fix_retina_viewport() {}
+inline void macos_apply_viewport() {}
+inline void macos_setup_menu_bar() {}
+inline void macos_enable_fullscreen() {}
+
+#endif  // __APPLE__
