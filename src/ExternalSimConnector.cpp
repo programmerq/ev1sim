@@ -426,8 +426,9 @@ constexpr std::uint32_t kSigExtVehiclePoseX           = 6930U;
 constexpr std::uint32_t kSigExtVehiclePoseY           = 6931U;
 constexpr std::uint32_t kSigExtVehiclePoseYawRad      = 6932U;
 // Buttons / discrete driver inputs — see docs/3d_sim_contract.md §1.3.
-constexpr std::uint32_t kSigDriverHornHighRequest     = 6940U;
-constexpr std::uint32_t kSigDriverHornLowRequest      = 6941U;
+// 6940/6941 (horn high/low request) REMOVED — the driver horn is a single
+// physical contact (circuit 28), now published as chassis horn cavity 4046.
+// IDs left reserved (do not reuse) per docs/3d_sim_contract.md §1.3.
 constexpr std::uint32_t kSigDriverHeadlightSwitch     = 6942U;
 constexpr std::uint32_t kSigDriverHeadlightDimRequest = 6943U;
 constexpr std::uint32_t kSigDriverTelltaleTestRequest = 6945U;
@@ -439,7 +440,7 @@ constexpr std::uint32_t kSigSensorDoorOpenPassenger   = 6961U;
 constexpr std::uint32_t kSigSensorHoodOpen            = 6962U;
 constexpr std::uint32_t kSigSensorTrunkOpen           = 6963U;
 constexpr std::uint32_t kSigSensorKeyPosition         = 6966U;
-constexpr int kNumExtContractSignals = 18;
+constexpr int kNumExtContractSignals = 16;  // was 18; horn 6940/6941 removed (now chassis cavity 4046)
 
 // BTCM per-wheel actuator state published on the chassis bus (IDs 4147-4154).
 // These mirror the legacy main-harness publications above but live on the
@@ -591,6 +592,7 @@ constexpr int kNumEndpoints =
     kNumIpcTelltaleSignals + kNumIpcTripDistSignals + kNumIpcBtcmTelltaleSignals +
     kNumIpcExtraTelltaleSignals + kNumBpmPackVoltageSignals +
     kNumBtcmActuatorChassisSignals + kNumExtContractSignals +
+    kNumTurnHazSw + kNumWiperSw +
     kNumDynamics + kNumDriverInputs;
 
 std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
@@ -617,6 +619,18 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     out[i++] = {kCombSwParkHeadlampOutId,
                 "vehicle.body.combination_switch.park_headlamp_out",
                 "comb_sw_park_headlamp_out", false};
+    out[i++] = {kTurnHazSwRightTurnOutId,
+                "vehicle.body.turn_haz_switch.right_turn_out",
+                "turn_haz_right_turn_out", false};
+    out[i++] = {kTurnHazSwLeftTurnOutId,
+                "vehicle.body.turn_haz_switch.left_turn_out",
+                "turn_haz_left_turn_out", false};
+    out[i++] = {kTurnHazSwHazardOutId,
+                "vehicle.body.turn_haz_switch.hazard_out",
+                "turn_haz_hazard_out", false};
+    out[i++] = {kTurnHazSwHornOutId,
+                "vehicle.body.turn_haz_switch.horn_out",
+                "turn_haz_horn_out", false};
     out[i++] = {kChargeCouplerPresentId,
                 "vehicle.body.charge_coupler.present",
                 "charge_coupler_present", false};
@@ -628,6 +642,18 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.driver.prnd_selector_c", "prnd_selector_c", false};
     out[i++] = {kPrndSelectorDId,
                 "vehicle.driver.prnd_selector_d", "prnd_selector_d", false};
+    out[i++] = {kWiperSwDelayOutId,
+                "vehicle.body.wiper_washer_switch.delay_out",
+                "wiper_sw_delay_out", false};
+    out[i++] = {kWiperSwRequestOutId,
+                "vehicle.body.wiper_washer_switch.request_out",
+                "wiper_sw_request_out", false};
+    out[i++] = {kWiperSwHiOutId,
+                "vehicle.body.wiper_washer_switch.hi_out",
+                "wiper_sw_hi_out", false};
+    out[i++] = {kWiperSwWasherSwitchOutId,
+                "vehicle.body.wiper_washer_switch.washer_switch_out",
+                "wiper_sw_washer_switch_out", false};
     // Motor state signals (chassis segment, ev1sim → electricsim).
     out[i++] = {kSigMotorRpm,
                 "vehicle.dynamics.motor_rpm", "motor_rpm", false};
@@ -889,12 +915,7 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.sensor.trunk_open",
                 "sensor_trunk_open", false};
     // Buttons / discrete driver inputs (3D-sim contract §1.3).
-    out[i++] = {kSigDriverHornHighRequest,
-                "vehicle.driver.horn_high_request",
-                "ext_horn_high_request", false};
-    out[i++] = {kSigDriverHornLowRequest,
-                "vehicle.driver.horn_low_request",
-                "ext_horn_low_request", false};
+    // (Horn 6940/6941 removed — single chassis horn cavity 4046; see above.)
     out[i++] = {kSigDriverHeadlightSwitch,
                 "vehicle.driver.headlight_switch",
                 "ext_headlight_switch", false};
@@ -962,19 +983,17 @@ struct ExternalSimConnector::State {
     std::int8_t sensor_hood_open_pub           = -1;
     std::int8_t sensor_trunk_open_pub          = -1;
 
-    // 3D-sim contract buttons/discretes (6940-6947, 6966).
+    // 3D-sim contract buttons/discretes (6942-6947, 6966).
     // Values latched via the SetDriver*Request / SetSensor* setters and
     // published on change in the main-harness Tick block.
-    bool         ext_horn_high_request          = false;
-    bool         ext_horn_low_request           = false;
+    // (Horn 6940/6941 removed — collapsed to the single chassis horn cavity
+    //  4046, circuit 28; see SetTurnHazSwOutputs + the chassis publish block.)
     std::uint8_t ext_headlight_switch           = 0;   // 0=OFF, 1=PARK, 2=ON, 3=HI
     bool         ext_headlight_dim_request      = false;
     bool         ext_telltale_test_request      = false;
     bool         ext_park_brake_set_request     = false;
     bool         ext_park_brake_release_request = false;
     std::uint8_t ext_key_position               = 2;   // default RUN — see note in setter
-    std::int8_t  ext_horn_high_pub          = -1;
-    std::int8_t  ext_horn_low_pub           = -1;
     std::int8_t  ext_headlight_switch_pub   = -1;
     std::int8_t  ext_headlight_dim_pub      = -1;
     std::int8_t  ext_telltale_test_pub      = -1;
@@ -991,6 +1010,30 @@ struct ExternalSimConnector::State {
     bool comb_sw_flash_to_pass_pub = false;
     bool comb_sw_park_headlamp_pub = false;
     bool comb_sw_ever_published    = false;
+
+    // Turn/hazard combination switch (12092237) output cavities — latched by
+    // SetTurnHazSwOutputs(), published wire-level on the chassis segment on change.
+    bool turn_haz_right_turn = false;
+    bool turn_haz_left_turn  = false;
+    bool turn_haz_hazard     = false;
+    bool turn_haz_horn       = false;
+    bool turn_haz_right_turn_pub = false;
+    bool turn_haz_left_turn_pub  = false;
+    bool turn_haz_hazard_pub     = false;
+    bool turn_haz_horn_pub       = false;
+    bool turn_haz_ever_published = false;
+
+    // Wiper/washer switch (12092254) output cavities — latched by
+    // SetWiperWasherSwOutputs(), published wire-level on the chassis segment on change.
+    bool wiper_delay   = false;
+    bool wiper_request = false;
+    bool wiper_hi      = false;
+    bool wiper_washer  = false;
+    bool wiper_delay_pub   = false;
+    bool wiper_request_pub = false;
+    bool wiper_hi_pub      = false;
+    bool wiper_washer_pub  = false;
+    bool wiper_ever_published = false;
 
     // Vehicle dynamics snapshot — updated by SetVehicleState() each frame,
     // published in Tick() as float32 signals.
@@ -1612,6 +1655,22 @@ void ExternalSimConnector::SetCombSwOutputs(bool low_beam, bool flash_to_pass, b
     m_state->comb_sw_park_headlamp = park_headlamp;
 }
 
+void ExternalSimConnector::SetTurnHazSwOutputs(bool right_turn, bool left_turn,
+                                               bool hazard, bool horn) {
+    m_state->turn_haz_right_turn = right_turn;
+    m_state->turn_haz_left_turn  = left_turn;
+    m_state->turn_haz_hazard     = hazard;
+    m_state->turn_haz_horn       = horn;
+}
+
+void ExternalSimConnector::SetWiperWasherSwOutputs(bool delay, bool request,
+                                                   bool hi, bool washer) {
+    m_state->wiper_delay   = delay;
+    m_state->wiper_request = request;
+    m_state->wiper_hi      = hi;
+    m_state->wiper_washer  = washer;
+}
+
 void ExternalSimConnector::SetDriverBrakePedalQ8(std::uint8_t q8) {
     m_state->driver_brake_q8 = q8;
 }
@@ -1720,14 +1779,9 @@ void ExternalSimConnector::SetDriverWiperWashRequest(bool pressed) {
 }
 
 // ---------------------------------------------------------------------------
-// 3D-sim contract buttons / discrete sensors (6940-6947, 6966).
+// 3D-sim contract buttons / discrete sensors (6942-6947, 6966).
+// (Horn 6940/6941 removed — see SetTurnHazSwOutputs / chassis horn cavity 4046.)
 // ---------------------------------------------------------------------------
-void ExternalSimConnector::SetDriverHornHighRequest(bool pressed) {
-    m_state->ext_horn_high_request = pressed;
-}
-void ExternalSimConnector::SetDriverHornLowRequest(bool pressed) {
-    m_state->ext_horn_low_request = pressed;
-}
 void ExternalSimConnector::SetDriverHeadlightSwitch(std::uint8_t position) {
     // Clamp to the 0..3 contract range; anything else is a programmer error.
     m_state->ext_headlight_switch = (position <= 3) ? position : 0;
@@ -2329,6 +2383,14 @@ EV1SIM_CHASSIS_ID_MATCHES(kSigChassisBtcmEmbMotorCmdLR,  kSigChassisBtcmEmbMotor
 EV1SIM_CHASSIS_ID_MATCHES(kSigChassisBtcmEmbMotorCmdRR,  kSigChassisBtcmEmbMotorCmdRR);
 EV1SIM_CHASSIS_ID_MATCHES(kSigChassisBtcmCylPressureFL_kPa, kSigChassisBtcmCylPressureFL_kPa);
 EV1SIM_CHASSIS_ID_MATCHES(kSigChassisBtcmCylPressureFR_kPa, kSigChassisBtcmCylPressureFR_kPa);
+EV1SIM_CHASSIS_ID_MATCHES(kTurnHazSwRightTurnOutId, kSigTurnHazSw_RightTurnOut);
+EV1SIM_CHASSIS_ID_MATCHES(kTurnHazSwLeftTurnOutId,  kSigTurnHazSw_LeftTurnOut);
+EV1SIM_CHASSIS_ID_MATCHES(kTurnHazSwHazardOutId,    kSigTurnHazSw_HazardOut);
+EV1SIM_CHASSIS_ID_MATCHES(kTurnHazSwHornOutId,      kSigTurnHazSw_HornOut);
+EV1SIM_CHASSIS_ID_MATCHES(kWiperSwDelayOutId,        kSigWiperSw_DelayOut);
+EV1SIM_CHASSIS_ID_MATCHES(kWiperSwRequestOutId,      kSigWiperSw_RequestOut);
+EV1SIM_CHASSIS_ID_MATCHES(kWiperSwHiOutId,           kSigWiperSw_HiOut);
+EV1SIM_CHASSIS_ID_MATCHES(kWiperSwWasherSwitchOutId, kSigWiperSw_WasherSwitchOut);
 // The 4100-range dynamics block publishes by literal offset from this base.
 EV1SIM_CHASSIS_ID_MATCHES(kDynamicsBase,                 kSigChassisSpeedMps);
 
@@ -2383,6 +2445,8 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         st.status    = Status::Connected;
         st.next_presence_time    = 0.0;
         st.panel_ever_published  = false;  // re-publish all panels after reconnect
+        st.turn_haz_ever_published = false; // re-publish turn/hazard cavities after reconnect
+        st.wiper_ever_published    = false; // re-publish wiper cavities after reconnect
         // Force re-publish of all chassis outputs after reconnect.
         st.charge_coupler_present_pub = -1;
         st.prnd_a_pub = -1;
@@ -2491,6 +2555,40 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         st.comb_sw_flash_to_pass_pub = st.comb_sw_flash_to_pass;
         st.comb_sw_park_headlamp_pub = st.comb_sw_park_headlamp;
         st.comb_sw_ever_published    = true;
+    }
+
+    // Turn/hazard combination switch cavities (IDs 4043-4046) — on change.
+    if (!st.turn_haz_ever_published ||
+        st.turn_haz_right_turn != st.turn_haz_right_turn_pub ||
+        st.turn_haz_left_turn  != st.turn_haz_left_turn_pub  ||
+        st.turn_haz_hazard     != st.turn_haz_hazard_pub     ||
+        st.turn_haz_horn       != st.turn_haz_horn_pub) {
+        outbound.push_back(MakeBoolDelta(kTurnHazSwRightTurnOutId, st.turn_haz_right_turn));
+        outbound.push_back(MakeBoolDelta(kTurnHazSwLeftTurnOutId,  st.turn_haz_left_turn));
+        outbound.push_back(MakeBoolDelta(kTurnHazSwHazardOutId,    st.turn_haz_hazard));
+        outbound.push_back(MakeBoolDelta(kTurnHazSwHornOutId,      st.turn_haz_horn));
+        st.turn_haz_right_turn_pub = st.turn_haz_right_turn;
+        st.turn_haz_left_turn_pub  = st.turn_haz_left_turn;
+        st.turn_haz_hazard_pub     = st.turn_haz_hazard;
+        st.turn_haz_horn_pub       = st.turn_haz_horn;
+        st.turn_haz_ever_published = true;
+    }
+
+    // Wiper/washer switch cavities (IDs 4054-4057) — on change.
+    if (!st.wiper_ever_published ||
+        st.wiper_delay   != st.wiper_delay_pub   ||
+        st.wiper_request != st.wiper_request_pub ||
+        st.wiper_hi      != st.wiper_hi_pub      ||
+        st.wiper_washer  != st.wiper_washer_pub) {
+        outbound.push_back(MakeBoolDelta(kWiperSwDelayOutId,        st.wiper_delay));
+        outbound.push_back(MakeBoolDelta(kWiperSwRequestOutId,      st.wiper_request));
+        outbound.push_back(MakeBoolDelta(kWiperSwHiOutId,           st.wiper_hi));
+        outbound.push_back(MakeBoolDelta(kWiperSwWasherSwitchOutId, st.wiper_washer));
+        st.wiper_delay_pub   = st.wiper_delay;
+        st.wiper_request_pub = st.wiper_request;
+        st.wiper_hi_pub      = st.wiper_hi;
+        st.wiper_washer_pub  = st.wiper_washer;
+        st.wiper_ever_published = true;
     }
 
     // Charge coupler presence (ID 4060) — publish delta on change.
@@ -2618,8 +2716,6 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             st.sensor_door_open_passenger_pub   = -1;
             st.sensor_hood_open_pub             = -1;
             st.sensor_trunk_open_pub            = -1;
-            st.ext_horn_high_pub                = -1;
-            st.ext_horn_low_pub                 = -1;
             st.ext_headlight_switch_pub         = -1;
             st.ext_headlight_dim_pub            = -1;
             st.ext_telltale_test_pub            = -1;
@@ -2871,13 +2967,8 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         publish_bool_change(kSigSensorTrunkOpen,
                             st.panel[static_cast<int>(PanelID::TRUNK)],
                             st.sensor_trunk_open_pub);
-        // 3D-sim contract buttons + key position (6940-6947, 6966).
-        publish_bool_change(kSigDriverHornHighRequest,
-                            st.ext_horn_high_request,
-                            st.ext_horn_high_pub);
-        publish_bool_change(kSigDriverHornLowRequest,
-                            st.ext_horn_low_request,
-                            st.ext_horn_low_pub);
+        // 3D-sim contract buttons + key position (6942-6947, 6966).
+        // (Horn 6940/6941 removed — single chassis horn cavity 4046.)
         publish_bool_change(kSigDriverHeadlightDimRequest,
                             st.ext_headlight_dim_request,
                             st.ext_headlight_dim_pub);
