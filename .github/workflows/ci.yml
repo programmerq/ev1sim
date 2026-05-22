@@ -44,8 +44,13 @@ jobs:
               if sim.get('headless'):
                   has_max = sim.get('max_time_s', 0) > 0
                   has_scripted = j.get('scripted', {}).get('enabled', False)
-                  if not (has_max or has_scripted):
-                      print(f'BAD {p}: headless requires max_time_s>0 or scripted.enabled')
+                  # A scenario harness self-terminates when its steps complete
+                  # (the ABS regression configs rely on this), so it counts as a
+                  # valid termination condition too.
+                  scen = j.get('scenario', {})
+                  has_scenario = bool(scen.get('path')) or scen.get('enabled', False)
+                  if not (has_max or has_scripted or has_scenario):
+                      print(f'BAD {p}: headless requires max_time_s>0, scripted.enabled, or a scenario')
                       errs += 1
           sys.exit(1 if errs else 0)
           PY
