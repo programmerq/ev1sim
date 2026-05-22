@@ -115,4 +115,9 @@ TEST_CASE("ForceFeedback curve: scale, sign, clamp, invert, speed taper", "[ffb]
     CHECK_THAT(ForceFeedback::CurveUnitForce(tap, 5.0, 0.0),  WithinAbs(0.0, 1e-9));   // below start
     CHECK_THAT(ForceFeedback::CurveUnitForce(tap, 5.0, 10.0), WithinAbs(0.25, 1e-9));  // halfway
     CHECK_THAT(ForceFeedback::CurveUnitForce(tap, 5.0, 20.0), WithinAbs(0.5, 1e-9));   // above full
+
+    // A misconfigured negative max_clamp must not be UB — force sanitizes to 0.
+    FfbConfig bad = cfg;
+    bad.max_clamp = -1.0;
+    CHECK_THAT(ForceFeedback::CurveUnitForce(bad, 5.0, 30.0), WithinAbs(0.0, 1e-9));
 }

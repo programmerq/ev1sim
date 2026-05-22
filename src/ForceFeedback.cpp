@@ -21,7 +21,10 @@ double ForceFeedback::CurveUnitForce(const FfbConfig& cfg,
     if (cfg.invert) {
         u = -u;
     }
-    return std::clamp(u, -cfg.max_clamp, cfg.max_clamp);
+    // Sanitize max_clamp to its documented [0,1] range: a negative value would
+    // violate std::clamp's lo <= hi precondition (undefined behavior).
+    const double cap = std::clamp(cfg.max_clamp, 0.0, 1.0);
+    return std::clamp(u, -cap, cap);
 }
 
 ForceFeedback::ForceFeedback(void* sdl_joystick, FfbConfig cfg) : m_cfg(cfg) {
