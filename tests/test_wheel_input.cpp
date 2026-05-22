@@ -15,7 +15,7 @@ namespace {
 WheelConfig make_test_config() {
     WheelConfig cfg;
     cfg.enabled           = true;
-    cfg.device_name_match = "";  // first device == our virtual joystick
+    cfg.device_name_match = "ev1sim virtual wheel";  // match only our virtual device
     cfg.axes = {
         {0, WheelAxisBinding::Target::Steering,   -32768.0, 32767.0, false, 0.02},
         {1, WheelAxisBinding::Target::Throttle,   -32768.0, 32767.0, false, 0.0},

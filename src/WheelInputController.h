@@ -84,6 +84,7 @@ private:
     std::uint32_t m_instance_id = 0;         // SDL_JoystickID of the open device
 
     std::vector<bool> m_button_prev;          // per-binding previous pressed state
+    bool              m_fresh_open = false;   // first poll after (re)open: seed only, no edges
     std::vector<InputAction> m_pending;       // momentary actions this frame
 };
 

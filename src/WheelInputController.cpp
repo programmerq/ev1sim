@@ -60,6 +60,7 @@ void WheelInputController::OpenMatchingDevice() {
             if (joy) {
                 m_joystick    = joy;
                 m_instance_id = ids[i];
+                m_fresh_open  = true;  // first poll seeds m_button_prev, fires no edges
                 std::cout << "[Wheel] opened '" << name << "' ("
                           << SDL_GetNumJoystickAxes(joy) << " axes, "
                           << SDL_GetNumJoystickButtons(joy) << " buttons)\n";
@@ -138,13 +139,17 @@ DriverCommand WheelInputController::Update(double /*dt*/) {
                 cmd.horn_low  = true;
                 cmd.horn_high = true;
             }
-        } else if (!InputActionIsHeld(b.action) && b.action != InputAction::None) {
+        } else if (!m_fresh_open && !InputActionIsHeld(b.action) &&
+                   b.action != InputAction::None) {
             if (down && !m_button_prev[i]) {
                 m_pending.push_back(b.action);  // rising edge
             }
         }
         m_button_prev[i] = down;
     }
+    // The first poll after a device (re)opens only seeds m_button_prev — a
+    // button already held when the wheel appeared must not fire a phantom edge.
+    m_fresh_open = false;
     return cmd;
 }
 
