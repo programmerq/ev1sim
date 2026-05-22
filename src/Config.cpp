@@ -17,6 +17,60 @@ void read_if(const json& j, const char* key, T& out) {
     if (j.contains(key)) j.at(key).get_to(out);
 }
 
+ev1sim::WheelAxisBinding::Target parse_axis_target(const std::string& s) {
+    using T = ev1sim::WheelAxisBinding::Target;
+    if (s == "steering")                    return T::Steering;
+    if (s == "throttle")                    return T::Throttle;
+    if (s == "front_brake" || s == "brake") return T::FrontBrake;
+    if (s == "rear_brake")                  return T::RearBrake;
+    return T::None;
+}
+
+void parse_wheel_config(const json& w, ev1sim::WheelConfig& out) {
+    read_if(w, "enabled", out.enabled);
+    read_if(w, "device_name_match", out.device_name_match);
+    if (w.contains("axes") && w["axes"].is_array()) {
+        for (const auto& a : w["axes"]) {
+            ev1sim::WheelAxisBinding b;
+            read_if(a, "sdl_axis", b.sdl_axis);
+            std::string target;
+            read_if(a, "target", target);
+            b.target = parse_axis_target(target);
+            if (b.target == ev1sim::WheelAxisBinding::Target::None && !target.empty())
+                std::cerr << "[Config] wheel axis: unknown target '" << target << "'\n";
+            read_if(a, "in_min", b.in_min);
+            read_if(a, "in_max", b.in_max);
+            read_if(a, "invert", b.invert);
+            read_if(a, "deadzone", b.deadzone);
+            out.axes.push_back(b);
+        }
+    }
+    if (w.contains("buttons") && w["buttons"].is_array()) {
+        for (const auto& bj : w["buttons"]) {
+            ev1sim::WheelButtonBinding b;
+            read_if(bj, "sdl_button", b.sdl_button);
+            std::string action;
+            read_if(bj, "action", action);
+            if (auto act = ev1sim::InputActionFromString(action))
+                b.action = *act;
+            else if (!action.empty())
+                std::cerr << "[Config] wheel button: unknown action '" << action << "'\n";
+            out.buttons.push_back(b);
+        }
+    }
+}
+
+void parse_ffb_config(const json& f, ev1sim::FfbConfig& out) {
+    read_if(f, "enabled", out.enabled);
+    read_if(f, "scale_nm_to_unit", out.scale_nm_to_unit);
+    read_if(f, "max_clamp", out.max_clamp);
+    read_if(f, "gain", out.gain);
+    read_if(f, "speed_taper_start_mps", out.speed_taper_start_mps);
+    read_if(f, "speed_taper_full_mps", out.speed_taper_full_mps);
+    read_if(f, "autocenter", out.autocenter);
+    read_if(f, "invert", out.invert);
+}
+
 }  // namespace
 
 // ---------------------------------------------------------------------------
@@ -81,6 +135,8 @@ Config Config::LoadFromFile(const std::string& path) {
         read_if(i, "steer_return_rate",  cfg.input.steer_return_rate);
         read_if(i, "throttle_rise_rate", cfg.input.throttle_rise_rate);
         read_if(i, "brake_rise_rate",    cfg.input.brake_rise_rate);
+        if (i.contains("wheel")) parse_wheel_config(i["wheel"], cfg.input.wheel);
+        if (i.contains("ffb"))   parse_ffb_config(i["ffb"], cfg.input.ffb);
     }
 
     if (j.contains("telemetry")) {

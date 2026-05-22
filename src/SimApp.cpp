@@ -70,6 +70,23 @@ SimApp::SimApp(const Config& config) : m_config(config) {
         m_keyboard = std::make_unique<KeyboardInputController>(rates);
     }
 
+#ifdef EV1SIM_HAVE_WHEEL_IO
+    // SDL3 wheel + force feedback — only when enabled in the bindings config and
+    // a window is present.  Degrades silently to keyboard if SDL init or device
+    // open fails (important for the no-hardware / CI case).
+    if (!headless && m_config.input.wheel.enabled) {
+        m_sdl = std::make_unique<ev1sim::SdlContext>();
+        if (m_sdl->ok()) {
+            m_wheel = std::make_unique<ev1sim::WheelInputController>(
+                m_sdl.get(), m_config.input.wheel);
+            if (m_config.input.ffb.enabled && m_wheel->HasDevice()) {
+                m_ffb = std::make_unique<ev1sim::ForceFeedback>(
+                    m_wheel->JoystickHandle(), m_config.input.ffb);
+            }
+        }
+    }
+#endif
+
     // 3. Telemetry.
     m_telemetry = std::make_unique<Telemetry>(
         m_config.telemetry.log_rate_hz,
@@ -1053,6 +1070,24 @@ int SimApp::RunWithVisualization() {
         // quit, etc.), but the drive command comes from the scripted driver
         // when configured — useful for visually debugging a scenario.
         DriverCommand cmd = m_keyboard->Update(render_dt);
+#ifdef EV1SIM_HAVE_WHEEL_IO
+        // Wheel overlays the keyboard's analog axes + adds its mapped buttons
+        // when a device is present; the keyboard stays the fallback driver.
+        if (m_sdl) m_sdl->Pump();
+        if (m_wheel) {
+            DriverCommand w = m_wheel->Update(render_dt);
+            if (m_wheel->HasDevice()) {
+                cmd.steering    = w.steering;
+                cmd.throttle    = w.throttle;
+                cmd.front_brake = w.front_brake;
+                cmd.rear_brake  = w.rear_brake;
+                cmd.horn_low    = cmd.horn_low  || w.horn_low;
+                cmd.horn_high   = cmd.horn_high || w.horn_high;
+            }
+            for (ev1sim::InputAction a : m_wheel->PendingActions()) DispatchAction(a);
+            m_wheel->ClearPendingActions();
+        }
+#endif
         if (m_scripted && !m_paused)
             cmd = m_scripted->Update(m_world->GetState());
 
@@ -1633,6 +1668,14 @@ int SimApp::RunWithVisualization() {
         m_vis->EndScene();
 
         // --- Horn audio (external sim commands OR'd with keyboard input) ---
+#ifdef EV1SIM_HAVE_WHEEL_IO
+        // Force feedback from the current front-axle self-aligning torque
+        // (zeroed while paused or with no haptic device).
+        if (m_ffb) {
+            const auto& vs = m_world->GetState();
+            m_ffb->Update(vs.steering_torque, vs.speed_mps, !m_paused);
+        }
+#endif
         bool horn_low  = cmd.horn_low;
         bool horn_high = cmd.horn_high;
         if (m_external_sim->IsConnected()) {
@@ -2151,4 +2194,50 @@ void SimApp::CruiseSpeedUp() {
 }
 void SimApp::CruiseSpeedDown() {
     if (m_physical) m_physical->cruise_stalk().press_speed_down();
+}
+
+void SimApp::DispatchAction(ev1sim::InputAction action) {
+    using A = ev1sim::InputAction;
+    switch (action) {
+        case A::HeadlightCycle:  HeadlightCycle();    break;
+        case A::TurnSignalLeft:  TurnSignalLeft();    break;
+        case A::TurnSignalRight: TurnSignalRight();   break;
+        case A::HazardToggle:    HazardToggle();      break;
+        case A::WiperCycle:
+            if (m_physical) m_physical->wiper_stalk().cycle_position();
+            break;
+        case A::WiperWash:
+            if (m_physical) m_physical->wiper_stalk().press_wash();
+            break;
+        case A::CruiseSet:       CruiseSet();         break;
+        case A::CruiseResume:    CruiseResume();      break;
+        case A::CruiseCancel:    CruiseCancel();      break;
+        case A::CruiseSpeedUp:   CruiseSpeedUp();     break;
+        case A::CruiseSpeedDown: CruiseSpeedDown();   break;
+        case A::PrndUp:          PrndUp();            break;
+        case A::PrndDown:        PrndDown();          break;
+        case A::KeyOnCycle:      KeyOnCycle();        break;
+        case A::IpcTripReset:    IpcTripResetPress(); break;
+        case A::ResetVehicle:    if (m_world) m_world->ResetVehicle(); break;
+        case A::CameraCycle:     if (m_camera) m_camera->CycleMode();  break;
+        case A::PauseToggle:
+            m_paused = !m_paused;
+            std::cout << (m_paused ? "[SimApp] PAUSED" : "[SimApp] RESUMED") << std::endl;
+            break;
+        case A::SnapshotToggle:  m_show_snapshot = !m_show_snapshot;   break;
+        // Horn is a held/level input folded into DriverCommand, not dispatched.
+        // The remaining actions have no button hook yet (need DriverCommand-level
+        // or window-state plumbing) — log + ignore so a stray binding is visible.
+        case A::Horn:
+        case A::ParkingBrakeToggle:
+        case A::UiModeToggle:
+        case A::HelpToggle:
+        case A::Quit:
+        case A::None:
+        default:
+            std::cout << "[SimApp] wheel action '"
+                      << ev1sim::InputActionToString(action)
+                      << "' not wired for button dispatch (ignored)\n";
+            break;
+    }
 }

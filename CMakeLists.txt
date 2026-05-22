@@ -63,6 +63,7 @@ FetchContent_MakeAvailable(json)
 # used — never video/audio — so SDL coexists with Irrlicht's window/GL context.
 option(EV1SIM_HAVE_WHEEL_IO "Build SDL3 wheel input + force feedback" ON)
 set(EV1SIM_WHEEL_IO_SRC "")
+set(EV1SIM_WHEEL_IO_TEST_SRC "")
 set(_ev1sim_wheel_io FALSE)
 if(EV1SIM_HAVE_WHEEL_IO)
     find_package(SDL3 QUIET CONFIG)
@@ -86,7 +87,11 @@ if(EV1SIM_HAVE_WHEEL_IO)
     else()
         message(STATUS "SDL3: using system package (${SDL3_DIR})")
     endif()
-    set(EV1SIM_WHEEL_IO_SRC src/SdlContext.cpp)
+    set(EV1SIM_WHEEL_IO_SRC
+        src/SdlContext.cpp
+        src/WheelInputController.cpp
+        src/ForceFeedback.cpp)
+    set(EV1SIM_WHEEL_IO_TEST_SRC tests/test_wheel_input.cpp)
     set(_ev1sim_wheel_io TRUE)
 endif()
 
@@ -263,6 +268,8 @@ if(BUILD_TESTS)
         tests/test_scenario.cpp
         tests/test_brake_pedal.cpp
         tests/test_brake_drum.cpp
+        tests/test_input_actions.cpp
+        ${EV1SIM_WHEEL_IO_TEST_SRC}
         src/Config.cpp
         src/KeyboardInputController.cpp
         src/ExternalSimConnector.cpp

@@ -1,0 +1,38 @@
+{
+  "_comment": "Logitech force-feedback wheel + pedals bindings for ev1sim. Pass via --config (other settings fall back to defaults), or copy the input.wheel / input.ffb blocks into your own config. Axis indices and pedal in_min/in_max are device-specific — verify with your wheel (a pedal that rests high floors low, so in_min > in_max inverts it). Button indices are best-effort defaults; remap to taste. Actions are the names in src/InputActions.h.",
+  "input": {
+    "wheel": {
+      "enabled": true,
+      "device_name_match": "Logitech",
+      "axes": [
+        { "sdl_axis": 0, "target": "steering",    "in_min": -32768, "in_max": 32767, "deadzone": 0.02 },
+        { "sdl_axis": 1, "target": "throttle",     "in_min": 32767,  "in_max": -32768 },
+        { "sdl_axis": 2, "target": "front_brake",  "in_min": 32767,  "in_max": -32768 },
+        { "sdl_axis": 2, "target": "rear_brake",   "in_min": 32767,  "in_max": -32768 }
+      ],
+      "buttons": [
+        { "sdl_button": 0,  "action": "horn" },
+        { "sdl_button": 4,  "action": "turn_left" },
+        { "sdl_button": 5,  "action": "turn_right" },
+        { "sdl_button": 6,  "action": "hazard_toggle" },
+        { "sdl_button": 2,  "action": "wiper_cycle" },
+        { "sdl_button": 3,  "action": "headlight_cycle" },
+        { "sdl_button": 9,  "action": "cruise_set" },
+        { "sdl_button": 10, "action": "cruise_resume" },
+        { "sdl_button": 11, "action": "cruise_cancel" },
+        { "sdl_button": 7,  "action": "camera_cycle" },
+        { "sdl_button": 8,  "action": "pause_toggle" }
+      ]
+    },
+    "ffb": {
+      "enabled": true,
+      "scale_nm_to_unit": 0.04,
+      "max_clamp": 1.0,
+      "gain": 0.8,
+      "speed_taper_start_mps": 0.0,
+      "speed_taper_full_mps": 0.0,
+      "autocenter": false,
+      "invert": false
+    }
+  }
+}

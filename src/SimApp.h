@@ -8,6 +8,7 @@
 #include "HornAudio.h"
 #include "KeyboardInputController.h"
 #include "PhysicalWorld.h"
+#include "SdlContext.h"
 #include "Scenario.h"
 #include "ScriptedDriver.h"
 #include "Telemetry.h"
@@ -41,6 +42,11 @@ public:
     void CruiseCancel()      override;
     void CruiseSpeedUp()     override;
     void CruiseSpeedDown()   override;
+
+    // Dispatch a named input action (from a wheel button / Arduino contact) by
+    // reusing the same handlers the keyboard drives.  Horn is a held input
+    // folded into DriverCommand, so it is not routed here.
+    void DispatchAction(ev1sim::InputAction action);
 
     // Exit codes returned from Run().  Chosen to be CI-friendly:
     //   0   — successful completion (scripted Done, user-closed window, or
@@ -105,6 +111,11 @@ private:
     std::unique_ptr<ev1sim::Scenario>       m_scenario;
     std::unique_ptr<WiperRenderer>          m_wiper;
     std::unique_ptr<FloatingUiPanel>        m_floating_ui;
+#ifdef EV1SIM_HAVE_WHEEL_IO
+    std::unique_ptr<ev1sim::SdlContext>           m_sdl;
+    std::unique_ptr<ev1sim::WheelInputController> m_wheel;
+    std::unique_ptr<ev1sim::ForceFeedback>        m_ffb;
+#endif
 
     std::shared_ptr<chrono::vehicle::ChWheeledVehicleVisualSystemIrrlicht> m_vis;
     chrono::ChRealtimeStepTimer m_realtime_timer;
