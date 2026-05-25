@@ -169,3 +169,39 @@ TEST_CASE("Horn L key sounds low tone only", "[Keyboard]") {
     CHECK(cmd.horn_low  == true);
     CHECK(cmd.horn_high == false);
 }
+
+// -----------------------------------------------------------------------
+// Cruise stalk held-contact bindings (faithful chassis-cavity model): the
+// SET/COAST contact is closed while G or '-' is held; RESUME/ACCEL while Y or
+// '+' is held.  These are level (held) queries, not edge-detected one-shots.
+TEST_CASE("Cruise SET/COAST contact closes while G or '-' is held", "[Keyboard]") {
+    auto ctrl = MakeController();
+    CHECK_FALSE(ctrl.CruiseSetCoastContactClosed());
+
+    ctrl.SetKeyPressed(irr::KEY_KEY_G, true);
+    CHECK(ctrl.CruiseSetCoastContactClosed());
+    CHECK_FALSE(ctrl.CruiseResumeAccelContactClosed());
+    ctrl.SetKeyPressed(irr::KEY_KEY_G, false);
+    CHECK_FALSE(ctrl.CruiseSetCoastContactClosed());
+
+    ctrl.SetKeyPressed(irr::KEY_MINUS, true);
+    CHECK(ctrl.CruiseSetCoastContactClosed());
+    ctrl.SetKeyPressed(irr::KEY_MINUS, false);
+    CHECK_FALSE(ctrl.CruiseSetCoastContactClosed());
+}
+
+TEST_CASE("Cruise RESUME/ACCEL contact closes while Y or '+' is held", "[Keyboard]") {
+    auto ctrl = MakeController();
+    CHECK_FALSE(ctrl.CruiseResumeAccelContactClosed());
+
+    ctrl.SetKeyPressed(irr::KEY_KEY_Y, true);
+    CHECK(ctrl.CruiseResumeAccelContactClosed());
+    CHECK_FALSE(ctrl.CruiseSetCoastContactClosed());
+    ctrl.SetKeyPressed(irr::KEY_KEY_Y, false);
+    CHECK_FALSE(ctrl.CruiseResumeAccelContactClosed());
+
+    ctrl.SetKeyPressed(irr::KEY_PLUS, true);
+    CHECK(ctrl.CruiseResumeAccelContactClosed());
+    ctrl.SetKeyPressed(irr::KEY_PLUS, false);
+    CHECK_FALSE(ctrl.CruiseResumeAccelContactClosed());
+}

@@ -86,6 +86,18 @@ public:
     bool ConsumeCruiseSpeedUp();
     bool ConsumeCruiseSpeedDown();
 
+    // Held-contact view for the faithful chassis-cavity cruise model
+    // (kSigCruiseSw_*): SET/COAST is closed while G or '-' is held; RESUME/ACCEL
+    // while Y or '+' is held. PIM's tap/hold decoder turns a brief close into
+    // SET/RESUME and a sustained close into SPEED_DOWN/SPEED_UP. ON/OFF is a
+    // latch SimApp maintains (N taps cancel; SET/RESUME activity auto-enables).
+    bool CruiseSetCoastContactClosed() const {
+        return m_keys[irr::KEY_KEY_G] || m_keys[irr::KEY_MINUS];
+    }
+    bool CruiseResumeAccelContactClosed() const {
+        return m_keys[irr::KEY_KEY_Y] || m_keys[irr::KEY_PLUS];
+    }
+
     // True once after V was tapped — cycle wiper stalk position.
     bool ConsumeWiperCycle();
 

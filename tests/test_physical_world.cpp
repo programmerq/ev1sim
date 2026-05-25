@@ -330,49 +330,93 @@ TEST_CASE("IpcTripResetButton: multiple press calls accumulate into a single eve
 // CruiseStalk
 // ---------------------------------------------------------------------------
 
-TEST_CASE("CruiseStalk: all consume methods return false at construction", "[PhysicalWorld]") {
+// The stalk is a faithful three-contact model (chassis cavities 4047-4049).
+// It does NOT decode tap vs. hold — it only opens/closes the raw contacts; PIM
+// does the decoding.  These tests assert the contact mechanics: keyboard held
+// state passes straight through, the ON/OFF master latch auto-arms on activity
+// and opens on CANCEL, and UI presses synthesize a brief (tap) or sustained
+// (hold) close.
+
+TEST_CASE("CruiseStalk: all contacts open at construction", "[PhysicalWorld]") {
     CruiseStalk stalk;
-    CHECK_FALSE(stalk.consume_set());
-    CHECK_FALSE(stalk.consume_resume());
-    CHECK_FALSE(stalk.consume_cancel());
-    CHECK_FALSE(stalk.consume_speed_up());
-    CHECK_FALSE(stalk.consume_speed_down());
+    CHECK_FALSE(stalk.set_coast_contact());
+    CHECK_FALSE(stalk.resume_accel_contact());
+    CHECK_FALSE(stalk.on_off_contact());
 }
 
-TEST_CASE("CruiseStalk: press_set → consume_set returns true once", "[PhysicalWorld]") {
+TEST_CASE("CruiseStalk: idle update keeps every contact open", "[PhysicalWorld]") {
+    CruiseStalk stalk;
+    for (int i = 0; i < 100; ++i) stalk.update(0.02, false, false);
+    CHECK_FALSE(stalk.set_coast_contact());
+    CHECK_FALSE(stalk.resume_accel_contact());
+    CHECK_FALSE(stalk.on_off_contact());
+}
+
+TEST_CASE("CruiseStalk: keyboard SET/COAST held closes the contact and auto-arms ON/OFF",
+          "[PhysicalWorld]") {
+    CruiseStalk stalk;
+    stalk.update(0.016, /*set_coast*/true, /*resume_accel*/false);
+    CHECK(stalk.set_coast_contact());
+    CHECK_FALSE(stalk.resume_accel_contact());
+    CHECK(stalk.on_off_contact());          // any SET/RESUME activity arms ON/OFF
+
+    // Release: the SET/COAST contact opens, but the master latch stays armed
+    // (only CANCEL opens it) — mirrors a real ON/OFF switch left on.
+    stalk.update(0.016, false, false);
+    CHECK_FALSE(stalk.set_coast_contact());
+    CHECK(stalk.on_off_contact());
+}
+
+TEST_CASE("CruiseStalk: keyboard RESUME/ACCEL held closes only that contact",
+          "[PhysicalWorld]") {
+    CruiseStalk stalk;
+    stalk.update(0.016, /*set_coast*/false, /*resume_accel*/true);
+    CHECK(stalk.resume_accel_contact());
+    CHECK_FALSE(stalk.set_coast_contact());
+    CHECK(stalk.on_off_contact());
+}
+
+TEST_CASE("CruiseStalk: CANCEL opens the ON/OFF latch; later activity re-arms it",
+          "[PhysicalWorld]") {
+    CruiseStalk stalk;
+    stalk.update(0.016, true, false);       // arm via SET/COAST activity
+    CHECK(stalk.on_off_contact());
+
+    stalk.press_cancel();                   // N key / UI CANCEL
+    stalk.update(0.016, false, false);
+    CHECK_FALSE(stalk.on_off_contact());    // master latch opened → PIM CANCELs
+
+    // A fresh SET/RESUME activity re-arms the latch.
+    stalk.update(0.016, true, false);
+    CHECK(stalk.on_off_contact());
+}
+
+TEST_CASE("CruiseStalk: UI press_set synthesizes a brief tap close", "[PhysicalWorld]") {
     CruiseStalk stalk;
     stalk.press_set();
-    CHECK(stalk.consume_set());
-    CHECK_FALSE(stalk.consume_set());
+    stalk.update(0.016, false, false);
+    CHECK(stalk.set_coast_contact());       // closed on the frame after the press
+    CHECK(stalk.on_off_contact());          // and arms the latch
+
+    // A tap lasts ~50 ms; advancing well past that re-opens the contact.
+    for (int i = 0; i < 10; ++i) stalk.update(0.016, false, false);
+    CHECK_FALSE(stalk.set_coast_contact());
+    CHECK(stalk.on_off_contact());          // latch survives the tap
 }
 
-TEST_CASE("CruiseStalk: each button is independent", "[PhysicalWorld]") {
-    CruiseStalk stalk;
-    stalk.press_resume();
-    stalk.press_cancel();
+TEST_CASE("CruiseStalk: UI SPEED close is sustained well beyond a tap", "[PhysicalWorld]") {
+    CruiseStalk up;
+    up.press_speed_up();                    // sustained RESUME/ACCEL close (~600 ms)
+    for (int i = 0; i < 6; ++i) up.update(0.016, false, false);   // ~96 ms in
+    CHECK(up.resume_accel_contact());       // a 50 ms tap would already be open
+    for (int i = 0; i < 40; ++i) up.update(0.016, false, false);  // well past 600 ms
+    CHECK_FALSE(up.resume_accel_contact());
 
-    // Only the pressed buttons return true.
-    CHECK_FALSE(stalk.consume_set());
-    CHECK(stalk.consume_resume());
-    CHECK(stalk.consume_cancel());
-    CHECK_FALSE(stalk.consume_speed_up());
-    CHECK_FALSE(stalk.consume_speed_down());
-
-    // All cleared after first consume.
-    CHECK_FALSE(stalk.consume_resume());
-    CHECK_FALSE(stalk.consume_cancel());
-}
-
-TEST_CASE("CruiseStalk: speed_up and speed_down are independent", "[PhysicalWorld]") {
-    CruiseStalk stalk;
-    stalk.press_speed_up();
-    CHECK(stalk.consume_speed_up());
-    CHECK_FALSE(stalk.consume_speed_up());
-    CHECK_FALSE(stalk.consume_speed_down()); // never pressed
-
-    stalk.press_speed_down();
-    CHECK(stalk.consume_speed_down());
-    CHECK_FALSE(stalk.consume_speed_down());
+    CruiseStalk down;
+    down.press_speed_down();                // sustained SET/COAST close
+    for (int i = 0; i < 6; ++i) down.update(0.016, false, false);
+    CHECK(down.set_coast_contact());
+    CHECK_FALSE(down.resume_accel_contact());
 }
 
 // ---------------------------------------------------------------------------

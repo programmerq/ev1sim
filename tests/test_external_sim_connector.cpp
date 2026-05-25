@@ -23,6 +23,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     constexpr int kNumPrnd          = 4;   // PRND selector lines (4050-4053)
     constexpr int kNumWiperSwCavity = 4;   // wiper/washer switch cavities (4054-4057)
     constexpr int kNumTurnHazSwCavity = 4; // turn/hazard switch cavities + horn (4043-4046)
+    constexpr int kNumCruiseSwCavity = 3;  // cruise switch cavities (4047-4049)
     constexpr int kNumMotor         = 2;   // motor_rpm (4070), motor_torque_nm (4071)
     constexpr int kNumSimTime       = 1;   // sim_time_ns (4075) — ev1sim → electricsim
     constexpr int kNumThrottleCmd   = 1;   // throttle_cmd_q8 (4073) — PIM → ev1sim
@@ -64,8 +65,8 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     // rsa_mode_button (6971),
     // rsa_keypad_button1 (6975), button2 (6976), button3 (6977),
     // button4 (6978), button5 (6979),
-    // ipc_trip_reset (6952), cruise_set (6953), cruise_resume (6954),
-    // cruise_cancel (6955), cruise_speed_up (6956), cruise_speed_down (6957),
+    // ipc_trip_reset (6952),
+    // (cruise stalk moved to chassis cavities kSigCruiseSw_* 4047-4049),
     // (wiper switch/wash moved to chassis cavities kSigWiperSw_* 4054-4057),
     // power_window_driver_up (6980), power_window_driver_down (6981),
     // power_window_passenger_up (6982), power_window_passenger_down (6983),
@@ -74,9 +75,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     // rsa_exterior_keypad5 (6989),
     // door_handle_attempt_driver (6990), door_handle_attempt_passenger (6991).
     // (6970 is reserved — not registered as an endpoint.)
-    constexpr int kNumDriverInputs = 30;  // wiper + turn/hazard moved to chassis cavities
+    constexpr int kNumDriverInputs = 25;  // wiper + turn/hazard + cruise moved to chassis cavities
     const int expected = NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS +
-                         kNumCombSw + kNumChargeCplr + kNumPrnd + kNumWiperSwCavity + kNumTurnHazSwCavity + kNumMotor +
+                         kNumCombSw + kNumChargeCplr + kNumPrnd + kNumWiperSwCavity + kNumTurnHazSwCavity + kNumCruiseSwCavity + kNumMotor +
                          kNumSimTime +
                          kNumThrottleCmd + kNumBrake + kNumWiper +
                          kNumHvac + kNumAmbient + kNumDoorLockPw +
@@ -100,7 +101,8 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     int charge_coupler_count = 0;
     int prnd_count           = 0;
     int wiper_sw_cavity_count = 0;  // wiper/washer switch cavities (4054-4057)
-    int turn_haz_cavity_count = 0;  // turn/hazard switch cavities (4043-4045)
+    int turn_haz_cavity_count = 0;  // turn/hazard switch cavities (4043-4046)
+    int cruise_sw_cavity_count = 0; // cruise switch cavities (4047-4049)
     int dynamics_count       = 0;   // includes motor_rpm + motor_torque_nm
     int hvac_count            = 0;   // hvac_blower_level (4082) + defrost_grid_active (4083)
     int door_lock_pw_count    = 0;   // door lock cmds (4084/4085) + pw motor cmds (4086/4087)
@@ -136,6 +138,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
         } else if (e.signal_id >= 4043 && e.signal_id <= 4046) {
             CHECK_FALSE(e.input_to_sim);    // turn/hazard switch cavities + horn are outputs
             ++turn_haz_cavity_count;
+        } else if (e.signal_id >= 4047 && e.signal_id <= 4049) {
+            CHECK_FALSE(e.input_to_sim);    // cruise switch cavities are outputs
+            ++cruise_sw_cavity_count;
         } else if (e.signal_id >= 4050 && e.signal_id <= 4053) {
             CHECK_FALSE(e.input_to_sim);    // PRND selector lines are outputs
             ++prnd_count;
@@ -216,15 +221,15 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
                    e.signal_id == 6965 ||
                    e.signal_id == 6971 ||
                    (e.signal_id >= 6975 && e.signal_id <= 6979) ||
-                   (e.signal_id >= 6952 && e.signal_id <= 6957) ||
+                   e.signal_id == 6952 ||
                    (e.signal_id >= 6980 && e.signal_id <= 6983) ||
                    (e.signal_id >= 6985 && e.signal_id <= 6991)) {
             // Driver inputs on the main harness segment — outputs from ev1sim.
             // 6900=brake_pedal_q8  6901=steering_deg_q8  6902=gear_selector
             // 6903=throttle_q8     6904=brake_switch
             // (hazard/turn now publish on chassis cavities 4043-4045)
-            // 6952=ipc_trip_reset  6953=cruise_set  6954=cruise_resume
-            // 6955=cruise_cancel   6956=cruise_speed_up  6957=cruise_speed_down
+            // 6952=ipc_trip_reset
+            // (cruise stalk now publishes on chassis cavities 4047-4049)
             // (wiper switch/wash now publish on chassis cavities 4054-4057)
             // 6964=seatbelt_buckled  6965=seatbelt_buckled_passenger
             // 6971=rsa_mode_button
@@ -248,6 +253,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     CHECK(prnd_count           == kNumPrnd);
     CHECK(wiper_sw_cavity_count == kNumWiperSwCavity);
     CHECK(turn_haz_cavity_count == kNumTurnHazSwCavity);
+    CHECK(cruise_sw_cavity_count == kNumCruiseSwCavity);
     CHECK(charge_coupler_count == kNumChargeCplr);
     // dynamics_count: 18 original dynamics + 2 motor (4070-4071)
     // + sim-time (4075) + throttle cmd (4073) + brake pressure (4074)
@@ -499,38 +505,30 @@ TEST_CASE("RSA keypad endpoints have correct IDs and direction", "[ExternalSim]"
     CHECK_FALSE(btn5->input_to_sim);
 }
 
-TEST_CASE("New driver-input endpoints (6952-6957) + wiper/washer cavities have correct IDs and direction", "[ExternalSim]") {
+TEST_CASE("New driver-input endpoints (6952) + cruise/wiper cavities have correct IDs and direction", "[ExternalSim]") {
     // IPC trip-reset (6952).
     const auto* ipc = ExternalSimConnector::FindEndpoint(6952);
     REQUIRE(ipc != nullptr);
     CHECK(std::string(ipc->qualified_name) == "vehicle.driver.ipc_trip_reset_button");
     CHECK_FALSE(ipc->input_to_sim);
 
-    // Cruise stalk: SET=6953, RESUME=6954, CANCEL=6955, SPEED_UP=6956, SPEED_DOWN=6957.
-    const auto* cset = ExternalSimConnector::FindEndpoint(6953);
-    REQUIRE(cset != nullptr);
-    CHECK(std::string(cset->qualified_name) == "vehicle.driver.cruise_set");
-    CHECK_FALSE(cset->input_to_sim);
+    // Cruise stalk now publishes as CHASSIS cavities (4047-4049): the raw
+    // SET/COAST, RESUME/ACCEL, and ON/OFF contacts.  PIM's tap/hold decoder
+    // turns held duration into SET/RESUME/SPEED_*/CANCEL — ev1sim does not.
+    const auto* csc = ExternalSimConnector::FindEndpoint(4047);
+    REQUIRE(csc != nullptr);
+    CHECK(std::string(csc->qualified_name) == "vehicle.driver.cruise_set_coast_contact");
+    CHECK_FALSE(csc->input_to_sim);
 
-    const auto* cresume = ExternalSimConnector::FindEndpoint(6954);
-    REQUIRE(cresume != nullptr);
-    CHECK(std::string(cresume->qualified_name) == "vehicle.driver.cruise_resume");
-    CHECK_FALSE(cresume->input_to_sim);
+    const auto* cra = ExternalSimConnector::FindEndpoint(4048);
+    REQUIRE(cra != nullptr);
+    CHECK(std::string(cra->qualified_name) == "vehicle.driver.cruise_resume_accel_contact");
+    CHECK_FALSE(cra->input_to_sim);
 
-    const auto* ccancel = ExternalSimConnector::FindEndpoint(6955);
-    REQUIRE(ccancel != nullptr);
-    CHECK(std::string(ccancel->qualified_name) == "vehicle.driver.cruise_cancel");
-    CHECK_FALSE(ccancel->input_to_sim);
-
-    const auto* cup = ExternalSimConnector::FindEndpoint(6956);
-    REQUIRE(cup != nullptr);
-    CHECK(std::string(cup->qualified_name) == "vehicle.driver.cruise_speed_up");
-    CHECK_FALSE(cup->input_to_sim);
-
-    const auto* cdown = ExternalSimConnector::FindEndpoint(6957);
-    REQUIRE(cdown != nullptr);
-    CHECK(std::string(cdown->qualified_name) == "vehicle.driver.cruise_speed_down");
-    CHECK_FALSE(cdown->input_to_sim);
+    const auto* coo = ExternalSimConnector::FindEndpoint(4049);
+    REQUIRE(coo != nullptr);
+    CHECK(std::string(coo->qualified_name) == "vehicle.driver.cruise_on_off_contact");
+    CHECK_FALSE(coo->input_to_sim);
 
     // Wiper/washer switch now publish as CHASSIS cavities (4054-4057), computed
     // from the detent enum, not the old 6958/6959 driver signals.
@@ -554,20 +552,28 @@ TEST_CASE("New driver-input endpoints (6952-6957) + wiper/washer cavities have c
     CHECK(std::string(wwash->qualified_name) == "vehicle.driver.washer_switch_contact");
     CHECK_FALSE(wwash->input_to_sim);
 
-    // The old 6958/6959 driver-segment signals are retired.
+    // The old 6958/6959 wiper and 6953-6957 cruise-pulse driver-segment signals
+    // are retired (migrated to chassis cavities).
     CHECK(ExternalSimConnector::FindEndpoint(6958) == nullptr);
     CHECK(ExternalSimConnector::FindEndpoint(6959) == nullptr);
+    CHECK(ExternalSimConnector::FindEndpoint(6953) == nullptr);
+    CHECK(ExternalSimConnector::FindEndpoint(6954) == nullptr);
+    CHECK(ExternalSimConnector::FindEndpoint(6955) == nullptr);
+    CHECK(ExternalSimConnector::FindEndpoint(6956) == nullptr);
+    CHECK(ExternalSimConnector::FindEndpoint(6957) == nullptr);
 }
 
-TEST_CASE("New driver-input setters (6952-6959) store without crashing", "[ExternalSim]") {
+TEST_CASE("New driver-input setters store without crashing", "[ExternalSim]") {
     ExternalSimConnector c;
     CHECK_NOTHROW(c.SetDriverIpcTripReset(true));
     CHECK_NOTHROW(c.SetDriverIpcTripReset(false));
-    CHECK_NOTHROW(c.SetDriverCruiseSet(true));
-    CHECK_NOTHROW(c.SetDriverCruiseResume(true));
-    CHECK_NOTHROW(c.SetDriverCruiseCancel(true));
-    CHECK_NOTHROW(c.SetDriverCruiseSpeedUp(true));
-    CHECK_NOTHROW(c.SetDriverCruiseSpeedDown(true));
+    // Cruise switch raw contacts (chassis cavities 4047-4049).
+    CHECK_NOTHROW(c.SetCruiseSetCoastContact(true));
+    CHECK_NOTHROW(c.SetCruiseSetCoastContact(false));
+    CHECK_NOTHROW(c.SetCruiseResumeAccelContact(true));
+    CHECK_NOTHROW(c.SetCruiseResumeAccelContact(false));
+    CHECK_NOTHROW(c.SetCruiseOnOffContact(true));
+    CHECK_NOTHROW(c.SetCruiseOnOffContact(false));
     CHECK_NOTHROW(c.SetDriverWiperSwitch(0));  // OFF
     CHECK_NOTHROW(c.SetDriverWiperSwitch(1));  // INT
     CHECK_NOTHROW(c.SetDriverWiperSwitch(2));  // LOW

@@ -411,31 +411,78 @@ private:
     bool m_pending = false;
 };
 
-/// Cruise-control stalk (five momentary buttons: SET/RESUME/CANCEL/SPEED+/SPEED-).
+/// Cruise-control stalk — faithful three-contact model of the raw chassis
+/// cavities kSigCruiseSw_{SetCoast,ResumeAccel,OnOff}Out (4047/4048/4049,
+/// circuits 84/87/397 at PIM J1).
 ///
-/// Each press() method marks a pending one-shot event.  Each consume_*() method
-/// returns true once then clears.  SimApp drives the consume path each frame
-/// and publishes the corresponding 6953-6957 signals on the main harness.
+/// The real stalk presents three raw contacts to PIM; PIM's tap/hold decoder
+/// (pim_cruise_input) does ALL interpretation: a brief SET/COAST close → SET,
+/// a sustained close → SPEED_DOWN (likewise RESUME/ACCEL → RESUME / SPEED_UP),
+/// and the ON/OFF contact is the master arm (falling edge → CANCEL; while open,
+/// SET/RESUME sit electrically dead).  ev1sim must NOT pre-decode tap-vs-hold —
+/// it only opens and closes the contacts; the held duration alone decides.
+///
+/// ev1sim drives the contacts faithfully:
+///   * keyboard: SET/COAST closed while G or '-' is held; RESUME/ACCEL while
+///     Y or '+' is held (held duration alone selects tap vs. hold downstream).
+///   * UI panel: a momentary SET/RES press → a brief synthesized close that
+///     decodes as a tap; SPEED+/- press → a sustained close that decodes as a
+///     hold (one speed step per click).
+///   * ON/OFF: a master latch — there is no dedicated key, so any SET/RESUME
+///     activity auto-arms it and CANCEL (N key / UI CANCEL) opens it.  This
+///     mirrors a real driver flipping ON before SET and CANCEL to disarm.
 class CruiseStalk {
 public:
-    void press_set()       { m_set    = true; }
-    void press_resume()    { m_resume = true; }
-    void press_cancel()    { m_cancel = true; }
-    void press_speed_up()  { m_up     = true; }
-    void press_speed_down(){ m_down   = true; }
+    /// Per-frame evolution.  Keyboard held-contact state is passed in directly
+    /// (level, not edge); UI presses and the cancel request (below) fold in.
+    /// Contact closures are sampled BEFORE the synthesized-close timers decay
+    /// so a single-frame click is always observed as ≥1 closed frame.
+    void update(double dt, bool kbd_set_coast_held, bool kbd_resume_accel_held) {
+        m_set_coast_closed =
+            kbd_set_coast_held || (m_ui_set_coast_s > 0.0);
+        m_resume_accel_closed =
+            kbd_resume_accel_held || (m_ui_resume_accel_s > 0.0);
 
-    bool consume_set()       { bool v = m_set;    m_set    = false; return v; }
-    bool consume_resume()    { bool v = m_resume; m_resume = false; return v; }
-    bool consume_cancel()    { bool v = m_cancel; m_cancel = false; return v; }
-    bool consume_speed_up()  { bool v = m_up;     m_up     = false; return v; }
-    bool consume_speed_down(){ bool v = m_down;   m_down   = false; return v; }
+        // ON/OFF master latch: any SET/RESUME activity arms it; CANCEL opens it.
+        if (m_set_coast_closed || m_resume_accel_closed) m_on_off_closed = true;
+        if (m_cancel_pending) { m_on_off_closed = false; m_cancel_pending = false; }
+
+        // Decay the UI synthesized-close timers (after sampling, above).
+        if (m_ui_set_coast_s > 0.0) {
+            m_ui_set_coast_s -= dt;
+            if (m_ui_set_coast_s < 0.0) m_ui_set_coast_s = 0.0;
+        }
+        if (m_ui_resume_accel_s > 0.0) {
+            m_ui_resume_accel_s -= dt;
+            if (m_ui_resume_accel_s < 0.0) m_ui_resume_accel_s = 0.0;
+        }
+    }
+
+    // Floating-UI panel actions (momentary).  SET/RES → brief tap close;
+    // SPEED+/- → sustained hold close; CANCEL → open the master latch.
+    void press_set()        { m_ui_set_coast_s    = kTapCloseSeconds; }
+    void press_resume()     { m_ui_resume_accel_s = kTapCloseSeconds; }
+    void press_speed_down() { m_ui_set_coast_s    = kHoldCloseSeconds; }
+    void press_speed_up()   { m_ui_resume_accel_s = kHoldCloseSeconds; }
+    void press_cancel()     { m_cancel_pending = true; }
+
+    // Faithful contact outputs — what PIM's three wires see this frame.
+    bool set_coast_contact()    const { return m_set_coast_closed; }
+    bool resume_accel_contact() const { return m_resume_accel_closed; }
+    bool on_off_contact()       const { return m_on_off_closed; }
 
 private:
-    bool m_set    = false;
-    bool m_resume = false;
-    bool m_cancel = false;
-    bool m_up     = false;
-    bool m_down   = false;
+    // A tap close must read below PIM_CRUISE_INPUT_TAP_HOLD_MS (500 ms); a hold
+    // close must exceed it (and persist long enough for one ~100 ms repeat).
+    static constexpr double kTapCloseSeconds  = 0.05;  //  50 ms → tap
+    static constexpr double kHoldCloseSeconds = 0.60;  // 600 ms → hold (1 step)
+
+    double m_ui_set_coast_s      = 0.0;
+    double m_ui_resume_accel_s   = 0.0;
+    bool   m_cancel_pending      = false;
+    bool   m_set_coast_closed    = false;
+    bool   m_resume_accel_closed = false;
+    bool   m_on_off_closed       = false;
 };
 
 /// Wiper stalk (right column, four rotary positions + momentary wash button).

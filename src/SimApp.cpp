@@ -1238,26 +1238,17 @@ int SimApp::RunWithVisualization() {
             std::cout << "[SimApp] UI mode: " << (m_ui_mode ? "ON" : "OFF") << "\n";
         }
 
-        // Cruise stalk: G=SET, Y=RESUME, N=CANCEL, +(=)=SPEED+, -=SPEED-.
-        if (m_keyboard->ConsumeCruiseSet()) {
-            m_physical->cruise_stalk().press_set();
-            std::cout << "[SimApp] Cruise: SET\n";
-        }
-        if (m_keyboard->ConsumeCruiseResume()) {
-            m_physical->cruise_stalk().press_resume();
-            std::cout << "[SimApp] Cruise: RESUME\n";
-        }
+        // Cruise stalk (faithful chassis-cavity model): the SET/COAST (G or '-')
+        // and RESUME/ACCEL (Y or '+') contacts are sampled as HELD state at
+        // publish time via CruiseSetCoastContactClosed /
+        // CruiseResumeAccelContactClosed and fed to cruise_stalk().update();
+        // PIM decodes tap vs. hold from how long each stays closed.  N taps
+        // CANCEL — momentarily opening the ON/OFF master latch.  (The legacy
+        // per-action one-shots ConsumeCruiseSet/Resume/SpeedUp/SpeedDown are
+        // intentionally NOT consumed here; the held contacts supersede them.)
         if (m_keyboard->ConsumeCruiseCancel()) {
             m_physical->cruise_stalk().press_cancel();
             std::cout << "[SimApp] Cruise: CANCEL\n";
-        }
-        if (m_keyboard->ConsumeCruiseSpeedUp()) {
-            m_physical->cruise_stalk().press_speed_up();
-            std::cout << "[SimApp] Cruise: SPEED+\n";
-        }
-        if (m_keyboard->ConsumeCruiseSpeedDown()) {
-            m_physical->cruise_stalk().press_speed_down();
-            std::cout << "[SimApp] Cruise: SPEED-\n";
         }
 
         // V = wiper cycle (OFF → INT → LOW → HIGH → OFF).
@@ -1421,20 +1412,22 @@ int SimApp::RunWithVisualization() {
                 m_external_sim->SetDriverRsaKeypadButton5(fires.button_value[4]);
                 m_external_sim->SetDriverRsaModeButton(fires.mode_button);
             }
-            // IPC trip-reset (6952), cruise stalk (6953-6957), wiper (6958, 6959).
-            // Consume one-shot events and publish to the main harness segment.
+            // IPC trip-reset (6952): consume one-shot event and publish.
             m_external_sim->SetDriverIpcTripReset(
                 m_physical->ipc_trip_reset().consume_press_event());
-            m_external_sim->SetDriverCruiseSet(
-                m_physical->cruise_stalk().consume_set());
-            m_external_sim->SetDriverCruiseResume(
-                m_physical->cruise_stalk().consume_resume());
-            m_external_sim->SetDriverCruiseCancel(
-                m_physical->cruise_stalk().consume_cancel());
-            m_external_sim->SetDriverCruiseSpeedUp(
-                m_physical->cruise_stalk().consume_speed_up());
-            m_external_sim->SetDriverCruiseSpeedDown(
-                m_physical->cruise_stalk().consume_speed_down());
+            // Cruise stalk: evolve the faithful 3-contact model from the keyboard
+            // held contacts (UI presses + N cancel already folded in via press_*),
+            // then publish the raw chassis cavities kSigCruiseSw_* (4047-4049).
+            m_physical->cruise_stalk().update(
+                render_dt,
+                m_keyboard->CruiseSetCoastContactClosed(),
+                m_keyboard->CruiseResumeAccelContactClosed());
+            m_external_sim->SetCruiseSetCoastContact(
+                m_physical->cruise_stalk().set_coast_contact());
+            m_external_sim->SetCruiseResumeAccelContact(
+                m_physical->cruise_stalk().resume_accel_contact());
+            m_external_sim->SetCruiseOnOffContact(
+                m_physical->cruise_stalk().on_off_contact());
             m_external_sim->SetDriverWiperSwitch(
                 static_cast<std::uint8_t>(m_physical->wiper_stalk().position()));
             m_external_sim->SetDriverWiperWashRequest(
@@ -1934,21 +1927,19 @@ int SimApp::RunHeadless() {
                 m_external_sim->SetDriverRsaKeypadButton5(fires.button_value[4]);
                 m_external_sim->SetDriverRsaModeButton(fires.mode_button);
             }
-            // IPC trip-reset (6952), cruise stalk (6953-6957), wiper (6958, 6959).
-            // Headless: no keyboard input; consume pending events (all idle in
-            // headless) and publish stable defaults so the bus sees defined state.
+            // IPC trip-reset (6952) + cruise stalk cavities (4047-4049), wiper.
+            // Headless: no keyboard/UI input; evolve the cruise model with both
+            // contacts open so the ON/OFF latch stays disarmed and the bus sees
+            // stable zeros.
             m_external_sim->SetDriverIpcTripReset(
                 m_physical->ipc_trip_reset().consume_press_event());
-            m_external_sim->SetDriverCruiseSet(
-                m_physical->cruise_stalk().consume_set());
-            m_external_sim->SetDriverCruiseResume(
-                m_physical->cruise_stalk().consume_resume());
-            m_external_sim->SetDriverCruiseCancel(
-                m_physical->cruise_stalk().consume_cancel());
-            m_external_sim->SetDriverCruiseSpeedUp(
-                m_physical->cruise_stalk().consume_speed_up());
-            m_external_sim->SetDriverCruiseSpeedDown(
-                m_physical->cruise_stalk().consume_speed_down());
+            m_physical->cruise_stalk().update(tick_dt, false, false);
+            m_external_sim->SetCruiseSetCoastContact(
+                m_physical->cruise_stalk().set_coast_contact());
+            m_external_sim->SetCruiseResumeAccelContact(
+                m_physical->cruise_stalk().resume_accel_contact());
+            m_external_sim->SetCruiseOnOffContact(
+                m_physical->cruise_stalk().on_off_contact());
             m_external_sim->SetDriverWiperSwitch(
                 static_cast<std::uint8_t>(m_physical->wiper_stalk().position()));
             m_external_sim->SetDriverWiperWashRequest(
