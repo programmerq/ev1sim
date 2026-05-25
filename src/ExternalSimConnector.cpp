@@ -181,6 +181,12 @@ constexpr std::uint32_t kSigDriverCruiseSpeedUp       = 6956U;
 constexpr std::uint32_t kSigDriverCruiseSpeedDown     = 6957U;
 constexpr std::uint32_t kSigDriverWiperSwitch         = 6958U;
 constexpr std::uint32_t kSigDriverWiperWashRequest    = 6959U;
+// RESERVED — do not reuse: cruise-switch CHASSIS cavities, electricsim
+// kSigCruiseSw_{SetCoast,ResumeAccel,OnOff}Out = 4047/4048/4049 (circuits
+// 84/87/397 -> PIM J1). PIM already consumes these; the keyboard peer will
+// publish them (replacing the 6953-6957 pre-decoded pulses) once cruise
+// contact modeling (latched on/off + tap/hold) lands. See the electricsim
+// cruise-stalk migration.
 constexpr int           kNumNewDriverInputs           = 8;
 // Power window switch signals (momentary bool, held while pressed).
 // Locked in lockstep with electricsim kSigDriverPowerWindow* = 6980-6983.
