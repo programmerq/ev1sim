@@ -21,6 +21,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     constexpr int kNumWiperSw       = 4;   // wiper/washer switch: delay, request, hi, washer (4054-4057)
     constexpr int kNumChargeCplr    = 1;   // charge coupler present (4060, stub)
     constexpr int kNumPrnd          = 4;   // PRND selector lines (4050-4053)
+    constexpr int kNumWiperSwCavity = 4;   // wiper/washer switch cavities (4054-4057)
     constexpr int kNumMotor         = 2;   // motor_rpm (4070), motor_torque_nm (4071)
     constexpr int kNumSimTime       = 1;   // sim_time_ns (4075) — ev1sim → electricsim
     constexpr int kNumThrottleCmd   = 1;   // throttle_cmd_q8 (4073) — PIM → ev1sim
@@ -64,7 +65,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     // button4 (6978), button5 (6979),
     // ipc_trip_reset (6952), cruise_set (6953), cruise_resume (6954),
     // cruise_cancel (6955), cruise_speed_up (6956), cruise_speed_down (6957),
-    // wiper_switch (6958), wiper_wash_request (6959),
+    // (wiper switch/wash moved to chassis cavities kSigWiperSw_* 4054-4057),
     // power_window_driver_up (6980), power_window_driver_down (6981),
     // power_window_passenger_up (6982), power_window_passenger_down (6983),
     // rsa_exterior_keypad1 (6985), rsa_exterior_keypad2 (6986),
@@ -72,10 +73,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     // rsa_exterior_keypad5 (6989),
     // door_handle_attempt_driver (6990), door_handle_attempt_passenger (6991).
     // (6970 is reserved — not registered as an endpoint.)
-    constexpr int kNumDriverInputs = 35;  // +1 for passenger seatbelt (6965)
+    constexpr int kNumDriverInputs = 33;  // wiper switch/wash moved to chassis cavities (4054-4057)
     const int expected = NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS +
-                         kNumCombSw + kNumTurnHazSw + kNumWiperSw +
-                         kNumChargeCplr + kNumPrnd + kNumMotor +
+                         kNumCombSw + kNumChargeCplr + kNumPrnd + kNumWiperSwCavity + kNumMotor +
                          kNumSimTime +
                          kNumThrottleCmd + kNumBrake + kNumWiper +
                          kNumHvac + kNumAmbient + kNumDoorLockPw +
@@ -98,6 +98,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     int wiper_sw_count       = 0;   // wiper/washer switch cavities (4054-4057)
     int charge_coupler_count = 0;
     int prnd_count           = 0;
+    int wiper_sw_cavity_count = 0;  // wiper/washer switch cavities (4054-4057)
     int dynamics_count       = 0;   // includes motor_rpm + motor_torque_nm
     int hvac_count            = 0;   // hvac_blower_level (4082) + defrost_grid_active (4083)
     int door_lock_pw_count    = 0;   // door lock cmds (4084/4085) + pw motor cmds (4086/4087)
@@ -139,6 +140,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
         } else if (e.signal_id >= 4050 && e.signal_id <= 4053) {
             CHECK_FALSE(e.input_to_sim);    // PRND selector lines are outputs
             ++prnd_count;
+        } else if (e.signal_id >= 4054 && e.signal_id <= 4057) {
+            CHECK_FALSE(e.input_to_sim);    // wiper/washer switch cavities are outputs
+            ++wiper_sw_cavity_count;
         } else if (e.signal_id == 4060) {
             CHECK_FALSE(e.input_to_sim);    // charge coupler present is an output
             ++charge_coupler_count;
@@ -216,7 +220,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
                    e.signal_id == 6965 ||
                    e.signal_id == 6971 ||
                    (e.signal_id >= 6975 && e.signal_id <= 6979) ||
-                   (e.signal_id >= 6952 && e.signal_id <= 6959) ||
+                   (e.signal_id >= 6952 && e.signal_id <= 6957) ||
                    (e.signal_id >= 6980 && e.signal_id <= 6983) ||
                    (e.signal_id >= 6985 && e.signal_id <= 6991)) {
             // Driver inputs on the main harness segment — outputs from ev1sim.
@@ -225,7 +229,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
             // 6944=hazard_request  6948=turn_signal_left  6949=turn_signal_right
             // 6952=ipc_trip_reset  6953=cruise_set  6954=cruise_resume
             // 6955=cruise_cancel   6956=cruise_speed_up  6957=cruise_speed_down
-            // 6958=wiper_switch    6959=wiper_wash_request
+            // (wiper switch/wash now publish on chassis cavities 4054-4057)
             // 6964=seatbelt_buckled  6965=seatbelt_buckled_passenger
             // 6971=rsa_mode_button
             // 6975..6979=rsa_keypad_button[1..5]  (6970 reserved; not registered)
@@ -246,6 +250,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     CHECK(turn_haz_count       == kNumTurnHazSw);
     CHECK(wiper_sw_count       == kNumWiperSw);
     CHECK(prnd_count           == kNumPrnd);
+    CHECK(wiper_sw_cavity_count == kNumWiperSwCavity);
     CHECK(charge_coupler_count == kNumChargeCplr);
     // dynamics_count: 18 original dynamics + 2 motor (4070-4071)
     // + sim-time (4075) + throttle cmd (4073) + brake pressure (4074)
@@ -497,7 +502,7 @@ TEST_CASE("RSA keypad endpoints have correct IDs and direction", "[ExternalSim]"
     CHECK_FALSE(btn5->input_to_sim);
 }
 
-TEST_CASE("New driver-input endpoints (6952-6959) have correct IDs and direction", "[ExternalSim]") {
+TEST_CASE("New driver-input endpoints (6952-6957) + wiper/washer cavities have correct IDs and direction", "[ExternalSim]") {
     // IPC trip-reset (6952).
     const auto* ipc = ExternalSimConnector::FindEndpoint(6952);
     REQUIRE(ipc != nullptr);
@@ -530,16 +535,31 @@ TEST_CASE("New driver-input endpoints (6952-6959) have correct IDs and direction
     CHECK(std::string(cdown->qualified_name) == "vehicle.driver.cruise_speed_down");
     CHECK_FALSE(cdown->input_to_sim);
 
-    // Wiper: switch=6958, wash=6959.
-    const auto* wsw = ExternalSimConnector::FindEndpoint(6958);
-    REQUIRE(wsw != nullptr);
-    CHECK(std::string(wsw->qualified_name) == "vehicle.driver.wiper_switch");
-    CHECK_FALSE(wsw->input_to_sim);
+    // Wiper/washer switch now publish as CHASSIS cavities (4054-4057), computed
+    // from the detent enum, not the old 6958/6959 driver signals.
+    const auto* wdelay = ExternalSimConnector::FindEndpoint(4054);
+    REQUIRE(wdelay != nullptr);
+    CHECK(std::string(wdelay->qualified_name) == "vehicle.driver.wiper_delay_contact");
+    CHECK_FALSE(wdelay->input_to_sim);
 
-    const auto* wwash = ExternalSimConnector::FindEndpoint(6959);
+    const auto* wreq = ExternalSimConnector::FindEndpoint(4055);
+    REQUIRE(wreq != nullptr);
+    CHECK(std::string(wreq->qualified_name) == "vehicle.driver.wiper_request_contact");
+    CHECK_FALSE(wreq->input_to_sim);
+
+    const auto* whi = ExternalSimConnector::FindEndpoint(4056);
+    REQUIRE(whi != nullptr);
+    CHECK(std::string(whi->qualified_name) == "vehicle.driver.wiper_hi_contact");
+    CHECK_FALSE(whi->input_to_sim);
+
+    const auto* wwash = ExternalSimConnector::FindEndpoint(4057);
     REQUIRE(wwash != nullptr);
-    CHECK(std::string(wwash->qualified_name) == "vehicle.driver.wiper_wash_request");
+    CHECK(std::string(wwash->qualified_name) == "vehicle.driver.washer_switch_contact");
     CHECK_FALSE(wwash->input_to_sim);
+
+    // The old 6958/6959 driver-segment signals are retired.
+    CHECK(ExternalSimConnector::FindEndpoint(6958) == nullptr);
+    CHECK(ExternalSimConnector::FindEndpoint(6959) == nullptr);
 }
 
 TEST_CASE("New driver-input setters (6952-6959) store without crashing", "[ExternalSim]") {

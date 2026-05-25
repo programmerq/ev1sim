@@ -169,25 +169,30 @@ constexpr std::uint32_t kSigDriverRsaKeypadButton5 = 6979U;  // "9/0" button (ta
 // 0=NONE, 1=OFF, 2=ACC, 3=RUN, 4=START.
 // Locked in lockstep with electricsim kSigDriverRsaModeButton = 6971.
 constexpr std::uint32_t kSigDriverRsaModeButton    = 6971U;
-// IPC trip-reset + cruise stalk + wiper stalk signals (IDs 6952-6959).
-// Locked in lockstep with electricsim kSigDriverIpcTripResetButton = 6952,
-// kSigDriverCruiseSet/Resume/Cancel/SpeedUp/SpeedDown = 6953-6957,
-// kSigDriverWiperSwitch = 6958, kSigDriverWiperWashRequest = 6959.
+// IPC trip-reset + cruise stalk signals (IDs 6952-6957), locked in lockstep
+// with electricsim kSigDriverIpcTripResetButton = 6952,
+// kSigDriverCruiseSet/Resume/Cancel/SpeedUp/SpeedDown = 6953-6957.
 constexpr std::uint32_t kSigDriverIpcTripResetButton = 6952U;
 constexpr std::uint32_t kSigDriverCruiseSet           = 6953U;
 constexpr std::uint32_t kSigDriverCruiseResume        = 6954U;
 constexpr std::uint32_t kSigDriverCruiseCancel        = 6955U;
 constexpr std::uint32_t kSigDriverCruiseSpeedUp       = 6956U;
 constexpr std::uint32_t kSigDriverCruiseSpeedDown     = 6957U;
-constexpr std::uint32_t kSigDriverWiperSwitch         = 6958U;
-constexpr std::uint32_t kSigDriverWiperWashRequest    = 6959U;
+// Wiper/washer switch CHASSIS cavities, locked in lockstep with electricsim
+// kSigWiperSw_* = 4054-4057. ev1sim computes these raw contacts from the
+// detent enum (driver_wiper_switch) and publishes them on the chassis segment;
+// RHJB's WSW decoder turns them back into OFF/INT/LOW/HIGH (ESM p.511).
+constexpr std::uint32_t kSigWiperSw_DelayOut          = 4054U;  // INT detent
+constexpr std::uint32_t kSigWiperSw_RequestOut        = 4055U;  // any on-state
+constexpr std::uint32_t kSigWiperSw_HiOut             = 4056U;  // HIGH detent
+constexpr std::uint32_t kSigWiperSw_WasherSwitchOut   = 4057U;  // wash button
 // RESERVED — do not reuse: cruise-switch CHASSIS cavities, electricsim
 // kSigCruiseSw_{SetCoast,ResumeAccel,OnOff}Out = 4047/4048/4049 (circuits
 // 84/87/397 -> PIM J1). PIM already consumes these; the keyboard peer will
 // publish them (replacing the 6953-6957 pre-decoded pulses) once cruise
 // contact modeling (latched on/off + tap/hold) lands. See the electricsim
 // cruise-stalk migration.
-constexpr int           kNumNewDriverInputs           = 8;
+constexpr int           kNumNewDriverInputs           = 6;  // ipc(1) + cruise(5)
 // Power window switch signals (momentary bool, held while pressed).
 // Locked in lockstep with electricsim kSigDriverPowerWindow* = 6980-6983.
 // consumer = RSA (window-motor logic), future round.
@@ -590,9 +595,13 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 //   (6920-6932 physics telemetry + 6960-6963 cabin sensors) on the main
 //   harness — ev1sim → electricsim, locking the wire format for the
 //   eventual subscribers.
+// Wiper/washer switch cavities (4054-4057): ev1sim publishes the raw contacts
+// computed from the detent enum; RHJB's WSW decoder consumes them.
+constexpr int kNumWiperSwCavitySignals = 4;
 constexpr int kNumEndpoints =
     NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumCombSw + 1 /*charge_coupler*/ +
-    kNumPrndSelector + kNumMotorSignals + kNumSimTimeSignals + kNumThrottleCmdSignals +
+    kNumPrndSelector + kNumWiperSwCavitySignals +
+    kNumMotorSignals + kNumSimTimeSignals + kNumThrottleCmdSignals +
     kNumBrakeSignals + kNumWiperSignals + kNumHvacSignals +
     kNumAmbientSignals + kNumDoorLockPwSignals + kNumRsaShiftBlockedSignals +
     kNumIpcTelltaleSignals + kNumIpcTripDistSignals + kNumIpcBtcmTelltaleSignals +
@@ -834,8 +843,8 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.driver.rsa_keypad_button4", "driver_rsa_keypad_button4", false};
     out[i++] = {kSigDriverRsaKeypadButton5,
                 "vehicle.driver.rsa_keypad_button5", "driver_rsa_keypad_button5", false};
-    // New driver inputs: IPC trip-reset (6952), cruise stalk (6953-6957),
-    // wiper stalk position (6958), wiper wash (6959).
+    // New driver inputs: IPC trip-reset (6952), cruise stalk (6953-6957).
+    // Wiper/washer publish as chassis cavities kSigWiperSw_* (4054-4057), below.
     out[i++] = {kSigDriverIpcTripResetButton,
                 "vehicle.driver.ipc_trip_reset_button", "driver_ipc_trip_reset", false};
     out[i++] = {kSigDriverCruiseSet,
@@ -848,10 +857,14 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.driver.cruise_speed_up", "driver_cruise_speed_up", false};
     out[i++] = {kSigDriverCruiseSpeedDown,
                 "vehicle.driver.cruise_speed_down", "driver_cruise_speed_down", false};
-    out[i++] = {kSigDriverWiperSwitch,
-                "vehicle.driver.wiper_switch", "driver_wiper_switch", false};
-    out[i++] = {kSigDriverWiperWashRequest,
-                "vehicle.driver.wiper_wash_request", "driver_wiper_wash_request", false};
+    out[i++] = {kSigWiperSw_DelayOut,
+                "vehicle.driver.wiper_delay_contact", "wiper_delay_contact", false};
+    out[i++] = {kSigWiperSw_RequestOut,
+                "vehicle.driver.wiper_request_contact", "wiper_request_contact", false};
+    out[i++] = {kSigWiperSw_HiOut,
+                "vehicle.driver.wiper_hi_contact", "wiper_hi_contact", false};
+    out[i++] = {kSigWiperSw_WasherSwitchOut,
+                "vehicle.driver.washer_switch_contact", "washer_switch_contact", false};
     // Power window switch signals (6980-6983) — momentary bool, held while pressed.
     // No keyboard binding; floating UI will drive press()/release() when it lands.
     // consumer = RSA (window-motor logic), future round.
@@ -1082,9 +1095,10 @@ struct ExternalSimConnector::State {
     std::int8_t   driver_rsa_btn_pub[5]   = {-1,-1,-1,-1,-1};
     std::int8_t   driver_rsa_mode_btn_pub = -1;
 
-    // New driver inputs: IPC trip-reset (6952), cruise stalk (6953-6957),
-    // wiper stalk position (6958), wiper wash (6959).
-    // Momentary bools (0=idle, 1=pressed this tick); wiper_switch is uint8 enum.
+    // New driver inputs: IPC trip-reset (6952), cruise stalk (6953-6957).
+    // Momentary bools (0=idle, 1=pressed this tick).  The wiper detent is held
+    // as a uint8 enum (driver_wiper_switch) and PUBLISHED as the raw chassis
+    // cavities kSigWiperSw_* (4054-4057).
     bool          driver_ipc_trip_reset   = false;
     bool          driver_cruise_set       = false;
     bool          driver_cruise_resume    = false;
@@ -1100,8 +1114,10 @@ struct ExternalSimConnector::State {
     std::int8_t   driver_cruise_cancel_pub     = -1;
     std::int8_t   driver_cruise_speed_up_pub   = -1;
     std::int8_t   driver_cruise_speed_down_pub = -1;
-    std::int8_t   driver_wiper_switch_pub      = -1;
-    std::int8_t   driver_wiper_wash_pub        = -1;
+    std::int8_t   driver_wiper_delay_pub       = -1;   // kSigWiperSw_DelayOut   (4054)
+    std::int8_t   driver_wiper_request_pub     = -1;   // kSigWiperSw_RequestOut (4055)
+    std::int8_t   driver_wiper_hi_pub          = -1;   // kSigWiperSw_HiOut      (4056)
+    std::int8_t   driver_wiper_wash_pub        = -1;   // kSigWiperSw_WasherSwitchOut (4057)
 
     // Power window switch states (IDs 6980-6983, main harness segment).
     // Momentary bools (0=released, 1=held this tick).
@@ -2916,15 +2932,19 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                             st.driver_cruise_speed_up_pub);
         publish_bool_change(kSigDriverCruiseSpeedDown, st.driver_cruise_speed_down,
                             st.driver_cruise_speed_down_pub);
-        // Wiper switch — uint8 enum (0=OFF, 1=INT, 2=LOW, 3=HIGH).
+        // Wiper switch — published as the three raw contact cavities computed
+        // from the detent enum, matching RHJB's WSW decoder (ESM p.511):
+        // OFF=000, INT=110, LOW=010, HIGH=011.  Washer on its own cavity (4057).
         {
-            const std::int8_t wsw_val = static_cast<std::int8_t>(st.driver_wiper_switch);
-            if (st.driver_wiper_switch_pub < 0 || wsw_val != st.driver_wiper_switch_pub) {
-                drv.push_back(MakeU8Delta(kSigDriverWiperSwitch, st.driver_wiper_switch));
-                st.driver_wiper_switch_pub = wsw_val;
-            }
+            const std::uint8_t e = st.driver_wiper_switch;  // 0=OFF,1=INT,2=LOW,3=HIGH
+            publish_bool_change(kSigWiperSw_DelayOut,   (e == 1U),
+                                st.driver_wiper_delay_pub);
+            publish_bool_change(kSigWiperSw_RequestOut, (e >= 1U && e <= 3U),
+                                st.driver_wiper_request_pub);
+            publish_bool_change(kSigWiperSw_HiOut,      (e == 3U),
+                                st.driver_wiper_hi_pub);
         }
-        publish_bool_change(kSigDriverWiperWashRequest, st.driver_wiper_wash,
+        publish_bool_change(kSigWiperSw_WasherSwitchOut, st.driver_wiper_wash,
                             st.driver_wiper_wash_pub);
         // Power window switches (6980-6983) — momentary bool, held while pressed.
         // Default false (no UI source yet); floating UI will set press()/release().
