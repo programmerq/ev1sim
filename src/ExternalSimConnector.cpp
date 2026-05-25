@@ -151,12 +151,13 @@ constexpr std::uint32_t kSigDriverSeatbeltBuckled = 6964U;
 // kSigDriverSeatbeltBuckledPassenger = 6965 (mirrors driver).
 // TODO(consumer): IPC seatbelt-light telltale — deferred.
 constexpr std::uint32_t kSigDriverSeatbeltBuckledPassenger = 6965U;
-// Turn signal stalk position — locked in lockstep with electricsim
-// ev1_driver_inputs.hpp kSigDriverTurnSignalLeft/Right = 6948/6949.
-constexpr std::uint32_t kSigDriverTurnSignalLeft  = 6948U;
-constexpr std::uint32_t kSigDriverTurnSignalRight = 6949U;
-// Hazard switch request — locked in lockstep with kSigDriverHazardRequest = 6944.
-constexpr std::uint32_t kSigDriverHazardRequest   = 6944U;
+// Turn/hazard combination-switch CHASSIS cavities (chassis segment), locked in
+// lockstep with electricsim kSigTurnHazSw_* = 4043-4045 (connector 12092237).
+// LHJB consumes these directly (turn left/right + hazard active).  (The horn
+// cavity 4046 on the same switch migrates separately.)
+constexpr std::uint32_t kSigTurnHazSw_RightTurnOut = 4043U;
+constexpr std::uint32_t kSigTurnHazSw_LeftTurnOut  = 4044U;
+constexpr std::uint32_t kSigTurnHazSw_HazardOut    = 4045U;
 // RSA per-digit keypad button signals (momentary 1-tick bool, 0=idle, 1=pressed).
 // Locked in lockstep with electricsim kSigDriverRsaKeypadButton[1..5] = 6975-6979.
 // (Slot 6970 was kSigDriverRsaKeypadCodeOk — now reserved, not published here.)
@@ -226,7 +227,7 @@ constexpr int           kNumExteriorKeypadInputs             = 7;  // 5 buttons 
 // 6985, 6986, 6987, 6988, 6989, 6990, 6991 = 35 total.
 // (6970 is reserved; not registered as an endpoint.)
 constexpr int kNumPassengerSeatbelt = 1;  // passenger seatbelt (6965)
-constexpr int kNumDriverInputs = 15 + kNumNewDriverInputs + kNumPowerWindowInputs + kNumExteriorKeypadInputs + kNumPassengerSeatbelt;
+constexpr int kNumDriverInputs = 12 + kNumNewDriverInputs + kNumPowerWindowInputs + kNumExteriorKeypadInputs + kNumPassengerSeatbelt;  // 12 base: turn/hazard (6944/6948/6949) moved to chassis cavities
 
 // Motor state signals on the chassis segment (ev1sim → electricsim, float32 LE).
 //   4070  vehicle.dynamics.motor_rpm        motor shaft RPM
@@ -598,9 +599,12 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // Wiper/washer switch cavities (4054-4057): ev1sim publishes the raw contacts
 // computed from the detent enum; RHJB's WSW decoder consumes them.
 constexpr int kNumWiperSwCavitySignals = 4;
+// Turn/hazard combination-switch cavities (4043-4045): ev1sim publishes the raw
+// contacts; LHJB consumes them. (Horn cavity 4046 migrates separately.)
+constexpr int kNumTurnHazSwCavitySignals = 3;
 constexpr int kNumEndpoints =
     NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumCombSw + 1 /*charge_coupler*/ +
-    kNumPrndSelector + kNumWiperSwCavitySignals +
+    kNumPrndSelector + kNumWiperSwCavitySignals + kNumTurnHazSwCavitySignals +
     kNumMotorSignals + kNumSimTimeSignals + kNumThrottleCmdSignals +
     kNumBrakeSignals + kNumWiperSignals + kNumHvacSignals +
     kNumAmbientSignals + kNumDoorLockPwSignals + kNumRsaShiftBlockedSignals +
@@ -825,12 +829,12 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     out[i++] = {kSigDriverSeatbeltBuckledPassenger,
                 "vehicle.driver.seatbelt_buckled_passenger",
                 "driver_seatbelt_buckled_passenger", false};
-    out[i++] = {kSigDriverHazardRequest,
-                "vehicle.driver.hazard_request", "driver_hazard_request", false};
-    out[i++] = {kSigDriverTurnSignalLeft,
-                "vehicle.driver.turn_signal_left", "driver_turn_signal_left", false};
-    out[i++] = {kSigDriverTurnSignalRight,
-                "vehicle.driver.turn_signal_right", "driver_turn_signal_right", false};
+    out[i++] = {kSigTurnHazSw_HazardOut,
+                "vehicle.driver.hazard_contact", "hazard_contact", false};
+    out[i++] = {kSigTurnHazSw_LeftTurnOut,
+                "vehicle.driver.turn_left_contact", "turn_left_contact", false};
+    out[i++] = {kSigTurnHazSw_RightTurnOut,
+                "vehicle.driver.turn_right_contact", "turn_right_contact", false};
     out[i++] = {kSigDriverRsaModeButton,
                 "vehicle.driver.rsa_mode_button", "driver_rsa_mode_button", false};
     out[i++] = {kSigDriverRsaKeypadButton1,
@@ -2871,20 +2875,21 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                                         st.driver_seatbelt_buckled_passenger));
             st.driver_seatbelt_buckled_passenger_pub = seatbelt_p_val;
         }
-        // Turn signal stalk (6948, 6949) and hazard (6944) — publish on change.
+        // Turn/hazard combination switch — published on the CHASSIS cavities
+        // kSigTurnHazSw_* (4043-4045) that LHJB consumes; publish on change.
         const std::int8_t turn_left_val  = st.driver_turn_left  ? 1 : 0;
         const std::int8_t turn_right_val = st.driver_turn_right ? 1 : 0;
         const std::int8_t hazard_val     = st.driver_hazard     ? 1 : 0;
         if (turn_left_val != st.driver_turn_left_pub) {
-            drv.push_back(MakeBoolDelta(kSigDriverTurnSignalLeft, st.driver_turn_left));
+            drv.push_back(MakeBoolDelta(kSigTurnHazSw_LeftTurnOut, st.driver_turn_left));
             st.driver_turn_left_pub = turn_left_val;
         }
         if (turn_right_val != st.driver_turn_right_pub) {
-            drv.push_back(MakeBoolDelta(kSigDriverTurnSignalRight, st.driver_turn_right));
+            drv.push_back(MakeBoolDelta(kSigTurnHazSw_RightTurnOut, st.driver_turn_right));
             st.driver_turn_right_pub = turn_right_val;
         }
         if (hazard_val != st.driver_hazard_pub) {
-            drv.push_back(MakeBoolDelta(kSigDriverHazardRequest, st.driver_hazard));
+            drv.push_back(MakeBoolDelta(kSigTurnHazSw_HazardOut, st.driver_hazard));
             st.driver_hazard_pub = hazard_val;
         }
         // RSA per-digit keypad buttons (IDs 6975-6979) — one-shot: publish on

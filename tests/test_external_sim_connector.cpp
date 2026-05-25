@@ -22,6 +22,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     constexpr int kNumChargeCplr    = 1;   // charge coupler present (4060, stub)
     constexpr int kNumPrnd          = 4;   // PRND selector lines (4050-4053)
     constexpr int kNumWiperSwCavity = 4;   // wiper/washer switch cavities (4054-4057)
+    constexpr int kNumTurnHazSwCavity = 3; // turn/hazard switch cavities (4043-4045)
     constexpr int kNumMotor         = 2;   // motor_rpm (4070), motor_torque_nm (4071)
     constexpr int kNumSimTime       = 1;   // sim_time_ns (4075) — ev1sim → electricsim
     constexpr int kNumThrottleCmd   = 1;   // throttle_cmd_q8 (4073) — PIM → ev1sim
@@ -58,7 +59,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     // Driver inputs on the main harness segment (electricsim_ev1_bus), output
     // from ev1sim: brake_pedal_q8 (6900), steering_deg_q8 (6901),
     // gear_selector (6902), throttle_q8 (6903), brake_switch (6904),
-    // hazard_request (6944), turn_signal_left (6948), turn_signal_right (6949),
+    // (hazard/turn moved to chassis cavities kSigTurnHazSw_* 4043-4045),
     // seatbelt_buckled (6964), seatbelt_buckled_passenger (6965),
     // rsa_mode_button (6971),
     // rsa_keypad_button1 (6975), button2 (6976), button3 (6977),
@@ -73,9 +74,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     // rsa_exterior_keypad5 (6989),
     // door_handle_attempt_driver (6990), door_handle_attempt_passenger (6991).
     // (6970 is reserved — not registered as an endpoint.)
-    constexpr int kNumDriverInputs = 33;  // wiper switch/wash moved to chassis cavities (4054-4057)
+    constexpr int kNumDriverInputs = 30;  // wiper + turn/hazard moved to chassis cavities
     const int expected = NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS +
-                         kNumCombSw + kNumChargeCplr + kNumPrnd + kNumWiperSwCavity + kNumMotor +
+                         kNumCombSw + kNumChargeCplr + kNumPrnd + kNumWiperSwCavity + kNumTurnHazSwCavity + kNumMotor +
                          kNumSimTime +
                          kNumThrottleCmd + kNumBrake + kNumWiper +
                          kNumHvac + kNumAmbient + kNumDoorLockPw +
@@ -99,6 +100,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     int charge_coupler_count = 0;
     int prnd_count           = 0;
     int wiper_sw_cavity_count = 0;  // wiper/washer switch cavities (4054-4057)
+    int turn_haz_cavity_count = 0;  // turn/hazard switch cavities (4043-4045)
     int dynamics_count       = 0;   // includes motor_rpm + motor_torque_nm
     int hvac_count            = 0;   // hvac_blower_level (4082) + defrost_grid_active (4083)
     int door_lock_pw_count    = 0;   // door lock cmds (4084/4085) + pw motor cmds (4086/4087)
@@ -131,12 +133,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
         } else if (e.signal_id >= 4040 && e.signal_id <= 4042) {
             CHECK_FALSE(e.input_to_sim);    // headlamp switch outputs
             ++comb_sw_count;
-        } else if (e.signal_id >= 4043 && e.signal_id <= 4046) {
-            CHECK_FALSE(e.input_to_sim);    // turn/hazard switch + horn cavities (outputs)
-            ++turn_haz_count;
-        } else if (e.signal_id >= 4054 && e.signal_id <= 4057) {
-            CHECK_FALSE(e.input_to_sim);    // wiper/washer switch cavities (outputs)
-            ++wiper_sw_count;
+        } else if (e.signal_id >= 4043 && e.signal_id <= 4045) {
+            CHECK_FALSE(e.input_to_sim);    // turn/hazard switch cavities are outputs
+            ++turn_haz_cavity_count;
         } else if (e.signal_id >= 4050 && e.signal_id <= 4053) {
             CHECK_FALSE(e.input_to_sim);    // PRND selector lines are outputs
             ++prnd_count;
@@ -213,9 +212,6 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
             CHECK_FALSE(e.input_to_sim);    // dynamics signals are outputs
             ++dynamics_count;
         } else if ((e.signal_id >= 6900 && e.signal_id <= 6904) ||
-                   e.signal_id == 6944 ||
-                   e.signal_id == 6948 ||
-                   e.signal_id == 6949 ||
                    e.signal_id == 6964 ||
                    e.signal_id == 6965 ||
                    e.signal_id == 6971 ||
@@ -226,7 +222,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
             // Driver inputs on the main harness segment — outputs from ev1sim.
             // 6900=brake_pedal_q8  6901=steering_deg_q8  6902=gear_selector
             // 6903=throttle_q8     6904=brake_switch
-            // 6944=hazard_request  6948=turn_signal_left  6949=turn_signal_right
+            // (hazard/turn now publish on chassis cavities 4043-4045)
             // 6952=ipc_trip_reset  6953=cruise_set  6954=cruise_resume
             // 6955=cruise_cancel   6956=cruise_speed_up  6957=cruise_speed_down
             // (wiper switch/wash now publish on chassis cavities 4054-4057)
@@ -251,6 +247,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     CHECK(wiper_sw_count       == kNumWiperSw);
     CHECK(prnd_count           == kNumPrnd);
     CHECK(wiper_sw_cavity_count == kNumWiperSwCavity);
+    CHECK(turn_haz_cavity_count == kNumTurnHazSwCavity);
     CHECK(charge_coupler_count == kNumChargeCplr);
     // dynamics_count: 18 original dynamics + 2 motor (4070-4071)
     // + sim-time (4075) + throttle cmd (4073) + brake pressure (4074)
