@@ -152,12 +152,13 @@ constexpr std::uint32_t kSigDriverSeatbeltBuckled = 6964U;
 // TODO(consumer): IPC seatbelt-light telltale — deferred.
 constexpr std::uint32_t kSigDriverSeatbeltBuckledPassenger = 6965U;
 // Turn/hazard combination-switch CHASSIS cavities (chassis segment), locked in
-// lockstep with electricsim kSigTurnHazSw_* = 4043-4045 (connector 12092237).
-// LHJB consumes these directly (turn left/right + hazard active).  (The horn
-// cavity 4046 on the same switch migrates separately.)
+// lockstep with electricsim kSigTurnHazSw_* = 4043-4046 (connector 12092237).
+// LHJB consumes these directly (turn left/right + hazard + the single horn
+// command on circuit 28).
 constexpr std::uint32_t kSigTurnHazSw_RightTurnOut = 4043U;
 constexpr std::uint32_t kSigTurnHazSw_LeftTurnOut  = 4044U;
 constexpr std::uint32_t kSigTurnHazSw_HazardOut    = 4045U;
+constexpr std::uint32_t kSigTurnHazSw_HornOut      = 4046U;  // single horn cmd (ckt 28)
 // RSA per-digit keypad button signals (momentary 1-tick bool, 0=idle, 1=pressed).
 // Locked in lockstep with electricsim kSigDriverRsaKeypadButton[1..5] = 6975-6979.
 // (Slot 6970 was kSigDriverRsaKeypadCodeOk — now reserved, not published here.)
@@ -599,9 +600,9 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // Wiper/washer switch cavities (4054-4057): ev1sim publishes the raw contacts
 // computed from the detent enum; RHJB's WSW decoder consumes them.
 constexpr int kNumWiperSwCavitySignals = 4;
-// Turn/hazard combination-switch cavities (4043-4045): ev1sim publishes the raw
-// contacts; LHJB consumes them. (Horn cavity 4046 migrates separately.)
-constexpr int kNumTurnHazSwCavitySignals = 3;
+// Turn/hazard combination-switch cavities (4043-4046): ev1sim publishes the raw
+// contacts (turn left/right, hazard, horn); LHJB consumes them.
+constexpr int kNumTurnHazSwCavitySignals = 4;
 constexpr int kNumEndpoints =
     NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS + kNumCombSw + 1 /*charge_coupler*/ +
     kNumPrndSelector + kNumWiperSwCavitySignals + kNumTurnHazSwCavitySignals +
@@ -835,6 +836,8 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.driver.turn_left_contact", "turn_left_contact", false};
     out[i++] = {kSigTurnHazSw_RightTurnOut,
                 "vehicle.driver.turn_right_contact", "turn_right_contact", false};
+    out[i++] = {kSigTurnHazSw_HornOut,
+                "vehicle.driver.horn_contact", "horn_contact", false};
     out[i++] = {kSigDriverRsaModeButton,
                 "vehicle.driver.rsa_mode_button", "driver_rsa_mode_button", false};
     out[i++] = {kSigDriverRsaKeypadButton1,
@@ -1089,6 +1092,7 @@ struct ExternalSimConnector::State {
     std::int8_t   driver_turn_left_pub    = -1;      // -1 forces first publish
     std::int8_t   driver_turn_right_pub   = -1;
     std::int8_t   driver_hazard_pub       = -1;
+    std::int8_t   driver_horn_out_pub     = -1;   // kSigTurnHazSw_HornOut (4046)
 
     // RSA per-digit keypad buttons (IDs 6975-6979) and mode button (ID 6971).
     // driver_rsa_buttons[0..4] encode Option A: 0=idle, 1=tap, 2=long-press.
@@ -2891,6 +2895,14 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         if (hazard_val != st.driver_hazard_pub) {
             drv.push_back(MakeBoolDelta(kSigTurnHazSw_HazardOut, st.driver_hazard));
             st.driver_hazard_pub = hazard_val;
+        }
+        // Horn — single combo-switch contact (circuit 28); ev1sim's high/low
+        // horn requests (6940/6941) OR into the one cavity LHJB consumes.
+        const bool horn_out = st.ext_horn_high_request || st.ext_horn_low_request;
+        const std::int8_t horn_out_val = horn_out ? 1 : 0;
+        if (horn_out_val != st.driver_horn_out_pub) {
+            drv.push_back(MakeBoolDelta(kSigTurnHazSw_HornOut, horn_out));
+            st.driver_horn_out_pub = horn_out_val;
         }
         // RSA per-digit keypad buttons (IDs 6975-6979) — one-shot: publish on
         // change.  Payload: 0=idle, 1=tap (lower digit), 2=long-press (higher digit).

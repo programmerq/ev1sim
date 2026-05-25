@@ -22,7 +22,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     constexpr int kNumChargeCplr    = 1;   // charge coupler present (4060, stub)
     constexpr int kNumPrnd          = 4;   // PRND selector lines (4050-4053)
     constexpr int kNumWiperSwCavity = 4;   // wiper/washer switch cavities (4054-4057)
-    constexpr int kNumTurnHazSwCavity = 3; // turn/hazard switch cavities (4043-4045)
+    constexpr int kNumTurnHazSwCavity = 4; // turn/hazard switch cavities + horn (4043-4046)
     constexpr int kNumMotor         = 2;   // motor_rpm (4070), motor_torque_nm (4071)
     constexpr int kNumSimTime       = 1;   // sim_time_ns (4075) — ev1sim → electricsim
     constexpr int kNumThrottleCmd   = 1;   // throttle_cmd_q8 (4073) — PIM → ev1sim
@@ -133,8 +133,8 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
         } else if (e.signal_id >= 4040 && e.signal_id <= 4042) {
             CHECK_FALSE(e.input_to_sim);    // headlamp switch outputs
             ++comb_sw_count;
-        } else if (e.signal_id >= 4043 && e.signal_id <= 4045) {
-            CHECK_FALSE(e.input_to_sim);    // turn/hazard switch cavities are outputs
+        } else if (e.signal_id >= 4043 && e.signal_id <= 4046) {
+            CHECK_FALSE(e.input_to_sim);    // turn/hazard switch cavities + horn are outputs
             ++turn_haz_cavity_count;
         } else if (e.signal_id >= 4050 && e.signal_id <= 4053) {
             CHECK_FALSE(e.input_to_sim);    // PRND selector lines are outputs
