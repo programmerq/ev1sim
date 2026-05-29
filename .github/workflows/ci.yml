@@ -76,9 +76,30 @@ jobs:
             exit 1
           fi
 
-  # Full build + test (ev1sim_tests) is not wired up here yet — Project Chrono
-  # must be built and cached first (30+ min cold, a few seconds warm).  Once a
-  # prebuilt Chrono image is available, add a job that:
-  #   - installs Irrlicht + Eigen3 via apt
-  #   - restores the Chrono install dir from cache (key on the Chrono release tag)
-  #   - runs `cmake -S . -B build -DChrono_DIR=...` and `ctest --test-dir build`
+  # Chrono-free unit tests.  The ev1sim_tests target compiles no Chrono sources
+  # (no VehicleWorld/SimApp), so it builds + runs without a (slow-to-build)
+  # Chrono install via -DEV1SIM_TESTS_ONLY=ON — it only needs Irrlicht headers,
+  # plus Catch2 + nlohmann/json (both fetched at configure time).  This catches
+  # the connector endpoint-contract / PhysicalWorld regressions that previously
+  # slipped through because nothing built the C++ in CI.
+  #
+  # The full sim app (Chrono) and the ABS integration gate (Chrono + electricsim)
+  # remain out of CI until a prebuilt Chrono image is cached; run them locally.
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Irrlicht (Chrono-free test dep)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libirrlicht-dev
+
+      - name: Configure (tests only — no Chrono)
+        run: cmake -B build -S . -DEV1SIM_TESTS_ONLY=ON -DEV1SIM_HAVE_WHEEL_IO=OFF
+
+      - name: Build unit tests
+        run: cmake --build build --target ev1sim_tests -j"$(nproc)"
+
+      - name: Run unit tests
+        run: ctest --test-dir build --output-on-failure
