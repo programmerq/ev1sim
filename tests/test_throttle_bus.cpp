@@ -49,6 +49,21 @@ TEST_CASE("ExternalSimConnector: throttle command goes stale outside freshness w
     CHECK(stale.q8 == 64u);  // value preserved across stale-ness
 }
 
+TEST_CASE("ExternalSimConnector: zero-length window makes throttle immediately stale",
+          "[ExternalSim][ThrottleBus]") {
+    ExternalSimConnector c;
+    c.DebugInjectU8(4073, 64);
+
+    // A zero-length window must read stale even when GetThrottleCmd lands in the
+    // same steady_clock tick as the inject — the strict '<' comparison makes
+    // this deterministic regardless of clock resolution.  ever_received stays
+    // true and the value is preserved (symmetric with the steering 0 ms case).
+    auto stale = c.GetThrottleCmd(std::chrono::milliseconds(0));
+    CHECK(stale.ever_received);
+    CHECK_FALSE(stale.fresh);
+    CHECK(stale.q8 == 64u);
+}
+
 TEST_CASE("ExternalSimConnector: subsequent inject re-freshens the throttle",
           "[ExternalSim][ThrottleBus]") {
     ExternalSimConnector c;

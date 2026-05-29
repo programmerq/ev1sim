@@ -244,6 +244,4 @@ private:
     // writes / log lines, including a spurious "reached UNLOCKED" on the first
     // tick after the motor-leg drives first appear.
     int m_last_dlm_stroke[2] = {0, 0};                 // [0]=LH/driver, [1]=RH/passenger
-    // Last sounder click count seen — detects a new TURN/HAZ click for audio/log.
-    unsigned long m_last_sounder_click_count = 0;
 };
