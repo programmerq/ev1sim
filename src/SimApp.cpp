@@ -1527,6 +1527,16 @@ int SimApp::RunWithVisualization() {
                 m_external_sim->SetHvacAcRequest(hv.ac_on());
                 m_external_sim->SetHvacDefrostRequest(hv.defrost_on());
             }
+            // Door lock STATE feedback (4155-4157) — publish the resulting
+            // DoorLocks state (after the door_lock_motor / RSA-cmd mirror) so an
+            // RSA/IPC central-locking consumer can confirm the actuated state.
+            {
+                using S = ev1sim::DoorLocks::State;
+                const auto& dl = m_physical->door_locks();
+                m_external_sim->SetDoorLockState(dl.driver()    == S::LOCKED,
+                                                 dl.passenger() == S::LOCKED,
+                                                 dl.trunk()     == S::LOCKED);
+            }
             // RSA exterior keypad (6985-6989) and door handle attempts (6990-6991).
             // Tick the sequence emitter then consume any pending fires.
             m_physical->rsa_exterior_keypad().update(render_dt);
@@ -2058,6 +2068,16 @@ int SimApp::RunHeadless() {
                 m_external_sim->SetHvacModeRequest(hv.mode_u8());
                 m_external_sim->SetHvacAcRequest(hv.ac_on());
                 m_external_sim->SetHvacDefrostRequest(hv.defrost_on());
+            }
+            // Door lock STATE feedback (4155-4157) — publish the resulting
+            // DoorLocks state (after the door_lock_motor / RSA-cmd mirror) so an
+            // RSA/IPC central-locking consumer can confirm the actuated state.
+            {
+                using S = ev1sim::DoorLocks::State;
+                const auto& dl = m_physical->door_locks();
+                m_external_sim->SetDoorLockState(dl.driver()    == S::LOCKED,
+                                                 dl.passenger() == S::LOCKED,
+                                                 dl.trunk()     == S::LOCKED);
             }
             // RSA exterior keypad (6985-6989) and door handle attempts (6990-6991).
             // Headless: no UI source; tick the sequence emitter and publish zeros.

@@ -509,6 +509,12 @@ public:
     void SetHvacAcRequest(bool on);
     void SetHvacDefrostRequest(bool on);
 
+    /// Outgoing door-lock STATE feedback (IDs 4155-4157, chassis segment) →
+    /// electricsim.  The resulting latched state of PhysicalWorld::DoorLocks
+    /// (driver/passenger/trunk; true = LOCKED), published on change each tick so
+    /// an RSA/IPC central-locking consumer can confirm the actuated state.
+    void SetDoorLockState(bool driver_locked, bool passenger_locked, bool trunk_locked);
+
     /// Incoming IPC seatbelt telltale — driver seat (ID 4130, chassis segment).
     /// Published by IPC when the driver seat is unbuckled AND speed > ~8 km/h.
     /// bool: true = lamp on (unbuckled at speed), false = lamp off.
