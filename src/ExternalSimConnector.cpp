@@ -378,6 +378,19 @@ constexpr std::uint32_t kSigPowerWindowMotorDriver    = 4086U;
 constexpr std::uint32_t kSigPowerWindowMotorPassenger = 4087U;
 constexpr int           kNumDoorLockPwSignals         = 4;  // 4084+4085+4086+4087
 
+// Door lock STATE feedback (ev1sim → electricsim, chassis segment).
+// The resulting per-door latched state of PhysicalWorld::DoorLocks, after the
+// door_lock_motor (4092-4095) reaches end-of-travel or the RSA cmd (4084/4085)
+// mirror is applied.  Closes the central-locking loop so RSA/IPC can confirm
+// the actuated state.  Allocated ev1sim-side first (see drift-guard note).
+//   4155  vehicle.body.door_lock_state.driver     uint8: 0=unlocked, 1=locked
+//   4156  vehicle.body.door_lock_state.passenger  uint8: 0=unlocked, 1=locked
+//   4157  vehicle.body.door_lock_state.trunk      uint8: 0=unlocked, 1=locked
+constexpr std::uint32_t kSigDoorLockStateDriver    = 4155U;
+constexpr std::uint32_t kSigDoorLockStatePassenger = 4156U;
+constexpr std::uint32_t kSigDoorLockStateTrunk     = 4157U;
+constexpr int           kNumDoorLockStateSignals   = 3;
+
 // RSA shift-blocked cue (electricsim/RSA → ev1sim, chassis segment).
 //   4088  vehicle.body.rsa.shift_blocked    uint8 bool: 0=no block, 1=blocked this tick
 // Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
@@ -689,7 +702,7 @@ constexpr int kNumEndpoints =
     kNumBrakeSignals + kNumWiperSignals + kNumHvacSignals +
     kNumAmbientSignals + kNumDoorLockPwSignals + kNumRsaShiftBlockedSignals +
     kNumDoorLockMotorSignals + kNumSounderSignals + kNumSteeringPumpSignals +
-    kNumHvacControlSignals +
+    kNumHvacControlSignals + kNumDoorLockStateSignals +
     kNumIpcTelltaleSignals + kNumIpcTripDistSignals + kNumIpcBtcmTelltaleSignals +
     kNumIpcExtraTelltaleSignals + kNumBpmPackVoltageSignals +
     kNumBtcmActuatorChassisSignals + kNumExtContractSignals +
@@ -886,6 +899,13 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.hvac.ac_request", "hvac_ac_request", false};
     out[i++] = {kSigHvacDefrostRequest,
                 "vehicle.hvac.defrost_request", "hvac_defrost_request", false};
+    // Door lock STATE feedback (ev1sim → electricsim, chassis segment, input_to_sim=false).
+    out[i++] = {kSigDoorLockStateDriver,
+                "vehicle.body.door_lock_state.driver", "door_lock_state_driver", false};
+    out[i++] = {kSigDoorLockStatePassenger,
+                "vehicle.body.door_lock_state.passenger", "door_lock_state_passenger", false};
+    out[i++] = {kSigDoorLockStateTrunk,
+                "vehicle.body.door_lock_state.trunk", "door_lock_state_trunk", false};
     // BTCM per-wheel actuator state (BTCM → ev1sim, chassis segment, input_to_sim=true).
     // Mirror of the legacy main-harness publications 5010-5015 plus two
     // new per-wheel cylinder pressure measurements (4153/4154) with no
@@ -1394,6 +1414,15 @@ struct ExternalSimConnector::State {
     std::int8_t   hvac_ac_request_pub      = -1;
     std::int8_t   hvac_defrost_request_pub = -1;
 
+    // Door lock STATE feedback (IDs 4155-4157, chassis segment) — published to electricsim.
+    // 0=unlocked, 1=locked.  Mirror of PhysicalWorld::DoorLocks; publish-on-change.
+    bool          door_lock_state_driver       = false;   // default UNLOCKED (DoorLocks default)
+    bool          door_lock_state_passenger     = false;
+    bool          door_lock_state_trunk         = false;
+    std::int8_t   door_lock_state_driver_pub    = -1;      // -1 forces first publish
+    std::int8_t   door_lock_state_passenger_pub = -1;
+    std::int8_t   door_lock_state_trunk_pub     = -1;
+
     // RSA run-mode broadcast (ID 5711, main harness segment).
     // Subscribed from RSA; 0xFF = never received.
     std::uint8_t  rsa_run_mode            = 0xFFu;
@@ -1720,6 +1749,14 @@ void ExternalSimConnector::SetHvacAcRequest(bool on) {
 }
 void ExternalSimConnector::SetHvacDefrostRequest(bool on) {
     m_state->hvac_defrost_request = on;
+}
+
+void ExternalSimConnector::SetDoorLockState(bool driver_locked,
+                                            bool passenger_locked,
+                                            bool trunk_locked) {
+    m_state->door_lock_state_driver    = driver_locked;
+    m_state->door_lock_state_passenger = passenger_locked;
+    m_state->door_lock_state_trunk     = trunk_locked;
 }
 
 bool ExternalSimConnector::GetIpcSeatbeltTelltaleDriver() const {
@@ -2642,6 +2679,9 @@ EV1SIM_CHASSIS_ID_MATCHES(kDynamicsBase,                 kSigChassisSpeedMps);
 //   kSigHvacModeRequest            (4126) → kSigChassisHvacModeRequest
 //   kSigHvacAcRequest              (4127) → kSigChassisHvacAcRequest
 //   kSigHvacDefrostRequest         (4128) → kSigChassisHvacDefrostRequest
+//   kSigDoorLockStateDriver        (4155) → kSigChassisDoorLockStateDriver
+//   kSigDoorLockStatePassenger     (4156) → kSigChassisDoorLockStatePassenger
+//   kSigDoorLockStateTrunk         (4157) → kSigChassisDoorLockStateTrunk
 
 #undef EV1SIM_CHASSIS_ID_MATCHES
 
@@ -2708,6 +2748,9 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         st.hvac_mode_request_pub     = -1;
         st.hvac_ac_request_pub       = -1;
         st.hvac_defrost_request_pub  = -1;
+        st.door_lock_state_driver_pub    = -1;
+        st.door_lock_state_passenger_pub = -1;
+        st.door_lock_state_trunk_pub     = -1;
         std::cout << "[ExternalSim] connected to bus '"
                   << m_opts.bus_name << "'\n";
     }
@@ -2896,6 +2939,20 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         pub_hvac_u8(kSigHvacModeRequest,    st.hvac_mode_request, st.hvac_mode_request_pub);
         pub_hvac_u8(kSigHvacAcRequest,      st.hvac_ac_request      ? 1u : 0u, st.hvac_ac_request_pub);
         pub_hvac_u8(kSigHvacDefrostRequest, st.hvac_defrost_request ? 1u : 0u, st.hvac_defrost_request_pub);
+    }
+
+    // Door lock STATE feedback (IDs 4155-4157) — publish deltas on change.
+    {
+        auto pub_lock = [&](std::uint32_t id, bool val, std::int8_t& pub) {
+            const std::int8_t v = val ? 1 : 0;
+            if (pub != v) {
+                outbound.push_back(MakeU8Delta(id, static_cast<std::uint8_t>(v)));
+                pub = v;
+            }
+        };
+        pub_lock(kSigDoorLockStateDriver,    st.door_lock_state_driver,    st.door_lock_state_driver_pub);
+        pub_lock(kSigDoorLockStatePassenger, st.door_lock_state_passenger, st.door_lock_state_passenger_pub);
+        pub_lock(kSigDoorLockStateTrunk,     st.door_lock_state_trunk,     st.door_lock_state_trunk_pub);
     }
 
     if (!outbound.empty()) {

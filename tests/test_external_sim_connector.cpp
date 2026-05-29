@@ -37,6 +37,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     constexpr int kNumSounder       = 1;   // sounder piezo_drive (4096) — LHJB flasher → ev1sim
     constexpr int kNumSteeringPump  = 2;   // pump speed_cmd_q8 (4097, in) + interlock_closed (4098, out)
     constexpr int kNumHvacControls  = 5;   // hvac setpoint/fan/mode/ac/defrost requests (4124-4128) — ev1sim → HTCM
+    constexpr int kNumDoorLockState = 3;   // door lock state feedback driver/passenger/trunk (4155-4157) — ev1sim → electricsim
     constexpr int kNumIpcTelltale   = 2;   // ipc_seatbelt_telltale_driver (4130),
                                            // ipc_seatbelt_telltale_passenger (4131)
     constexpr int kNumIpcTripDist   = 1;   // ipc_trip_distance_m (4132)
@@ -86,7 +87,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
                          kNumHvac + kNumAmbient + kNumDoorLockPw +
                          kNumRsaShiftBlocked +
                          kNumDoorLockMotor + kNumSounder + kNumSteeringPump +
-                         kNumHvacControls +
+                         kNumHvacControls + kNumDoorLockState +
                          kNumIpcTelltale + kNumIpcTripDist + kNumIpcBtcmTelltale +
                          kNumIpcExtraTelltale + kNumBpmPackVoltage +
                          kNumBtcmChassisActuator + kNumExtContract +
@@ -114,6 +115,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     int sounder_count         = 0;   // sounder piezo_drive (4096)
     int steering_pump_count   = 0;   // pump speed_cmd_q8 (4097) + interlock_closed (4098)
     int hvac_controls_count   = 0;   // hvac setpoint/fan/mode/ac/defrost (4124-4128)
+    int door_lock_state_count = 0;   // door lock state feedback (4155-4157)
     int bpm_pack_voltage_count    = 0;   // bpm_pack_voltage_mv (4139)
     int ipc_telltale_count        = 0;   // IPC seatbelt telltales (4130/4131)
     int ipc_trip_dist_count       = 0;   // IPC trip distance (4132)
@@ -196,6 +198,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
         } else if (e.signal_id >= 4124 && e.signal_id <= 4128) {
             CHECK_FALSE(e.input_to_sim);    // HVAC driver-control requests flow out to HTCM
             ++hvac_controls_count;
+        } else if (e.signal_id >= 4155 && e.signal_id <= 4157) {
+            CHECK_FALSE(e.input_to_sim);    // door-lock state feedback flows out to electricsim
+            ++door_lock_state_count;
         } else if (e.signal_id == 4139) {
             CHECK(e.input_to_sim);          // BPM pack voltage flows into ev1sim
             ++bpm_pack_voltage_count;
@@ -295,6 +300,8 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     CHECK(steering_pump_count     == kNumSteeringPump);
     // hvac_controls_count: setpoint/fan/mode/ac/defrost requests (4124-4128) — ev1sim → HTCM.
     CHECK(hvac_controls_count     == kNumHvacControls);
+    // door_lock_state_count: driver/passenger/trunk lock state (4155-4157) — ev1sim → electricsim.
+    CHECK(door_lock_state_count   == kNumDoorLockState);
     // bpm_pack_voltage_count: BPM pack voltage (4139) — uint32 mV, from BPM.
     CHECK(bpm_pack_voltage_count  == kNumBpmPackVoltage);
     // ipc_telltale_count: driver seatbelt telltale (4130) + passenger (4131) — from IPC.
@@ -829,6 +836,35 @@ TEST_CASE("HVAC control setters store without crashing", "[ExternalSim]") {
     CHECK_NOTHROW(c.SetHvacModeRequest(250));   // > 3 → clamped
     CHECK_NOTHROW(c.Tick(0.0));
     CHECK_NOTHROW(c.Tick(0.0));   // a second tick must not re-publish from a broken sentinel
+}
+
+// ---------------------------------------------------------------------------
+// Door lock STATE feedback (4155-4157) — ev1sim → electricsim.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("Door-lock state endpoints have correct IDs and direction", "[ExternalSim]") {
+    struct Row { std::uint32_t sid; const char* qualified; };
+    const Row rows[] = {
+        {4155, "vehicle.body.door_lock_state.driver"},
+        {4156, "vehicle.body.door_lock_state.passenger"},
+        {4157, "vehicle.body.door_lock_state.trunk"},
+    };
+    for (const auto& r : rows) {
+        const auto* ep = ExternalSimConnector::FindEndpoint(r.sid);
+        REQUIRE(ep != nullptr);
+        CHECK(std::string(ep->qualified_name) == r.qualified);
+        CHECK_FALSE(ep->input_to_sim);   // state feedback flows out to electricsim
+    }
+}
+
+TEST_CASE("SetDoorLockState stores without crashing", "[ExternalSim]") {
+    ExternalSimConnector c;
+    CHECK_NOTHROW(c.SetDoorLockState(false, false, false));
+    CHECK_NOTHROW(c.Tick(0.0));
+    CHECK_NOTHROW(c.SetDoorLockState(true, false, true));   // driver + trunk locked
+    CHECK_NOTHROW(c.Tick(0.0));
+    CHECK_NOTHROW(c.SetDoorLockState(true, true, true));    // all locked
+    CHECK_NOTHROW(c.Tick(0.0));
 }
 
 TEST_CASE("Injected deltas to panel IDs are ignored", "[ExternalSim]") {

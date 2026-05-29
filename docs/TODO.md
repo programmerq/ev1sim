@@ -9,9 +9,10 @@ The `PhysicalWorld` pattern landed with `CombinationSwitch` as the first
 instance.  Each item below is a new component that joins it — keyboard or
 future-UI input on one side, chassis-segment signal publishing on the other.
 
-- [ ] **Hazard switch** (latched push-button on column).  Defer keyboard
-  binding; needs a floating UI panel for click-to-toggle (see floating-UI
-  item below).
+- [x] **Hazard switch** — `PhysicalWorld::HazardSwitch` (latched push-button).
+  X key toggles it and the FloatingUiPanel has a click-to-toggle button (Wave 1).
+  Derived hazard-active publishes on the chassis cavity `kSigTurnHazSw_HazardOut`
+  (4045); LHJB overrides both turn sides from it.
 - [x] **Turn signal stalk** — left/right detents with return-to-center
   behavior (auto-cancel from steering travel implemented).  Shares the same
   physical column as the combination switch.
@@ -32,14 +33,17 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   Convenience macro button "Enter 111111" queues a full 6-digit sequence.
   Publishes `kSigDriverRsaExteriorKeypad[1..5]` (6985-6989) each tick.
   Consumer-side RSA wiring is a TODO (see electricsim/docs/TODO.md).
-- [ ] **RSA interior buttons** — PRND select, EPB switch, power window
-  switches.  These are RSA's internal HMI; ev1sim simulates the user
-  pressing them and publishes the resulting signals to RSA.
-- [ ] **PRND keyboard cycling** — up/down keys to advance the PRND
-  selector (the SimApp `SetDriverGearSelector(3)` placeholder needs
-  replacement with an actual cycle).  When RSA's solenoid blocks the
-  shift (e.g. shift-out-of-Park without brake), ev1sim shows an
-  unobtrusive cue.
+- [x] **RSA interior buttons** — PRND select (`PhysicalWorld::PrndSelector`)
+  and power-window switches (`PowerWindows`, 6980-6983) are modelled and
+  published.  EPB is covered by the park-brake path (`DriverCommand.parking_brake`
+  → set/release edges `kSigDriverParkBrakeSetRequest/ReleaseRequest` 6946/6947);
+  a dedicated `ElectronicParkBrake` HMI component is optional polish — see
+  call-out below.
+- [x] **PRND keyboard cycling** — `,`/`.` keys (`prnd_up`/`prnd_down` actions)
+  advance `PrndSelector::cycle_up/down`; SimApp publishes the real selector
+  position via `SetDriverGearSelector` (the `(3)` placeholder is gone).  RSA's
+  shift-block cue is surfaced from `GetRsaShiftBlocked()` (4088) in a
+  FloatingUiPanel status row.  Scenario JSON supports `prnd_up`/`prnd_down`.
 - [x] **Power windows** — `PhysicalWorld::PowerWindows` models driver +
   passenger window × up/down (4 momentary bools).  Signals 6980-6983 pinned
   and published on the main harness segment.  PowerWindows have no keyboard
@@ -74,9 +78,12 @@ future-UI input on one side, chassis-segment signal publishing on the other.
 - [x] **Door lock state** modeled in `PhysicalWorld::DoorLocks` (driver,
   passenger, trunk; defaults UNLOCKED).  No keyboard binding — toggles will
   land via the floating-UI panel.
-- [ ] **Door lock bus signal pinning** — `DoorLocks` state is not yet published
-  on the chassis bus.  Add per-door lock state signals when an electricsim
-  consumer (RSA central locking, key fob) wants to read them.
+- [x] **Door lock bus signal pinning** — `DoorLocks` state is published on the
+  chassis bus as `vehicle.body.door_lock_state.{driver,passenger,trunk}`
+  (4155-4157, uint8 0=unlocked/1=locked), publish-on-change, mirroring the
+  RSA cmd encoding (4084/4085).  Closes the `door_lock_motor` loop so RSA/IPC
+  central-locking can confirm the actuated state.  IDs allocated ev1sim-side
+  first; electricsim consumer wiring is a TODO on that side.
 - [ ] **Motor current calculation** — motor current (Amps) is not published;
   Chrono's `ChEngineSimpleMap` does not expose a current output directly.
   Needs investigation of how to compute I from torque + motor characteristics.
@@ -201,29 +208,23 @@ future-UI input on one side, chassis-segment signal publishing on the other.
 
 The chassis-bus contract + plant models for three electricsim-driven actuators
 landed (signal IDs, endpoints, decode, `PhysicalWorld` plant classes, unit
-tests, and [docs/peripherals.md](peripherals.md)).  Each still needs the live
-consumer wiring (drive the `PhysicalWorld` plant each `SimApp` tick from the
-connector accessors, then surface in render/audio):
+tests, and [docs/peripherals.md](peripherals.md)), and `SimApp::ConsumeBody
+ActuatorPeripherals(dt)` now drives all three plants each tick in both loops.
+Only the render/audio surfacing remains (tracked in the "defer all" section above):
 
-- [x] **`door_lock_motor` spec (4092-4095)** — `PhysicalWorld::DoorLockMotor`
-  ×2 (LH/RH); consumes the RHJB dual-H-bridge LOCK/UNLOCK legs and models the
-  lock stroke (UNLOCKED/MID_STROKE/LOCKED, ~0.5 s traverse inside the 600 ms
-  pulse).  Connector: `GetDoorLockMotorDrive(leg)`.
-  - [ ] Wire into `SimApp` tick (drive both motors from 4092-4095; mirror the
-    end-of-travel stroke into `DoorLocks` and the door-lock solenoid
-    audio/visual click above).
-- [x] **`sounder` spec (4096)** — `PhysicalWorld::Sounder`; consumes the LHJB
-  flasher piezo drive, exposes `sounding()` + `click_count()`.
-  Connector: `GetSounderPiezoDrive()`.
-  - [ ] Wire into `SimApp` tick + play the TURN/HAZ click in the audio backend
-    (the long-deferred electricsim Task #5 publish lands the contract).
-- [x] **`power_steering_pump_motor` spec (4097 in / 4098 out)** —
-  `PhysicalWorld::PowerSteeringPumpMotor`; consumes the PSCM commanded pump
-  speed (q8) with a first-order lag and publishes the HV interlock-closed
-  boolean.  Connector: `GetSteeringPumpSpeedCmdQ8()`,
-  `SetSteeringPumpInterlockClosed()`.
-  - [ ] Wire into `SimApp` tick (drive the pump from 4097; publish 4098 each
-    tick).  Optional future: per-phase BLDC model on molex.A/B/C.
+- [x] **`door_lock_motor` spec + consume (4092-4095)** — `PhysicalWorld::Door
+  LockMotor` ×2 (LH/RH); SimApp drives both motors from 4092-4095 (preferring
+  the legs over the 4084/4085 mirror) and reflects end-of-travel into `DoorLocks`
+  (now also republished as 4155-4157).  Remaining: door-lock solenoid
+  audio/visual click (render — deferred above).
+- [x] **`sounder` spec + consume (4096)** — `PhysicalWorld::Sounder`; SimApp
+  advances it from 4096 each tick and detects the click edge.  Remaining: play
+  the TURN/HAZ click in the audio backend (a `SounderAudio` backend like
+  `HornAudio` — deferred).
+- [x] **`power_steering_pump_motor` spec + consume (4097 in / 4098 out)** —
+  `PhysicalWorld::PowerSteeringPumpMotor`; SimApp drives the pump from 4097 and
+  publishes the HV interlock-closed boolean (4098) each tick.  Optional future:
+  per-phase BLDC model on molex.A/B/C.
 
 ## Door handles + exterior keypad follow-up
 
