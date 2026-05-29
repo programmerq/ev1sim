@@ -91,6 +91,14 @@ struct Config {
         std::string demo_mode = "off";
     } lights;
 
+    // Body / cabin initial state.
+    struct Body {
+        // Lock the doors at startup.  DoorLocks otherwise defaults UNLOCKED;
+        // set true so interactive lock/keypad tests start from a locked cabin
+        // without having to lock first.  (Applied once, at SimApp init.)
+        bool door_locks_locked_at_start = false;
+    } body;
+
     struct ExternalSim {
         bool        enabled            = false;
         std::string bus_name           = "electricsim_chassis_bus";

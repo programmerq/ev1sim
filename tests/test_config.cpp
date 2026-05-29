@@ -112,6 +112,16 @@ TEST_CASE("Config loads external_sim and lights sections", "[Config]") {
 }
 
 // -----------------------------------------------------------------------
+TEST_CASE("Config body.door_locks_locked_at_start defaults false and parses", "[Config]") {
+    Config def;
+    CHECK(def.body.door_locks_locked_at_start == false);
+
+    auto path = WriteTempJson(R"({ "body": { "door_locks_locked_at_start": true } })");
+    Config cfg = Config::LoadFromFile(path);
+    CHECK(cfg.body.door_locks_locked_at_start == true);
+}
+
+// -----------------------------------------------------------------------
 TEST_CASE("Config accepts legacy boolean demo_mode", "[Config]") {
     // Earlier versions stored demo_mode as a bool; preserve compatibility.
     auto path_true  = WriteTempJson(R"({ "lights": { "demo_mode": true  } })");

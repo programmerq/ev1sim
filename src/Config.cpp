@@ -218,6 +218,11 @@ Config Config::LoadFromFile(const std::string& path) {
         read_if(sc, "path", cfg.scenario.path);
     }
 
+    if (j.contains("body")) {
+        auto& b = j["body"];
+        read_if(b, "door_locks_locked_at_start", cfg.body.door_locks_locked_at_start);
+    }
+
     return cfg;
 }
 

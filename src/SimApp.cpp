@@ -121,6 +121,10 @@ SimApp::SimApp(const Config& config) : m_config(config) {
     //     floating-UI panel lambdas can safely dereference m_physical during
     //     their initial label evaluation in AddButton().
     m_physical = std::make_unique<ev1sim::PhysicalWorld>();
+    // Optional initial-state config: start with the cabin locked (DoorLocks
+    // otherwise defaults UNLOCKED).  Applied once, here at init.
+    if (m_config.body.door_locks_locked_at_start)
+        m_physical->door_locks().lock_all();
 
     // 5. Visualization (creates window).  Skipped entirely in headless mode;
     //    no Irrlicht device, no window, no OpenGL context.
