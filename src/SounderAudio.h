@@ -8,7 +8,7 @@
 //
 // The EV1 piezo is a square-wave-driven buzzer: while energised it buzzes, and
 // the LHJB flasher gates it on/off each flash half-cycle — that toggling IS the
-// audible TURN/HAZ "tick".  Drive SetSounding() from PhysicalWorld::Sounder
+// audible TURN/HAZ "tick".  Drive SetSounding() from ev1sim::Sounder
 // (chassis 4096) each frame; fire PlayClick() for a one-shot actuation click
 // (e.g. a door-lock motor reaching end-of-travel).
 class SounderAudio {

@@ -392,7 +392,7 @@ constexpr std::uint32_t kSigPowerWindowMotorPassenger = 4087U;
 constexpr int           kNumDoorLockPwSignals         = 4;  // 4084+4085+4086+4087
 
 // Door lock STATE feedback (ev1sim → electricsim, chassis segment).
-// The resulting per-door latched state of PhysicalWorld::DoorLocks, after the
+// The resulting per-door latched state of ev1sim::DoorLocks, after the
 // door_lock_motor (4092-4095) reaches end-of-travel or the RSA cmd (4084/4085)
 // mirror is applied.  Closes the central-locking loop so RSA/IPC can confirm
 // the actuated state.  Allocated ev1sim-side first (see drift-guard note).
@@ -418,7 +418,7 @@ constexpr int           kNumRsaShiftBlockedSignals = 1;
 // BOTH door-lock motors (LH driver + RH passenger) in lockstep.  Each motor has
 // a LOCK leg and an UNLOCK leg; the leg whose drive is high decides the motor's
 // direction, both-high/both-low → motor off.  ev1sim's door_lock_motor
-// peripheral (PhysicalWorld::DoorLockMotor ×2) consumes these and models the
+// peripheral (ev1sim::DoorLockMotor ×2) consumes these and models the
 // mechanical lock stroke.  Wire-level mapping (cavity → chassis-bus signal),
 // authoritative for the electricsim router — see docs/peripherals.md:
 //   4092  vehicle.body.door_lock_motor.lh_lock_drive    ckt 294A, RHJB J9.C5 → LH motor LOCK
@@ -437,7 +437,7 @@ constexpr int           kNumDoorLockMotorSignals       = 4;
 //   4096  vehicle.body.sounder.piezo_drive   uint8 bool: 1 = piezo energised
 // The LHJB turn/hazard flasher produces a piezo square-wave (the TURN/HAZ
 // "click" in a real GM vehicle).  ev1sim's sounder peripheral
-// (PhysicalWorld::Sounder) consumes the boolean drive and exposes an
+// (ev1sim::Sounder) consumes the boolean drive and exposes an
 // audible-output signal for the 3D-sim audio contract; each rising edge is one
 // click.  The piezo is a real LHJB-internal component the printed schematics
 // are silent on (no first-class component_id) — see docs/peripherals.md.
@@ -448,7 +448,7 @@ constexpr int           kNumSounderSignals    = 1;
 // The PSCM is an HV inverter on batt-731 whose molex 3-phase outputs (molex.A/
 // B/C) drive a steering pump motor; the motor body returns the HV interlock
 // loop on molex.D/E.  ev1sim's power_steering_pump_motor peripheral
-// (PhysicalWorld::PowerSteeringPumpMotor) is the minimum-viable plant: it
+// (ev1sim::PowerSteeringPumpMotor) is the minimum-viable plant: it
 // consumes a single commanded pump speed and closes the HV interlock loop.
 // Per-phase BLDC commutation is future work.  Wire-level mapping:
 //   4097  vehicle.steering.pump_motor.speed_cmd_q8     PSCM molex.A/B/C → pump  (uint8 q8: 0=stopped, 255=full)  [in]
@@ -458,7 +458,7 @@ constexpr std::uint32_t kSigPscmPumpInterlockClosed = 4098U;
 constexpr int           kNumSteeringPumpSignals     = 2;  // 4097 (in) + 4098 (out)
 
 // HVAC driver controls (ev1sim → electricsim/HTCM, chassis segment).
-// The driver's climate-panel requests, modelled by PhysicalWorld::HvacControls.
+// The driver's climate-panel requests, modelled by ev1sim::HvacControls.
 // HTCM owns the plant and feeds back the actual blower level (4082) + rear
 // defrost grid (4083); these five are the upstream driver inputs.  Allocated
 // ev1sim-side first (see the "pending electricsim adoption" note below).
@@ -473,7 +473,7 @@ constexpr std::uint32_t kSigHvacModeRequest     = 4126U;
 constexpr std::uint32_t kSigHvacAcRequest       = 4127U;
 constexpr std::uint32_t kSigHvacDefrostRequest  = 4128U;
 constexpr int           kNumHvacControlSignals  = 5;
-// Sanitization bounds for the HVAC setters (mirror PhysicalWorld::HvacControls);
+// Sanitization bounds for the HVAC setters (mirror ev1sim::HvacControls);
 // keep out-of-range inputs from violating the wire contract or breaking the
 // publish-on-change sentinels.
 constexpr float        kHvacSetpointMinC     = 16.0f;
@@ -1406,18 +1406,18 @@ struct ExternalSimConnector::State {
 
     // Door-lock motor leg drives (IDs 4092-4095, chassis segment) — received from RHJB.
     // dual-H-bridge: [0]=LH lock, [1]=LH unlock, [2]=RH lock, [3]=RH unlock.
-    // bool: true = leg energised.  Consumed by PhysicalWorld::DoorLockMotor ×2.
+    // bool: true = leg energised.  Consumed by ev1sim::DoorLockMotor ×2.
     bool          door_lock_motor_drive[4]     = {};
     bool          has_door_lock_motor_drive[4] = {};
 
     // Sounder / piezo drive (ID 4096, chassis segment) — received from LHJB flasher.
-    // bool: true = piezo energised.  Consumed by PhysicalWorld::Sounder.
+    // bool: true = piezo energised.  Consumed by ev1sim::Sounder.
     bool          sounder_piezo_drive     = false;
     bool          has_sounder_piezo_drive = false;
 
     // Power-steering pump speed command (ID 4097, chassis segment) — received from PSCM.
     // uint8 q8: 0=stopped, 255=full.  0xFF = never received.  Consumed by
-    // PhysicalWorld::PowerSteeringPumpMotor.
+    // ev1sim::PowerSteeringPumpMotor.
     std::uint8_t  steering_pump_speed_cmd_q8 = 0xFFu;
     bool          has_steering_pump_speed_cmd = false;
     // Power-steering pump HV interlock-closed (ID 4098, chassis segment) — published to PSCM.
@@ -1426,7 +1426,7 @@ struct ExternalSimConnector::State {
     std::int8_t   steering_pump_interlock_pub    = -1;     // -1 forces first publish
 
     // HVAC driver controls (IDs 4124-4128, chassis segment) — published to HTCM.
-    // Publish-on-change; defaults match PhysicalWorld::HvacControls.
+    // Publish-on-change; defaults match ev1sim::HvacControls.
     float         hvac_temp_setpoint_c     = 21.0f;
     std::uint8_t  hvac_fan_request         = 0u;     // OFF
     std::uint8_t  hvac_mode_request        = 0u;     // FACE
@@ -1439,7 +1439,7 @@ struct ExternalSimConnector::State {
     std::int8_t   hvac_defrost_request_pub = -1;
 
     // Door lock STATE feedback (IDs 4155-4157, chassis segment) — published to electricsim.
-    // 0=unlocked, 1=locked.  Mirror of PhysicalWorld::DoorLocks; publish-on-change.
+    // 0=unlocked, 1=locked.  Mirror of ev1sim::DoorLocks; publish-on-change.
     bool          door_lock_state_driver       = false;   // default UNLOCKED (DoorLocks default)
     bool          door_lock_state_passenger     = false;
     bool          door_lock_state_trunk         = false;

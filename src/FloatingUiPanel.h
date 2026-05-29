@@ -65,7 +65,7 @@ std::wstring FormatHvacBlowerLabel(std::uint8_t level);
 std::wstring FormatDefrostGridLabel(bool active);
 
 // HVAC driver-control labels (the requests the driver sends; distinct from the
-// blower/defrost-grid *feedback* helpers above).  Mirror PhysicalWorld::HvacControls.
+// blower/defrost-grid *feedback* helpers above).  Mirror ev1sim::HvacControls.
 /// Format the HVAC temperature setpoint (°C, one decimal): "HVAC Temp: 21.0 C".
 std::wstring FormatHvacSetpointLabel(double setpoint_c);
 /// Format the HVAC fan request.  fan: 0=OFF, 1=LOW, 2=MED, 3=HIGH.

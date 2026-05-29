@@ -397,7 +397,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                 },
                 []() {});   // no-op: display-only row
 
-            // --- HVAC driver controls (drive PhysicalWorld::HvacControls; the
+            // --- HVAC driver controls (drive ev1sim::HvacControls; the
             //     requests are published to HTCM on chassis 4124-4128 each tick).
             //     Display row for the setpoint + buttons to adjust/cycle/toggle. ---
             m_floating_ui->AddButton(
