@@ -3135,9 +3135,11 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             drv.push_back(MakeBoolDelta(kSigTurnHazSw_HazardOut, st.driver_hazard));
             st.driver_hazard_pub = hazard_val;
         }
-        // Horn — single combo-switch contact (circuit 28); ev1sim's high/low
-        // horn requests (6940/6941) OR into the one cavity LHJB consumes.
-        const bool horn_out = st.ext_horn_high_request || st.ext_horn_low_request;
+        // Horn — single combo-switch contact (circuit 28), published on the
+        // main-harness horn cavity in lockstep with the chassis cavity 4046.
+        // (The old high/low horn requests 6940/6941 were collapsed to this one
+        // contact; mirror the same turn_haz_horn state SetTurnHazSwOutputs latches.)
+        const bool horn_out = st.turn_haz_horn;
         const std::int8_t horn_out_val = horn_out ? 1 : 0;
         if (horn_out_val != st.driver_horn_out_pub) {
             drv.push_back(MakeBoolDelta(kSigTurnHazSw_HornOut, horn_out));
