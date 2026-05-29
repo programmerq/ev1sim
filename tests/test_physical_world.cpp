@@ -3,6 +3,8 @@
 
 #include "PhysicalWorld.h"
 
+#include <string>
+
 using namespace ev1sim;
 
 // ---------------------------------------------------------------------------
@@ -943,4 +945,125 @@ TEST_CASE("Seatbelts: toggle_passenger flips passenger only", "[PhysicalWorld][S
     sb.toggle_passenger();
     CHECK(sb.driver_buckled());
     CHECK(sb.passenger_buckled());
+}
+
+// ---------------------------------------------------------------------------
+// DoorLockMotor — RHJB dual-H-bridge motor + mechanical lock stroke.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("DoorLockMotor: defaults to UNLOCKED, not moving", "[PhysicalWorld][DoorLockMotor]") {
+    DoorLockMotor m;
+    CHECK(m.stroke() == DoorLockMotor::Stroke::UNLOCKED);
+    CHECK(m.position() == 0.0);
+    CHECK_FALSE(m.moving());
+    CHECK(std::string(m.stroke_name()) == "UNLOCKED");
+}
+
+TEST_CASE("DoorLockMotor: both drives low or both high → motor off", "[PhysicalWorld][DoorLockMotor]") {
+    DoorLockMotor m;
+    m.update(0.1, false, false);   // neither leg energised
+    CHECK(m.position() == 0.0);
+    m.update(0.1, true, true);     // illegal shoot-through → treated as off
+    CHECK(m.position() == 0.0);
+    CHECK_FALSE(m.moving());
+}
+
+TEST_CASE("DoorLockMotor: lock drive advances toward LOCKED and clamps", "[PhysicalWorld][DoorLockMotor]") {
+    using Catch::Matchers::WithinAbs;
+    DoorLockMotor m;                       // default 0.5 s traverse
+    m.update(0.25, true, false);           // half the stroke
+    CHECK_THAT(m.position(), WithinAbs(0.5, 1e-9));
+    CHECK(m.stroke() == DoorLockMotor::Stroke::MID_STROKE);
+    CHECK(m.moving());
+    m.update(0.40, true, false);           // overshoot — clamps at end-of-travel
+    CHECK(m.position() == 1.0);
+    CHECK(m.stroke() == DoorLockMotor::Stroke::LOCKED);
+    CHECK_FALSE(m.moving());
+}
+
+TEST_CASE("DoorLockMotor: unlock drive returns toward UNLOCKED", "[PhysicalWorld][DoorLockMotor]") {
+    DoorLockMotor m;
+    m.set_position(1.0);                   // start LOCKED
+    m.update(0.6, false, true);            // unlock for longer than the stroke
+    CHECK(m.position() == 0.0);
+    CHECK(m.stroke() == DoorLockMotor::Stroke::UNLOCKED);
+}
+
+TEST_CASE("DoorLockMotor: 600 ms drive pulse reaches the latch", "[PhysicalWorld][DoorLockMotor]") {
+    // Default 0.5 s traverse sits inside the RHJB DLM's 600 ms pulse, so a
+    // single pulse drives the latch fully home.
+    DoorLockMotor m;
+    m.update(0.6, true, false);
+    CHECK(m.stroke() == DoorLockMotor::Stroke::LOCKED);
+}
+
+// ---------------------------------------------------------------------------
+// Sounder — LHJB flasher piezo "click".
+// ---------------------------------------------------------------------------
+
+TEST_CASE("Sounder: silent at construction", "[PhysicalWorld][Sounder]") {
+    Sounder s;
+    CHECK_FALSE(s.sounding());
+    CHECK(s.click_count() == 0);
+}
+
+TEST_CASE("Sounder: counts one click per rising edge", "[PhysicalWorld][Sounder]") {
+    Sounder s;
+    s.update(true);                 // rising edge → click 1
+    CHECK(s.sounding());
+    CHECK(s.click_count() == 1);
+    s.update(true);                 // still high → no new click
+    CHECK(s.click_count() == 1);
+    s.update(false);                // falling edge — silent, count unchanged
+    CHECK_FALSE(s.sounding());
+    CHECK(s.click_count() == 1);
+    s.update(true);                 // next rising edge → click 2
+    CHECK(s.click_count() == 2);
+}
+
+// ---------------------------------------------------------------------------
+// PowerSteeringPumpMotor — PSCM-driven pump (minimum-viable plant).
+// ---------------------------------------------------------------------------
+
+TEST_CASE("PowerSteeringPumpMotor: present (interlock closed) by default", "[PhysicalWorld][SteeringPump]") {
+    PowerSteeringPumpMotor p;
+    CHECK(p.interlock_closed());
+    CHECK(p.commanded_speed() == 0.0);
+    CHECK(p.actual_speed() == 0.0);
+}
+
+TEST_CASE("PowerSteeringPumpMotor: actual speed lags then converges to command", "[PhysicalWorld][SteeringPump]") {
+    PowerSteeringPumpMotor p;            // default tau 0.15 s
+    p.update(0.01, 1.0);
+    CHECK(p.commanded_speed() == 1.0);
+    CHECK(p.actual_speed() > 0.0);       // started moving
+    CHECK(p.actual_speed() < 1.0);       // but lags the command
+    for (int i = 0; i < 200; ++i) p.update(0.01, 1.0);   // 2 s
+    CHECK(p.actual_speed() > 0.99);      // converged
+}
+
+TEST_CASE("PowerSteeringPumpMotor: command is clamped to [0,1]", "[PhysicalWorld][SteeringPump]") {
+    PowerSteeringPumpMotor p;
+    p.update(0.01, 5.0);
+    CHECK(p.commanded_speed() == 1.0);
+    p.update(0.01, -3.0);
+    CHECK(p.commanded_speed() == 0.0);
+}
+
+TEST_CASE("PowerSteeringPumpMotor: zero tau is an instantaneous plant", "[PhysicalWorld][SteeringPump]") {
+    using Catch::Matchers::WithinAbs;
+    PowerSteeringPumpMotor::Config cfg;
+    cfg.response_tau_s = 0.0;
+    PowerSteeringPumpMotor p(cfg);
+    p.update(0.01, 0.7);
+    CHECK_THAT(p.actual_speed(), WithinAbs(0.7, 1e-12));
+}
+
+TEST_CASE("PowerSteeringPumpMotor: unplugging opens the HV interlock loop", "[PhysicalWorld][SteeringPump]") {
+    PowerSteeringPumpMotor p;
+    CHECK(p.interlock_closed());
+    p.set_present(false);
+    CHECK_FALSE(p.interlock_closed());
+    p.set_present(true);
+    CHECK(p.interlock_closed());
 }

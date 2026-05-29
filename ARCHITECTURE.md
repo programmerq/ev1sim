@@ -102,7 +102,7 @@ Signals fall into three ID blocks:
 
 | Block      | Segment      | What lives there                                    |
 |------------|--------------|-----------------------------------------------------|
-| 4000..4199 | chassis bus  | bulbs/horn (4000-4021), panel sensors (4030-4033), motor/throttle/brake/**sim-time** (4070-4075), wiper/HVAC/ambient (4080-4091), IPC telltales (4130-4145), BTCM actuators (4147-4154) |
+| 4000..4199 | chassis bus  | bulbs/horn (4000-4021), panel sensors (4030-4033), motor/throttle/brake/**sim-time** (4070-4075), wiper/HVAC/ambient (4080-4091), body-actuator peripherals — door-lock motor / sounder / steering pump (4092-4098, see [docs/peripherals.md](docs/peripherals.md)), IPC telltales (4130-4145), BTCM actuators (4147-4154) |
 | 5000..5899 | main harness | per-module ECU signals **owned by electricsim** (BTCM 5000-5099, …) that ev1sim subscribes to |
 | 6900..6999 | main harness | driver inputs + 3D-sim-contract physics/sensors **ev1sim publishes** (6900-6991) |
 

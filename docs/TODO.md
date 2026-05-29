@@ -191,6 +191,34 @@ future-UI input on one side, chassis-segment signal publishing on the other.
 - [ ] Door lock solenoid (audio + visual click).
 - [ ] Trunk animation (T key already toggles state; no visual today).
 
+## Actuator/plant peripherals (specs landed; consumer wiring deferred)
+
+The chassis-bus contract + plant models for three electricsim-driven actuators
+landed (signal IDs, endpoints, decode, `PhysicalWorld` plant classes, unit
+tests, and [docs/peripherals.md](peripherals.md)).  Each still needs the live
+consumer wiring (drive the `PhysicalWorld` plant each `SimApp` tick from the
+connector accessors, then surface in render/audio):
+
+- [x] **`door_lock_motor` spec (4092-4095)** — `PhysicalWorld::DoorLockMotor`
+  ×2 (LH/RH); consumes the RHJB dual-H-bridge LOCK/UNLOCK legs and models the
+  lock stroke (UNLOCKED/MID_STROKE/LOCKED, ~0.5 s traverse inside the 600 ms
+  pulse).  Connector: `GetDoorLockMotorDrive(leg)`.
+  - [ ] Wire into `SimApp` tick (drive both motors from 4092-4095; mirror the
+    end-of-travel stroke into `DoorLocks` and the door-lock solenoid
+    audio/visual click above).
+- [x] **`sounder` spec (4096)** — `PhysicalWorld::Sounder`; consumes the LHJB
+  flasher piezo drive, exposes `sounding()` + `click_count()`.
+  Connector: `GetSounderPiezoDrive()`.
+  - [ ] Wire into `SimApp` tick + play the TURN/HAZ click in the audio backend
+    (the long-deferred electricsim Task #5 publish lands the contract).
+- [x] **`power_steering_pump_motor` spec (4097 in / 4098 out)** —
+  `PhysicalWorld::PowerSteeringPumpMotor`; consumes the PSCM commanded pump
+  speed (q8) with a first-order lag and publishes the HV interlock-closed
+  boolean.  Connector: `GetSteeringPumpSpeedCmdQ8()`,
+  `SetSteeringPumpInterlockClosed()`.
+  - [ ] Wire into `SimApp` tick (drive the pump from 4097; publish 4098 each
+    tick).  Optional future: per-phase BLDC model on molex.A/B/C.
+
 ## Door handles + exterior keypad follow-up
 
 - [ ] **Hover-magnify polish for keypad buttons** — currently uses Irrlicht

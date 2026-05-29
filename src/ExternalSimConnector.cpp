@@ -96,7 +96,9 @@ constexpr std::uint32_t kTurnHazSwRightTurnOutId = 4043;
 constexpr std::uint32_t kTurnHazSwLeftTurnOutId  = 4044;
 constexpr std::uint32_t kTurnHazSwHazardOutId    = 4045;
 constexpr std::uint32_t kTurnHazSwHornOutId      = 4046;
-constexpr int           kNumTurnHazSw            = 4;
+// (The endpoint-registry entries for these cavities live once in the
+//  driver-input section as vehicle.driver.*_contact; these IDs are still used
+//  by the chassis-bus publish block + the drift guard below.)
 
 // Charge coupler presence (ev1sim → electricsim, chassis segment).
 //   4060  vehicle.body.charge_coupler.present
@@ -132,7 +134,8 @@ constexpr std::uint32_t kWiperSwDelayOutId        = 4054;
 constexpr std::uint32_t kWiperSwRequestOutId      = 4055;
 constexpr std::uint32_t kWiperSwHiOutId           = 4056;
 constexpr std::uint32_t kWiperSwWasherSwitchOutId = 4057;
-constexpr int           kNumWiperSw               = 4;
+// (Registered once in the driver-input section as vehicle.driver.*_contact;
+//  these IDs remain in use by the chassis-bus publish block + drift guard.)
 
 constexpr std::uint32_t kDynamicsBase   = 4100;
 
@@ -384,6 +387,50 @@ constexpr int           kNumDoorLockPwSignals         = 4;  // 4084+4085+4086+40
 constexpr std::uint32_t kSigRsaShiftBlocked = 4088U;
 constexpr int           kNumRsaShiftBlockedSignals = 1;
 
+// Door-lock motor leg drives (electricsim/RHJB → ev1sim, chassis segment).
+// RHJB's rhjb_door_lock behavioral model is a 4-output dual-H-bridge driving
+// BOTH door-lock motors (LH driver + RH passenger) in lockstep.  Each motor has
+// a LOCK leg and an UNLOCK leg; the leg whose drive is high decides the motor's
+// direction, both-high/both-low → motor off.  ev1sim's door_lock_motor
+// peripheral (PhysicalWorld::DoorLockMotor ×2) consumes these and models the
+// mechanical lock stroke.  Wire-level mapping (cavity → chassis-bus signal),
+// authoritative for the electricsim router — see docs/peripherals.md:
+//   4092  vehicle.body.door_lock_motor.lh_lock_drive    ckt 294A, RHJB J9.C5 → LH motor LOCK
+//   4093  vehicle.body.door_lock_motor.lh_unlock_drive  ckt 295A, RHJB J9.C6 → LH motor UNLOCK
+//   4094  vehicle.body.door_lock_motor.rh_lock_drive    ckt 294C, RHJB J3.A6 → RH motor LOCK
+//   4095  vehicle.body.door_lock_motor.rh_unlock_drive  ckt 295C, RHJB J3.A7 → RH motor UNLOCK
+// uint8/bool wire level: 1 = leg energised.  Allocated ev1sim-side first; see
+// the "pending electricsim adoption" note in the drift-guard block below.
+constexpr std::uint32_t kSigDoorLockMotorLhLockDrive   = 4092U;
+constexpr std::uint32_t kSigDoorLockMotorLhUnlockDrive = 4093U;
+constexpr std::uint32_t kSigDoorLockMotorRhLockDrive   = 4094U;
+constexpr std::uint32_t kSigDoorLockMotorRhUnlockDrive = 4095U;
+constexpr int           kNumDoorLockMotorSignals       = 4;
+
+// Sounder / piezo drive (electricsim/LHJB → ev1sim, chassis segment).
+//   4096  vehicle.body.sounder.piezo_drive   uint8 bool: 1 = piezo energised
+// The LHJB turn/hazard flasher produces a piezo square-wave (the TURN/HAZ
+// "click" in a real GM vehicle).  ev1sim's sounder peripheral
+// (PhysicalWorld::Sounder) consumes the boolean drive and exposes an
+// audible-output signal for the 3D-sim audio contract; each rising edge is one
+// click.  The piezo is a real LHJB-internal component the printed schematics
+// are silent on (no first-class component_id) — see docs/peripherals.md.
+constexpr std::uint32_t kSigSounderPiezoDrive = 4096U;
+constexpr int           kNumSounderSignals    = 1;
+
+// Power-steering pump motor (PSCM ↔ ev1sim, chassis segment).
+// The PSCM is an HV inverter on batt-731 whose molex 3-phase outputs (molex.A/
+// B/C) drive a steering pump motor; the motor body returns the HV interlock
+// loop on molex.D/E.  ev1sim's power_steering_pump_motor peripheral
+// (PhysicalWorld::PowerSteeringPumpMotor) is the minimum-viable plant: it
+// consumes a single commanded pump speed and closes the HV interlock loop.
+// Per-phase BLDC commutation is future work.  Wire-level mapping:
+//   4097  vehicle.steering.pump_motor.speed_cmd_q8     PSCM molex.A/B/C → pump  (uint8 q8: 0=stopped, 255=full)  [in]
+//   4098  vehicle.steering.pump_motor.interlock_closed pump molex.D/E → PSCM    (uint8 bool: 1=loop closed)      [out]
+constexpr std::uint32_t kSigPscmPumpSpeedCmdQ8      = 4097U;
+constexpr std::uint32_t kSigPscmPumpInterlockClosed = 4098U;
+constexpr int           kNumSteeringPumpSignals     = 2;  // 4097 (in) + 4098 (out)
+
 // RSA run-mode broadcast — published by RSA on the main harness segment.
 // ev1sim subscribes to this (input_to_sim = true for subscription, but we
 // don't register it as an endpoint we publish — only receive).
@@ -616,10 +663,10 @@ constexpr int kNumEndpoints =
     kNumMotorSignals + kNumSimTimeSignals + kNumThrottleCmdSignals +
     kNumBrakeSignals + kNumWiperSignals + kNumHvacSignals +
     kNumAmbientSignals + kNumDoorLockPwSignals + kNumRsaShiftBlockedSignals +
+    kNumDoorLockMotorSignals + kNumSounderSignals + kNumSteeringPumpSignals +
     kNumIpcTelltaleSignals + kNumIpcTripDistSignals + kNumIpcBtcmTelltaleSignals +
     kNumIpcExtraTelltaleSignals + kNumBpmPackVoltageSignals +
     kNumBtcmActuatorChassisSignals + kNumExtContractSignals +
-    kNumTurnHazSw + kNumWiperSw +
     kNumDynamics + kNumDriverInputs;
 
 std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
@@ -646,18 +693,12 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     out[i++] = {kCombSwParkHeadlampOutId,
                 "vehicle.body.combination_switch.park_headlamp_out",
                 "comb_sw_park_headlamp_out", false};
-    out[i++] = {kTurnHazSwRightTurnOutId,
-                "vehicle.body.turn_haz_switch.right_turn_out",
-                "turn_haz_right_turn_out", false};
-    out[i++] = {kTurnHazSwLeftTurnOutId,
-                "vehicle.body.turn_haz_switch.left_turn_out",
-                "turn_haz_left_turn_out", false};
-    out[i++] = {kTurnHazSwHazardOutId,
-                "vehicle.body.turn_haz_switch.hazard_out",
-                "turn_haz_hazard_out", false};
-    out[i++] = {kTurnHazSwHornOutId,
-                "vehicle.body.turn_haz_switch.horn_out",
-                "turn_haz_horn_out", false};
+    // Turn/hazard switch cavities (4043-4046) are registered ONCE, in the
+    // driver-input section below as vehicle.driver.{turn_right,turn_left,
+    // hazard,horn}_contact.  (They are still published wire-level on the
+    // chassis bus via the turn_haz publish block in Tick; the endpoint table
+    // is metadata only.)  A second vehicle.body.turn_haz_switch.* registration
+    // here was a leftover from the pre-cavity wiring and is intentionally gone.
     out[i++] = {kChargeCouplerPresentId,
                 "vehicle.body.charge_coupler.present",
                 "charge_coupler_present", false};
@@ -669,18 +710,12 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.driver.prnd_selector_c", "prnd_selector_c", false};
     out[i++] = {kPrndSelectorDId,
                 "vehicle.driver.prnd_selector_d", "prnd_selector_d", false};
-    out[i++] = {kWiperSwDelayOutId,
-                "vehicle.body.wiper_washer_switch.delay_out",
-                "wiper_sw_delay_out", false};
-    out[i++] = {kWiperSwRequestOutId,
-                "vehicle.body.wiper_washer_switch.request_out",
-                "wiper_sw_request_out", false};
-    out[i++] = {kWiperSwHiOutId,
-                "vehicle.body.wiper_washer_switch.hi_out",
-                "wiper_sw_hi_out", false};
-    out[i++] = {kWiperSwWasherSwitchOutId,
-                "vehicle.body.wiper_washer_switch.washer_switch_out",
-                "wiper_sw_washer_switch_out", false};
+    // Wiper/washer switch cavities (4054-4057) are registered ONCE, in the
+    // driver-input section below as vehicle.driver.{wiper_delay,wiper_request,
+    // wiper_hi,washer_switch}_contact.  (Still published wire-level on the
+    // chassis bus via the wiper publish block in Tick.)  A second
+    // vehicle.body.wiper_washer_switch.* registration here was a leftover from
+    // the pre-cavity wiring and is intentionally gone.
     // Motor state signals (chassis segment, ev1sim → electricsim).
     out[i++] = {kSigMotorRpm,
                 "vehicle.dynamics.motor_rpm", "motor_rpm", false};
@@ -787,6 +822,33 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     out[i++] = {kSigRsaShiftBlocked,
                 "vehicle.body.rsa.shift_blocked",
                 "rsa_shift_blocked", true};
+    // Door-lock motor leg drives (RHJB → ev1sim, chassis segment, input_to_sim=true).
+    // dual-H-bridge: [LH lock, LH unlock, RH lock, RH unlock].  See docs/peripherals.md.
+    out[i++] = {kSigDoorLockMotorLhLockDrive,
+                "vehicle.body.door_lock_motor.lh_lock_drive",
+                "door_lock_motor_lh_lock_drive", true};
+    out[i++] = {kSigDoorLockMotorLhUnlockDrive,
+                "vehicle.body.door_lock_motor.lh_unlock_drive",
+                "door_lock_motor_lh_unlock_drive", true};
+    out[i++] = {kSigDoorLockMotorRhLockDrive,
+                "vehicle.body.door_lock_motor.rh_lock_drive",
+                "door_lock_motor_rh_lock_drive", true};
+    out[i++] = {kSigDoorLockMotorRhUnlockDrive,
+                "vehicle.body.door_lock_motor.rh_unlock_drive",
+                "door_lock_motor_rh_unlock_drive", true};
+    // Sounder / piezo drive (LHJB flasher → ev1sim, chassis segment, input_to_sim=true).
+    out[i++] = {kSigSounderPiezoDrive,
+                "vehicle.body.sounder.piezo_drive",
+                "sounder_piezo_drive", true};
+    // Power-steering pump motor (PSCM ↔ ev1sim, chassis segment).
+    // speed_cmd_q8 flows PSCM → ev1sim (input); interlock_closed flows
+    // ev1sim → PSCM (output, the molex.D/E HV interlock loop).
+    out[i++] = {kSigPscmPumpSpeedCmdQ8,
+                "vehicle.steering.pump_motor.speed_cmd_q8",
+                "steering_pump_speed_cmd_q8", true};
+    out[i++] = {kSigPscmPumpInterlockClosed,
+                "vehicle.steering.pump_motor.interlock_closed",
+                "steering_pump_interlock_closed", false};
     // BTCM per-wheel actuator state (BTCM → ev1sim, chassis segment, input_to_sim=true).
     // Mirror of the legacy main-harness publications 5010-5015 plus two
     // new per-wheel cylinder pressure measurements (4153/4154) with no
@@ -1261,6 +1323,27 @@ struct ExternalSimConnector::State {
     bool          rsa_shift_blocked       = false;
     bool          has_rsa_shift_blocked   = false;
 
+    // Door-lock motor leg drives (IDs 4092-4095, chassis segment) — received from RHJB.
+    // dual-H-bridge: [0]=LH lock, [1]=LH unlock, [2]=RH lock, [3]=RH unlock.
+    // bool: true = leg energised.  Consumed by PhysicalWorld::DoorLockMotor ×2.
+    bool          door_lock_motor_drive[4]     = {};
+    bool          has_door_lock_motor_drive[4] = {};
+
+    // Sounder / piezo drive (ID 4096, chassis segment) — received from LHJB flasher.
+    // bool: true = piezo energised.  Consumed by PhysicalWorld::Sounder.
+    bool          sounder_piezo_drive     = false;
+    bool          has_sounder_piezo_drive = false;
+
+    // Power-steering pump speed command (ID 4097, chassis segment) — received from PSCM.
+    // uint8 q8: 0=stopped, 255=full.  0xFF = never received.  Consumed by
+    // PhysicalWorld::PowerSteeringPumpMotor.
+    std::uint8_t  steering_pump_speed_cmd_q8 = 0xFFu;
+    bool          has_steering_pump_speed_cmd = false;
+    // Power-steering pump HV interlock-closed (ID 4098, chassis segment) — published to PSCM.
+    // bool: true = molex.D/E loop closed (motor present).  Publish-on-change.
+    bool          steering_pump_interlock_closed = true;   // motor present → loop closed
+    std::int8_t   steering_pump_interlock_pub    = -1;     // -1 forces first publish
+
     // RSA run-mode broadcast (ID 5711, main harness segment).
     // Subscribed from RSA; 0xFF = never received.
     std::uint8_t  rsa_run_mode            = 0xFFu;
@@ -1535,6 +1618,33 @@ bool ExternalSimConnector::GetRsaShiftBlocked() const {
 }
 bool ExternalSimConnector::HasReceivedRsaShiftBlocked() const {
     return m_state->has_rsa_shift_blocked;
+}
+
+bool ExternalSimConnector::GetDoorLockMotorDrive(int leg) const {
+    if (leg < 0 || leg > 3) return false;
+    return m_state->door_lock_motor_drive[leg];
+}
+bool ExternalSimConnector::HasReceivedDoorLockMotorDrive(int leg) const {
+    if (leg < 0 || leg > 3) return false;
+    return m_state->has_door_lock_motor_drive[leg];
+}
+
+bool ExternalSimConnector::GetSounderPiezoDrive() const {
+    return m_state->sounder_piezo_drive;
+}
+bool ExternalSimConnector::HasReceivedSounderPiezoDrive() const {
+    return m_state->has_sounder_piezo_drive;
+}
+
+std::uint8_t ExternalSimConnector::GetSteeringPumpSpeedCmdQ8() const {
+    return m_state->steering_pump_speed_cmd_q8;
+}
+bool ExternalSimConnector::HasReceivedSteeringPumpSpeedCmd() const {
+    return m_state->has_steering_pump_speed_cmd;
+}
+
+void ExternalSimConnector::SetSteeringPumpInterlockClosed(bool closed) {
+    m_state->steering_pump_interlock_closed = closed;
 }
 
 bool ExternalSimConnector::GetIpcSeatbeltTelltaleDriver() const {
@@ -2146,6 +2256,21 @@ void ExternalSimConnector::DebugInjectDelta(std::uint32_t signal_id, bool value)
                 break;
             default: break;
         }
+    } else if (signal_id == kSigDoorLockMotorLhLockDrive) {
+        m_state->door_lock_motor_drive[0]     = value;
+        m_state->has_door_lock_motor_drive[0] = true;
+    } else if (signal_id == kSigDoorLockMotorLhUnlockDrive) {
+        m_state->door_lock_motor_drive[1]     = value;
+        m_state->has_door_lock_motor_drive[1] = true;
+    } else if (signal_id == kSigDoorLockMotorRhLockDrive) {
+        m_state->door_lock_motor_drive[2]     = value;
+        m_state->has_door_lock_motor_drive[2] = true;
+    } else if (signal_id == kSigDoorLockMotorRhUnlockDrive) {
+        m_state->door_lock_motor_drive[3]     = value;
+        m_state->has_door_lock_motor_drive[3] = true;
+    } else if (signal_id == kSigSounderPiezoDrive) {
+        m_state->sounder_piezo_drive     = value;
+        m_state->has_sounder_piezo_drive = true;
     }
     // Panel-sensor signals are outputs — ignore inbound.
 }
@@ -2259,6 +2384,9 @@ void ExternalSimConnector::DebugInjectU8(std::uint32_t signal_id,
     } else if (signal_id == kSigPimCruiseActive) {
         m_state->pim_cruise_active     = (value != 0u);
         m_state->has_pim_cruise_active = true;
+    } else if (signal_id == kSigPscmPumpSpeedCmdQ8) {
+        m_state->steering_pump_speed_cmd_q8  = value;
+        m_state->has_steering_pump_speed_cmd = true;
     }
     // All other uint8 signals are not currently subscribed as inputs.
 }
@@ -2419,6 +2547,22 @@ EV1SIM_CHASSIS_ID_MATCHES(kWiperSwWasherSwitchOutId, kSigWiperSw_WasherSwitchOut
 // The 4100-range dynamics block publishes by literal offset from this base.
 EV1SIM_CHASSIS_ID_MATCHES(kDynamicsBase,                 kSigChassisSpeedMps);
 
+// ── Pending electricsim adoption (allocated ev1sim-side first) ──────────────
+// These chassis IDs were allocated here so electricsim's RHJB / LHJB / PSCM
+// controllers can start publishing against a fixed wire contract.  They have
+// no electricsim::io::kSigChassis* counterpart yet, so they intentionally do
+// NOT get an EV1SIM_CHASSIS_ID_MATCHES line — adding one now would break the
+// integrated (EV1SIM_HAVE_EXTERNAL_SIM) build until electricsim catches up.
+// When electricsim adds the canonical constants (suggested names below), move
+// each into the guard above so drift is caught from then on:
+//   kSigDoorLockMotorLhLockDrive   (4092) → kSigChassisDoorLockMotorLhLockDrive
+//   kSigDoorLockMotorLhUnlockDrive (4093) → kSigChassisDoorLockMotorLhUnlockDrive
+//   kSigDoorLockMotorRhLockDrive   (4094) → kSigChassisDoorLockMotorRhLockDrive
+//   kSigDoorLockMotorRhUnlockDrive (4095) → kSigChassisDoorLockMotorRhUnlockDrive
+//   kSigSounderPiezoDrive          (4096) → kSigChassisSounderPiezoDrive
+//   kSigPscmPumpSpeedCmdQ8         (4097) → kSigChassisPscmPumpSpeedCmdQ8
+//   kSigPscmPumpInterlockClosed    (4098) → kSigChassisPscmPumpInterlockClosed
+
 #undef EV1SIM_CHASSIS_ID_MATCHES
 
 } // namespace
@@ -2478,6 +2622,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         st.prnd_b_pub = -1;
         st.prnd_c_pub = -1;
         st.prnd_d_pub = -1;
+        st.steering_pump_interlock_pub = -1;
         std::cout << "[ExternalSim] connected to bus '"
                   << m_opts.bus_name << "'\n";
     }
@@ -2547,10 +2692,12 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                 d.signal_id == kSigIpcTempTelltale          ||
                 d.signal_id == kSigIpcBatteryLifeTelltale   ||
                 d.signal_id == kSigIpcReducedPerfTelltale   ||
-                d.signal_id == kSigIpcCheckTirePressTelltale) {
+                d.signal_id == kSigIpcCheckTirePressTelltale ||
+                d.signal_id == kSigPscmPumpSpeedCmdQ8) {
                 DebugInjectU8(d.signal_id, d.payload[0]);
             } else {
                 // All other inbound signals are boolean (bool) — decode LSB.
+                // (door-lock motor legs 4092-4095 and sounder piezo 4096 land here.)
                 const bool v = (d.payload[0] & 1u) != 0u;
                 DebugInjectDelta(d.signal_id, v);
             }
@@ -2635,6 +2782,16 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         pub_prnd(kPrndSelectorBId, st.prnd_b, st.prnd_b_pub);
         pub_prnd(kPrndSelectorCId, st.prnd_c, st.prnd_c_pub);
         pub_prnd(kPrndSelectorDId, st.prnd_d, st.prnd_d_pub);
+    }
+
+    // Power-steering pump HV interlock-closed (ID 4098) — publish delta on change.
+    // The pump motor body closes the molex.D/E loop while present; PSCM senses it.
+    if (st.steering_pump_interlock_pub < 0 ||
+        static_cast<bool>(st.steering_pump_interlock_pub) != st.steering_pump_interlock_closed) {
+        outbound.push_back(MakeBoolDelta(kSigPscmPumpInterlockClosed,
+                                         st.steering_pump_interlock_closed));
+        st.steering_pump_interlock_pub =
+            static_cast<std::int8_t>(st.steering_pump_interlock_closed ? 1 : 0);
     }
 
     if (!outbound.empty()) {

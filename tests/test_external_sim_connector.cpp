@@ -17,8 +17,6 @@ using Catch::Matchers::WithinAbs;
 TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     constexpr int kNumDynamics      = 18;  // 10 chassis/actuator + 4 wheel_omega + 4 slip_ratio
     constexpr int kNumCombSw        = 3;   // headlamp switch: low_beam, flash_to_pass, park_headlamp (4040-4042)
-    constexpr int kNumTurnHazSw     = 4;   // turn/hazard switch: right/left turn, hazard, horn (4043-4046)
-    constexpr int kNumWiperSw       = 4;   // wiper/washer switch: delay, request, hi, washer (4054-4057)
     constexpr int kNumChargeCplr    = 1;   // charge coupler present (4060, stub)
     constexpr int kNumPrnd          = 4;   // PRND selector lines (4050-4053)
     constexpr int kNumWiperSwCavity = 4;   // wiper/washer switch cavities (4054-4057)
@@ -34,6 +32,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     constexpr int kNumDoorLockPw    = 4;   // door_lock_cmd driver/passenger (4084/4085)
                                            // + power_window_motor driver/passenger (4086/4087)
     constexpr int kNumRsaShiftBlocked = 1; // rsa_shift_blocked (4088)
+    constexpr int kNumDoorLockMotor = 4;   // door_lock_motor leg drives (4092-4095) — RHJB → ev1sim
+    constexpr int kNumSounder       = 1;   // sounder piezo_drive (4096) — LHJB flasher → ev1sim
+    constexpr int kNumSteeringPump  = 2;   // pump speed_cmd_q8 (4097, in) + interlock_closed (4098, out)
     constexpr int kNumIpcTelltale   = 2;   // ipc_seatbelt_telltale_driver (4130),
                                            // ipc_seatbelt_telltale_passenger (4131)
     constexpr int kNumIpcTripDist   = 1;   // ipc_trip_distance_m (4132)
@@ -82,6 +83,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
                          kNumThrottleCmd + kNumBrake + kNumWiper +
                          kNumHvac + kNumAmbient + kNumDoorLockPw +
                          kNumRsaShiftBlocked +
+                         kNumDoorLockMotor + kNumSounder + kNumSteeringPump +
                          kNumIpcTelltale + kNumIpcTripDist + kNumIpcBtcmTelltale +
                          kNumIpcExtraTelltale + kNumBpmPackVoltage +
                          kNumBtcmChassisActuator + kNumExtContract +
@@ -96,8 +98,6 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     int horn_count           = 0;
     int panel_count          = 0;
     int comb_sw_count        = 0;
-    int turn_haz_count       = 0;   // turn/hazard switch cavities (4043-4046)
-    int wiper_sw_count       = 0;   // wiper/washer switch cavities (4054-4057)
     int charge_coupler_count = 0;
     int prnd_count           = 0;
     int wiper_sw_cavity_count = 0;  // wiper/washer switch cavities (4054-4057)
@@ -107,6 +107,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     int hvac_count            = 0;   // hvac_blower_level (4082) + defrost_grid_active (4083)
     int door_lock_pw_count    = 0;   // door lock cmds (4084/4085) + pw motor cmds (4086/4087)
     int rsa_shift_blocked_count = 0; // rsa_shift_blocked (4088)
+    int door_lock_motor_count = 0;   // door-lock motor leg drives (4092-4095)
+    int sounder_count         = 0;   // sounder piezo_drive (4096)
+    int steering_pump_count   = 0;   // pump speed_cmd_q8 (4097) + interlock_closed (4098)
     int bpm_pack_voltage_count    = 0;   // bpm_pack_voltage_mv (4139)
     int ipc_telltale_count        = 0;   // IPC seatbelt telltales (4130/4131)
     int ipc_trip_dist_count       = 0;   // IPC trip distance (4132)
@@ -174,6 +177,18 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
         } else if (e.signal_id == 4088) {
             CHECK(e.input_to_sim);          // RSA shift-blocked cue flows into ev1sim
             ++rsa_shift_blocked_count;
+        } else if (e.signal_id >= 4092 && e.signal_id <= 4095) {
+            CHECK(e.input_to_sim);          // door-lock motor leg drives flow into ev1sim
+            ++door_lock_motor_count;
+        } else if (e.signal_id == 4096) {
+            CHECK(e.input_to_sim);          // sounder piezo drive flows into ev1sim
+            ++sounder_count;
+        } else if (e.signal_id == 4097) {
+            CHECK(e.input_to_sim);          // PSCM pump speed cmd flows into ev1sim
+            ++steering_pump_count;
+        } else if (e.signal_id == 4098) {
+            CHECK_FALSE(e.input_to_sim);    // pump interlock-closed flows out to PSCM
+            ++steering_pump_count;
         } else if (e.signal_id == 4139) {
             CHECK(e.input_to_sim);          // BPM pack voltage flows into ev1sim
             ++bpm_pack_voltage_count;
@@ -248,8 +263,6 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     CHECK(horn_count           == 2);
     CHECK(panel_count          == VehiclePanels::NUM_PANELS);
     CHECK(comb_sw_count        == kNumCombSw);
-    CHECK(turn_haz_count       == kNumTurnHazSw);
-    CHECK(wiper_sw_count       == kNumWiperSw);
     CHECK(prnd_count           == kNumPrnd);
     CHECK(wiper_sw_cavity_count == kNumWiperSwCavity);
     CHECK(turn_haz_cavity_count == kNumTurnHazSwCavity);
@@ -267,6 +280,12 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     CHECK(door_lock_pw_count      == kNumDoorLockPw);
     // rsa_shift_blocked_count: RSA shift-blocked cue (4088).
     CHECK(rsa_shift_blocked_count == kNumRsaShiftBlocked);
+    // door_lock_motor_count: RHJB dual-H-bridge motor leg drives (4092-4095).
+    CHECK(door_lock_motor_count   == kNumDoorLockMotor);
+    // sounder_count: LHJB flasher piezo drive (4096).
+    CHECK(sounder_count           == kNumSounder);
+    // steering_pump_count: PSCM pump speed cmd (4097, in) + interlock-closed (4098, out).
+    CHECK(steering_pump_count     == kNumSteeringPump);
     // bpm_pack_voltage_count: BPM pack voltage (4139) — uint32 mV, from BPM.
     CHECK(bpm_pack_voltage_count  == kNumBpmPackVoltage);
     // ipc_telltale_count: driver seatbelt telltale (4130) + passenger (4131) — from IPC.
@@ -658,6 +677,105 @@ TEST_CASE("SetChargeCouplerPresent stores without crashing", "[ExternalSim]") {
     ExternalSimConnector c;
     CHECK_NOTHROW(c.SetChargeCouplerPresent(false));
     CHECK_NOTHROW(c.SetChargeCouplerPresent(true));
+    CHECK_NOTHROW(c.Tick(0.0));
+}
+
+// ---------------------------------------------------------------------------
+// Door-lock motor leg drives (4092-4095) — RHJB dual-H-bridge → ev1sim.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("Door-lock motor endpoints have correct IDs and direction", "[ExternalSim]") {
+    struct Row { std::uint32_t sid; const char* qualified; };
+    const Row rows[] = {
+        {4092, "vehicle.body.door_lock_motor.lh_lock_drive"},
+        {4093, "vehicle.body.door_lock_motor.lh_unlock_drive"},
+        {4094, "vehicle.body.door_lock_motor.rh_lock_drive"},
+        {4095, "vehicle.body.door_lock_motor.rh_unlock_drive"},
+    };
+    for (const auto& r : rows) {
+        const auto* ep = ExternalSimConnector::FindEndpoint(r.sid);
+        REQUIRE(ep != nullptr);
+        CHECK(std::string(ep->qualified_name) == r.qualified);
+        CHECK(ep->input_to_sim);   // RHJB drives these into ev1sim
+    }
+}
+
+TEST_CASE("Injected door-lock motor leg drives latch per leg", "[ExternalSim]") {
+    ExternalSimConnector c;
+    for (int leg = 0; leg < 4; ++leg)
+        CHECK_FALSE(c.HasReceivedDoorLockMotorDrive(leg));
+
+    c.DebugInjectDelta(4092, true);   // LH lock leg
+    c.DebugInjectDelta(4095, true);   // RH unlock leg
+    CHECK(c.GetDoorLockMotorDrive(0));
+    CHECK(c.HasReceivedDoorLockMotorDrive(0));
+    CHECK_FALSE(c.GetDoorLockMotorDrive(1));   // LH unlock not driven
+    CHECK(c.GetDoorLockMotorDrive(3));         // RH unlock driven
+
+    c.DebugInjectDelta(4092, false);
+    CHECK_FALSE(c.GetDoorLockMotorDrive(0));
+    CHECK(c.HasReceivedDoorLockMotorDrive(0));  // latched on first ever write
+
+    // Out-of-range legs are safe (return false, no crash).
+    CHECK_FALSE(c.GetDoorLockMotorDrive(-1));
+    CHECK_FALSE(c.GetDoorLockMotorDrive(4));
+    CHECK_FALSE(c.HasReceivedDoorLockMotorDrive(99));
+}
+
+// ---------------------------------------------------------------------------
+// Sounder / piezo (4096) — LHJB flasher → ev1sim.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("Sounder endpoint has correct ID and direction", "[ExternalSim]") {
+    const auto* ep = ExternalSimConnector::FindEndpoint(4096);
+    REQUIRE(ep != nullptr);
+    CHECK(std::string(ep->qualified_name) == "vehicle.body.sounder.piezo_drive");
+    CHECK(std::string(ep->short_name)     == "sounder_piezo_drive");
+    CHECK(ep->input_to_sim);   // LHJB flasher drives this into ev1sim
+}
+
+TEST_CASE("Injected sounder piezo drive latches", "[ExternalSim]") {
+    ExternalSimConnector c;
+    CHECK_FALSE(c.HasReceivedSounderPiezoDrive());
+    CHECK_FALSE(c.GetSounderPiezoDrive());
+
+    c.DebugInjectDelta(4096, true);
+    CHECK(c.GetSounderPiezoDrive());
+    CHECK(c.HasReceivedSounderPiezoDrive());
+
+    c.DebugInjectDelta(4096, false);
+    CHECK_FALSE(c.GetSounderPiezoDrive());
+    CHECK(c.HasReceivedSounderPiezoDrive());
+}
+
+// ---------------------------------------------------------------------------
+// Power-steering pump motor (4097 in / 4098 out) — PSCM ↔ ev1sim.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("Power-steering pump endpoints have correct IDs and direction", "[ExternalSim]") {
+    const auto* cmd = ExternalSimConnector::FindEndpoint(4097);
+    REQUIRE(cmd != nullptr);
+    CHECK(std::string(cmd->qualified_name) == "vehicle.steering.pump_motor.speed_cmd_q8");
+    CHECK(cmd->input_to_sim);   // PSCM → ev1sim
+
+    const auto* ilk = ExternalSimConnector::FindEndpoint(4098);
+    REQUIRE(ilk != nullptr);
+    CHECK(std::string(ilk->qualified_name) == "vehicle.steering.pump_motor.interlock_closed");
+    CHECK_FALSE(ilk->input_to_sim);   // ev1sim → PSCM (the HV interlock loop)
+}
+
+TEST_CASE("Injected pump speed cmd latches; interlock setter stores", "[ExternalSim]") {
+    ExternalSimConnector c;
+    CHECK(c.GetSteeringPumpSpeedCmdQ8() == 0xFFu);   // sentinel: never received
+    CHECK_FALSE(c.HasReceivedSteeringPumpSpeedCmd());
+
+    c.DebugInjectU8(4097, 200);
+    CHECK(c.GetSteeringPumpSpeedCmdQ8() == 200);
+    CHECK(c.HasReceivedSteeringPumpSpeedCmd());
+
+    // Interlock-closed is an output; setter + Tick must not crash.
+    CHECK_NOTHROW(c.SetSteeringPumpInterlockClosed(false));
+    CHECK_NOTHROW(c.SetSteeringPumpInterlockClosed(true));
     CHECK_NOTHROW(c.Tick(0.0));
 }
 
