@@ -103,3 +103,44 @@ jobs:
 
       - name: Run unit tests
         run: ctest --test-dir build --output-on-failure
+
+  # Integrated build: compile the connector with EV1SIM_HAVE_EXTERNAL_SIM=1
+  # against a committed, self-contained electricsim I/O stub
+  # (tests/electricsim_stub).  The unit-tests job builds the *stub* connector
+  # (the `#else` branch); this one compiles the guarded transport/publish path
+  # that branch `#if`-excludes — the class of breakage that let the main-harness
+  # horn bug reach main.  No real electricsim checkout, no secret; still Chrono-
+  # free.  (Live chassis-ID drift detection vs the real electricsim is out of
+  # scope here — the stub's IDs are pinned to ev1sim's; see the stub README.)
+  integrated-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Irrlicht
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libirrlicht-dev
+
+      - name: Configure (tests-only + electricsim stub connector)
+        run: |
+          cmake -B build -S . \
+            -DEV1SIM_TESTS_ONLY=ON \
+            -DEV1SIM_HAVE_WHEEL_IO=OFF \
+            -DELECTRICSIM_DIR="${GITHUB_WORKSPACE}/tests/electricsim_stub" 2>&1 | tee cmake-configure.log
+
+      - name: Assert the electricsim connector was enabled
+        # Guard against a false green: if the stub tree weren't picked up, the
+        # build would silently fall back to the plain stub and skip the guarded path.
+        run: |
+          if grep -q "electricsim connector: not found" cmake-configure.log; then
+            echo "::error::electricsim stub not picked up — integrated build fell back to stub mode"
+            exit 1
+          fi
+          grep "electricsim connector:" cmake-configure.log
+
+      - name: Build unit tests (EV1SIM_HAVE_EXTERNAL_SIM=1)
+        run: cmake --build build --target ev1sim_tests -j"$(nproc)"
+
+      - name: Run unit tests
+        run: ctest --test-dir build --output-on-failure
