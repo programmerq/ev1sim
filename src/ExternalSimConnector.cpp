@@ -1944,6 +1944,15 @@ bool ExternalSimConnector::HasVehicleSpeed() const {
     return m_state->has_vstate;
 }
 
+float ExternalSimConnector::GetSteeringAngleRad() const {
+    return m_state->has_vstate
+               ? static_cast<float>(m_state->vstate.steering_angle)
+               : 0.0f;
+}
+bool ExternalSimConnector::HasVehicleState() const {
+    return m_state->has_vstate;
+}
+
 void ExternalSimConnector::SetPanelSensor(PanelID panel, bool ajar) {
     int idx = static_cast<int>(panel);
     if (idx < 0 || idx >= VehiclePanels::NUM_PANELS) return;

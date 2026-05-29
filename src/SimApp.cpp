@@ -470,6 +470,17 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                 },
                 []() {});   // no-op: display-only row
 
+            // --- PRND shift buttons (mirror the , / . keyboard shift actions) ---
+            // cycle_up advances P→R→N→D; cycle_down reverses (both clamp at the
+            // ends).  Click advances the local PrndSelector — the new position
+            // is published via SetDriverGearSelector and shown in the row above.
+            m_floating_ui->AddButton(
+                []() -> std::wstring { return L"Gear Up: P>R>N>D"; },
+                [this]() { PrndUp(); });
+            m_floating_ui->AddButton(
+                []() -> std::wstring { return L"Gear Down: D>N>R>P"; },
+                [this]() { PrndDown(); });
+
             // --- PIM cruise-control status (display-only; main harness bus 5860/5861) ---
             // Subscribes to PIM signals kSigPimCruiseActive (5860) and
             // kSigPimCruiseSetpointMps (5861) on the main harness segment.
@@ -746,6 +757,19 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                     return FormatVehicleSpeedLabel(
                         m_external_sim->HasVehicleSpeed(),
                         m_external_sim->GetVehicleSpeedMps());
+                },
+                []() {});   // no-op: display-only row
+
+            // --- Steering angle indicator (display-only; ev1sim physics) ---
+            // Front road-wheel angle from the VehicleState snapshot (rad → deg).
+            // Positive = left.  Shows "Steering: 12.3 deg L/R" or "Steering: ---".
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    if (!m_external_sim || !m_external_sim->HasVehicleState())
+                        return L"Steering: ---";
+                    const double deg = m_external_sim->GetSteeringAngleRad()
+                                       * 180.0 / 3.14159265358979323846;
+                    return FormatSteeringAngleLabel(deg);
                 },
                 []() {});   // no-op: display-only row
 
