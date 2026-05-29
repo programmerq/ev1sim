@@ -285,8 +285,9 @@ Only the render/audio surfacing remains (tracked in the "defer all" section abov
 - [ ] **Remaining UI candidates** — next floating-panel rounds:
   - Trunk open/close (T key covers it but panel would be friendlier)
   - Hood open/close
-  - Power windows (driver, passenger) — signals 6980-6983 pinned, no
-    panel buttons yet
+  - Power windows (driver, passenger) **(done)** — momentary press-and-hold
+    panel buttons (Drv/Pass Up/Down) drive signals 6980-6983 via the new
+    FloatingUiPanel hold-button support (polls IGUIButton::isPressed())
   - Pedals: brake pressure slider, accelerator slider (currently
     keyboard-only — no analog range exposed in FloatingUiPanel)
   - Steering angle indicator **(done)** — display row, front road-wheel angle

@@ -172,6 +172,12 @@ std::wstring FormatVehicleSpeedLabel(bool ever_received, float speed_mps);
 /// Shows "Steering: 0.0 deg", "Steering: 12.3 deg L", or "Steering: 12.3 deg R".
 std::wstring FormatSteeringAngleLabel(double angle_deg);
 
+// Power-window momentary hold-button label helper.
+/// Format a press-and-hold power-window button label.
+/// text:   static base label, e.g. L"Drv Window Up" (null treated as empty).
+/// active: true while the switch is asserted (held) — appends " [ON]".
+std::wstring FormatPowerWindowButtonLabel(const wchar_t* text, bool active);
+
 // BPM pack voltage label helper (display-only, not a button).
 /// Format BPM pack voltage as "PackVolt: NNN.N V" or "PackVolt: ---" if not received.
 /// pack_voltage_mv: raw millivolt value from kSigChassisBpmPackVoltageMv (4139).
@@ -198,6 +204,13 @@ public:
     void AddButton(std::function<std::wstring()> label_fn,
                    std::function<void()>         on_click);
 
+    // Register a momentary "hold" button.  on_hold(pressed) is called every
+    // frame from UpdateLabels() with the button's current pressed state (true
+    // while the mouse is held down on it), and once with false when the panel
+    // is hidden — so a momentary switch can never get stuck asserted.
+    void AddHoldButton(std::function<std::wstring()> label_fn,
+                       std::function<void(bool)>     on_hold);
+
     // Show or hide the whole panel (all buttons + background).
     void SetVisible(bool visible);
     bool IsVisible() const { return m_visible; }
@@ -215,7 +228,14 @@ private:
         irr::gui::IGUIButton*     widget   = nullptr;
         std::function<std::wstring()> label_fn;
         std::function<void()>         on_click;
+        std::function<void(bool)>     on_hold;        // momentary hold callback
+        bool                          is_hold = false;
     };
+
+    // Create the Irrlicht button widget for the next entry (shared by
+    // AddButton / AddHoldButton); also grows the background panel.
+    irr::gui::IGUIButton* CreateButtonWidget(
+        const std::function<std::wstring()>& label_fn);
 
     irr::gui::IGUIEnvironment* m_gui;
     irr::gui::IGUIStaticText*  m_bg       = nullptr;

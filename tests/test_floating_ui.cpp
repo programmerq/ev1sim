@@ -836,3 +836,17 @@ TEST_CASE("FormatSteeringAngleLabel: non-finite shows placeholder", "[FloatingUI
     CHECK(FormatSteeringAngleLabel(std::numeric_limits<double>::infinity())
           == L"Steering: ---");
 }
+
+// --- Power-window momentary hold-button label -------------------------------
+
+TEST_CASE("FormatPowerWindowButtonLabel: appends [ON] only while held", "[FloatingUI]") {
+    CHECK(FormatPowerWindowButtonLabel(L"Drv Window Up", false) == L"Drv Window Up");
+    CHECK(FormatPowerWindowButtonLabel(L"Drv Window Up", true)  == L"Drv Window Up [ON]");
+    CHECK(FormatPowerWindowButtonLabel(L"Pass Window Down", true)
+          == L"Pass Window Down [ON]");
+}
+
+TEST_CASE("FormatPowerWindowButtonLabel: null text is treated as empty", "[FloatingUI]") {
+    CHECK(FormatPowerWindowButtonLabel(nullptr, false) == L"");
+    CHECK(FormatPowerWindowButtonLabel(nullptr, true)  == L" [ON]");
+}
