@@ -49,9 +49,18 @@ public:
     /// Electrical power drawn from the pack (W, signed: + discharge, − charge)
     /// for a signed shaft torque (N·m) and speed (rad/s).
     static double pack_power_w(double torque_nm, double speed_rad_s, const Params& p) {
-        const double p_mech  = torque_nm * speed_rad_s;
-        const double p_drive = (p_mech >= 0.0) ? p_mech / p.drive_efficiency
-                                               : p_mech * p.regen_efficiency;
+        const double p_mech = torque_nm * speed_rad_s;
+        double p_drive;
+        if (p_mech >= 0.0) {
+            // Motoring: draw more than P_mech.  Guard the division so a
+            // misconfigured (non-positive) efficiency can't leak inf/NaN into
+            // published telemetry — fall back to a lossless pass-through.
+            p_drive = (p.drive_efficiency > 0.0) ? p_mech / p.drive_efficiency
+                                                 : p_mech;
+        } else {
+            // Regen: recover less than |P_mech| (multiplication is always finite).
+            p_drive = p_mech * p.regen_efficiency;
+        }
         return p_drive + p.accessory_load_w;
     }
     static double pack_power_w(double torque_nm, double speed_rad_s) {
