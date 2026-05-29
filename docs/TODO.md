@@ -187,14 +187,22 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   is MacPherson front / trailing-arm (twist-beam) rear.  Substantial
   rebuild; deferred until either (a) Chrono `MacPhersonStrut` JSON
   sample available, or (b) we have measured EV1 hardpoints.
-- [ ] **Body aerodynamics.**  No `ChAerodynamicLoad` on the chassis;
-  the EV1's signature 0.19 Cd is currently lumped into tire dissipation.
-  Add explicit drag once the rolling/slip dissipation is calibrated.
-- [ ] **Brake bias front/rear.**  Currently both axles share
-  `EV1_BrakeSimple.json` at 800 N·m/wheel.  Real EV1 has front discs
-  + rear drums with stronger front bias.  Split into
-  `EV1_BrakeSimple_Front.json` (800) and `_Rear.json` (500) when
-  tuning braking dynamics matters.
+  *(Round 4: the existing DoubleWishbone geometry is now sanity-verified —
+  track widths, masses/inertias, spring/damper rates, control-arm
+  orientation — with regression guards in `tests/test_suspension_geometry.cpp`;
+  see [vehicle-dynamics.md](vehicle-dynamics.md).)*
+- [x] **Body aerodynamics** (Round 4) — explicit chassis drag via
+  `ChChassis::SetAerodynamicDrag` using the EV1's published Cd 0.19, frontal
+  area 1.89 m², ISA sea-level air.  Constants + the `F = ½ρCdAv²` law live in
+  [`src/Aerodynamics.h`](../src/Aerodynamics.h) (pinned by
+  `tests/test_aerodynamics.cpp`).  Follow-up: trim tire rolling/slip dissipation
+  now that drag is no longer lumped into it — see
+  [vehicle-dynamics.md](vehicle-dynamics.md).
+- [x] **Brake bias front/rear** (Round 4) — split into
+  `EV1_BrakeSimple_Front.json` (1120 N·m) + `EV1_BrakeSimple_Rear.json`
+  (480 N·m) for a 70/30 front-biased split, total preserved at 3200 N·m
+  (~0.88 g peak decel).  Rear value is pinned to `SimApp::kRearBrakeMaxTorqueNm`
+  (rear-EMB torque→ratio).  Guarded by `tests/test_brake_bias.cpp`.
 
 ## Outputs ev1sim could render (defer all)
 - [ ] Wiper motor visual sweep (model update needed).

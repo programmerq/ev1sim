@@ -1,0 +1,14 @@
+{
+  "Name":                       "EV1 Rear Brake (drum)",
+  "Type":                       "Brake",
+  "Template":                   "BrakeSimple",
+
+  "//":                         "Round 4 brake bias — rear drum carries ~30% of total braking.",
+  "//1":                        "Maximum Torque 480 N·m/wheel pairs with front 1120 for a 70/30 split and",
+  "//2":                        "  a 3200 N·m 4-wheel total → ~0.88g friction-limited peak decel.",
+  "//3":                        "EMB headroom: the rear electromechanical drum (BrakeDrum model) peaks at",
+  "//4":                        "  ~456 N·m at speed (μ0.38 × 4000 N × 0.10 m × (1+α2.0)), so a 480 N·m",
+  "//5":                        "  allocation lets the EMB nearly saturate its share without clipping.",
+  "//6":                        "MUST stay in sync with SimApp::kRearBrakeMaxTorqueNm (torque→ratio convert).",
+  "Maximum Torque":             480
+}

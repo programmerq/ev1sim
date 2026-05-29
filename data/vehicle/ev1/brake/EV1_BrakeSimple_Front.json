@@ -1,0 +1,13 @@
+{
+  "Name":                       "EV1 Front Brake (vented disc)",
+  "Type":                       "Brake",
+  "Template":                   "BrakeSimple",
+
+  "//":                         "Round 4 brake bias — front vented disc carries ~70% of total braking.",
+  "//1":                        "4-wheel total brake torque preserved at 3200 N·m so the friction-limited",
+  "//2":                        "  peak decel stays ~0.88g (see EV1_BrakeSimple_Rear.json for the pairing).",
+  "//3":                        "Static weight is ~50/50, but a 0.8g stop transfers load forward, so a",
+  "//4":                        "  70/30 front bias matches the dynamic axle loads and the disc's thermal",
+  "//5":                        "  headroom.  Front pair 2×1120 = 2240 N·m (70%); rear pair 2×480 = 960 (30%).",
+  "Maximum Torque":             1120
+}
