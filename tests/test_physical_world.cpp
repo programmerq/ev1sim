@@ -1067,3 +1067,60 @@ TEST_CASE("PowerSteeringPumpMotor: unplugging opens the HV interlock loop", "[Ph
     p.set_present(true);
     CHECK(p.interlock_closed());
 }
+
+// ---------------------------------------------------------------------------
+// HvacControls — driver climate HMI (publishes requests to HTCM).
+// ---------------------------------------------------------------------------
+
+TEST_CASE("HvacControls: sane defaults", "[PhysicalWorld][Hvac]") {
+    using Catch::Matchers::WithinAbs;
+    HvacControls h;
+    CHECK_THAT(h.temp_setpoint_c(), WithinAbs(21.0, 1e-9));
+    CHECK(h.fan()  == HvacControls::Fan::OFF);
+    CHECK(h.mode() == HvacControls::Mode::FACE);
+    CHECK(h.fan_u8()  == 0);
+    CHECK(h.mode_u8() == 0);
+    CHECK_FALSE(h.ac_on());
+    CHECK_FALSE(h.defrost_on());
+}
+
+TEST_CASE("HvacControls: setpoint clamps to the cabin range", "[PhysicalWorld][Hvac]") {
+    using Catch::Matchers::WithinAbs;
+    HvacControls h;
+    h.set_temp_setpoint_c(25.0);
+    CHECK_THAT(h.temp_setpoint_c(), WithinAbs(25.0, 1e-9));
+    h.set_temp_setpoint_c(99.0);
+    CHECK_THAT(h.temp_setpoint_c(), WithinAbs(HvacControls::kMaxSetpointC, 1e-9));
+    h.set_temp_setpoint_c(-40.0);
+    CHECK_THAT(h.temp_setpoint_c(), WithinAbs(HvacControls::kMinSetpointC, 1e-9));
+    // adjust_setpoint_c nudges and clamps.
+    h.set_temp_setpoint_c(21.0);
+    h.adjust_setpoint_c(2.5);
+    CHECK_THAT(h.temp_setpoint_c(), WithinAbs(23.5, 1e-9));
+    h.adjust_setpoint_c(-100.0);
+    CHECK_THAT(h.temp_setpoint_c(), WithinAbs(HvacControls::kMinSetpointC, 1e-9));
+}
+
+TEST_CASE("HvacControls: fan cycles OFF -> LOW -> MED -> HIGH -> OFF", "[PhysicalWorld][Hvac]") {
+    HvacControls h;
+    h.cycle_fan(); CHECK(h.fan() == HvacControls::Fan::LOW);  CHECK(h.fan_u8() == 1);
+    h.cycle_fan(); CHECK(h.fan() == HvacControls::Fan::MED);  CHECK(h.fan_u8() == 2);
+    h.cycle_fan(); CHECK(h.fan() == HvacControls::Fan::HIGH); CHECK(h.fan_u8() == 3);
+    h.cycle_fan(); CHECK(h.fan() == HvacControls::Fan::OFF);
+}
+
+TEST_CASE("HvacControls: mode cycles FACE -> BILEVEL -> FEET -> DEFROST -> FACE", "[PhysicalWorld][Hvac]") {
+    HvacControls h;
+    h.cycle_mode(); CHECK(h.mode() == HvacControls::Mode::BILEVEL); CHECK(h.mode_u8() == 1);
+    h.cycle_mode(); CHECK(h.mode() == HvacControls::Mode::FEET);    CHECK(h.mode_u8() == 2);
+    h.cycle_mode(); CHECK(h.mode() == HvacControls::Mode::DEFROST); CHECK(h.mode_u8() == 3);
+    h.cycle_mode(); CHECK(h.mode() == HvacControls::Mode::FACE);
+}
+
+TEST_CASE("HvacControls: AC and defrost toggle independently", "[PhysicalWorld][Hvac]") {
+    HvacControls h;
+    h.toggle_ac();      CHECK(h.ac_on());      CHECK_FALSE(h.defrost_on());
+    h.toggle_defrost(); CHECK(h.ac_on());      CHECK(h.defrost_on());
+    h.set_ac(false);    CHECK_FALSE(h.ac_on()); CHECK(h.defrost_on());
+    h.set_defrost(false); CHECK_FALSE(h.defrost_on());
+}

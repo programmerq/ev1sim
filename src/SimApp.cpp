@@ -1514,6 +1514,19 @@ int SimApp::RunWithVisualization() {
                 m_external_sim->SetDriverPowerWindowPassengerUp(pw.passenger_up());
                 m_external_sim->SetDriverPowerWindowPassengerDown(pw.passenger_down());
             }
+            // HVAC driver controls (4124-4128) — no keyboard source yet; the
+            // floating UI panel will drive the setters when expanded.  Publish
+            // the current panel state each tick so the HTCM-facing wire format
+            // is locked (mirrors the PowerWindows posture above).
+            {
+                const auto& hv = m_physical->hvac_controls();
+                m_external_sim->SetHvacTempSetpointC(
+                    static_cast<float>(hv.temp_setpoint_c()));
+                m_external_sim->SetHvacFanRequest(hv.fan_u8());
+                m_external_sim->SetHvacModeRequest(hv.mode_u8());
+                m_external_sim->SetHvacAcRequest(hv.ac_on());
+                m_external_sim->SetHvacDefrostRequest(hv.defrost_on());
+            }
             // RSA exterior keypad (6985-6989) and door handle attempts (6990-6991).
             // Tick the sequence emitter then consume any pending fires.
             m_physical->rsa_exterior_keypad().update(render_dt);
@@ -2032,6 +2045,19 @@ int SimApp::RunHeadless() {
                 m_external_sim->SetDriverPowerWindowDriverDown(pw.driver_down());
                 m_external_sim->SetDriverPowerWindowPassengerUp(pw.passenger_up());
                 m_external_sim->SetDriverPowerWindowPassengerDown(pw.passenger_down());
+            }
+            // HVAC driver controls (4124-4128) — no keyboard source yet; the
+            // floating UI panel will drive the setters when expanded.  Publish
+            // the current panel state each tick so the HTCM-facing wire format
+            // is locked (mirrors the PowerWindows posture above).
+            {
+                const auto& hv = m_physical->hvac_controls();
+                m_external_sim->SetHvacTempSetpointC(
+                    static_cast<float>(hv.temp_setpoint_c()));
+                m_external_sim->SetHvacFanRequest(hv.fan_u8());
+                m_external_sim->SetHvacModeRequest(hv.mode_u8());
+                m_external_sim->SetHvacAcRequest(hv.ac_on());
+                m_external_sim->SetHvacDefrostRequest(hv.defrost_on());
             }
             // RSA exterior keypad (6985-6989) and door handle attempts (6990-6991).
             // Headless: no UI source; tick the sequence emitter and publish zeros.

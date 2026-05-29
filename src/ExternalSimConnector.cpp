@@ -431,6 +431,23 @@ constexpr std::uint32_t kSigPscmPumpSpeedCmdQ8      = 4097U;
 constexpr std::uint32_t kSigPscmPumpInterlockClosed = 4098U;
 constexpr int           kNumSteeringPumpSignals     = 2;  // 4097 (in) + 4098 (out)
 
+// HVAC driver controls (ev1sim → electricsim/HTCM, chassis segment).
+// The driver's climate-panel requests, modelled by PhysicalWorld::HvacControls.
+// HTCM owns the plant and feeds back the actual blower level (4082) + rear
+// defrost grid (4083); these five are the upstream driver inputs.  Allocated
+// ev1sim-side first (see the "pending electricsim adoption" note below).
+//   4124  vehicle.hvac.temp_setpoint_c   float32 LE, °C (clamped 16..30)
+//   4125  vehicle.hvac.fan_request       uint8: 0=OFF, 1=LOW, 2=MED, 3=HIGH
+//   4126  vehicle.hvac.mode_request      uint8: 0=FACE, 1=BILEVEL, 2=FEET, 3=DEFROST
+//   4127  vehicle.hvac.ac_request        uint8 bool: 0=off, 1=on
+//   4128  vehicle.hvac.defrost_request   uint8 bool: 0=off, 1=on
+constexpr std::uint32_t kSigHvacTempSetpointC   = 4124U;
+constexpr std::uint32_t kSigHvacFanRequest      = 4125U;
+constexpr std::uint32_t kSigHvacModeRequest     = 4126U;
+constexpr std::uint32_t kSigHvacAcRequest       = 4127U;
+constexpr std::uint32_t kSigHvacDefrostRequest  = 4128U;
+constexpr int           kNumHvacControlSignals  = 5;
+
 // RSA run-mode broadcast — published by RSA on the main harness segment.
 // ev1sim subscribes to this (input_to_sim = true for subscription, but we
 // don't register it as an endpoint we publish — only receive).
@@ -664,6 +681,7 @@ constexpr int kNumEndpoints =
     kNumBrakeSignals + kNumWiperSignals + kNumHvacSignals +
     kNumAmbientSignals + kNumDoorLockPwSignals + kNumRsaShiftBlockedSignals +
     kNumDoorLockMotorSignals + kNumSounderSignals + kNumSteeringPumpSignals +
+    kNumHvacControlSignals +
     kNumIpcTelltaleSignals + kNumIpcTripDistSignals + kNumIpcBtcmTelltaleSignals +
     kNumIpcExtraTelltaleSignals + kNumBpmPackVoltageSignals +
     kNumBtcmActuatorChassisSignals + kNumExtContractSignals +
@@ -849,6 +867,17 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     out[i++] = {kSigPscmPumpInterlockClosed,
                 "vehicle.steering.pump_motor.interlock_closed",
                 "steering_pump_interlock_closed", false};
+    // HVAC driver controls (ev1sim → HTCM, chassis segment, input_to_sim=false).
+    out[i++] = {kSigHvacTempSetpointC,
+                "vehicle.hvac.temp_setpoint_c", "hvac_temp_setpoint_c", false};
+    out[i++] = {kSigHvacFanRequest,
+                "vehicle.hvac.fan_request", "hvac_fan_request", false};
+    out[i++] = {kSigHvacModeRequest,
+                "vehicle.hvac.mode_request", "hvac_mode_request", false};
+    out[i++] = {kSigHvacAcRequest,
+                "vehicle.hvac.ac_request", "hvac_ac_request", false};
+    out[i++] = {kSigHvacDefrostRequest,
+                "vehicle.hvac.defrost_request", "hvac_defrost_request", false};
     // BTCM per-wheel actuator state (BTCM → ev1sim, chassis segment, input_to_sim=true).
     // Mirror of the legacy main-harness publications 5010-5015 plus two
     // new per-wheel cylinder pressure measurements (4153/4154) with no
@@ -1344,6 +1373,19 @@ struct ExternalSimConnector::State {
     bool          steering_pump_interlock_closed = true;   // motor present → loop closed
     std::int8_t   steering_pump_interlock_pub    = -1;     // -1 forces first publish
 
+    // HVAC driver controls (IDs 4124-4128, chassis segment) — published to HTCM.
+    // Publish-on-change; defaults match PhysicalWorld::HvacControls.
+    float         hvac_temp_setpoint_c     = 21.0f;
+    std::uint8_t  hvac_fan_request         = 0u;     // OFF
+    std::uint8_t  hvac_mode_request        = 0u;     // FACE
+    bool          hvac_ac_request          = false;
+    bool          hvac_defrost_request     = false;
+    float         hvac_temp_setpoint_pub   = -9999.0f;  // sentinel: force first publish
+    std::int8_t   hvac_fan_request_pub     = -1;
+    std::int8_t   hvac_mode_request_pub    = -1;
+    std::int8_t   hvac_ac_request_pub      = -1;
+    std::int8_t   hvac_defrost_request_pub = -1;
+
     // RSA run-mode broadcast (ID 5711, main harness segment).
     // Subscribed from RSA; 0xFF = never received.
     std::uint8_t  rsa_run_mode            = 0xFFu;
@@ -1645,6 +1687,22 @@ bool ExternalSimConnector::HasReceivedSteeringPumpSpeedCmd() const {
 
 void ExternalSimConnector::SetSteeringPumpInterlockClosed(bool closed) {
     m_state->steering_pump_interlock_closed = closed;
+}
+
+void ExternalSimConnector::SetHvacTempSetpointC(float setpoint_c) {
+    m_state->hvac_temp_setpoint_c = setpoint_c;
+}
+void ExternalSimConnector::SetHvacFanRequest(std::uint8_t level) {
+    m_state->hvac_fan_request = level;
+}
+void ExternalSimConnector::SetHvacModeRequest(std::uint8_t mode) {
+    m_state->hvac_mode_request = mode;
+}
+void ExternalSimConnector::SetHvacAcRequest(bool on) {
+    m_state->hvac_ac_request = on;
+}
+void ExternalSimConnector::SetHvacDefrostRequest(bool on) {
+    m_state->hvac_defrost_request = on;
 }
 
 bool ExternalSimConnector::GetIpcSeatbeltTelltaleDriver() const {
@@ -2562,6 +2620,11 @@ EV1SIM_CHASSIS_ID_MATCHES(kDynamicsBase,                 kSigChassisSpeedMps);
 //   kSigSounderPiezoDrive          (4096) → kSigChassisSounderPiezoDrive
 //   kSigPscmPumpSpeedCmdQ8         (4097) → kSigChassisPscmPumpSpeedCmdQ8
 //   kSigPscmPumpInterlockClosed    (4098) → kSigChassisPscmPumpInterlockClosed
+//   kSigHvacTempSetpointC          (4124) → kSigChassisHvacTempSetpointC
+//   kSigHvacFanRequest             (4125) → kSigChassisHvacFanRequest
+//   kSigHvacModeRequest            (4126) → kSigChassisHvacModeRequest
+//   kSigHvacAcRequest              (4127) → kSigChassisHvacAcRequest
+//   kSigHvacDefrostRequest         (4128) → kSigChassisHvacDefrostRequest
 
 #undef EV1SIM_CHASSIS_ID_MATCHES
 
@@ -2623,6 +2686,11 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         st.prnd_c_pub = -1;
         st.prnd_d_pub = -1;
         st.steering_pump_interlock_pub = -1;
+        st.hvac_temp_setpoint_pub   = -9999.0f;
+        st.hvac_fan_request_pub      = -1;
+        st.hvac_mode_request_pub     = -1;
+        st.hvac_ac_request_pub       = -1;
+        st.hvac_defrost_request_pub  = -1;
         std::cout << "[ExternalSim] connected to bus '"
                   << m_opts.bus_name << "'\n";
     }
@@ -2792,6 +2860,25 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                                          st.steering_pump_interlock_closed));
         st.steering_pump_interlock_pub =
             static_cast<std::int8_t>(st.steering_pump_interlock_closed ? 1 : 0);
+    }
+
+    // HVAC driver controls (IDs 4124-4128) — publish deltas on change.
+    {
+        if (st.hvac_temp_setpoint_pub < -9000.0f ||
+            std::fabs(st.hvac_temp_setpoint_pub - st.hvac_temp_setpoint_c) > 0.01f) {
+            outbound.push_back(MakeFloatDelta(kSigHvacTempSetpointC, st.hvac_temp_setpoint_c));
+            st.hvac_temp_setpoint_pub = st.hvac_temp_setpoint_c;
+        }
+        auto pub_hvac_u8 = [&](std::uint32_t id, std::uint8_t val, std::int8_t& pub) {
+            if (pub < 0 || static_cast<std::uint8_t>(pub) != val) {
+                outbound.push_back(MakeU8Delta(id, val));
+                pub = static_cast<std::int8_t>(val);
+            }
+        };
+        pub_hvac_u8(kSigHvacFanRequest,     st.hvac_fan_request,  st.hvac_fan_request_pub);
+        pub_hvac_u8(kSigHvacModeRequest,    st.hvac_mode_request, st.hvac_mode_request_pub);
+        pub_hvac_u8(kSigHvacAcRequest,      st.hvac_ac_request      ? 1u : 0u, st.hvac_ac_request_pub);
+        pub_hvac_u8(kSigHvacDefrostRequest, st.hvac_defrost_request ? 1u : 0u, st.hvac_defrost_request_pub);
     }
 
     if (!outbound.empty()) {

@@ -60,8 +60,14 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   No live weather API this round — see follow-up below.
 - [ ] **Live weather API integration** (free service, with naive-almanac fallback
   if API is down) — current implementation is naive-almanac only.
-- [ ] **HVAC controls** — temp setpoint, fan speed, mode selector, AC
-  button, defrost button.
+- [x] **HVAC controls** — `PhysicalWorld::HvacControls` models the driver
+  climate panel: temp setpoint (°C, clamped 16–30), fan (OFF/LOW/MED/HIGH),
+  mode (FACE/BILEVEL/FEET/DEFROST), A/C request, and front-defrost request.
+  Published to HTCM on the chassis bus (`4124` setpoint f32, `4125` fan,
+  `4126` mode, `4127` A/C, `4128` defrost) each tick, publish-on-change.  No
+  keyboard binding — the floating-UI panel will drive the setters when its
+  widget set expands (mirrors PowerWindows).  Consumer wiring (HTCM HVAC
+  inputs; IDs allocated ev1sim-side first) is a TODO on the electricsim side.
 
 ## Door / lock state
 

@@ -498,6 +498,17 @@ public:
     /// (motor present).  Set false for fault injection (motor unplugged).
     void SetSteeringPumpInterlockClosed(bool closed);
 
+    /// Outgoing HVAC driver-control requests (IDs 4124-4128, chassis segment) →
+    /// HTCM.  Latched by these setters; published on change each tick.  Mirror of
+    /// PhysicalWorld::HvacControls.  Encodings: setpoint float32 °C; fan/mode
+    /// uint8 enums (fan 0=OFF/1=LOW/2=MED/3=HIGH, mode 0=FACE/1=BILEVEL/2=FEET/
+    /// 3=DEFROST); ac/defrost uint8 bool.
+    void SetHvacTempSetpointC(float setpoint_c);
+    void SetHvacFanRequest(std::uint8_t level);
+    void SetHvacModeRequest(std::uint8_t mode);
+    void SetHvacAcRequest(bool on);
+    void SetHvacDefrostRequest(bool on);
+
     /// Incoming IPC seatbelt telltale — driver seat (ID 4130, chassis segment).
     /// Published by IPC when the driver seat is unbuckled AND speed > ~8 km/h.
     /// bool: true = lamp on (unbuckled at speed), false = lamp off.
