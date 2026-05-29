@@ -26,6 +26,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     constexpr int kNumMotor         = 2;   // motor_rpm (4070), motor_torque_nm (4071)
     constexpr int kNumSimTime       = 1;   // sim_time_ns (4075) — ev1sim → electricsim
     constexpr int kNumThrottleCmd   = 1;   // throttle_cmd_q8 (4073) — PIM → ev1sim
+    constexpr int kNumSteeringCmd   = 1;   // steering_cmd (4076) — electricsim → ev1sim
     constexpr int kNumBrake         = 1;   // master_cylinder_pressure_kpa (4074) — ev1sim → BTCM
     constexpr int kNumWiper         = 2;   // wiper_motor_command (4080), washer_pump_command (4081)
     constexpr int kNumHvac          = 2;   // hvac_blower_level (4082), defrost_grid_active (4083)
@@ -83,7 +84,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     const int expected = NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS +
                          kNumCombSw + kNumChargeCplr + kNumPrnd + kNumWiperSwCavity + kNumTurnHazSwCavity + kNumCruiseSwCavity + kNumMotor +
                          kNumSimTime +
-                         kNumThrottleCmd + kNumBrake + kNumWiper +
+                         kNumThrottleCmd + kNumSteeringCmd + kNumBrake + kNumWiper +
                          kNumHvac + kNumAmbient + kNumDoorLockPw +
                          kNumRsaShiftBlocked +
                          kNumDoorLockMotor + kNumSounder + kNumSteeringPump +
@@ -167,6 +168,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
             ++dynamics_count;
         } else if (e.signal_id == 4073) {
             CHECK(e.input_to_sim);          // PIM throttle command flows into ev1sim
+            ++dynamics_count;
+        } else if (e.signal_id == 4076) {
+            CHECK(e.input_to_sim);          // steering command flows into ev1sim
             ++dynamics_count;
         } else if (e.signal_id == 4074) {
             CHECK_FALSE(e.input_to_sim);    // brake master pressure flows out to BTCM
@@ -284,7 +288,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     // + sim-time (4075) + throttle cmd (4073) + brake pressure (4074)
     // + 2 wiper (4080-4081) + 2 ambient env (4090-4091).
     CHECK(dynamics_count       == kNumDynamics + kNumMotor + kNumSimTime +
-                                  kNumThrottleCmd +
+                                  kNumThrottleCmd + kNumSteeringCmd +
                                   kNumBrake + kNumWiper + kNumAmbient);
     // hvac_count: blower level (4082) + defrost grid (4083) — from HTCM.
     CHECK(hvac_count           == kNumHvac);
@@ -865,6 +869,33 @@ TEST_CASE("SetDoorLockState stores without crashing", "[ExternalSim]") {
     CHECK_NOTHROW(c.Tick(0.0));
     CHECK_NOTHROW(c.SetDoorLockState(true, true, true));    // all locked
     CHECK_NOTHROW(c.Tick(0.0));
+}
+
+// ---------------------------------------------------------------------------
+// Steering command (4076) — electricsim → ev1sim (symmetric with throttle).
+// ---------------------------------------------------------------------------
+
+TEST_CASE("Steering command endpoint + GetSteeringCmd decode/freshness", "[ExternalSim]") {
+    const auto* ep = ExternalSimConnector::FindEndpoint(4076);
+    REQUIRE(ep != nullptr);
+    CHECK(std::string(ep->qualified_name) == "vehicle.dynamics.steering_cmd");
+    CHECK(ep->input_to_sim);   // electricsim → ev1sim
+
+    ExternalSimConnector c;
+    auto none = c.GetSteeringCmd(std::chrono::milliseconds(200));
+    CHECK_FALSE(none.ever_received);
+    CHECK_FALSE(none.fresh);
+
+    c.DebugInjectFloat(4076, -0.5f);
+    auto got = c.GetSteeringCmd(std::chrono::milliseconds(3000));
+    CHECK(got.ever_received);
+    CHECK(got.fresh);
+    CHECK_THAT(static_cast<double>(got.value), WithinAbs(-0.5, 1e-6));
+
+    // Zero-length freshness window → immediately stale (but ever_received stays true).
+    auto stale = c.GetSteeringCmd(std::chrono::milliseconds(0));
+    CHECK(stale.ever_received);
+    CHECK_FALSE(stale.fresh);
 }
 
 TEST_CASE("Injected deltas to panel IDs are ignored", "[ExternalSim]") {

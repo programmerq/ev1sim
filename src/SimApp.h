@@ -97,6 +97,12 @@ private:
     // Logs freshness transitions on tick boundaries.
     void ApplyElectronicsThrottle(DriverCommand& cmd);
 
+    // Symmetric to ApplyElectronicsThrottle: override cmd.steering from the
+    // chassis steering command (4076) when m_driver_mode == "electronics" and
+    // the bus value is fresh; fall back to the local input otherwise.  No
+    // electricsim producer today — for closed-loop / physical-rig steering.
+    void ApplyElectronicsSteering(DriverCommand& cmd);
+
     // Consume the electricsim-driven body actuator peripherals each tick:
     //   - power-steering pump motor (chassis 4097 in / 4098 out)
     //   - sounder / piezo "click"     (chassis 4096 in)
@@ -197,6 +203,8 @@ private:
     std::string m_driver_mode = "local";          ///< "local" | "electronics"
     bool        m_throttle_bus_was_fresh = false; ///< was bus fresh last tick?
     std::chrono::milliseconds m_throttle_freshness_window{200};
+    bool        m_steering_bus_was_fresh = false; ///< steering bus fresh last tick?
+    std::chrono::milliseconds m_steering_freshness_window{200};
 
     // Help overlay — show keyboard controls in a translucent box.
     // Auto-show for the first 5 seconds, then toggle with '?'.

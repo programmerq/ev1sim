@@ -438,6 +438,20 @@ public:
     ThrottleCmd GetThrottleCmd(
         std::chrono::milliseconds freshness_window) const;
 
+    /// Steering command (ID 4076, chassis segment) — float32 normalized -1..+1
+    /// (positive = left, matching DriverCommand.steering).  Symmetric with the
+    /// throttle path: used by SimApp::ApplyElectronicsSteering() to override the
+    /// local steering in "electronics" drive mode when fresh.  Allocated
+    /// ev1sim-side first (no electricsim producer yet — a closed-loop / rig
+    /// steering input, distinct from the PSCM power-steering pump peripheral).
+    struct SteeringCmd {
+        float value         = 0.0f;
+        bool  fresh         = false;
+        bool  ever_received = false;
+    };
+    SteeringCmd GetSteeringCmd(
+        std::chrono::milliseconds freshness_window) const;
+
     /// Incoming washer pump command (ID 4081, chassis segment).
     /// Received from RHJB. true = pump active, false = idle.
     bool GetWasherPumpCommand() const;
