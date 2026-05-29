@@ -190,10 +190,11 @@ private:
     // ratio against the BrakeSimple max torque.
     bool m_rear_lr_was_fresh = false;
     bool m_rear_rr_was_fresh = false;
-    /// Per-axle BrakeSimple "Maximum Torque" — used to convert physical
-    /// drum torque into the [0,1] brake ratio Chrono's brake takes.
-    /// Sync with data/vehicle/ev1/brake/EV1_BrakeSimple.json.
-    static constexpr double kBrakeSimpleMaxTorqueNm = 800.0;
+    /// Rear brake "Maximum Torque" (N·m) — converts the physical drum torque
+    /// from the BrakeDrum model into the [0,1] ratio Chrono's brake takes.
+    /// MUST equal data/vehicle/ev1/brake/EV1_BrakeSimple_Rear.json's
+    /// "Maximum Torque" (Round 4 brake bias: front 1120 / rear 480, 70/30).
+    static constexpr double kRearBrakeMaxTorqueNm = 480.0;
 
     // Throttle authority — when m_driver_mode == "electronics", subscribe
     // to PIM's commanded throttle (kSigChassisThrottleCmdQ8 = 4073) and

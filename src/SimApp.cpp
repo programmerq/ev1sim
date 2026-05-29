@@ -1057,7 +1057,7 @@ void SimApp::ApplyRearEmbBrake(double time, double /*local_rear_brake*/) {
     const double omega_rr = state.wheel_omega[3];
 
     auto torque_to_ratio = [&](double torque_nm) {
-        const double ratio = torque_nm / kBrakeSimpleMaxTorqueNm;
+        const double ratio = torque_nm / kRearBrakeMaxTorqueNm;
         return ratio < 0.0 ? 0.0 : (ratio > 1.0 ? 1.0 : ratio);
     };
 

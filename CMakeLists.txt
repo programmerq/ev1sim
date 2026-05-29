@@ -301,6 +301,9 @@ if(BUILD_TESTS)
         tests/test_scenario.cpp
         tests/test_brake_pedal.cpp
         tests/test_brake_drum.cpp
+        tests/test_brake_bias.cpp
+        tests/test_aerodynamics.cpp
+        tests/test_suspension_geometry.cpp
         tests/test_input_actions.cpp
         ${EV1SIM_WHEEL_IO_TEST_SRC}
         src/Config.cpp

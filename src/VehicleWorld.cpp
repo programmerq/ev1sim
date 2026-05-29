@@ -1,4 +1,5 @@
 #include "VehicleWorld.h"
+#include "Aerodynamics.h"
 
 #include "chrono/core/ChGlobal.h"
 #include "chrono/core/ChRotation.h"
@@ -103,6 +104,19 @@ void VehicleWorld::CreateEV1(const Config& cfg) {
 
     m_vehicle = m_ev1.get();
     m_system  = m_ev1->GetSystem();
+
+    // --- Body aerodynamics (Round 4) -------------------------------------
+    // The EV1's signature 0.19 Cd was previously lumped into tire dissipation;
+    // apply it explicitly to the chassis instead.  ChChassis::SetAerodynamicDrag
+    // applies F = 0.5·rho·Cd·A·v² at the COM opposing chassis velocity each
+    // Synchronize.  The constants (and the matching formula the unit tests pin)
+    // live in Aerodynamics.h.  NOTE: now that drag is no longer baked into the
+    // tire model, tire rolling/slip dissipation may want a small downward
+    // recalibration to keep top speed / coastdown honest.
+    m_ev1->GetChassis()->SetAerodynamicDrag(
+        ev1sim::Aerodynamics::kEV1DragCoefficient,
+        ev1sim::Aerodynamics::kEV1FrontalAreaM2,
+        ev1sim::Aerodynamics::kAirDensityIsaSeaLevel);
 
     // Powertrain: engine + single-speed transmission.
     auto engine       = vehicle::ReadEngineJSON(engine_json);
