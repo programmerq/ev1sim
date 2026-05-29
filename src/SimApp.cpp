@@ -396,6 +396,42 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                 },
                 []() {});   // no-op: display-only row
 
+            // --- HVAC driver controls (drive PhysicalWorld::HvacControls; the
+            //     requests are published to HTCM on chassis 4124-4128 each tick).
+            //     Display row for the setpoint + buttons to adjust/cycle/toggle. ---
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatHvacSetpointLabel(
+                        m_physical->hvac_controls().temp_setpoint_c());
+                },
+                []() {});   // display-only row (setpoint value)
+            m_floating_ui->AddButton(
+                []() -> std::wstring { return L"HVAC Temp +"; },
+                [this]() { m_physical->hvac_controls().adjust_setpoint_c(0.5); });
+            m_floating_ui->AddButton(
+                []() -> std::wstring { return L"HVAC Temp -"; },
+                [this]() { m_physical->hvac_controls().adjust_setpoint_c(-0.5); });
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatHvacFanLabel(m_physical->hvac_controls().fan_u8());
+                },
+                [this]() { m_physical->hvac_controls().cycle_fan(); });
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatHvacModeLabel(m_physical->hvac_controls().mode_u8());
+                },
+                [this]() { m_physical->hvac_controls().cycle_mode(); });
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatHvacAcLabel(m_physical->hvac_controls().ac_on());
+                },
+                [this]() { m_physical->hvac_controls().toggle_ac(); });
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatHvacDefrostLabel(m_physical->hvac_controls().defrost_on());
+                },
+                [this]() { m_physical->hvac_controls().toggle_defrost(); });
+
             // --- IPC LCD telltale status (display-only; no click action) ---
             // Subscribes to IPC chassis-bus signals 4130 (driver seatbelt telltale)
             // and 4131 (passenger seatbelt telltale).  Lamp is ON when the seat is

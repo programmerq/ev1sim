@@ -764,3 +764,50 @@ TEST_CASE("FormatBpmPackVoltageLabel: zero voltage shows 0.0 V",
     CHECK(FormatBpmPackVoltageLabel(/*ever_received=*/true, 0u)
           == L"PackVolt: 0.0 V");
 }
+
+// ---------------------------------------------------------------------------
+// HVAC driver-control labels (Round 2 — surfacing the HVAC control panel)
+// ---------------------------------------------------------------------------
+
+TEST_CASE("FormatHvacSetpointLabel: one-decimal Celsius", "[FloatingUI]") {
+    CHECK(FormatHvacSetpointLabel(21.0) == L"HVAC Temp: 21.0 C");
+    CHECK(FormatHvacSetpointLabel(16.5) == L"HVAC Temp: 16.5 C");
+    CHECK(FormatHvacSetpointLabel(30.0) == L"HVAC Temp: 30.0 C");
+}
+
+TEST_CASE("FormatHvacFanLabel: OFF/LOW/MED/HIGH + fallback", "[FloatingUI]") {
+    CHECK(FormatHvacFanLabel(0) == L"HVAC Fan: OFF");
+    CHECK(FormatHvacFanLabel(1) == L"HVAC Fan: LOW");
+    CHECK(FormatHvacFanLabel(2) == L"HVAC Fan: MED");
+    CHECK(FormatHvacFanLabel(3) == L"HVAC Fan: HIGH");
+    CHECK(FormatHvacFanLabel(9) == L"HVAC Fan: ?");
+}
+
+TEST_CASE("FormatHvacModeLabel: FACE/BILEVEL/FEET/DEFROST + fallback", "[FloatingUI]") {
+    CHECK(FormatHvacModeLabel(0) == L"HVAC Mode: FACE");
+    CHECK(FormatHvacModeLabel(1) == L"HVAC Mode: BILEVEL");
+    CHECK(FormatHvacModeLabel(2) == L"HVAC Mode: FEET");
+    CHECK(FormatHvacModeLabel(3) == L"HVAC Mode: DEFROST");
+    CHECK(FormatHvacModeLabel(9) == L"HVAC Mode: ?");
+}
+
+TEST_CASE("FormatHvacAcLabel / FormatHvacDefrostLabel: ON/OFF", "[FloatingUI]") {
+    CHECK(FormatHvacAcLabel(true)  == L"HVAC A/C: ON");
+    CHECK(FormatHvacAcLabel(false) == L"HVAC A/C: OFF");
+    CHECK(FormatHvacDefrostLabel(true)  == L"HVAC Defrost: ON");
+    CHECK(FormatHvacDefrostLabel(false) == L"HVAC Defrost: OFF");
+}
+
+// Cross-check the wire-level accessors feed the labels correctly: cycle the
+// HvacControls model and confirm the uint8 enums map to the expected labels.
+TEST_CASE("FloatingUI: HvacControls cycle drives fan/mode labels", "[FloatingUI][Callbacks]") {
+    ev1sim::HvacControls h;
+    CHECK(FormatHvacFanLabel(h.fan_u8())   == L"HVAC Fan: OFF");
+    CHECK(FormatHvacModeLabel(h.mode_u8()) == L"HVAC Mode: FACE");
+    h.cycle_fan();   // OFF -> LOW
+    h.cycle_mode();  // FACE -> BILEVEL
+    CHECK(FormatHvacFanLabel(h.fan_u8())   == L"HVAC Fan: LOW");
+    CHECK(FormatHvacModeLabel(h.mode_u8()) == L"HVAC Mode: BILEVEL");
+    h.toggle_ac();
+    CHECK(FormatHvacAcLabel(h.ac_on()) == L"HVAC A/C: ON");
+}

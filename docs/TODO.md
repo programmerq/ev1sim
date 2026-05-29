@@ -266,6 +266,11 @@ Only the render/audio surfacing remains (tracked in the "defer all" section abov
   path.  The fourth declared-but-deferred IPC LCD slot, WAIT (charge-wait
   indicator), has no equivalent bulb feed line and remains fully deferred
   until electricsim adds a separate charge-state signal.
+- [x] **HVAC control panel** — FloatingUiPanel rows for the driver climate
+  controls (`PhysicalWorld::HvacControls`, published to HTCM on 4124-4128): a
+  setpoint display row + buttons for Temp +/- (0.5 °C), fan cycle, mode cycle,
+  A/C toggle, and defrost toggle.  Pure `FormatHvac*Label` helpers are unit-
+  tested; the panel wiring lives in `SimApp`.
 - [ ] **Remaining UI candidates** — next floating-panel rounds:
   - Trunk open/close (T key covers it but panel would be friendlier)
   - Hood open/close
@@ -276,7 +281,6 @@ Only the render/audio surfacing remains (tracked in the "defer all" section abov
   - Steering wheel angle indicator / override
   - IPC LCD brightness and LED telltale overrides
   - RSA LEDs (door-lock feedback, entry-accepted, entry-denied)
-  - HVAC: temp setpoint, fan speed, mode, AC, defrost
   - Shifter (PRND) — currently keyboard-only
 
 ## Bus-mediated physics
