@@ -162,12 +162,13 @@ future-UI input on one side, chassis-segment signal publishing on the other.
     - Front time-locked drops slightly with ABS but not dramatically
       because dry asphalt's high friction limit barely benefits from
       modulation.
-- [ ] **Low-mu ABS scenario.**  The dry-asphalt scenario shows ABS
-  engaging but only marginal stopping-distance improvement.  Add
-  a low-mu (icy / wet) variant where the friction-limited
-  deceleration is significantly less than the locked deceleration —
-  there ABS should give a much bigger stopping-distance reduction
-  and the comparison plot becomes more dramatic.
+- [x] **Low-mu ABS scenario.**  `config/abs_low_mu.json` (uniform ice, µ=0.10)
+  + `config/scenarios/abs_low_mu_stop.json` give the slippery-surface stop where
+  the friction-limited deceleration is well below the locked deceleration.  Wired
+  into the ABS regression sweep (`scripts/abs_regression.sh`, `run_abs_compare.sh`)
+  with baseline thresholds in `scripts/abs_baseline.txt` (fl/fr locked < 50 %,
+  phases > 25).  (Comparison run + charts require a local Chrono + electricsim
+  build.)
 - [ ] **ABS rumble feedback for force-feedback rigs (deferred).**
   When ABS engages, the BTCM sol_*_iso/sol_*_dmp signals cycle.
   Surfacing this as a `kSigChassisAbsActive` boolean would let a
@@ -303,7 +304,13 @@ Only the render/audio surfacing remains (tracked in the "defer all" section abov
   falls back to local pedal at 200 ms staleness.  Selected via
   `vehicle_dynamics.driver = "electronics"`.  Cruise demo exercises the
   full loop end-to-end (`config/scenarios/cruise_demo_electronics.json`).
-- [ ] Same pattern for **steering assist** etc.
+- [x] **Steering bus-input** — `kSigChassisSteeringCmd` (4076, float32 norm
+  -1..+1), the symmetric counterpart of the throttle path.  Connector
+  `GetSteeringCmd(window)` + `SimApp::ApplyElectronicsSteering` override the
+  local steering in "electronics" drive mode when fresh, else fall back.
+  Allocated ev1sim-side first: **no electricsim producer today** — a closed-loop
+  / physical-rig steering input, distinct from the PSCM power-steering pump
+  peripheral.  (Power-steering *assist* itself is the `power_steering_pump_motor`.)
 
 ## Sim-time sync — ev1sim publisher side
 

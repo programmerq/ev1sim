@@ -1097,6 +1097,30 @@ void SimApp::ApplyElectronicsThrottle(DriverCommand& cmd) {
     cmd.throttle = static_cast<double>(bus.q8) / 255.0;
 }
 
+void SimApp::ApplyElectronicsSteering(DriverCommand& cmd) {
+    if (m_driver_mode != "electronics") return;
+
+    const auto bus = m_external_sim->GetSteeringCmd(m_steering_freshness_window);
+
+    if (bus.fresh != m_steering_bus_was_fresh) {
+        if (bus.fresh) {
+            std::cout << "[SimApp] steering from bus (live) value="
+                      << bus.value << "\n";
+        } else {
+            std::cout << "[SimApp] steering fallback (bus stale) — "
+                         "using local input\n";
+        }
+        m_steering_bus_was_fresh = bus.fresh;
+    }
+
+    if (!bus.fresh) return;
+    // Normalized steering; clamp defensively to the valid [-1, +1] range.
+    double v = static_cast<double>(bus.value);
+    if (v < -1.0) v = -1.0;
+    if (v >  1.0) v =  1.0;
+    cmd.steering = v;
+}
+
 // ---------------------------------------------------------------------------
 // Consume the electricsim-driven body actuator peripherals (specs added in the
 // door-lock-motor / sounder / power-steering-pump round).  Advances the
@@ -1239,6 +1263,7 @@ int SimApp::RunWithVisualization() {
         // No-op in "local" mode.  Must run before the propulsion gate so
         // a stale-fallback to the local pedal still respects KEY OFF.
         ApplyElectronicsThrottle(cmd);
+        ApplyElectronicsSteering(cmd);
 
         // --- Propulsion enable gate (KEY OFF override) ---
         // While m_propulsion_enabled is false, clamp brakes at full and zero
@@ -1942,6 +1967,7 @@ int SimApp::RunHeadless() {
         // fallback is the scripted driver (or zero throttle).  When the
         // bus is fresh, PIM's commanded throttle replaces the local value.
         ApplyElectronicsThrottle(cmd);
+        ApplyElectronicsSteering(cmd);
 
         // --- Propulsion enable gate (KEY OFF override) ---
         // In headless mode no keyboard presses cycle the RSA state.

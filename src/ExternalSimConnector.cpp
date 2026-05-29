@@ -277,6 +277,19 @@ constexpr int           kNumBrakeSignals           = 1;
 constexpr std::uint32_t kSigThrottleCmdQ8     = 4073U;
 constexpr int           kNumThrottleCmdSignals = 1;
 
+// Steering command (electricsim → ev1sim, chassis segment).
+//   4076  vehicle.dynamics.steering_cmd   float32 LE, normalized -1..+1
+//         (positive = left, matching Chrono / DriverCommand.steering).
+// The symmetric counterpart of the throttle bus path: when running in
+// "electronics" drive mode ev1sim subscribes and overrides the local steering
+// when the value is fresh, falling back to the local input otherwise.  Allocated
+// ev1sim-side first — there is no electricsim steering producer today; this is a
+// closed-loop / physical-rig steering input, NOT the PSCM power-steering pump
+// (that is the separate power_steering_pump_motor peripheral).  See the
+// "pending electricsim adoption" note in the drift guard below.
+constexpr std::uint32_t kSigSteeringCmd        = 4076U;
+constexpr int           kNumSteeringCmdSignals = 1;
+
 // Wiper motor command (electricsim/RHJB → ev1sim, chassis segment).
 //   4080  vehicle.body.wiper_motor.command  uint8 enum: 0=OFF, 1=INT, 2=LOW, 3=HIGH
 //   4081  vehicle.body.washer_pump.command  uint8 bool: 0=idle, 1=pump active
@@ -699,6 +712,7 @@ constexpr int kNumEndpoints =
     kNumPrndSelector + kNumWiperSwCavitySignals + kNumTurnHazSwCavitySignals +
     kNumCruiseSwCavitySignals +
     kNumMotorSignals + kNumSimTimeSignals + kNumThrottleCmdSignals +
+    kNumSteeringCmdSignals +
     kNumBrakeSignals + kNumWiperSignals + kNumHvacSignals +
     kNumAmbientSignals + kNumDoorLockPwSignals + kNumRsaShiftBlockedSignals +
     kNumDoorLockMotorSignals + kNumSounderSignals + kNumSteeringPumpSignals +
@@ -771,6 +785,9 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     // Throttle command (PIM → ev1sim, chassis segment).
     out[i++] = {kSigThrottleCmdQ8,
                 "vehicle.dynamics.throttle_cmd_q8", "throttle_cmd_q8", true};
+    // Steering command (electricsim → ev1sim, chassis segment, input_to_sim=true).
+    out[i++] = {kSigSteeringCmd,
+                "vehicle.dynamics.steering_cmd", "steering_cmd", true};
     // Brake master cylinder pressure (ev1sim → electricsim, chassis segment).
     out[i++] = {kSigBrakeMasterPressureKpa,
                 "vehicle.brake.master_cylinder_pressure_kpa",
@@ -1300,6 +1317,13 @@ struct ExternalSimConnector::State {
     bool          has_throttle_cmd        = false;
     std::uint64_t throttle_cmd_ns         = 0;
 
+    // Steering command (ID 4076, chassis segment) — received from electricsim.
+    // float32 normalized -1..+1 (positive = left).  Freshness tracked like
+    // throttle for the stale-fallback in SimApp::ApplyElectronicsSteering.
+    float         steering_cmd            = 0.0f;
+    bool          has_steering_cmd        = false;
+    std::uint64_t steering_cmd_ns         = 0;
+
     // Wiper motor command (ID 4080, chassis segment) — received from RHJB.
     // 0xFF = never received; valid values 0=OFF, 1=INT, 2=LOW, 3=HIGH.
     std::uint8_t  wiper_motor_cmd         = 0xFFu;
@@ -1644,6 +1668,24 @@ ExternalSimConnector::ThrottleCmd ExternalSimConnector::GetThrottleCmd(
     const auto window_ns = static_cast<std::uint64_t>(
         std::chrono::duration_cast<std::chrono::nanoseconds>(freshness_window).count());
     r.fresh = (now_ns - m_state->throttle_cmd_ns) <= window_ns;
+    return r;
+}
+
+ExternalSimConnector::SteeringCmd ExternalSimConnector::GetSteeringCmd(
+    std::chrono::milliseconds freshness_window) const {
+    SteeringCmd r{};
+    r.value         = m_state->steering_cmd;
+    r.ever_received = m_state->has_steering_cmd;
+    if (!r.ever_received) {
+        r.fresh = false;
+        return r;
+    }
+    const auto now_ns = static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
+    const auto window_ns = static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(freshness_window).count());
+    r.fresh = (now_ns - m_state->steering_cmd_ns) <= window_ns;
     return r;
 }
 
@@ -2397,6 +2439,10 @@ void ExternalSimConnector::DebugInjectFloat(std::uint32_t signal_id, float value
     } else if (signal_id == kSigRearMotorRR) {
         m_state->rear_motor_rr    = value;
         m_state->rear_motor_rr_ns = now_ns;
+    } else if (signal_id == kSigSteeringCmd) {
+        m_state->steering_cmd     = value;
+        m_state->has_steering_cmd = true;
+        m_state->steering_cmd_ns  = now_ns;
     } else if (signal_id == kSigPimCruiseSetpointMps) {
         m_state->pim_cruise_setpoint_mps     = value;
         m_state->has_pim_cruise_setpoint_mps = true;
@@ -2682,6 +2728,7 @@ EV1SIM_CHASSIS_ID_MATCHES(kDynamicsBase,                 kSigChassisSpeedMps);
 //   kSigDoorLockStateDriver        (4155) → kSigChassisDoorLockStateDriver
 //   kSigDoorLockStatePassenger     (4156) → kSigChassisDoorLockStatePassenger
 //   kSigDoorLockStateTrunk         (4157) → kSigChassisDoorLockStateTrunk
+//   kSigSteeringCmd                (4076) → kSigChassisSteeringCmd
 
 #undef EV1SIM_CHASSIS_ID_MATCHES
 
@@ -2776,6 +2823,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             if (d.payload.empty()) continue;
             // float32 LE chassis-bus signals — decode as 4-byte little-endian float.
             if (d.signal_id == kSigIpcTripDistanceM            ||
+                d.signal_id == kSigSteeringCmd                 ||
                 d.signal_id == kSigChassisBtcmEmbMotorCmdLR    ||
                 d.signal_id == kSigChassisBtcmEmbMotorCmdRR    ||
                 d.signal_id == kSigChassisBtcmCylPressureFL_kPa ||
