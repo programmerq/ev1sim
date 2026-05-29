@@ -970,6 +970,90 @@ private:
     bool   m_present = true;   // motor present → interlock loop closed
 };
 
+/// HVAC control panel (driver HMI).
+///
+/// Models the dashboard climate controls the driver operates; ev1sim publishes
+/// the resulting requests to the HTCM, which owns the heat-pump / blower plant
+/// and feeds back the actual blower level (4082) and rear-defrost grid (4083).
+/// Five controls, mirroring the TODO "next batches" item:
+///   - temperature setpoint (°C, clamped to a cabin-sane range)
+///   - fan request           (OFF / LOW / MED / HIGH, mirrors the blower enum)
+///   - mode / air distribution (FACE / BILEVEL / FEET / DEFROST)
+///   - A/C compressor request (on/off)
+///   - front-defrost request  (on/off)
+///
+/// No keyboard binding yet — like PowerWindows, the floating-UI panel will
+/// drive the setters when its widget set expands; ev1sim publishes the current
+/// (default) state each tick in the meantime so the wire format is locked.
+class HvacControls {
+public:
+    enum class Fan  : std::uint8_t { OFF = 0, LOW = 1, MED = 2, HIGH = 3 };
+    enum class Mode : std::uint8_t { FACE = 0, BILEVEL = 1, FEET = 2, DEFROST = 3 };
+
+    // Cabin-sane setpoint clamp (matches a typical GM HVAC head unit range).
+    static constexpr double kMinSetpointC = 16.0;
+    static constexpr double kMaxSetpointC = 30.0;
+
+    // --- Temperature setpoint (°C) ---
+    double temp_setpoint_c() const { return m_setpoint_c; }
+    void   set_temp_setpoint_c(double c) { m_setpoint_c = clamp_setpoint(c); }
+    /// Nudge the setpoint by delta °C (e.g. +/- buttons), clamped to range.
+    void   adjust_setpoint_c(double delta) { set_temp_setpoint_c(m_setpoint_c + delta); }
+
+    // --- Fan request ---
+    Fan  fan() const { return m_fan; }
+    void set_fan(Fan f) { m_fan = f; }
+    /// Cycle OFF → LOW → MED → HIGH → OFF.
+    void cycle_fan() {
+        switch (m_fan) {
+            case Fan::OFF:  m_fan = Fan::LOW;  break;
+            case Fan::LOW:  m_fan = Fan::MED;  break;
+            case Fan::MED:  m_fan = Fan::HIGH; break;
+            case Fan::HIGH: m_fan = Fan::OFF;  break;
+        }
+    }
+
+    // --- Mode / air distribution ---
+    Mode mode() const { return m_mode; }
+    void set_mode(Mode m) { m_mode = m; }
+    /// Cycle FACE → BILEVEL → FEET → DEFROST → FACE.
+    void cycle_mode() {
+        switch (m_mode) {
+            case Mode::FACE:    m_mode = Mode::BILEVEL; break;
+            case Mode::BILEVEL: m_mode = Mode::FEET;    break;
+            case Mode::FEET:    m_mode = Mode::DEFROST; break;
+            case Mode::DEFROST: m_mode = Mode::FACE;    break;
+        }
+    }
+
+    // --- A/C compressor request ---
+    bool ac_on() const { return m_ac; }
+    void set_ac(bool on) { m_ac = on; }
+    void toggle_ac() { m_ac = !m_ac; }
+
+    // --- Front-defrost request ---
+    bool defrost_on() const { return m_defrost; }
+    void set_defrost(bool on) { m_defrost = on; }
+    void toggle_defrost() { m_defrost = !m_defrost; }
+
+    // Wire-level enum values for the chassis-bus publish (uint8).
+    std::uint8_t fan_u8()  const { return static_cast<std::uint8_t>(m_fan);  }
+    std::uint8_t mode_u8() const { return static_cast<std::uint8_t>(m_mode); }
+
+private:
+    static double clamp_setpoint(double c) {
+        if (c < kMinSetpointC) return kMinSetpointC;
+        if (c > kMaxSetpointC) return kMaxSetpointC;
+        return c;
+    }
+
+    double m_setpoint_c = 21.0;        // mild default cabin target
+    Fan    m_fan        = Fan::OFF;
+    Mode   m_mode       = Mode::FACE;
+    bool   m_ac         = false;
+    bool   m_defrost    = false;
+};
+
 /// Container for all physical-world components: driver-operated inputs
 /// (switches, pedals, keypads) and actuator/plant models driven by the
 /// external electrical sim (door-lock motors, sounder, steering pump).
@@ -1041,6 +1125,9 @@ public:
     PowerSteeringPumpMotor&       power_steering_pump()       { return m_steering_pump; }
     const PowerSteeringPumpMotor& power_steering_pump() const { return m_steering_pump; }
 
+    HvacControls&       hvac_controls()       { return m_hvac; }
+    const HvacControls& hvac_controls() const { return m_hvac; }
+
     /// Draw HUD overlays for: key state, combination switch, PRND selector,
     /// and turn signals/hazard.  Call between BeginScene and EndScene.
     /// rsa_run_mode: most recently received RSA run mode (0=OFF,1=ACC,2=RUN;
@@ -1086,6 +1173,7 @@ private:
     DoorLockMotor          m_door_lock_motor_rh;   // passenger door
     Sounder                m_sounder;
     PowerSteeringPumpMotor m_steering_pump;
+    HvacControls           m_hvac;
 };
 
 }  // namespace ev1sim

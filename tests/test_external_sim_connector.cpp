@@ -35,6 +35,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     constexpr int kNumDoorLockMotor = 4;   // door_lock_motor leg drives (4092-4095) — RHJB → ev1sim
     constexpr int kNumSounder       = 1;   // sounder piezo_drive (4096) — LHJB flasher → ev1sim
     constexpr int kNumSteeringPump  = 2;   // pump speed_cmd_q8 (4097, in) + interlock_closed (4098, out)
+    constexpr int kNumHvacControls  = 5;   // hvac setpoint/fan/mode/ac/defrost requests (4124-4128) — ev1sim → HTCM
     constexpr int kNumIpcTelltale   = 2;   // ipc_seatbelt_telltale_driver (4130),
                                            // ipc_seatbelt_telltale_passenger (4131)
     constexpr int kNumIpcTripDist   = 1;   // ipc_trip_distance_m (4132)
@@ -84,6 +85,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
                          kNumHvac + kNumAmbient + kNumDoorLockPw +
                          kNumRsaShiftBlocked +
                          kNumDoorLockMotor + kNumSounder + kNumSteeringPump +
+                         kNumHvacControls +
                          kNumIpcTelltale + kNumIpcTripDist + kNumIpcBtcmTelltale +
                          kNumIpcExtraTelltale + kNumBpmPackVoltage +
                          kNumBtcmChassisActuator + kNumExtContract +
@@ -110,6 +112,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     int door_lock_motor_count = 0;   // door-lock motor leg drives (4092-4095)
     int sounder_count         = 0;   // sounder piezo_drive (4096)
     int steering_pump_count   = 0;   // pump speed_cmd_q8 (4097) + interlock_closed (4098)
+    int hvac_controls_count   = 0;   // hvac setpoint/fan/mode/ac/defrost (4124-4128)
     int bpm_pack_voltage_count    = 0;   // bpm_pack_voltage_mv (4139)
     int ipc_telltale_count        = 0;   // IPC seatbelt telltales (4130/4131)
     int ipc_trip_dist_count       = 0;   // IPC trip distance (4132)
@@ -189,6 +192,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
         } else if (e.signal_id == 4098) {
             CHECK_FALSE(e.input_to_sim);    // pump interlock-closed flows out to PSCM
             ++steering_pump_count;
+        } else if (e.signal_id >= 4124 && e.signal_id <= 4128) {
+            CHECK_FALSE(e.input_to_sim);    // HVAC driver-control requests flow out to HTCM
+            ++hvac_controls_count;
         } else if (e.signal_id == 4139) {
             CHECK(e.input_to_sim);          // BPM pack voltage flows into ev1sim
             ++bpm_pack_voltage_count;
@@ -286,6 +292,8 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     CHECK(sounder_count           == kNumSounder);
     // steering_pump_count: PSCM pump speed cmd (4097, in) + interlock-closed (4098, out).
     CHECK(steering_pump_count     == kNumSteeringPump);
+    // hvac_controls_count: setpoint/fan/mode/ac/defrost requests (4124-4128) — ev1sim → HTCM.
+    CHECK(hvac_controls_count     == kNumHvacControls);
     // bpm_pack_voltage_count: BPM pack voltage (4139) — uint32 mV, from BPM.
     CHECK(bpm_pack_voltage_count  == kNumBpmPackVoltage);
     // ipc_telltale_count: driver seatbelt telltale (4130) + passenger (4131) — from IPC.
@@ -776,6 +784,40 @@ TEST_CASE("Injected pump speed cmd latches; interlock setter stores", "[External
     // Interlock-closed is an output; setter + Tick must not crash.
     CHECK_NOTHROW(c.SetSteeringPumpInterlockClosed(false));
     CHECK_NOTHROW(c.SetSteeringPumpInterlockClosed(true));
+    CHECK_NOTHROW(c.Tick(0.0));
+}
+
+// ---------------------------------------------------------------------------
+// HVAC driver controls (4124-4128) — ev1sim → HTCM.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("HVAC control endpoints have correct IDs and direction", "[ExternalSim]") {
+    struct Row { std::uint32_t sid; const char* qualified; };
+    const Row rows[] = {
+        {4124, "vehicle.hvac.temp_setpoint_c"},
+        {4125, "vehicle.hvac.fan_request"},
+        {4126, "vehicle.hvac.mode_request"},
+        {4127, "vehicle.hvac.ac_request"},
+        {4128, "vehicle.hvac.defrost_request"},
+    };
+    for (const auto& r : rows) {
+        const auto* ep = ExternalSimConnector::FindEndpoint(r.sid);
+        REQUIRE(ep != nullptr);
+        CHECK(std::string(ep->qualified_name) == r.qualified);
+        CHECK_FALSE(ep->input_to_sim);   // driver requests flow out to HTCM
+    }
+}
+
+TEST_CASE("HVAC control setters store without crashing", "[ExternalSim]") {
+    ExternalSimConnector c;
+    CHECK_NOTHROW(c.SetHvacTempSetpointC(22.5f));
+    CHECK_NOTHROW(c.SetHvacFanRequest(3));      // HIGH
+    CHECK_NOTHROW(c.SetHvacModeRequest(3));     // DEFROST
+    CHECK_NOTHROW(c.SetHvacAcRequest(true));
+    CHECK_NOTHROW(c.SetHvacDefrostRequest(true));
+    CHECK_NOTHROW(c.Tick(0.0));
+    // Idempotent re-set + Tick (exercises the publish-on-change path's no-change branch).
+    CHECK_NOTHROW(c.SetHvacFanRequest(3));
     CHECK_NOTHROW(c.Tick(0.0));
 }
 
