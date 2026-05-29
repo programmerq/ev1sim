@@ -3,6 +3,7 @@
 
 #include "PhysicalWorld.h"
 
+#include <limits>
 #include <string>
 
 using namespace ev1sim;
@@ -1123,4 +1124,22 @@ TEST_CASE("HvacControls: AC and defrost toggle independently", "[PhysicalWorld][
     h.toggle_defrost(); CHECK(h.ac_on());      CHECK(h.defrost_on());
     h.set_ac(false);    CHECK_FALSE(h.ac_on()); CHECK(h.defrost_on());
     h.set_defrost(false); CHECK_FALSE(h.defrost_on());
+}
+
+TEST_CASE("HvacControls: non-finite setpoint falls back to the default", "[PhysicalWorld][Hvac]") {
+    using Catch::Matchers::WithinAbs;
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double inf = std::numeric_limits<double>::infinity();
+    HvacControls h;
+    h.set_temp_setpoint_c(25.0);               // move off the default first
+    h.set_temp_setpoint_c(nan);
+    CHECK_THAT(h.temp_setpoint_c(), WithinAbs(HvacControls::kDefaultSetpointC, 1e-9));
+    h.set_temp_setpoint_c(inf);
+    CHECK_THAT(h.temp_setpoint_c(), WithinAbs(HvacControls::kDefaultSetpointC, 1e-9));
+    h.set_temp_setpoint_c(-inf);
+    CHECK_THAT(h.temp_setpoint_c(), WithinAbs(HvacControls::kDefaultSetpointC, 1e-9));
+    // A non-finite *delta* (current + NaN) must not leak NaN either.
+    h.set_temp_setpoint_c(21.0);
+    h.adjust_setpoint_c(nan);
+    CHECK_THAT(h.temp_setpoint_c(), WithinAbs(HvacControls::kDefaultSetpointC, 1e-9));
 }

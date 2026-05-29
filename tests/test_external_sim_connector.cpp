@@ -4,6 +4,7 @@
 #include "ExternalSimConnector.h"
 
 #include <chrono>
+#include <limits>
 #include <set>
 #include <string>
 #include <thread>
@@ -819,6 +820,15 @@ TEST_CASE("HVAC control setters store without crashing", "[ExternalSim]") {
     // Idempotent re-set + Tick (exercises the publish-on-change path's no-change branch).
     CHECK_NOTHROW(c.SetHvacFanRequest(3));
     CHECK_NOTHROW(c.Tick(0.0));
+    // Out-of-range / non-finite inputs are sanitized at the setter boundary so
+    // they can't break the publish-on-change sentinels — must not throw.
+    CHECK_NOTHROW(c.SetHvacTempSetpointC(std::numeric_limits<float>::quiet_NaN()));
+    CHECK_NOTHROW(c.SetHvacTempSetpointC(-99999.0f));
+    CHECK_NOTHROW(c.SetHvacTempSetpointC(99999.0f));
+    CHECK_NOTHROW(c.SetHvacFanRequest(200));    // > 3 → clamped
+    CHECK_NOTHROW(c.SetHvacModeRequest(250));   // > 3 → clamped
+    CHECK_NOTHROW(c.Tick(0.0));
+    CHECK_NOTHROW(c.Tick(0.0));   // a second tick must not re-publish from a broken sentinel
 }
 
 TEST_CASE("Injected deltas to panel IDs are ignored", "[ExternalSim]") {
