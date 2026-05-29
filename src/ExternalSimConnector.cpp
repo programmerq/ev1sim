@@ -447,6 +447,14 @@ constexpr std::uint32_t kSigHvacModeRequest     = 4126U;
 constexpr std::uint32_t kSigHvacAcRequest       = 4127U;
 constexpr std::uint32_t kSigHvacDefrostRequest  = 4128U;
 constexpr int           kNumHvacControlSignals  = 5;
+// Sanitization bounds for the HVAC setters (mirror PhysicalWorld::HvacControls);
+// keep out-of-range inputs from violating the wire contract or breaking the
+// publish-on-change sentinels.
+constexpr float        kHvacSetpointMinC     = 16.0f;
+constexpr float        kHvacSetpointMaxC     = 30.0f;
+constexpr float        kHvacSetpointDefaultC = 21.0f;   // NaN/Inf fallback
+constexpr std::uint8_t kHvacFanMax           = 3u;      // OFF/LOW/MED/HIGH
+constexpr std::uint8_t kHvacModeMax          = 3u;      // FACE/BILEVEL/FEET/DEFROST
 
 // RSA run-mode broadcast — published by RSA on the main harness segment.
 // ev1sim subscribes to this (input_to_sim = true for subscription, but we
@@ -1690,13 +1698,22 @@ void ExternalSimConnector::SetSteeringPumpInterlockClosed(bool closed) {
 }
 
 void ExternalSimConnector::SetHvacTempSetpointC(float setpoint_c) {
+    // Sanitize at the boundary: a non-finite or out-of-range setpoint would
+    // both violate the wire contract and break the publish-on-change sentinel
+    // (a value <= -9000 would collide with the "never published" sentinel and
+    // re-publish every tick).  Clamp to the cabin range (mirrors HvacControls).
+    if (!std::isfinite(setpoint_c)) setpoint_c = kHvacSetpointDefaultC;
+    if (setpoint_c < kHvacSetpointMinC) setpoint_c = kHvacSetpointMinC;
+    if (setpoint_c > kHvacSetpointMaxC) setpoint_c = kHvacSetpointMaxC;
     m_state->hvac_temp_setpoint_c = setpoint_c;
 }
 void ExternalSimConnector::SetHvacFanRequest(std::uint8_t level) {
-    m_state->hvac_fan_request = level;
+    // Clamp to the 0..3 enum: a value > 127 would overflow the int8 published
+    // cache and re-publish every tick.
+    m_state->hvac_fan_request = (level > kHvacFanMax) ? kHvacFanMax : level;
 }
 void ExternalSimConnector::SetHvacModeRequest(std::uint8_t mode) {
-    m_state->hvac_mode_request = mode;
+    m_state->hvac_mode_request = (mode > kHvacModeMax) ? kHvacModeMax : mode;
 }
 void ExternalSimConnector::SetHvacAcRequest(bool on) {
     m_state->hvac_ac_request = on;

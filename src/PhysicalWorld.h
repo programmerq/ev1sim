@@ -993,6 +993,7 @@ public:
     // Cabin-sane setpoint clamp (matches a typical GM HVAC head unit range).
     static constexpr double kMinSetpointC = 16.0;
     static constexpr double kMaxSetpointC = 30.0;
+    static constexpr double kDefaultSetpointC = 21.0;   // also the NaN/Inf fallback
 
     // --- Temperature setpoint (°C) ---
     double temp_setpoint_c() const { return m_setpoint_c; }
@@ -1042,12 +1043,13 @@ public:
 
 private:
     static double clamp_setpoint(double c) {
+        if (!std::isfinite(c)) return kDefaultSetpointC;  // reject NaN/Inf
         if (c < kMinSetpointC) return kMinSetpointC;
         if (c > kMaxSetpointC) return kMaxSetpointC;
         return c;
     }
 
-    double m_setpoint_c = 21.0;        // mild default cabin target
+    double m_setpoint_c = kDefaultSetpointC;   // mild default cabin target
     Fan    m_fan        = Fan::OFF;
     Mode   m_mode       = Mode::FACE;
     bool   m_ac         = false;
