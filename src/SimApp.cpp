@@ -1057,6 +1057,75 @@ void SimApp::ApplyElectronicsThrottle(DriverCommand& cmd) {
 }
 
 // ---------------------------------------------------------------------------
+// Consume the electricsim-driven body actuator peripherals (specs added in the
+// door-lock-motor / sounder / power-steering-pump round).  Advances the
+// PhysicalWorld plant models from the connector's latched chassis-bus inputs.
+// Called once per tick from both the windowed and headless loops, after the
+// connector has drained inbound frames.
+void SimApp::ConsumeBodyActuatorPeripherals(double dt) {
+    if (!m_external_sim) return;
+
+    // --- Power-steering pump motor (chassis 4097 in) ---
+    // PSCM publishes a q8 commanded speed; drive the plant (0..1 normalized).
+    {
+        double cmd01 = 0.0;
+        if (m_external_sim->HasReceivedSteeringPumpSpeedCmd())
+            cmd01 = static_cast<double>(m_external_sim->GetSteeringPumpSpeedCmdQ8()) / 255.0;
+        m_physical->power_steering_pump().update(dt, cmd01);
+    }
+
+    // --- Sounder / piezo "click" (chassis 4096 in) ---
+    // The LHJB flasher toggles the piezo; each rising edge is one audible tick.
+    {
+        m_physical->sounder().update(m_external_sim->GetSounderPiezoDrive());
+        const unsigned long clicks = m_physical->sounder().click_count();
+        if (clicks != m_last_sounder_click_count) {
+            m_last_sounder_click_count = clicks;
+            // TODO(audio): play the TURN/HAZ tick through the audio backend
+            // (mirrors HornAudio).  Contract + plant are in place; the click
+            // edge is detected here for the eventual SounderAudio hook.
+        }
+    }
+
+    // --- Door-lock motors LH/RH (chassis 4092-4095 in) ---
+    // Prefer the RHJB dual-H-bridge motor-leg drives when present: advance each
+    // motor and mirror its end-of-travel stroke into DoorLocks.  When the legs
+    // are not published yet (electricsim hasn't adopted 4092-4095) the motors
+    // never move and the high-level 4084/4085 mirror remains authoritative.
+    {
+        using S = ev1sim::DoorLocks::State;
+        using Stroke = ev1sim::DoorLockMotor::Stroke;
+        const bool have_legs =
+            m_external_sim->HasReceivedDoorLockMotorDrive(0) ||
+            m_external_sim->HasReceivedDoorLockMotorDrive(1) ||
+            m_external_sim->HasReceivedDoorLockMotorDrive(2) ||
+            m_external_sim->HasReceivedDoorLockMotorDrive(3);
+        if (have_legs) {
+            ev1sim::DoorLockMotor* motors[2] = {
+                &m_physical->door_lock_motor_lh(),   // door 0 = driver
+                &m_physical->door_lock_motor_rh()};  // door 1 = passenger
+            for (int door = 0; door < 2; ++door) {
+                const bool lock_drv   = m_external_sim->GetDoorLockMotorDrive(door * 2);
+                const bool unlock_drv = m_external_sim->GetDoorLockMotorDrive(door * 2 + 1);
+                motors[door]->update(dt, lock_drv, unlock_drv);
+                const Stroke stroke = motors[door]->stroke();
+                if (static_cast<int>(stroke) == m_last_dlm_stroke[door]) continue;
+                m_last_dlm_stroke[door] = static_cast<int>(stroke);
+                // Only an end-of-travel limit changes the latched lock state.
+                if (stroke == Stroke::LOCKED || stroke == Stroke::UNLOCKED) {
+                    const S st = (stroke == Stroke::LOCKED) ? S::LOCKED : S::UNLOCKED;
+                    if (door == 0) m_physical->door_locks().set_driver(st);
+                    else           m_physical->door_locks().set_passenger(st);
+                    std::cout << "[SimApp] Door-lock motor "
+                              << (door == 0 ? "LH/driver" : "RH/passenger")
+                              << " reached " << motors[door]->stroke_name() << "\n";
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 int SimApp::Run() {
     if (m_config.simulation.headless) {
         // Guard against the hang-forever foot-gun: headless with no terminator
@@ -1348,6 +1417,10 @@ int SimApp::RunWithVisualization() {
         // a floating-UI panel or charge-door animation sets it.
         m_external_sim->SetChargeCouplerPresent(
             m_physical->charge_coupler().present());
+        // Power-steering pump HV interlock loop (chassis bus, ID 4098).
+        // The pump motor body closes molex.D/E while present; PSCM senses it.
+        m_external_sim->SetSteeringPumpInterlockClosed(
+            m_physical->power_steering_pump().interlock_closed());
         // PRND selector wire-level pins (chassis bus, IDs 4050-4053).
         {
             const auto& prnd = m_physical->prnd_selector();
@@ -1582,6 +1655,9 @@ int SimApp::RunWithVisualization() {
                           << ": " << name << "\n";
             }
         }
+
+        // --- Body actuator peripherals (door-lock motors / sounder / pump) ---
+        ConsumeBodyActuatorPeripherals(render_dt);
 
         // --- Render ---
         m_vis->BeginScene();
@@ -1868,6 +1944,10 @@ int SimApp::RunHeadless() {
         // a floating-UI panel or charge-door animation sets it.
         m_external_sim->SetChargeCouplerPresent(
             m_physical->charge_coupler().present());
+        // Power-steering pump HV interlock loop (chassis bus, ID 4098).
+        // The pump motor body closes molex.D/E while present; PSCM senses it.
+        m_external_sim->SetSteeringPumpInterlockClosed(
+            m_physical->power_steering_pump().interlock_closed());
         // PRND selector wire-level pins (chassis bus, IDs 4050-4053).
         // In headless mode stays at default Park; no keyboard cycling.
         {
@@ -2061,6 +2141,9 @@ int SimApp::RunHeadless() {
                           << ": " << name << "\n";
             }
         }
+
+        // --- Body actuator peripherals (door-lock motors / sounder / pump) ---
+        ConsumeBodyActuatorPeripherals(tick_dt);
 
         // --- Horn audio (external-sim-driven only in headless) ---
         bool horn_low = false, horn_high = false;

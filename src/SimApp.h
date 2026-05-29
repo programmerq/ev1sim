@@ -96,6 +96,15 @@ private:
     // Logs freshness transitions on tick boundaries.
     void ApplyElectronicsThrottle(DriverCommand& cmd);
 
+    // Consume the electricsim-driven body actuator peripherals each tick:
+    //   - power-steering pump motor (chassis 4097 in / 4098 out)
+    //   - sounder / piezo "click"     (chassis 4096 in)
+    //   - door-lock motors LH/RH      (chassis 4092-4095 in)
+    // Advances the PhysicalWorld plant models from the connector's latched
+    // inputs and mirrors door-lock end-of-travel into DoorLocks.  Safe to call
+    // when m_external_sim is null (no-op).  dt is the tick duration in seconds.
+    void ConsumeBodyActuatorPeripherals(double dt);
+
     Config m_config;
 
     std::unique_ptr<VehicleWorld>           m_world;
@@ -219,4 +228,12 @@ private:
     // Last-seen power window motor cmd — used to suppress repeated log lines.
     // 0xFF = never received.
     std::uint8_t m_last_pw_motor_cmd[2]  = {0xFFu, 0xFFu};  // [0]=driver,[1]=passenger
+
+    // Last-applied door-lock motor stroke per door (cast of DoorLockMotor::Stroke;
+    // 0 == UNLOCKED, the motors' initial stroke).  Suppresses repeated DoorLocks
+    // writes / log lines, including a spurious "reached UNLOCKED" on the first
+    // tick after the motor-leg drives first appear.
+    int m_last_dlm_stroke[2] = {0, 0};                 // [0]=LH/driver, [1]=RH/passenger
+    // Last sounder click count seen — detects a new TURN/HAZ click for audio/log.
+    unsigned long m_last_sounder_click_count = 0;
 };
