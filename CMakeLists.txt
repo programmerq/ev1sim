@@ -65,9 +65,17 @@ else()
                    "(EV1SIM_TESTS_ONLY); the ev1sim app target is skipped.")
     find_path(IRRLICHT_INCLUDE_DIR NAMES irrlicht.h PATH_SUFFIXES irrlicht)
     find_library(IRRLICHT_LIBRARY NAMES Irrlicht)
-    if(IRRLICHT_INCLUDE_DIR)
-        include_directories(${IRRLICHT_INCLUDE_DIR})
+    # Fail fast with an actionable message rather than a murky compile/link error
+    # later if Irrlicht (still needed by the render helpers in the test sources)
+    # is missing in a tests-only build.
+    if(NOT IRRLICHT_INCLUDE_DIR OR NOT IRRLICHT_LIBRARY)
+        message(FATAL_ERROR
+            "EV1SIM_TESTS_ONLY needs Irrlicht (headers + library), but it was not "
+            "found.\n  Install it — Ubuntu: 'sudo apt install libirrlicht-dev'; "
+            "macOS: 'brew install irrlicht'.\n  Or build the full app against "
+            "Chrono instead (leave EV1SIM_TESTS_ONLY=OFF).")
     endif()
+    include_directories(${IRRLICHT_INCLUDE_DIR})
 endif()
 
 # ── nlohmann/json (header-only, fetched at configure time) ──────────────────
