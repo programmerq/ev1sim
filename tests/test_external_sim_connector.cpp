@@ -23,7 +23,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     constexpr int kNumWiperSwCavity = 4;   // wiper/washer switch cavities (4054-4057)
     constexpr int kNumTurnHazSwCavity = 4; // turn/hazard switch cavities + horn (4043-4046)
     constexpr int kNumCruiseSwCavity = 3;  // cruise switch cavities (4047-4049)
-    constexpr int kNumMotor         = 2;   // motor_rpm (4070), motor_torque_nm (4071)
+    constexpr int kNumMotor         = 3;   // motor_rpm (4070), motor_torque_nm (4071), motor_current_a (4072)
     constexpr int kNumSimTime       = 1;   // sim_time_ns (4075) — ev1sim → electricsim
     constexpr int kNumThrottleCmd   = 1;   // throttle_cmd_q8 (4073) — PIM → ev1sim
     constexpr int kNumSteeringCmd   = 1;   // steering_cmd (4076) — electricsim → ev1sim
@@ -160,8 +160,8 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
         } else if (e.signal_id == 4060) {
             CHECK_FALSE(e.input_to_sim);    // charge coupler present is an output
             ++charge_coupler_count;
-        } else if (e.signal_id == 4070 || e.signal_id == 4071) {
-            CHECK_FALSE(e.input_to_sim);    // motor RPM + torque are outputs
+        } else if (e.signal_id >= 4070 && e.signal_id <= 4072) {
+            CHECK_FALSE(e.input_to_sim);    // motor RPM + torque + DC current are outputs
             ++dynamics_count;
         } else if (e.signal_id == 4075) {
             CHECK_FALSE(e.input_to_sim);    // sim-time clock is an output (ev1sim → electricsim)

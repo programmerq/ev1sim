@@ -236,11 +236,18 @@ constexpr int kNumPassengerSeatbelt = 1;  // passenger seatbelt (6965)
 constexpr int kNumDriverInputs = 12 + kNumNewDriverInputs + kNumPowerWindowInputs + kNumExteriorKeypadInputs + kNumPassengerSeatbelt;  // 12 base: turn/hazard (6944/6948/6949) + cruise (6953-6957) moved to chassis cavities
 
 // Motor state signals on the chassis segment (ev1sim → electricsim, float32 LE).
-//   4070  vehicle.dynamics.motor_rpm        motor shaft RPM
-//   4071  vehicle.dynamics.motor_torque_nm  motor shaft torque (Nm, signed)
-constexpr std::uint32_t kSigMotorRpm      = 4070U;
-constexpr std::uint32_t kSigMotorTorqueNm = 4071U;
-constexpr int           kNumMotorSignals  = 2;
+//   4070  vehicle.dynamics.motor_rpm          motor shaft RPM
+//   4071  vehicle.dynamics.motor_torque_nm    motor shaft torque (Nm, signed)
+//   4072  vehicle.dynamics.motor_current_a    DC pack current (A, signed: + discharge)
+constexpr std::uint32_t kSigMotorRpm       = 4070U;
+constexpr std::uint32_t kSigMotorTorqueNm  = 4071U;
+constexpr std::uint32_t kSigMotorCurrentA  = 4072U;
+constexpr int           kNumMotorSignals   = 3;
+// NOTE: 4072 (motor_current_a) is allocated ev1sim-side first — electricsim has
+// no kSigChassisMotorCurrentA counterpart yet, so it is intentionally absent
+// from the compile-time drift guard below (a static_assert for an ID
+// electricsim doesn't define would break the integrated build).  Move it into
+// the guard once electricsim adds the canonical constant.
 
 // Sim-time master clock (ev1sim → electricsim, chassis segment, uint64 LE ns).
 //   4075  vehicle.dynamics.sim_time_ns   monotonic Chrono sim-time, nanoseconds
@@ -680,7 +687,7 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // (Slot 6970 is reserved; not registered.)
 // +1 for the charge coupler presence (ID 4060, chassis segment).
 // +kNumPrndSelector for the 4 PRND selector lines (IDs 4050-4053, chassis segment).
-// +kNumMotorSignals for motor RPM + torque (IDs 4070-4071, chassis segment).
+// +kNumMotorSignals for motor RPM + torque + DC current (IDs 4070-4072, chassis segment).
 // +kNumWiperSignals for wiper motor command (4080) + washer pump command (4081).
 // +kNumHvacSignals for hvac_blower_level (4082) + defrost_grid_active (4083).
 // +kNumAmbientSignals for ambient temp (4090) + ambient humidity (4091).
@@ -774,6 +781,8 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.dynamics.motor_rpm", "motor_rpm", false};
     out[i++] = {kSigMotorTorqueNm,
                 "vehicle.dynamics.motor_torque_nm", "motor_torque_nm", false};
+    out[i++] = {kSigMotorCurrentA,
+                "vehicle.dynamics.motor_current_a", "motor_current_a", false};
     // Sim-time master clock (chassis segment, ev1sim → electricsim, uint64 LE ns).
     out[i++] = {kSigSimTimeNs,
                 "vehicle.dynamics.sim_time_ns", "sim_time_ns", false};
@@ -1291,12 +1300,14 @@ struct ExternalSimConnector::State {
     std::int8_t   driver_door_handle_driver_pub     = -1;
     std::int8_t   driver_door_handle_passenger_pub  = -1;
 
-    // Motor state (IDs 4070-4071, chassis segment).
+    // Motor state (IDs 4070-4072, chassis segment).
     // Publish-on-change with small epsilon thresholds.
     float         motor_rpm               = 0.0f;
     float         motor_torque_nm         = 0.0f;
+    float         motor_current_a         = 0.0f;
     float         motor_rpm_pub           = -9999.0f;   // sentinel: always publish first
     float         motor_torque_pub        = -9999.0f;
+    float         motor_current_pub       = -9999.0f;
 
     // Ambient environment sensors (IDs 4090-4091, chassis segment).
     // Publish-on-change with small epsilon thresholds.
@@ -2145,6 +2156,10 @@ void ExternalSimConnector::SetMotorRpm(float rpm) {
 
 void ExternalSimConnector::SetMotorTorqueNm(float torque_nm) {
     m_state->motor_torque_nm = torque_nm;
+}
+
+void ExternalSimConnector::SetMotorCurrentA(float amps) {
+    m_state->motor_current_a = amps;
 }
 
 void ExternalSimConnector::SetAmbientTempC(float temp_c) {
@@ -3451,14 +3466,16 @@ void ExternalSimConnector::Tick(double sim_time_s) {
     }
     main_transport_done:;
 
-    // 5b. Publish motor state (RPM + torque) on the chassis segment.
+    // 5b. Publish motor state (RPM + torque + DC current) on the chassis segment.
     // Publish-on-change with small epsilon thresholds to avoid flooding.
     {
-        constexpr float kRpmEps    = 0.01f;
-        constexpr float kTorqueEps = 0.01f;
-        const bool rpm_changed    = std::abs(st.motor_rpm - st.motor_rpm_pub) > kRpmEps;
-        const bool torque_changed = std::abs(st.motor_torque_nm - st.motor_torque_pub) > kTorqueEps;
-        if (rpm_changed || torque_changed) {
+        constexpr float kRpmEps     = 0.01f;
+        constexpr float kTorqueEps  = 0.01f;
+        constexpr float kCurrentEps = 0.1f;   // amps; current spans ±~330 A
+        const bool rpm_changed     = std::abs(st.motor_rpm - st.motor_rpm_pub) > kRpmEps;
+        const bool torque_changed  = std::abs(st.motor_torque_nm - st.motor_torque_pub) > kTorqueEps;
+        const bool current_changed = std::abs(st.motor_current_a - st.motor_current_pub) > kCurrentEps;
+        if (rpm_changed || torque_changed || current_changed) {
             std::vector<DeltaRecord> mdyn;
             if (rpm_changed) {
                 mdyn.push_back(MakeFloatDelta(kSigMotorRpm, st.motor_rpm));
@@ -3467,6 +3484,10 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             if (torque_changed) {
                 mdyn.push_back(MakeFloatDelta(kSigMotorTorqueNm, st.motor_torque_nm));
                 st.motor_torque_pub = st.motor_torque_nm;
+            }
+            if (current_changed) {
+                mdyn.push_back(MakeFloatDelta(kSigMotorCurrentA, st.motor_current_a));
+                st.motor_current_pub = st.motor_current_a;
             }
             Frame mf{};
             mf.header.type              = FrameType::DeltaBatch;

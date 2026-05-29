@@ -84,11 +84,13 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   RSA cmd encoding (4084/4085).  Closes the `door_lock_motor` loop so RSA/IPC
   central-locking can confirm the actuated state.  IDs allocated ev1sim-side
   first; electricsim consumer wiring is a TODO on that side.
-- [ ] **Motor current calculation** — motor current (Amps) is not published;
-  Chrono's `ChEngineSimpleMap` does not expose a current output directly.
-  Needs investigation of how to compute I from torque + motor characteristics.
-  A placeholder TODO: add `vehicle.dynamics.motor_current_a` (chassis ID 4072)
-  once the Chrono API path is confirmed.
+- [x] **Motor current calculation** — `src/MotorCurrent.h` derives DC pack
+  current from shaft torque × speed (P_mech → P_pack via drive/regen efficiency
+  + a 12 V accessory load, ÷ 343.2 V Gen 2 NiMH pack).  SimApp publishes it on
+  `vehicle.dynamics.motor_current_a` (chassis ID **4072**, float32, signed:
+  + discharge / − regen charge) each tick, publish-on-change.  Allocated
+  ev1sim-side first (no electricsim counterpart yet, so intentionally absent
+  from the compile-time drift guard).  Pinned by `tests/test_motor_current.cpp`.
 - [x] **EV1 powertrain model fidelity audit (initial pass).**  Done in
   [docs/ev1_chrono_audit.md](ev1_chrono_audit.md).  Fixed final drive
   10.0 → 10.946:1, brake torque 1800 → 800 N·m/wheel, chassis mass
