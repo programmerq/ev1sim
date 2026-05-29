@@ -6,6 +6,7 @@
 #include "ExternalSimConnector.h"
 #include "FloatingUiPanel.h"
 #include "HornAudio.h"
+#include "SounderAudio.h"
 #include "KeyboardInputController.h"
 #include "PhysicalWorld.h"
 #include "SdlContext.h"
@@ -112,6 +113,7 @@ private:
     std::unique_ptr<CameraManager>          m_camera;
     std::unique_ptr<Telemetry>              m_telemetry;
     std::unique_ptr<HornAudio>              m_horn;
+    std::unique_ptr<SounderAudio>           m_sounder_audio;
     std::unique_ptr<VehicleLights>          m_lights;
     std::unique_ptr<VehiclePanels>          m_panels;
     std::unique_ptr<ev1sim::PhysicalWorld>  m_physical;
