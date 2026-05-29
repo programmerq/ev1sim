@@ -472,6 +472,32 @@ public:
     bool GetRsaShiftBlocked() const;
     bool HasReceivedRsaShiftBlocked() const;
 
+    /// Incoming door-lock motor leg drives from RHJB (IDs 4092-4095, chassis segment).
+    /// RHJB's dual-H-bridge drives both door-lock motors in lockstep; each motor
+    /// has a LOCK leg and an UNLOCK leg.  leg index: 0=LH lock, 1=LH unlock,
+    /// 2=RH lock, 3=RH unlock.  bool: true = leg energised.  Out-of-range → false.
+    /// Consumed by PhysicalWorld::DoorLockMotor (×2).
+    bool GetDoorLockMotorDrive(int leg) const;
+    bool HasReceivedDoorLockMotorDrive(int leg) const;
+
+    /// Incoming sounder / piezo drive from the LHJB flasher (ID 4096, chassis segment).
+    /// bool: true = piezo energised (the TURN/HAZ "click").  Returns false if
+    /// never received.  Consumed by PhysicalWorld::Sounder.
+    bool GetSounderPiezoDrive() const;
+    bool HasReceivedSounderPiezoDrive() const;
+
+    /// Incoming power-steering pump speed command from PSCM (ID 4097, chassis segment).
+    /// uint8 q8: 0=stopped, 255=full.  Returns 0xFF if never received.
+    /// Consumed by PhysicalWorld::PowerSteeringPumpMotor.
+    std::uint8_t GetSteeringPumpSpeedCmdQ8() const;
+    bool         HasReceivedSteeringPumpSpeedCmd() const;
+
+    /// Outgoing power-steering pump HV interlock-closed (ID 4098, chassis segment).
+    /// The pump motor body closes the molex.D/E HV interlock loop while present;
+    /// PSCM senses this as interlock-closed.  Published on change; defaults true
+    /// (motor present).  Set false for fault injection (motor unplugged).
+    void SetSteeringPumpInterlockClosed(bool closed);
+
     /// Incoming IPC seatbelt telltale — driver seat (ID 4130, chassis segment).
     /// Published by IPC when the driver seat is unbuckled AND speed > ~8 km/h.
     /// bool: true = lamp on (unbuckled at speed), false = lamp off.

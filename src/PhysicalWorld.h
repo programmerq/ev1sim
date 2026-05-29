@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cmath>
 #include <cstdint>
 
 // Forward declaration — avoid pulling Irrlicht into every translation unit
@@ -806,7 +807,172 @@ private:
     bool m_passenger = false;
 };
 
-/// Container for all physical-world input components.
+/// Door-lock motor + mechanical lock stroke (one peripheral instance per door:
+/// LH = driver, RH = passenger).
+///
+/// Consumes the RHJB dual-H-bridge motor-leg drives (chassis bus):
+///   lock_drive    LOCK leg energised  → motor runs toward LOCKED
+///   unlock_drive  UNLOCK leg energised → motor runs toward UNLOCKED
+/// The motor runs in the direction whose drive is active and stops at the
+/// end-of-travel limit.  Both drives high (an illegal H-bridge shoot-through
+/// command) or both low → motor off (no motion).
+///
+/// Wire-level mapping (cavity → chassis-bus signal), authoritative for the
+/// electricsim router — see docs/peripherals.md:
+///   LH (driver):    lock=294A RHJB J9.C5 → 4092,  unlock=295A RHJB J9.C6 → 4093
+///   RH (passenger): lock=294C RHJB J3.A6 → 4094,  unlock=295C RHJB J3.A7 → 4095
+///
+/// Mechanical model: a normalized stroke position in [0,1] (0 = UNLOCKED end
+/// of travel, 1 = LOCKED end of travel).  While a single drive is active the
+/// stroke advances at 1/traverse_time per second toward that end and clamps at
+/// the limit.  stroke() reports LOCKED / UNLOCKED / MID_STROKE.
+class DoorLockMotor {
+public:
+    enum class Stroke { UNLOCKED, MID_STROKE, LOCKED };
+
+    struct Config {
+        /// End-to-end travel time (UNLOCKED↔LOCKED).  Typical GM door-lock
+        /// motor stroke is ~0.4–0.6 s; the default 0.5 s sits comfortably
+        /// inside the RHJB DLM's 600 ms drive pulse, so the latch reaches its
+        /// end-of-travel within a single pulse.
+        double traverse_time_s = 0.5;
+    };
+
+    DoorLockMotor() = default;
+    explicit DoorLockMotor(const Config& cfg) : m_cfg(cfg) {}
+
+    /// Advance the mechanical stroke for dt seconds given the two H-bridge legs.
+    void update(double dt, bool lock_drive, bool unlock_drive) {
+        if (dt <= 0.0 || m_cfg.traverse_time_s <= 0.0) return;
+        const double step = dt / m_cfg.traverse_time_s;
+        if (lock_drive && !unlock_drive) {
+            m_pos += step;            // run toward LOCKED
+        } else if (unlock_drive && !lock_drive) {
+            m_pos -= step;            // run toward UNLOCKED
+        }
+        // both high or both low → motor off (hold position).
+        if (m_pos > 1.0) m_pos = 1.0; // end-of-travel limit (LOCKED)
+        if (m_pos < 0.0) m_pos = 0.0; // end-of-travel limit (UNLOCKED)
+    }
+
+    /// Normalized stroke position: 0 = UNLOCKED end, 1 = LOCKED end.
+    double position() const { return m_pos; }
+
+    /// true while a single drive is moving the pawl off an end-of-travel limit.
+    bool moving() const { return m_pos > 0.0 && m_pos < 1.0; }
+
+    Stroke stroke() const {
+        if (m_pos >= 1.0) return Stroke::LOCKED;
+        if (m_pos <= 0.0) return Stroke::UNLOCKED;
+        return Stroke::MID_STROKE;
+    }
+
+    const char* stroke_name() const {
+        switch (stroke()) {
+            case Stroke::LOCKED:   return "LOCKED";
+            case Stroke::UNLOCKED: return "UNLOCKED";
+            default:               return "MID-STROKE";
+        }
+    }
+
+    /// Seed the stroke to a known position (tests / initial-state config).
+    void set_position(double pos01) {
+        m_pos = pos01 < 0.0 ? 0.0 : (pos01 > 1.0 ? 1.0 : pos01);
+    }
+
+private:
+    Config m_cfg{};
+    double m_pos = 0.0;   // default UNLOCKED (matches DoorLocks default)
+};
+
+/// Piezo sounder — the LHJB turn/hazard "click" (and any future chime).
+///
+/// Consumes a single boolean drive (the LHJB flasher's piezo square-wave
+/// output, chassis ID 4096).  The flasher toggles the drive each flash
+/// half-cycle; the sounder emits an audible tick while the drive is high.
+/// No frequency model — the piezo is a fixed-pitch element; a fancier model
+/// could carry a frequency/level later.
+///
+/// The piezo is a real LHJB-internal component the printed EV1 schematics are
+/// silent on (no first-class component_id) — see docs/peripherals.md.
+class Sounder {
+public:
+    /// Update from the piezo drive line.  Call once per tick.  Each rising
+    /// edge (false→true) counts one audible click.
+    void update(bool drive) {
+        if (drive && !m_drive) ++m_click_count;   // rising edge
+        m_drive = drive;
+    }
+
+    /// true while the piezo is energised — the audible-output signal a future
+    /// 3D-sim audio backend plays.
+    bool sounding() const { return m_drive; }
+
+    /// Number of rising edges (clicks) since construction.
+    unsigned long click_count() const { return m_click_count; }
+
+private:
+    bool          m_drive       = false;
+    unsigned long m_click_count = 0;
+};
+
+/// Power-steering pump motor (3-phase BLDC driven by the PSCM HV inverter).
+///
+/// Minimum-viable plant: consumes a single commanded speed (normalized 0..1,
+/// the PSCM's q8 pump-speed command / 255) and tracks an actual speed with a
+/// first-order spin-up/spin-down lag.  Real BLDC commutation across the three
+/// molex phases (A/B/C) is intentionally ignored — per-phase modeling is
+/// future work.
+///
+/// The motor body also closes the HV interlock loop (molex.D/E): while the
+/// peripheral is present/connected, interlock_closed() is true, which the PSCM
+/// senses.  set_present(false) opens the loop for fault injection.
+///
+/// Wire-level mapping (see docs/peripherals.md):
+///   PSCM molex.A/B/C → pump phase_A/B/C   (commanded speed, chassis 4097)
+///   pump molex.D/E   → PSCM HV INTERLOCK   (interlock-closed, chassis 4098)
+class PowerSteeringPumpMotor {
+public:
+    struct Config {
+        /// First-order response time constant (s): the actual speed chases the
+        /// commanded speed with this lag.  Default ~0.15 s (a responsive
+        /// accessory BLDC).  0 → instantaneous plant.
+        double response_tau_s = 0.15;
+    };
+
+    PowerSteeringPumpMotor() = default;
+    explicit PowerSteeringPumpMotor(const Config& cfg) : m_cfg(cfg) {}
+
+    /// Advance the plant.  commanded_speed is normalized 0..1 and clamped.
+    void update(double dt, double commanded_speed) {
+        m_cmd = commanded_speed < 0.0 ? 0.0
+                                      : (commanded_speed > 1.0 ? 1.0 : commanded_speed);
+        if (dt <= 0.0 || m_cfg.response_tau_s <= 0.0) {
+            m_actual = m_cmd;   // instantaneous plant
+            return;
+        }
+        // Exponential approach: actual += (cmd - actual)·(1 - e^{-dt/tau}).
+        const double alpha = 1.0 - std::exp(-dt / m_cfg.response_tau_s);
+        m_actual += (m_cmd - m_actual) * alpha;
+    }
+
+    double commanded_speed() const { return m_cmd; }     // 0..1
+    double actual_speed()    const { return m_actual; }  // 0..1, after lag
+
+    /// HV interlock loop (molex.D/E): closed while the motor is present.
+    bool interlock_closed() const { return m_present; }
+    void set_present(bool present) { m_present = present; }
+
+private:
+    Config m_cfg{};
+    double m_cmd     = 0.0;
+    double m_actual  = 0.0;
+    bool   m_present = true;   // motor present → interlock loop closed
+};
+
+/// Container for all physical-world components: driver-operated inputs
+/// (switches, pedals, keypads) and actuator/plant models driven by the
+/// external electrical sim (door-lock motors, sounder, steering pump).
 class PhysicalWorld {
 public:
     CombinationSwitch&       combination_switch()       { return m_comb_sw; }
@@ -863,6 +1029,18 @@ public:
     DoorHandles&       door_handles()       { return m_door_handles; }
     const DoorHandles& door_handles() const { return m_door_handles; }
 
+    // Door-lock motor plant — two instances: LH (driver) and RH (passenger).
+    DoorLockMotor&       door_lock_motor_lh()       { return m_door_lock_motor_lh; }
+    const DoorLockMotor& door_lock_motor_lh() const { return m_door_lock_motor_lh; }
+    DoorLockMotor&       door_lock_motor_rh()       { return m_door_lock_motor_rh; }
+    const DoorLockMotor& door_lock_motor_rh() const { return m_door_lock_motor_rh; }
+
+    Sounder&       sounder()       { return m_sounder; }
+    const Sounder& sounder() const { return m_sounder; }
+
+    PowerSteeringPumpMotor&       power_steering_pump()       { return m_steering_pump; }
+    const PowerSteeringPumpMotor& power_steering_pump() const { return m_steering_pump; }
+
     /// Draw HUD overlays for: key state, combination switch, PRND selector,
     /// and turn signals/hazard.  Call between BeginScene and EndScene.
     /// rsa_run_mode: most recently received RSA run mode (0=OFF,1=ACC,2=RUN;
@@ -903,6 +1081,11 @@ private:
     PowerWindows       m_power_windows;
     RsaExteriorKeypad  m_rsa_ext_keypad;
     DoorHandles        m_door_handles;
+    // Actuator/plant peripherals driven by the external electrical sim.
+    DoorLockMotor          m_door_lock_motor_lh;   // driver door
+    DoorLockMotor          m_door_lock_motor_rh;   // passenger door
+    Sounder                m_sounder;
+    PowerSteeringPumpMotor m_steering_pump;
 };
 
 }  // namespace ev1sim
