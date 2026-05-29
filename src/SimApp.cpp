@@ -116,6 +116,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
 
     // 4. Horn audio — CoreAudio on macOS, no-op elsewhere.  Safe headless.
     m_horn = std::make_unique<HornAudio>();
+    m_sounder_audio = std::make_unique<SounderAudio>();
 
     // 4b. Physical-world inputs — constructed early (before visualization) so
     //     floating-UI panel lambdas can safely dereference m_physical during
@@ -1114,17 +1115,15 @@ void SimApp::ConsumeBodyActuatorPeripherals(double dt) {
         m_physical->power_steering_pump().update(dt, cmd01);
     }
 
-    // --- Sounder / piezo "click" (chassis 4096 in) ---
-    // The LHJB flasher toggles the piezo; each rising edge is one audible tick.
+    // --- Sounder / piezo "tick" (chassis 4096 in) ---
+    // The LHJB flasher gates the piezo on/off each flash half-cycle; that
+    // toggling IS the audible TURN/HAZ tick.  Drive the buzz from sounding()
+    // (continuous while energised); SounderAudio is a no-op off macOS.
     {
         m_physical->sounder().update(m_external_sim->GetSounderPiezoDrive());
-        const unsigned long clicks = m_physical->sounder().click_count();
-        if (clicks != m_last_sounder_click_count) {
-            m_last_sounder_click_count = clicks;
-            // TODO(audio): play the TURN/HAZ tick through the audio backend
-            // (mirrors HornAudio).  Contract + plant are in place; the click
-            // edge is detected here for the eventual SounderAudio hook.
-        }
+        if (m_sounder_audio)
+            m_sounder_audio->SetSounding(m_physical->sounder().sounding());
+        m_last_sounder_click_count = m_physical->sounder().click_count();
     }
 
     // --- Door-lock motors LH/RH (chassis 4092-4095 in) ---
@@ -1159,6 +1158,7 @@ void SimApp::ConsumeBodyActuatorPeripherals(double dt) {
                     std::cout << "[SimApp] Door-lock motor "
                               << (door == 0 ? "LH/driver" : "RH/passenger")
                               << " reached " << motors[door]->stroke_name() << "\n";
+                    if (m_sounder_audio) m_sounder_audio->PlayClick();  // solenoid click
                 }
             }
         }
