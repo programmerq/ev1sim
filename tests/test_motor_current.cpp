@@ -6,6 +6,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include <cmath>
+
 #include "MotorCurrent.h"
 
 using Catch::Matchers::WithinAbs;
@@ -75,4 +77,14 @@ TEST_CASE("MotorCurrent: a non-positive pack voltage is handled defensively",
     MotorCurrent::Params p;
     p.pack_voltage_v = 0.0;
     CHECK(MotorCurrent::dc_bus_current_a(100.0, 200.0, p) == 0.0);
+}
+
+TEST_CASE("MotorCurrent: a non-positive drive efficiency can't leak inf/NaN",
+          "[MotorCurrent]") {
+    MotorCurrent::Params p;
+    p.drive_efficiency = 0.0;   // misconfigured — would divide by zero unguarded
+    const double i = MotorCurrent::dc_bus_current_a(100.0, 200.0, p);
+    CHECK(std::isfinite(i));
+    // Falls back to a lossless pass-through: (20 kW + 1200 W) / 343.2 V.
+    CHECK_THAT(i, WithinAbs((20000.0 + 1200.0) / 343.2, 0.05));
 }

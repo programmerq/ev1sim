@@ -72,7 +72,9 @@ TEST_CASE("Brake bias: EV1_Vehicle.json wires front→Front and rear→Rear brak
         CHECK(axles[1].at(side).get<std::string>().find("Rear")  != std::string::npos);
     }
 
-    // The superseded shared brake file must no longer be referenced anywhere.
+    // The superseded shared brake file must no longer be referenced by the
+    // vehicle definition.  (This guards EV1_Vehicle.json specifically — a stray
+    // mention elsewhere, e.g. a historical note in docs, isn't caught here.)
     const std::string dump = veh.dump();
     CHECK(dump.find("EV1_BrakeSimple.json") == std::string::npos);
 }
