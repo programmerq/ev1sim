@@ -87,6 +87,45 @@ std::wstring FormatDefrostGridLabel(bool active) {
     return active ? L"Defrost: ON" : L"Defrost: OFF";
 }
 
+// --- HVAC driver-control labels (the requests the driver sends to HTCM,
+//     distinct from the blower/defrost-grid *feedback* helpers above). ---
+std::wstring FormatHvacSetpointLabel(double setpoint_c) {
+    wchar_t buf[64];
+    std::swprintf(buf, sizeof(buf) / sizeof(buf[0]),
+                  L"HVAC Temp: %.1f C", setpoint_c);
+    return buf;
+}
+
+std::wstring FormatHvacFanLabel(std::uint8_t fan) {
+    // Mirrors HvacControls::Fan: 0=OFF, 1=LOW, 2=MED, 3=HIGH.
+    switch (fan) {
+        case 0:  return L"HVAC Fan: OFF";
+        case 1:  return L"HVAC Fan: LOW";
+        case 2:  return L"HVAC Fan: MED";
+        case 3:  return L"HVAC Fan: HIGH";
+        default: return L"HVAC Fan: ?";
+    }
+}
+
+std::wstring FormatHvacModeLabel(std::uint8_t mode) {
+    // Mirrors HvacControls::Mode: 0=FACE, 1=BILEVEL, 2=FEET, 3=DEFROST.
+    switch (mode) {
+        case 0:  return L"HVAC Mode: FACE";
+        case 1:  return L"HVAC Mode: BILEVEL";
+        case 2:  return L"HVAC Mode: FEET";
+        case 3:  return L"HVAC Mode: DEFROST";
+        default: return L"HVAC Mode: ?";
+    }
+}
+
+std::wstring FormatHvacAcLabel(bool on) {
+    return on ? L"HVAC A/C: ON" : L"HVAC A/C: OFF";
+}
+
+std::wstring FormatHvacDefrostLabel(bool on) {
+    return on ? L"HVAC Defrost: ON" : L"HVAC Defrost: OFF";
+}
+
 std::wstring FormatIpcSeatbeltTelltaleLabel(const wchar_t* seat_name,
                                             bool lamp_on,
                                             bool ever_received) {

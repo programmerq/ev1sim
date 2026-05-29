@@ -64,6 +64,19 @@ std::wstring FormatHvacBlowerLabel(std::uint8_t level);
 /// Format defrost grid status label.  active: true=ON, false=OFF.
 std::wstring FormatDefrostGridLabel(bool active);
 
+// HVAC driver-control labels (the requests the driver sends; distinct from the
+// blower/defrost-grid *feedback* helpers above).  Mirror PhysicalWorld::HvacControls.
+/// Format the HVAC temperature setpoint (°C, one decimal): "HVAC Temp: 21.0 C".
+std::wstring FormatHvacSetpointLabel(double setpoint_c);
+/// Format the HVAC fan request.  fan: 0=OFF, 1=LOW, 2=MED, 3=HIGH.
+std::wstring FormatHvacFanLabel(std::uint8_t fan);
+/// Format the HVAC mode request.  mode: 0=FACE, 1=BILEVEL, 2=FEET, 3=DEFROST.
+std::wstring FormatHvacModeLabel(std::uint8_t mode);
+/// Format the A/C-compressor request.  on: true=ON, false=OFF.
+std::wstring FormatHvacAcLabel(bool on);
+/// Format the front-defrost request.  on: true=ON, false=OFF.
+std::wstring FormatHvacDefrostLabel(bool on);
+
 // IPC LCD telltale status label helpers (display-only, not buttons).
 /// Format IPC seatbelt telltale label.
 /// seat_name: e.g. L"D" (driver) or L"P" (passenger).
