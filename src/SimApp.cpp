@@ -481,6 +481,33 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                 []() -> std::wstring { return L"Gear Down: D>N>R>P"; },
                 [this]() { PrndDown(); });
 
+            // --- Power windows (momentary press-and-hold; bus 6980-6983) ---
+            // These panel buttons are the only driver input for the windows
+            // (no keyboard source).  While a button is held the matching switch
+            // signal is asserted; releasing it — or hiding the panel — returns
+            // the window to NONE.  set_held() coordinates Up vs Down so the two
+            // buttons for one window don't clobber each other.
+            {
+                using PwWin = ev1sim::PowerWindows::Window;
+                using PwDir = ev1sim::PowerWindows::Direction;
+                auto add_window_btn =
+                    [this](const wchar_t* label, PwWin w, PwDir d) {
+                        m_floating_ui->AddHoldButton(
+                            [this, label, w, d]() -> std::wstring {
+                                return FormatPowerWindowButtonLabel(
+                                    label,
+                                    m_physical->power_windows().state(w) == d);
+                            },
+                            [this, w, d](bool held) {
+                                m_physical->power_windows().set_held(w, d, held);
+                            });
+                    };
+                add_window_btn(L"Drv Window Up",    PwWin::DRIVER,    PwDir::UP);
+                add_window_btn(L"Drv Window Down",  PwWin::DRIVER,    PwDir::DOWN);
+                add_window_btn(L"Pass Window Up",   PwWin::PASSENGER, PwDir::UP);
+                add_window_btn(L"Pass Window Down", PwWin::PASSENGER, PwDir::DOWN);
+            }
+
             // --- PIM cruise-control status (display-only; main harness bus 5860/5861) ---
             // Subscribes to PIM signals kSigPimCruiseActive (5860) and
             // kSigPimCruiseSetpointMps (5861) on the main harness segment.

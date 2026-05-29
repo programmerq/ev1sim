@@ -286,6 +286,12 @@ std::wstring FormatPedalPercentLabel(const char* name, double value_0_to_1) {
     return buf;
 }
 
+std::wstring FormatPowerWindowButtonLabel(const wchar_t* text, bool active) {
+    std::wstring s = text ? text : L"";
+    if (active) s += L" [ON]";
+    return s;
+}
+
 std::wstring FormatSteeringAngleLabel(double angle_deg) {
     // Guard against NaN / infinity (also the caller's "no vehicle state yet"
     // signal) — show a placeholder.
@@ -346,8 +352,8 @@ FloatingUiPanel::~FloatingUiPanel() {
 }
 
 // ---------------------------------------------------------------------------
-void FloatingUiPanel::AddButton(std::function<std::wstring()> label_fn,
-                                std::function<void()>         on_click) {
+irr::gui::IGUIButton* FloatingUiPanel::CreateButtonWidget(
+        const std::function<std::wstring()>& label_fn) {
     const int idx = static_cast<int>(m_buttons.size());
     const int by  = m_anchor_y + kBgPadTop
                     + idx * (m_btn_h + kPadding);
@@ -364,7 +370,7 @@ void FloatingUiPanel::AddButton(std::function<std::wstring()> label_fn,
         btn->setNotClipped(true);
     }
 
-    // Resize background to cover all buttons.
+    // Resize background to cover all buttons (including the one being added).
     if (m_bg) {
         const int total_h = kBgPadTop
                             + static_cast<int>(m_buttons.size() + 1)
@@ -377,8 +383,28 @@ void FloatingUiPanel::AddButton(std::function<std::wstring()> label_fn,
                              m_anchor_x + total_w,
                              m_anchor_y + total_h));
     }
+    return btn;
+}
 
-    m_buttons.push_back({ btn, std::move(label_fn), std::move(on_click) });
+void FloatingUiPanel::AddButton(std::function<std::wstring()> label_fn,
+                                std::function<void()>         on_click) {
+    auto* btn = CreateButtonWidget(label_fn);
+    ButtonEntry e;
+    e.widget   = btn;
+    e.label_fn = std::move(label_fn);
+    e.on_click = std::move(on_click);
+    m_buttons.push_back(std::move(e));
+}
+
+void FloatingUiPanel::AddHoldButton(std::function<std::wstring()> label_fn,
+                                    std::function<void(bool)>     on_hold) {
+    auto* btn = CreateButtonWidget(label_fn);
+    ButtonEntry e;
+    e.widget   = btn;
+    e.label_fn = std::move(label_fn);
+    e.on_hold  = std::move(on_hold);
+    e.is_hold  = true;
+    m_buttons.push_back(std::move(e));
 }
 
 // ---------------------------------------------------------------------------
@@ -388,6 +414,10 @@ void FloatingUiPanel::SetVisible(bool visible) {
     for (auto& b : m_buttons) {
         if (b.widget)
             b.widget->setVisible(visible);
+        // Hiding the panel must release any held momentary switch so it can't
+        // stay asserted (and keep publishing) while the panel is invisible.
+        if (!visible && b.is_hold && b.on_hold)
+            b.on_hold(false);
     }
 }
 
@@ -396,6 +426,10 @@ void FloatingUiPanel::UpdateLabels() {
     if (!m_visible)
         return;
     for (auto& b : m_buttons) {
+        // Momentary hold buttons: drive the callback from the live pressed
+        // state before refreshing the label, so the label reflects this tick.
+        if (b.is_hold && b.widget && b.on_hold)
+            b.on_hold(b.widget->isPressed());
         if (b.widget && b.label_fn) {
             std::wstring label = b.label_fn();
             b.widget->setText(label.c_str());

@@ -568,6 +568,15 @@ public:
         (w == Window::DRIVER ? m_driver : m_passenger) = Direction::NONE;
     }
 
+    /// Drive one switch from a momentary (press-and-hold) control.  While
+    /// `held`, assert direction `d`.  On release, return to NONE only if this
+    /// control's own direction is still the active one — so the opposite-
+    /// direction control for the same window isn't clobbered.
+    void set_held(Window w, Direction d, bool held) {
+        if (held)               press(w, d);
+        else if (state(w) == d) release(w);
+    }
+
     Direction state(Window w) const {
         return (w == Window::DRIVER) ? m_driver : m_passenger;
     }

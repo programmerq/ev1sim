@@ -730,6 +730,36 @@ TEST_CASE("test_power_windows_press_overrides_existing", "[PhysicalWorld][PowerW
     CHECK(pw.state(W::DRIVER) == D::DOWN);
 }
 
+TEST_CASE("test_power_windows_set_held_asserts_and_releases", "[PhysicalWorld][PowerWindows]") {
+    PowerWindows pw;
+    using W = PowerWindows::Window;
+    using D = PowerWindows::Direction;
+
+    // Held → asserted; released → back to NONE.
+    pw.set_held(W::DRIVER, D::UP, true);
+    CHECK(pw.driver_up());
+    pw.set_held(W::DRIVER, D::UP, false);
+    CHECK(pw.state(W::DRIVER) == D::NONE);
+}
+
+TEST_CASE("test_power_windows_set_held_does_not_clobber_opposite", "[PhysicalWorld][PowerWindows]") {
+    PowerWindows pw;
+    using W = PowerWindows::Window;
+    using D = PowerWindows::Direction;
+
+    // DOWN is held; the (un-held) UP control must not release the switch.
+    pw.set_held(W::DRIVER, D::DOWN, true);
+    CHECK(pw.driver_down());
+
+    pw.set_held(W::DRIVER, D::UP, false);   // UP button not pressed this frame
+    CHECK(pw.driver_down());                 // DOWN survives
+    CHECK(pw.state(W::DRIVER) == D::DOWN);
+
+    // Releasing the DOWN control (the active one) does return to NONE.
+    pw.set_held(W::DRIVER, D::DOWN, false);
+    CHECK(pw.state(W::DRIVER) == D::NONE);
+}
+
 TEST_CASE("test_power_windows_independent_per_window", "[PhysicalWorld][PowerWindows]") {
     PowerWindows pw;
     using W = PowerWindows::Window;
