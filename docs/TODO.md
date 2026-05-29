@@ -64,7 +64,7 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   No live weather API this round — see follow-up below.
 - [ ] **Live weather API integration** (free service, with naive-almanac fallback
   if API is down) — current implementation is naive-almanac only.
-- [x] **HVAC controls** — `PhysicalWorld::HvacControls` models the driver
+- [x] **HVAC controls** — `ev1sim::HvacControls` models the driver
   climate panel: temp setpoint (°C, clamped 16–30), fan (OFF/LOW/MED/HIGH),
   mode (FACE/BILEVEL/FEET/DEFROST), A/C request, and front-defrost request.
   Published to HTCM on the chassis bus (`4124` setpoint f32, `4125` fan,
@@ -75,7 +75,7 @@ future-UI input on one side, chassis-segment signal publishing on the other.
 
 ## Door / lock state
 
-- [x] **Door lock state** modeled in `PhysicalWorld::DoorLocks` (driver,
+- [x] **Door lock state** modeled in `ev1sim::DoorLocks` (driver,
   passenger, trunk; defaults UNLOCKED).  No keyboard binding — toggles will
   land via the floating-UI panel.
 - [x] **Door lock bus signal pinning** — `DoorLocks` state is published on the
@@ -218,12 +218,12 @@ Only the render/audio surfacing remains (tracked in the "defer all" section abov
   the legs over the 4084/4085 mirror) and reflects end-of-travel into `DoorLocks`
   (now also republished as 4155-4157).  Remaining: door-lock solenoid
   audio/visual click (render — deferred above).
-- [x] **`sounder` spec + consume (4096)** — `PhysicalWorld::Sounder`; SimApp
+- [x] **`sounder` spec + consume (4096)** — `ev1sim::Sounder`; SimApp
   advances it from 4096 each tick and detects the click edge.  Remaining: play
   the TURN/HAZ click in the audio backend (a `SounderAudio` backend like
   `HornAudio` — deferred).
 - [x] **`power_steering_pump_motor` spec + consume (4097 in / 4098 out)** —
-  `PhysicalWorld::PowerSteeringPumpMotor`; SimApp drives the pump from 4097 and
+  `ev1sim::PowerSteeringPumpMotor`; SimApp drives the pump from 4097 and
   publishes the HV interlock-closed boolean (4098) each tick.  Optional future:
   per-phase BLDC model on molex.A/B/C.
 
@@ -268,7 +268,7 @@ Only the render/audio surfacing remains (tracked in the "defer all" section abov
   indicator), has no equivalent bulb feed line and remains fully deferred
   until electricsim adds a separate charge-state signal.
 - [x] **HVAC control panel** — FloatingUiPanel rows for the driver climate
-  controls (`PhysicalWorld::HvacControls`, published to HTCM on 4124-4128): a
+  controls (`ev1sim::HvacControls`, published to HTCM on 4124-4128): a
   setpoint display row + buttons for Temp +/- (0.5 °C), fan cycle, mode cycle,
   A/C toggle, and defrost toggle.  Pure `FormatHvac*Label` helpers are unit-
   tested; the panel wiring lives in `SimApp`.

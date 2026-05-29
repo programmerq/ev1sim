@@ -490,19 +490,19 @@ public:
     /// RHJB's dual-H-bridge drives both door-lock motors in lockstep; each motor
     /// has a LOCK leg and an UNLOCK leg.  leg index: 0=LH lock, 1=LH unlock,
     /// 2=RH lock, 3=RH unlock.  bool: true = leg energised.  Out-of-range → false.
-    /// Consumed by PhysicalWorld::DoorLockMotor (×2).
+    /// Consumed by ev1sim::DoorLockMotor (×2).
     bool GetDoorLockMotorDrive(int leg) const;
     bool HasReceivedDoorLockMotorDrive(int leg) const;
 
     /// Incoming sounder / piezo drive from the LHJB flasher (ID 4096, chassis segment).
     /// bool: true = piezo energised (the TURN/HAZ "click").  Returns false if
-    /// never received.  Consumed by PhysicalWorld::Sounder.
+    /// never received.  Consumed by ev1sim::Sounder.
     bool GetSounderPiezoDrive() const;
     bool HasReceivedSounderPiezoDrive() const;
 
     /// Incoming power-steering pump speed command from PSCM (ID 4097, chassis segment).
     /// uint8 q8: 0=stopped, 255=full.  Returns 0xFF if never received.
-    /// Consumed by PhysicalWorld::PowerSteeringPumpMotor.
+    /// Consumed by ev1sim::PowerSteeringPumpMotor.
     std::uint8_t GetSteeringPumpSpeedCmdQ8() const;
     bool         HasReceivedSteeringPumpSpeedCmd() const;
 
@@ -514,7 +514,7 @@ public:
 
     /// Outgoing HVAC driver-control requests (IDs 4124-4128, chassis segment) →
     /// HTCM.  Latched by these setters; published on change each tick.  Mirror of
-    /// PhysicalWorld::HvacControls.  Encodings: setpoint float32 °C; fan/mode
+    /// ev1sim::HvacControls.  Encodings: setpoint float32 °C; fan/mode
     /// uint8 enums (fan 0=OFF/1=LOW/2=MED/3=HIGH, mode 0=FACE/1=BILEVEL/2=FEET/
     /// 3=DEFROST); ac/defrost uint8 bool.
     void SetHvacTempSetpointC(float setpoint_c);
@@ -524,7 +524,7 @@ public:
     void SetHvacDefrostRequest(bool on);
 
     /// Outgoing door-lock STATE feedback (IDs 4155-4157, chassis segment) →
-    /// electricsim.  The resulting latched state of PhysicalWorld::DoorLocks
+    /// electricsim.  The resulting latched state of ev1sim::DoorLocks
     /// (driver/passenger/trunk; true = LOCKED), published on change each tick so
     /// an RSA/IPC central-locking consumer can confirm the actuated state.
     void SetDoorLockState(bool driver_locked, bool passenger_locked, bool trunk_locked);
