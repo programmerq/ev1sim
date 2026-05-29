@@ -15,38 +15,60 @@ if(APPLE)
 endif()
 
 
-# ── Chrono (must be pre-installed with Vehicle + Irrlicht modules) ──────────
+# ── Chrono (required for the sim app; optional for a unit-tests-only build) ──
 # Auto-detect local deps/ install; override with -DChrono_DIR=<path>
 if(NOT Chrono_DIR AND EXISTS "${CMAKE_SOURCE_DIR}/deps/chrono-install/lib/cmake/Chrono")
     set(Chrono_DIR "${CMAKE_SOURCE_DIR}/deps/chrono-install/lib/cmake/Chrono")
 endif()
-find_package(Chrono REQUIRED COMPONENTS Vehicle Irrlicht CONFIG)
+# The unit tests are Chrono-free (no VehicleWorld/SimApp in the test target), so
+# CI can build + run them without a (slow-to-build) Chrono install.  Pass
+# -DEV1SIM_TESTS_ONLY=ON to relax the Chrono requirement and skip the sim app.
+# Default OFF keeps the normal `find_package(Chrono REQUIRED)` behaviour intact.
+option(EV1SIM_TESTS_ONLY "Build only the Chrono-free unit tests (no sim app)" OFF)
+if(EV1SIM_TESTS_ONLY)
+    find_package(Chrono QUIET COMPONENTS Vehicle Irrlicht CONFIG)
+else()
+    find_package(Chrono REQUIRED COMPONENTS Vehicle Irrlicht CONFIG)
+endif()
 
-# Chrono uses old-style CMake variables rather than imported targets.
-# Apply its compiler flags, include dirs, and linker flags globally for
-# all targets that need Chrono.
-include_directories(${CHRONO_INCLUDE_DIRS})
-add_compile_options(${CHRONO_CXX_FLAGS})
+if(Chrono_FOUND)
+    # Chrono uses old-style CMake variables rather than imported targets.
+    # Apply its compiler flags, include dirs, and linker flags globally for
+    # all targets that need Chrono.
+    include_directories(${CHRONO_INCLUDE_DIRS})
+    add_compile_options(${CHRONO_CXX_FLAGS})
 
-# Chrono's chrono-config.cmake hard-codes `-Wl,-no_compact_unwind` into
-# CHRONO_LINKER_FLAGS.  On Apple Silicon that strips the __unwind_info
-# section the runtime needs to walk the stack on `throw`, silently breaking
-# every try/catch in the program (uncaught exceptions abort with libc++abi
-# even when a matching handler is in main).  Drop it.
-list(REMOVE_ITEM CHRONO_LINKER_FLAGS "-Wl,-no_compact_unwind")
-add_link_options(${CHRONO_LINKER_FLAGS})
+    # Chrono's chrono-config.cmake hard-codes `-Wl,-no_compact_unwind` into
+    # CHRONO_LINKER_FLAGS.  On Apple Silicon that strips the __unwind_info
+    # section the runtime needs to walk the stack on `throw`, silently breaking
+    # every try/catch in the program (uncaught exceptions abort with libc++abi
+    # even when a matching handler is in main).  Drop it.
+    list(REMOVE_ITEM CHRONO_LINKER_FLAGS "-Wl,-no_compact_unwind")
+    add_link_options(${CHRONO_LINKER_FLAGS})
 
-# Ensure Chrono shared libraries are found at runtime via RPATH.
-set(CMAKE_BUILD_RPATH_USE_ORIGIN TRUE)
-set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-# Extract library directories from CHRONO_LIBRARIES for RPATH.
-set(_chrono_rpaths "")
-foreach(_lib ${CHRONO_LIBRARIES})
-    get_filename_component(_dir "${_lib}" DIRECTORY)
-    list(APPEND _chrono_rpaths "${_dir}")
-endforeach()
-list(REMOVE_DUPLICATES _chrono_rpaths)
-set(CMAKE_BUILD_RPATH "${_chrono_rpaths}")
+    # Ensure Chrono shared libraries are found at runtime via RPATH.
+    set(CMAKE_BUILD_RPATH_USE_ORIGIN TRUE)
+    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+    # Extract library directories from CHRONO_LIBRARIES for RPATH.
+    set(_chrono_rpaths "")
+    foreach(_lib ${CHRONO_LIBRARIES})
+        get_filename_component(_dir "${_lib}" DIRECTORY)
+        list(APPEND _chrono_rpaths "${_dir}")
+    endforeach()
+    list(REMOVE_DUPLICATES _chrono_rpaths)
+    set(CMAKE_BUILD_RPATH "${_chrono_rpaths}")
+else()
+    # Chrono-free build (EV1SIM_TESTS_ONLY).  The unit tests still include
+    # Irrlicht headers (via VehicleLights/VehiclePanels) and call into it from
+    # the render helpers, so locate Irrlicht directly instead of via Chrono.
+    message(STATUS "Chrono not found — building Chrono-free unit tests only "
+                   "(EV1SIM_TESTS_ONLY); the ev1sim app target is skipped.")
+    find_path(IRRLICHT_INCLUDE_DIR NAMES irrlicht.h PATH_SUFFIXES irrlicht)
+    find_library(IRRLICHT_LIBRARY NAMES Irrlicht)
+    if(IRRLICHT_INCLUDE_DIR)
+        include_directories(${IRRLICHT_INCLUDE_DIR})
+    endif()
+endif()
 
 # ── nlohmann/json (header-only, fetched at configure time) ──────────────────
 include(FetchContent)
@@ -181,7 +203,8 @@ else()
     set(MACOS_PLATFORM_SRC)
 endif()
 
-# ── Main executable ─────────────────────────────────────────────────────────
+# ── Main executable (Chrono/Irrlicht sim app; skipped in a tests-only build) ─
+if(Chrono_FOUND)
 add_executable(ev1sim
     src/main.cpp
     src/SimApp.cpp
@@ -240,6 +263,7 @@ foreach(_f ${EV1_DATA_FILES})
     file(RELATIVE_PATH _rel "${CMAKE_SOURCE_DIR}/data/vehicle/ev1" "${_f}")
     configure_file("${_f}" "${CHRONO_DATA_DIR}/vehicle/ev1/${_rel}" COPYONLY)
 endforeach()
+endif()  # Chrono_FOUND (main executable)
 
 # ── Unit tests (optional) ──────────────────────────────────────────────────
 option(BUILD_TESTS "Build unit tests" ON)
@@ -290,6 +314,7 @@ if(BUILD_TESTS)
         Catch2::Catch2WithMain
         nlohmann_json::nlohmann_json
         ${CHRONO_LIBRARIES}
+        ${IRRLICHT_LIBRARY}   # empty when Chrono provides Irrlicht; set in the tests-only build
     )
     if(EV1SIM_HAVE_EXTERNAL_SIM)
         target_link_libraries(ev1sim_tests PRIVATE electricsim_connector)
@@ -317,7 +342,8 @@ if(BUILD_TESTS)
     #
     # Deliberately kept out of the default `ctest` (slow, multi-process, and
     # needs electricsim controllers built at ELECTRICSIM_DIR).
-    if(EV1SIM_HAVE_EXTERNAL_SIM)
+    # Requires the ev1sim app target (Chrono), so skip it in a tests-only build.
+    if(EV1SIM_HAVE_EXTERNAL_SIM AND Chrono_FOUND)
         add_custom_target(test-integration
             COMMAND ${CMAKE_COMMAND} -E env "ELECTRICSIM_DIR=${ELECTRICSIM_DIR}"
                     bash ${CMAKE_SOURCE_DIR}/scripts/abs_regression.sh
