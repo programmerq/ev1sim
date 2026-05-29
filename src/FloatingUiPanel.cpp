@@ -286,6 +286,24 @@ std::wstring FormatPedalPercentLabel(const char* name, double value_0_to_1) {
     return buf;
 }
 
+std::wstring FormatSteeringAngleLabel(double angle_deg) {
+    // Guard against NaN / infinity (also the caller's "no vehicle state yet"
+    // signal) — show a placeholder.
+    if (!std::isfinite(angle_deg)) return L"Steering: ---";
+
+    const double mag = (angle_deg < 0.0) ? -angle_deg : angle_deg;
+    wchar_t buf[64];
+    if (mag < 0.05) {
+        // Within rounding distance of centered — no left/right side.
+        std::swprintf(buf, sizeof(buf) / sizeof(buf[0]), L"Steering: 0.0 deg");
+    } else {
+        const wchar_t* side = (angle_deg > 0.0) ? L"L" : L"R";
+        std::swprintf(buf, sizeof(buf) / sizeof(buf[0]),
+                      L"Steering: %.1f deg %ls", mag, side);
+    }
+    return buf;
+}
+
 // ---------------------------------------------------------------------------
 // FloatingUiPanel
 // ---------------------------------------------------------------------------

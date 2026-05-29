@@ -811,3 +811,28 @@ TEST_CASE("FloatingUI: HvacControls cycle drives fan/mode labels", "[FloatingUI]
     h.toggle_ac();
     CHECK(FormatHvacAcLabel(h.ac_on()) == L"HVAC A/C: ON");
 }
+
+// --- Steering-angle indicator -------------------------------------------------
+
+TEST_CASE("FormatSteeringAngleLabel: centered shows no side", "[FloatingUI]") {
+    CHECK(FormatSteeringAngleLabel(0.0)   == L"Steering: 0.0 deg");
+    CHECK(FormatSteeringAngleLabel(0.02)  == L"Steering: 0.0 deg");  // within deadband
+    CHECK(FormatSteeringAngleLabel(-0.02) == L"Steering: 0.0 deg");
+}
+
+TEST_CASE("FormatSteeringAngleLabel: positive = left, negative = right", "[FloatingUI]") {
+    CHECK(FormatSteeringAngleLabel(12.3)  == L"Steering: 12.3 deg L");
+    CHECK(FormatSteeringAngleLabel(-7.0)  == L"Steering: 7.0 deg R");
+}
+
+TEST_CASE("FormatSteeringAngleLabel: rounds to one decimal", "[FloatingUI]") {
+    CHECK(FormatSteeringAngleLabel(12.34)  == L"Steering: 12.3 deg L");
+    CHECK(FormatSteeringAngleLabel(-12.36) == L"Steering: 12.4 deg R");
+}
+
+TEST_CASE("FormatSteeringAngleLabel: non-finite shows placeholder", "[FloatingUI]") {
+    CHECK(FormatSteeringAngleLabel(std::numeric_limits<double>::quiet_NaN())
+          == L"Steering: ---");
+    CHECK(FormatSteeringAngleLabel(std::numeric_limits<double>::infinity())
+          == L"Steering: ---");
+}

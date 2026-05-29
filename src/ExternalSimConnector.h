@@ -650,6 +650,14 @@ public:
     float GetVehicleSpeedMps() const;
     bool  HasVehicleSpeed() const;
 
+    /// Current front road-wheel steering angle from the ev1sim physics model
+    /// (radians; positive = left, per Chrono's GetSteeringAngle convention).
+    /// Derived from the VehicleState snapshot (SetVehicleState).  Returns 0 if
+    /// SetVehicleState() has never been called — gate with HasVehicleState().
+    float GetSteeringAngleRad() const;
+    /// True once SetVehicleState() has been called at least once.
+    bool  HasVehicleState() const;
+
     // ---------------------------------------------------------------------
     // Test hooks — feed the connector synthetic delta records as though they
     // arrived over the bus.  Used by unit tests; not part of the runtime path.

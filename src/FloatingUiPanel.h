@@ -165,6 +165,13 @@ std::wstring FormatTurnSignalStatusLabel(const wchar_t* side, bool active,
 /// Locale-independent formatting (period decimal, no thousand separators).
 std::wstring FormatVehicleSpeedLabel(bool ever_received, float speed_mps);
 
+// Steering-angle indicator label helper (display-only, not a button).
+/// Format the front road-wheel steering angle (degrees) for the HUD.
+/// angle_deg: front-left road-wheel angle (positive = left, per Chrono's
+///            GetSteeringAngle convention).  NaN/inf → "Steering: ---".
+/// Shows "Steering: 0.0 deg", "Steering: 12.3 deg L", or "Steering: 12.3 deg R".
+std::wstring FormatSteeringAngleLabel(double angle_deg);
+
 // BPM pack voltage label helper (display-only, not a button).
 /// Format BPM pack voltage as "PackVolt: NNN.N V" or "PackVolt: ---" if not received.
 /// pack_voltage_mv: raw millivolt value from kSigChassisBpmPackVoltageMv (4139).

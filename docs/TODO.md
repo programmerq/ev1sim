@@ -289,10 +289,12 @@ Only the render/audio surfacing remains (tracked in the "defer all" section abov
     panel buttons yet
   - Pedals: brake pressure slider, accelerator slider (currently
     keyboard-only — no analog range exposed in FloatingUiPanel)
-  - Steering wheel angle indicator / override
+  - Steering angle indicator **(done)** — display row, front road-wheel angle
+    (rad→deg, L/R); analog override still TODO
   - IPC LCD brightness and LED telltale overrides
   - RSA LEDs (door-lock feedback, entry-accepted, entry-denied)
-  - Shifter (PRND) — currently keyboard-only
+  - Shifter (PRND) **(done)** — "Gear Up/Down" panel buttons added (mirror the
+    `,` / `.` keys); display row was already present
 
 ## Bus-mediated physics
 - [x] **Front-brake torque from BTCM ABS solenoid state (DONE).** ev1sim
