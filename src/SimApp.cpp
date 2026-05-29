@@ -1,5 +1,6 @@
 #include "SimApp.h"
 #include "BrakeDrum.h"
+#include "MotorCurrent.h"
 #include "MacOSPlatform.h"
 
 #include "chrono_vehicle/ChEngine.h"
@@ -1644,18 +1645,24 @@ int SimApp::RunWithVisualization() {
             m_external_sim->SetAmbientHumidityPct(
                 static_cast<float>(m_physical->ambient_temp_sensor().humidity_pct()));
         }
-        // Motor RPM and torque (chassis bus 4070-4071).
+        // Motor RPM, torque, and DC pack current (chassis bus 4070-4072).
         {
             auto* engine = m_world->GetVehicle().GetEngine().get();
             float motor_rpm = 0.0f;
             float motor_torque = 0.0f;
+            float motor_current = 0.0f;
             if (engine) {
                 // GetMotorSpeed() returns rad/s; convert to RPM.
-                motor_rpm    = static_cast<float>(engine->GetMotorSpeed() * 60.0 / (2.0 * 3.14159265358979323846));
-                motor_torque = static_cast<float>(engine->GetOutputMotorshaftTorque());
+                const double omega  = engine->GetMotorSpeed();
+                const double torque = engine->GetOutputMotorshaftTorque();
+                motor_rpm     = static_cast<float>(omega * 60.0 / (2.0 * 3.14159265358979323846));
+                motor_torque  = static_cast<float>(torque);
+                motor_current = static_cast<float>(
+                    ev1sim::MotorCurrent::dc_bus_current_a(torque, omega));
             }
             m_external_sim->SetMotorRpm(motor_rpm);
             m_external_sim->SetMotorTorqueNm(motor_torque);
+            m_external_sim->SetMotorCurrentA(motor_current);
         }
         m_external_sim->Tick(t);
 
@@ -2186,17 +2193,23 @@ int SimApp::RunHeadless() {
             m_external_sim->SetAmbientHumidityPct(
                 static_cast<float>(m_physical->ambient_temp_sensor().humidity_pct()));
         }
-        // Motor RPM and torque (chassis bus 4070-4071).
+        // Motor RPM, torque, and DC pack current (chassis bus 4070-4072).
         {
             auto* engine = m_world->GetVehicle().GetEngine().get();
             float motor_rpm = 0.0f;
             float motor_torque = 0.0f;
+            float motor_current = 0.0f;
             if (engine) {
-                motor_rpm    = static_cast<float>(engine->GetMotorSpeed() * 60.0 / (2.0 * 3.14159265358979323846));
-                motor_torque = static_cast<float>(engine->GetOutputMotorshaftTorque());
+                const double omega  = engine->GetMotorSpeed();
+                const double torque = engine->GetOutputMotorshaftTorque();
+                motor_rpm     = static_cast<float>(omega * 60.0 / (2.0 * 3.14159265358979323846));
+                motor_torque  = static_cast<float>(torque);
+                motor_current = static_cast<float>(
+                    ev1sim::MotorCurrent::dc_bus_current_a(torque, omega));
             }
             m_external_sim->SetMotorRpm(motor_rpm);
             m_external_sim->SetMotorTorqueNm(motor_torque);
+            m_external_sim->SetMotorCurrentA(motor_current);
         }
         m_external_sim->Tick(t);
 
