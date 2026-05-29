@@ -1667,7 +1667,9 @@ ExternalSimConnector::ThrottleCmd ExternalSimConnector::GetThrottleCmd(
             std::chrono::steady_clock::now().time_since_epoch()).count());
     const auto window_ns = static_cast<std::uint64_t>(
         std::chrono::duration_cast<std::chrono::nanoseconds>(freshness_window).count());
-    r.fresh = (now_ns - m_state->throttle_cmd_ns) <= window_ns;
+    // Strict '<' so a zero-length window is always stale (deterministic even
+    // when the read lands in the same steady_clock tick as the last update).
+    r.fresh = (now_ns - m_state->throttle_cmd_ns) < window_ns;
     return r;
 }
 
@@ -1685,7 +1687,9 @@ ExternalSimConnector::SteeringCmd ExternalSimConnector::GetSteeringCmd(
             std::chrono::steady_clock::now().time_since_epoch()).count());
     const auto window_ns = static_cast<std::uint64_t>(
         std::chrono::duration_cast<std::chrono::nanoseconds>(freshness_window).count());
-    r.fresh = (now_ns - m_state->steering_cmd_ns) <= window_ns;
+    // Strict '<' so a zero-length window is always stale (deterministic even
+    // when the read lands in the same steady_clock tick as the last update).
+    r.fresh = (now_ns - m_state->steering_cmd_ns) < window_ns;
     return r;
 }
 

@@ -1147,7 +1147,6 @@ void SimApp::ConsumeBodyActuatorPeripherals(double dt) {
         m_physical->sounder().update(m_external_sim->GetSounderPiezoDrive());
         if (m_sounder_audio)
             m_sounder_audio->SetSounding(m_physical->sounder().sounding());
-        m_last_sounder_click_count = m_physical->sounder().click_count();
     }
 
     // --- Door-lock motors LH/RH (chassis 4092-4095 in) ---

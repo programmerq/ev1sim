@@ -426,7 +426,8 @@ public:
 
     /// Throttle command from PIM (ID 4073, chassis segment) — q8 throttle.
     /// q8=0 → zero throttle, q8=255 → full throttle.
-    /// fresh = true when the last update arrived within freshness_window.
+    /// fresh = true when the last update arrived strictly within freshness_window
+    /// (so a zero-length window is always stale).
     /// ever_received = true after the first message; false on a cold start.
     /// Used by SimApp::ApplyElectronicsThrottle() to decide whether to
     /// override the local pedal in "electronics" drive mode.
