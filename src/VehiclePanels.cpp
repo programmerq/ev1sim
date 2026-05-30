@@ -4,6 +4,15 @@
 
 using irr::video::SColor;
 
+static const char* HoodStateName(Hood::State s) {
+    switch (s) {
+        case Hood::State::CLOSED: return "CLOSED";
+        case Hood::State::POPPED: return "POPPED";
+        case Hood::State::OPEN:   return "OPEN";
+    }
+    return "?";
+}
+
 VehiclePanels::VehiclePanels() {
     // All panels default to closed (open=false).
     // Doors initialised unlocked; locking model deferred per docs/TODO.md.
@@ -17,6 +26,15 @@ void VehiclePanels::Toggle(PanelID panel) {
     int idx = static_cast<int>(panel);
     if (idx < 0 || idx >= NUM_PANELS) return;
 
+    // The hood's two-stage latch is the source of truth for the HOOD panel.
+    // The keyboard shortcut (F) pops it when closed, else closes one stage;
+    // full staging (raise off the safety catch) is via the floating-UI buttons.
+    if (panel == PanelID::HOOD) {
+        m_hood.quick_toggle();
+        std::cout << "[VehiclePanels] HOOD: " << HoodStateName(m_hood.state()) << "\n";
+        return;
+    }
+
     auto& p = m_panels[idx];
     p.open = !p.open;
     std::cout << "[VehiclePanels] " << p.name << ": "
@@ -24,6 +42,8 @@ void VehiclePanels::Toggle(PanelID panel) {
 }
 
 bool VehiclePanels::IsOpen(PanelID panel) const {
+    // HOOD reports the derived primary-latch ajar sensor (POPPED or OPEN).
+    if (panel == PanelID::HOOD) return m_hood.ajar_sensor();
     int idx = static_cast<int>(panel);
     return (idx >= 0 && idx < NUM_PANELS) ? m_panels[idx].open : false;
 }
@@ -56,9 +76,16 @@ void VehiclePanels::DrawHUD(irr::IrrlichtDevice* device) const {
     SColor closed_color(120, 40, 50, 40);
     SColor open_color(220, 60, 220, 60);
 
-    // Hood — horizontal bar at front of car.
+    // Hood — horizontal bar at front of car.  Three-stage latch: closed (dim),
+    // popped/safety-catch (amber), fully open (green).
     {
-        SColor c = IsOpen(PanelID::HOOD) ? open_color : closed_color;
+        SColor amber_color(210, 220, 170, 40);
+        SColor c = closed_color;
+        switch (m_hood.state()) {
+            case Hood::State::CLOSED: c = closed_color; break;
+            case Hood::State::POPPED: c = amber_color;  break;
+            case Hood::State::OPEN:   c = open_color;    break;
+        }
         int y = car_top + 14;
         driver->draw2DRectangle(c,
             irr::core::recti(cx - 10, y, cx + 10, y + 3));

@@ -286,6 +286,15 @@ std::wstring FormatPedalPercentLabel(const char* name, double value_0_to_1) {
     return buf;
 }
 
+std::wstring FormatHoodStateLabel(int state) {
+    switch (state) {
+        case 0:  return L"Hood: CLOSED";
+        case 1:  return L"Hood: POPPED (safety catch)";
+        case 2:  return L"Hood: OPEN";
+        default: return L"Hood: ?";
+    }
+}
+
 std::wstring FormatPowerWindowButtonLabel(const wchar_t* text, bool active) {
     std::wstring s = text ? text : L"";
     if (active) s += L" [ON]";

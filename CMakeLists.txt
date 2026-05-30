@@ -306,6 +306,7 @@ if(BUILD_TESTS)
         tests/test_motor_current.cpp
         tests/test_suspension_geometry.cpp
         tests/test_input_actions.cpp
+        tests/test_hood.cpp
         ${EV1SIM_WHEEL_IO_TEST_SRC}
         src/Config.cpp
         src/KeyboardInputController.cpp
@@ -316,6 +317,7 @@ if(BUILD_TESTS)
         src/WiperRenderer.cpp
         src/PhysicalWorld.cpp
         src/FloatingUiPanel.cpp
+        src/VehiclePanels.cpp
         ${EV1SIM_WHEEL_IO_SRC}
     )
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Hood.h"
+
 #include <irrlicht.h>
 
 /// Identifiers for each movable body panel.
@@ -21,6 +23,13 @@ public:
     void Toggle(PanelID panel);
     bool IsOpen(PanelID panel) const;
 
+    /// The HOOD panel is richer than a simple open/closed bool: it has a
+    /// two-stage latch (see Hood).  IsOpen(HOOD) returns the derived ajar
+    /// sensor; this accessor exposes the full mechanical state for the staged
+    /// release controls and the HUD.
+    Hood&       hood()       { return m_hood; }
+    const Hood& hood() const { return m_hood; }
+
     /// Draw panel status indicators on the top-down vehicle HUD.
     /// Call between BeginScene/EndScene.
     void DrawHUD(irr::IrrlichtDevice* device) const;
@@ -34,4 +43,5 @@ private:
     };
 
     Panel m_panels[NUM_PANELS];
+    Hood  m_hood;   // HOOD panel's two-stage latch state machine
 };

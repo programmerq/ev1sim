@@ -284,7 +284,11 @@ Only the render/audio surfacing remains (tracked in the "defer all" section abov
   tested; the panel wiring lives in `SimApp`.
 - [ ] **Remaining UI candidates** — next floating-panel rounds:
   - Trunk open/close (T key covers it but panel would be friendlier)
-  - Hood open/close
+  - Hood open/close **(done)** — modeled as a two-stage latch (Hood: CLOSED →
+    POPPED → OPEN). Single primary-latch ajar sensor (6962) trips as soon as it
+    pops, so POPPED/OPEN are indistinguishable on the bus while ev1sim tracks the
+    full state. Panel: status row + Interior Release / Raise / Lower-Latch
+    buttons; F = pop/close shortcut. VehiclePanels.HOOD delegates to Hood.
   - Power windows (driver, passenger) **(done)** — momentary press-and-hold
     panel buttons (Drv/Pass Up/Down) drive signals 6980-6983 via the new
     FloatingUiPanel hold-button support (polls IGUIButton::isPressed())
