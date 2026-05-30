@@ -291,6 +291,28 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                     }
                 });
 
+            // --- Hood (two-stage latch: CLOSED -> POPPED -> OPEN) ---
+            // The primary ajar sensor (6962) trips as soon as the hood pops, so
+            // POPPED and OPEN are indistinguishable on the bus; this status row
+            // shows the true mechanical state.  The three click actions mirror
+            // the real releases (interior cable lever, then the safety catch);
+            // raise is gated behind a pop, just like the real latch.
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatHoodStateLabel(
+                        static_cast<int>(m_panels->hood().state()));
+                },
+                []() {});   // no-op: display-only status row
+            m_floating_ui->AddButton(
+                []() -> std::wstring { return L"Hood: Interior Release"; },
+                [this]() { m_panels->hood().interior_release(); });
+            m_floating_ui->AddButton(
+                []() -> std::wstring { return L"Hood: Raise (safety catch)"; },
+                [this]() { m_panels->hood().raise(); });
+            m_floating_ui->AddButton(
+                []() -> std::wstring { return L"Hood: Lower / Latch"; },
+                [this]() { m_panels->hood().lower_latch(); });
+
             // --- Wiper: cycle position (OFF → INT → LOW → HIGH → OFF) ---
             m_floating_ui->AddButton(
                 [this]() -> std::wstring {
@@ -1894,7 +1916,7 @@ int SimApp::RunWithVisualization() {
                 drawL(L"X            hazard toggle",                       norm);
                 drawL(L", / .        PRND down / up",                      norm);
                 drawL(L"B / O / L    horn (both / high / low)",           norm);
-                drawL(L"F            hood toggle",                         norm);
+                drawL(L"F            hood pop/close (panel: full stage)",  norm);
                 drawL(L"T            trunk toggle",                        norm);
                 drawL(L"[ / ]        door L / R toggle",                  norm);
                 drawL(L"Z            physical-world snapshot overlay",     norm);

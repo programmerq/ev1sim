@@ -850,3 +850,12 @@ TEST_CASE("FormatPowerWindowButtonLabel: null text is treated as empty", "[Float
     CHECK(FormatPowerWindowButtonLabel(nullptr, false) == L"");
     CHECK(FormatPowerWindowButtonLabel(nullptr, true)  == L" [ON]");
 }
+
+// --- Hood two-stage latch status label --------------------------------------
+
+TEST_CASE("FormatHoodStateLabel: CLOSED / POPPED / OPEN + fallback", "[FloatingUI]") {
+    CHECK(FormatHoodStateLabel(0) == L"Hood: CLOSED");
+    CHECK(FormatHoodStateLabel(1) == L"Hood: POPPED (safety catch)");
+    CHECK(FormatHoodStateLabel(2) == L"Hood: OPEN");
+    CHECK(FormatHoodStateLabel(9) == L"Hood: ?");
+}

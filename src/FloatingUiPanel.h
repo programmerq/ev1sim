@@ -172,6 +172,13 @@ std::wstring FormatVehicleSpeedLabel(bool ever_received, float speed_mps);
 /// Shows "Steering: 0.0 deg", "Steering: 12.3 deg L", or "Steering: 12.3 deg R".
 std::wstring FormatSteeringAngleLabel(double angle_deg);
 
+// Hood two-stage latch state label helper (display-only, not a button).
+/// Format the hood latch state for the HUD panel.
+/// state: 0=CLOSED, 1=POPPED, 2=OPEN (matches Hood::State cast to int).
+/// Shows "Hood: CLOSED" / "Hood: POPPED (safety catch)" / "Hood: OPEN".
+/// Unknown values show "Hood: ?".
+std::wstring FormatHoodStateLabel(int state);
+
 // Power-window momentary hold-button label helper.
 /// Format a press-and-hold power-window button label.
 /// text:   static base label, e.g. L"Drv Window Up" (null treated as empty).
