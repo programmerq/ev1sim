@@ -19,7 +19,10 @@
 /// physical releases.
 class Hood {
 public:
-    enum class State { CLOSED, POPPED, OPEN };
+    // Underlying values are explicit and stable: FormatHoodStateLabel() and the
+    // SimApp status row map State by integer (0=CLOSED, 1=POPPED, 2=OPEN) via
+    // static_cast<int>, so do not renumber these.
+    enum class State { CLOSED = 0, POPPED = 1, OPEN = 2 };
 
     /// Interior cable release: CLOSED -> POPPED (pops onto the safety catch).
     void interior_release() { if (m_state == State::CLOSED) m_state = State::POPPED; }
