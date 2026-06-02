@@ -28,6 +28,9 @@
   "external_sim": {
     "enabled": false
   },
+  "vehicle_dynamics": {
+    "start_propulsion_enabled": true
+  },
   "scripted": {
     "enabled": true,
     "target_speed_kph": 30.0,
