@@ -14,6 +14,7 @@
   "//12": "left half asphalt 0.9, right half ice 0.08).",
 
   "name": "abs_split_mu",
+  "requires_external_sim": true,
   "driver_mode": "local",
   "max_time_s": 30.0,
   "events": [

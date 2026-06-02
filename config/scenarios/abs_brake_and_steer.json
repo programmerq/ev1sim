@@ -13,6 +13,7 @@
   "//11": "the car actually turned.",
 
   "name": "abs_brake_and_steer",
+  "requires_external_sim": true,
   "driver_mode": "local",
   "max_time_s": 30.0,
   "events": [

@@ -264,6 +264,34 @@ TEST_CASE("Scenario: LoadFromFile parses events + stats + driver_mode",
     std::filesystem::remove(tmp);
 }
 
+TEST_CASE("Scenario: LoadFromFile reads requires_external_sim",
+          "[Scenario]") {
+    using ev1sim::Scenario;
+    auto write_tmp = [](const std::string& body) {
+        auto tmp = std::filesystem::temp_directory_path() /
+                   "ev1sim_scenario_reqext_test.json";
+        { std::ofstream f(tmp); f << body; }
+        return tmp;
+    };
+
+    SECTION("defaults to false when the key is absent") {
+        auto tmp = write_tmp(R"({"name": "no_flag", "max_time_s": 1.0})");
+        auto loaded = Scenario::LoadFromFile(tmp.string());
+        REQUIRE(loaded.has_value());
+        CHECK_FALSE(loaded->requires_external_sim());
+        std::filesystem::remove(tmp);
+    }
+
+    SECTION("parses true") {
+        auto tmp = write_tmp(
+            R"({"name": "needs_sim", "max_time_s": 1.0, "requires_external_sim": true})");
+        auto loaded = Scenario::LoadFromFile(tmp.string());
+        REQUIRE(loaded.has_value());
+        CHECK(loaded->requires_external_sim());
+        std::filesystem::remove(tmp);
+    }
+}
+
 TEST_CASE("Scenario: LoadFromFile sorts events by at_time_s",
           "[Scenario]") {
     using ev1sim::Scenario;

@@ -143,7 +143,7 @@ Both modes return one of:
 
 | Code | Meaning                                                          |
 |------|------------------------------------------------------------------|
-| 0    | `kExitSuccess` — scenario finished or window closed               |
+| 0    | `kExitSuccess` — scenario finished, window closed, or a `requires_external_sim` scenario skipped (no external sim present) |
 | 2    | `kExitUsage` — headless without a terminator                      |
 | 3    | `kExitTimeout` — `max_time_s` reached with scripted still running |
 | 130  | `kExitInterrupted` — SIGINT in headless                           |

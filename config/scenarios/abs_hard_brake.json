@@ -13,6 +13,7 @@
   "//11": "from brake-on to speed=0.  scripts/compare_abs_runs.py does this.",
 
   "name": "abs_hard_brake",
+  "requires_external_sim": true,
   "driver_mode": "local",
   "max_time_s": 30.0,
   "events": [

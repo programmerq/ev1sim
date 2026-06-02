@@ -43,6 +43,8 @@ std::optional<Scenario> Scenario::LoadFromFile(const std::string& path) {
     if (j.contains("name"))        s.m_name        = j["name"].get<std::string>();
     if (j.contains("driver_mode")) s.m_driver_mode = j["driver_mode"].get<std::string>();
     if (j.contains("max_time_s"))  s.m_max_time_s  = j["max_time_s"].get<double>();
+    if (j.contains("requires_external_sim"))
+        s.m_requires_external_sim = j["requires_external_sim"].get<bool>();
 
     if (j.contains("events") && j["events"].is_array()) {
         for (const auto& ev : j["events"]) {
@@ -87,7 +89,9 @@ std::optional<Scenario> Scenario::LoadFromFile(const std::string& path) {
               << "' from " << path
               << " (" << s.m_events.size() << " events, "
               << "driver_mode=" << s.m_driver_mode << ", "
-              << "max_time=" << s.m_max_time_s << " s)\n";
+              << "max_time=" << s.m_max_time_s << " s"
+              << (s.m_requires_external_sim ? ", requires_external_sim" : "")
+              << ")\n";
     return s;
 }
 
