@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    # Keep the Chrono build cache warm.  A restore (even a hit) resets GitHub's
+    # 7-day idle-eviction timer, and a miss rebuilds it off the PR critical path
+    # so contributors never wait on a cold (~20-40 min) Chrono build.
+    - cron: '17 6 */3 * *'
 
 jobs:
   validate-configs:
@@ -83,8 +88,10 @@ jobs:
   # the connector endpoint-contract / PhysicalWorld regressions that previously
   # slipped through because nothing built the C++ in CI.
   #
-  # The full sim app (Chrono) and the ABS integration gate (Chrono + electricsim)
-  # remain out of CI until a prebuilt Chrono image is cached; run them locally.
+  # The full sim app (Chrono) IS now built + smoke-tested by the chrono-smoke
+  # job below (Chrono is built once and cached via actions/cache).  The ABS
+  # integration gate (Chrono + electricsim) still remains out of CI; run it
+  # locally via scripts/abs_regression.sh.
   unit-tests:
     runs-on: ubuntu-latest
     steps:
@@ -144,3 +151,94 @@ jobs:
 
       - name: Run unit tests
         run: ctest --test-dir build --output-on-failure
+
+  # Real sim build + headless smoke gate.  Builds the Chrono-backed ev1sim
+  # executable — src/SimApp.cpp (2,500+ lines) and src/VehicleWorld.cpp, which
+  # the jobs above never compile (they build the Chrono-free test target via
+  # -DEV1SIM_TESTS_ONLY=ON) — and runs it headless as a merge gate, so compile
+  # breaks and runtime regressions in the largest source files can no longer
+  # reach main unseen.
+  #
+  # Project Chrono (Vehicle + Irrlicht) is built from source on a cache miss
+  # (~20-40 min cold) and restored from actions/cache on a hit (then only
+  # ev1sim compiles, ~2-5 min).  Headless mode creates no Irrlicht/OpenGL device
+  # (SimApp skips SetupVisualization), so no X/display server is needed at run
+  # time even though the Irrlicht library is linked.
+  #
+  # Future option (deferred): bake Chrono into a prebuilt image on GHCR and use
+  # `container:` here for zero cold-build variance — see scripts/build_chrono.sh.
+  chrono-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75          # absolute ceiling; covers a cold Chrono build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Chrono build deps (Vehicle + Irrlicht + GL/X11)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            libirrlicht-dev libeigen3-dev \
+            libgl1-mesa-dev libglu1-mesa-dev \
+            libxxf86vm-dev libxext-dev libx11-dev freeglut3-dev
+
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: ccache-chrono-smoke-${{ runner.os }}
+          max-size: 2G
+
+      - name: Restore prebuilt Chrono install
+        id: chrono-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/chrono-install
+          # The recipe (ref + flags) lives in scripts/build_chrono.sh, so
+          # hashing it rotates the cache key whenever the recipe changes.
+          key: chrono-${{ runner.os }}-release-9.0-${{ hashFiles('scripts/build_chrono.sh') }}
+          restore-keys: |
+            chrono-${{ runner.os }}-release-9.0-
+
+      - name: Build + install Chrono (cache miss only)
+        if: steps.chrono-cache.outputs.cache-hit != 'true'
+        run: scripts/build_chrono.sh "$HOME/chrono-install"
+
+      - name: Configure ev1sim against Chrono
+        run: |
+          cmake -B build -S . \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DChrono_DIR="$HOME/chrono-install/lib/cmake/Chrono" \
+            -DEV1SIM_HAVE_WHEEL_IO=OFF \
+            -DBUILD_TESTS=OFF \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+        # No -DEV1SIM_TESTS_ONLY ⇒ find_package(Chrono REQUIRED) makes a missing
+        # Chrono a hard configure failure (no silent false-green); the explicit
+        # --target ev1sim below errors if the app target were skipped.  No
+        # -DELECTRICSIM_DIR ⇒ the external-sim connector stays off, so the smoke
+        # run takes the no-bus headless path.
+
+      - name: Build the ev1sim executable
+        run: cmake --build build --target ev1sim -j"$(nproc)"
+
+      - name: Smoke — headless_smoke.json must exit 0
+        timeout-minutes: 3
+        run: ./build/ev1sim --config config/headless_smoke.json
+
+      - name: Smoke — accel_brake.json must exit 0 (scripted accel/hold/brake)
+        timeout-minutes: 3
+        run: ./build/ev1sim --config config/accel_brake.json
+
+      # Bonus: compile + run the unit-test target against the REAL Chrono.  The
+      # tests-only jobs above link ev1sim_tests against Irrlicht directly; this
+      # exercises the Chrono link path (CMakeLists.txt: ${CHRONO_LIBRARIES})
+      # that nothing else in CI builds.  Reuses the Chrono built above.
+      - name: Build + run unit tests against full Chrono
+        run: |
+          cmake -B build-tests -S . \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DChrono_DIR="$HOME/chrono-install/lib/cmake/Chrono" \
+            -DEV1SIM_HAVE_WHEEL_IO=OFF \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          cmake --build build-tests --target ev1sim_tests -j"$(nproc)"
+          ctest --test-dir build-tests --output-on-failure

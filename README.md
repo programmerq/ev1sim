@@ -39,6 +39,18 @@ cmake --install .
 
 The install directory (`$HOME/chrono-install`) will contain a `lib/cmake/Chrono/` directory — that's your `Chrono_DIR`.
 
+**Linux / CI shortcut:** [`scripts/build_chrono.sh`](scripts/build_chrono.sh) runs
+the steps above with the exact ref and flags CI uses:
+
+```bash
+scripts/build_chrono.sh ~/chrono-install
+```
+
+The same script drives the `chrono-smoke` CI job, which builds the simulator and
+runs a headless scenario as a merge gate (Chrono is built once and cached). A
+prebuilt-Chrono container image on GHCR is a possible future swap-in — see the
+note in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+
 ## Building ev1sim
 
 The recommended path is via [CMake presets](CMakePresets.json) (requires CMake 3.21+):
