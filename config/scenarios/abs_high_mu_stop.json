@@ -8,6 +8,7 @@
   "//6": "Pair with config/abs_high_mu.json (rigid-plane asphalt friction 0.9).",
 
   "name": "abs_high_mu_stop",
+  "requires_external_sim": true,
   "driver_mode": "local",
   "max_time_s": 30.0,
   "events": [

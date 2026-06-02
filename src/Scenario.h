@@ -128,6 +128,10 @@ public:
     double               max_time_s() const { return m_max_time_s; }
     const std::string&   driver_mode() const { return m_driver_mode; }
     const std::string&   name()        const { return m_name; }
+    // True if this scenario drives/asserts on signals only the external
+    // electronics sim produces (BTCM ABS, PIM cruise, ...); SimApp skips the
+    // run when that sim can never be present (stub build / --external-sim off).
+    bool                 requires_external_sim() const { return m_requires_external_sim; }
     bool                 has_stats()   const { return !m_stats.output_csv.empty(); }
     const ScenarioStats& stats() const { return m_stats; }
     std::size_t          event_count() const { return m_events.size(); }
@@ -137,11 +141,13 @@ public:
     void set_stats(ScenarioStats s)               { m_stats  = std::move(s); }
     void set_max_time_s(double v)                 { m_max_time_s = v; }
     void set_driver_mode(const std::string& v)    { m_driver_mode = v; }
+    void set_requires_external_sim(bool v)        { m_requires_external_sim = v; }
 
 private:
     std::string                m_name;
     std::string                m_driver_mode = "local";
     double                     m_max_time_s  = 0.0;
+    bool                       m_requires_external_sim = false;
 
     std::vector<ScenarioEvent> m_events;
     std::size_t                m_next_event = 0;

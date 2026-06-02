@@ -23,6 +23,7 @@
   "//21": "(no cruise to hold the speed).",
 
   "name": "cruise_demo_electronics",
+  "requires_external_sim": true,
   "driver_mode": "electronics",
   "max_time_s": 60.0,
   "events": [

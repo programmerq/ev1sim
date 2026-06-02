@@ -1264,6 +1264,29 @@ void SimApp::ConsumeBodyActuatorPeripherals(double dt) {
 
 // ---------------------------------------------------------------------------
 int SimApp::Run() {
+    // Some scenarios drive or assert on signals that only the external
+    // electronics sim (electricsim: BTCM ABS, PIM cruise, ...) produces.  Run
+    // them only when that sim can actually be present.  Note ev1sim *creates*
+    // the shared-memory bus and the electricsim controllers attach to it, so a
+    // "connected" transport just means our own bus is open — it does not prove
+    // a controller is there, and controllers attach during the loop, after
+    // this point.  What we *can* tell at startup is when the external sim can
+    // never appear: a build without electricsim (Status::Unavailable) or
+    // --external-sim off (Status::Disabled).  In those cases skip cleanly
+    // (exit 0) rather than failing assertions or burning a realtime run.
+    if (m_scenario && m_scenario->requires_external_sim()) {
+        const auto status = m_external_sim->GetStatus();
+        if (status == ExternalSimConnector::Status::Unavailable ||
+            status == ExternalSimConnector::Status::Disabled) {
+            std::cout << "[SimApp] SKIPPED scenario '" << m_scenario->name()
+                      << "': requires the external electronics sim, which is "
+                         "not available (status: " << m_external_sim->StatusString()
+                      << ").  Build with electricsim (ELECTRICSIM_DIR) and run "
+                         "with --external-sim on.\n";
+            return kExitSuccess;
+        }
+    }
+
     if (m_config.simulation.headless) {
         // Guard against the hang-forever foot-gun: headless with no terminator
         // and no scripted scenario would loop until SIGINT, which is a bad

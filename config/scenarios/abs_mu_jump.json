@@ -13,6 +13,7 @@
   "//11": "asphalt for first 100 m, then ice for 500 m).",
 
   "name": "abs_mu_jump",
+  "requires_external_sim": true,
   "driver_mode": "local",
   "max_time_s": 30.0,
   "events": [

@@ -18,6 +18,7 @@
   "//16": "alternating-diagonal stripes with 2.512 m period).",
 
   "name": "abs_diagonal_mu",
+  "requires_external_sim": true,
   "driver_mode": "local",
   "max_time_s": 30.0,
   "events": [
