@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>  // std::uint32_t — keep the stub self-contained (matches the real header)
 // CI STUB — minimal stand-in for electricsim's src/io/ev1_chassis_signals.hpp.
 // Canonical chassis-bus IDs, pinned to ev1sim's own values so the connector's
 // drift-guard static_asserts compile.  NOTE: this is self-referential — it
