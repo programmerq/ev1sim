@@ -2773,6 +2773,17 @@ EV1SIM_CHASSIS_ID_MATCHES(kDynamicsBase,                 kSigChassisSpeedMps);
 #define EV1_CHASSIS_CONTRACT_VERSION_IMPLEMENTED_MINOR 0
 #define EV1_CHASSIS_CONTRACT_VERSION_IMPLEMENTED_PATCH 0
 
+// Baseline guard: if this is built against an electricsim that predates the
+// contract version handshake, the producer macros are absent. Fail with a clear
+// message about the required baseline rather than a murky undefined-identifier
+// error in the static_asserts below.
+#if !defined(EV1_CHASSIS_CONTRACT_VERSION_MAJOR) \
+    || !defined(EV1_CHASSIS_CONTRACT_VERSION_MINOR)
+#  error "electricsim's ev1_chassis_signals.hpp does not define \
+EV1_CHASSIS_CONTRACT_VERSION_{MAJOR,MINOR} — it predates the chassis-contract \
+version handshake (electricsim Phase 0). Update the electricsim checkout."
+#endif
+
 // Compile-time compatibility guard: the contract is backward-compatible across
 // MINOR bumps, so a consumer must share the producer's MAJOR and may not run
 // ahead of the producer's MINOR. This catches an incompatible-version build
