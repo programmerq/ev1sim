@@ -5,6 +5,16 @@
 // proves the guarded region COMPILES (the horn-bug class), not that ev1sim is
 // in sync with the real electricsim (that needs the App-token integrated build).
 // Regenerate from the EV1SIM_CHASSIS_ID_MATCHES pairs if you add a guarded ID.
+//
+// Chassis-signal contract version — mirrors the real electricsim header's
+// EV1_CHASSIS_CONTRACT_VERSION_* so the connector's Phase-1 compatibility
+// static_asserts compile in the stub build. Keep in sync with the real
+// producer version when bumping (the cross-repo audit checks the real one).
+#define EV1_CHASSIS_CONTRACT_VERSION_MAJOR 1
+#define EV1_CHASSIS_CONTRACT_VERSION_MINOR 0
+#define EV1_CHASSIS_CONTRACT_VERSION_PATCH 0
+#define EV1_CHASSIS_CONTRACT_VERSION "1.0.0"
+
 namespace electricsim { namespace io {
 constexpr std::uint32_t kSigChassisMotorRpm = 4070U;
 constexpr std::uint32_t kSigChassisMotorTorqueNm = 4071U;

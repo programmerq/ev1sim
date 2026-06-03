@@ -2760,6 +2760,35 @@ EV1SIM_CHASSIS_ID_MATCHES(kDynamicsBase,                 kSigChassisSpeedMps);
 
 #undef EV1SIM_CHASSIS_ID_MATCHES
 
+// ── Chassis-signal contract version handshake (Phase 1) ──────────────────────
+// The version of the electricsim chassis-signal contract this connector
+// implements. electricsim is the PRODUCER and owns the contract semver
+// (electricsim::io's EV1_CHASSIS_CONTRACT_VERSION_* in ev1_chassis_signals.hpp);
+// ev1sim is the CONSUMER and declares here the version it was written against.
+// scripts/audit_chassis_contract.py reads both and enforces compatibility in CI
+// (same MAJOR, producer MINOR >= consumer MINOR). Bump these to match the
+// producer whenever this connector is updated to a newer contract.
+// See electricsim docs/chassis_contract_versioning.md.
+#define EV1_CHASSIS_CONTRACT_VERSION_IMPLEMENTED_MAJOR 1
+#define EV1_CHASSIS_CONTRACT_VERSION_IMPLEMENTED_MINOR 0
+#define EV1_CHASSIS_CONTRACT_VERSION_IMPLEMENTED_PATCH 0
+
+// Compile-time compatibility guard: the contract is backward-compatible across
+// MINOR bumps, so a consumer must share the producer's MAJOR and may not run
+// ahead of the producer's MINOR. This catches an incompatible-version build
+// locally; the audit catches it cross-repo in CI. Same MAJOR required:
+static_assert(EV1_CHASSIS_CONTRACT_VERSION_IMPLEMENTED_MAJOR
+                  == EV1_CHASSIS_CONTRACT_VERSION_MAJOR,
+              "ev1sim chassis-contract MAJOR differs from electricsim's — the "
+              "shared signal contract changed incompatibly; update this "
+              "connector to the new contract.");
+// Consumer must not be ahead of the producer on MINOR (it would implement
+// signals the producer hasn't defined):
+static_assert(EV1_CHASSIS_CONTRACT_VERSION_IMPLEMENTED_MINOR
+                  <= EV1_CHASSIS_CONTRACT_VERSION_MINOR,
+              "ev1sim chassis-contract MINOR is ahead of electricsim's — this "
+              "connector implements signals newer than the producer defines.");
+
 } // namespace
 
 void ExternalSimConnector::Tick(double sim_time_s) {
