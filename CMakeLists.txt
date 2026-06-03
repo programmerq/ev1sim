@@ -57,6 +57,20 @@ if(Chrono_FOUND)
     endforeach()
     list(REMOVE_DUPLICATES _chrono_rpaths)
     set(CMAKE_BUILD_RPATH "${_chrono_rpaths}")
+
+    # ev1sim's render helpers (VehicleLights, CameraManager, FloatingUiPanel,
+    # WiperRenderer) reference Irrlicht symbols directly (e.g.
+    # irr::video::IdentityMaterial), so the Irrlicht library must be explicit on
+    # the link line.  Modern GNU ld will NOT inherit it transitively from
+    # Chrono's libChronoEngine_irrlicht ("DSO missing from command line");
+    # macOS's linker tolerates the transitive reference, Linux does not.  The
+    # headers already arrive via CHRONO_INCLUDE_DIRS.  If Irrlicht isn't a
+    # standalone library here (some macOS/Chrono setups), leave it empty and
+    # fall back to Chrono's transitive link.
+    find_library(IRRLICHT_LIBRARY NAMES Irrlicht)
+    if(NOT IRRLICHT_LIBRARY)
+        set(IRRLICHT_LIBRARY "")
+    endif()
 else()
     # Chrono-free build (EV1SIM_TESTS_ONLY).  The unit tests still include
     # Irrlicht headers (via VehicleLights/VehiclePanels) and call into it from
@@ -239,6 +253,7 @@ add_executable(ev1sim
 target_include_directories(ev1sim PRIVATE src)
 target_link_libraries(ev1sim PRIVATE
     ${CHRONO_LIBRARIES}
+    ${IRRLICHT_LIBRARY}   # explicit Irrlicht .so — render helpers reference it directly (GNU ld)
     nlohmann_json::nlohmann_json
 )
 if(EV1SIM_HAVE_EXTERNAL_SIM)
