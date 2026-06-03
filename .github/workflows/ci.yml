@@ -5,13 +5,17 @@ on:
     branches: [main]
   pull_request:
   schedule:
-    # Keep the Chrono build cache warm.  A restore (even a hit) resets GitHub's
-    # 7-day idle-eviction timer, and a miss rebuilds it off the PR critical path
-    # so contributors never wait on a cold (~20-40 min) Chrono build.
+    # Keep the Chrono build cache warm.  Only chrono-smoke runs on this cron —
+    # every other job is gated with `if: github.event_name != 'schedule'` so the
+    # warm-up doesn't burn runner time on the cheap jobs.  A cache restore (even
+    # a hit) resets GitHub's 7-day idle-eviction timer, and a miss rebuilds it
+    # off the PR critical path so contributors never wait on a cold (~20-40 min)
+    # Chrono build.
     - cron: '17 6 */3 * *'
 
 jobs:
   validate-configs:
+    if: github.event_name != 'schedule'   # cron only warms chrono-smoke's cache
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -61,6 +65,7 @@ jobs:
           PY
 
   repo-hygiene:
+    if: github.event_name != 'schedule'   # cron only warms chrono-smoke's cache
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -93,6 +98,7 @@ jobs:
   # integration gate (Chrono + electricsim) still remains out of CI; run it
   # locally via scripts/abs_regression.sh.
   unit-tests:
+    if: github.event_name != 'schedule'   # cron only warms chrono-smoke's cache
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -120,6 +126,7 @@ jobs:
   # free.  (Live chassis-ID drift detection vs the real electricsim is out of
   # scope here — the stub's IDs are pinned to ev1sim's; see the stub README.)
   integrated-build:
+    if: github.event_name != 'schedule'   # cron only warms chrono-smoke's cache
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
