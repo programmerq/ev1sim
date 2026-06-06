@@ -1,15 +1,15 @@
 {
     "spawn": {
-        "x": 1380.0,
-        "y": 600.0,
-        "z": 322.5,
-        "yaw_deg": 94.0
+        "x": 222.2,
+        "y": -674.0,
+        "z": 340.5,
+        "yaw_deg": 158.3
     },
     "patches": [
         {
             "mesh": "milford_asphault.obj",
             "surface": "asphalt",
-            "friction": 0.9,
+            "friction": 0.88,
             "texture": "road.jpg",
             "texture_scale": 20.0
         },
