@@ -53,10 +53,29 @@ note in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 ## Building ev1sim
 
+> **Point CMake at your Chrono install first.** ev1sim does a
+> `find_package(Chrono REQUIRED …)`, and the stock presets **do not** hardcode
+> where Chrono lives (the install path is machine-specific). If CMake can't find
+> it, configure fails with
+> `Could not find a package configuration file provided by "Chrono"`. Make it
+> discoverable in one of these ways:
+>
+> ```bash
+> # A) Export the location of the Chrono CMake package (find_package honors this
+> #    env var) — works with the presets below, no file edits:
+> export Chrono_DIR=$HOME/chrono-install/lib/cmake/Chrono
+>
+> # B) Or pin it permanently in a local CMakeUserPresets.json (see worktrees
+> #    section) so you don't have to export it each shell.
+> ```
+>
+> Don't have Chrono yet? See [Installing Project Chrono](#installing-project-chrono-from-source) above — it is built from source, not a package-manager install.
+
 The recommended path is via [CMake presets](CMakePresets.json) (requires CMake 3.21+):
 
 ```bash
 cd /path/to/ev1sim
+export Chrono_DIR=$HOME/chrono-install/lib/cmake/Chrono   # if not already set
 cmake --preset default                         # configure into build/
 cmake --build --preset default -j$(sysctl -n hw.ncpu)
 ```
@@ -133,6 +152,23 @@ When you delete an electricsim worktree, any ev1sim build that still points at i
   ```
 
 The stale-cache self-heal is the safety net — but for repeatable builds, prefer keeping `CMakeUserPresets.json` in sync with which worktrees actually exist.
+
+### Troubleshooting common build failures
+
+| Symptom (at configure or link time) | Cause & fix |
+|---|---|
+| `Could not find a package configuration file provided by "Chrono"` | Chrono isn't installed, or CMake can't see it. Build it from source ([above](#installing-project-chrono-from-source) / `scripts/build_chrono.sh ~/chrono-install`) and point at it: `export Chrono_DIR=$HOME/chrono-install/lib/cmake/Chrono` (or pin it in `CMakeUserPresets.json`). The stock presets deliberately don't hardcode this path. |
+| Configure succeeds on one machine but not another, both with Chrono "installed" | You have a Chrono *build tree* but never ran `cmake --install`. `Chrono_DIR` must point at the **installed** `lib/cmake/Chrono`, which contains `ChronoConfig.cmake`. |
+| Link error `DSO missing from command line` mentioning Irrlicht (Linux) | Install `libirrlicht-dev`. ev1sim links Irrlicht explicitly because GNU ld won't inherit it transitively from Chrono; the CMake already handles the link line once the library is present. |
+| `try/catch` doesn't catch — program aborts via `libc++abi` even with a matching handler (Apple Silicon) | Chrono's config injects `-Wl,-no_compact_unwind`, which strips the unwind info the runtime needs. ev1sim's `CMakeLists.txt` already removes this flag; if you copied a custom link setup, drop that flag. |
+| Compiling `electricsim_connector` fails with `use of undeclared identifier 'pthread_mutex_consistent'` / `'PTHREAD_MUTEX_ROBUST'` (macOS) | The connector compiles electricsim's `src/io/shm_transport.cpp`, which uses POSIX **robust mutexes** that macOS doesn't implement. Update your electricsim checkout — current `main` carries a `__APPLE__` fallback shim. If you're pinned to an older electricsim, bump it. |
+| `electricsim connector: not found` (a `STATUS` line, **not** an error) | Not fatal — the build proceeds with a stub and `--external-sim` becomes a no-op. To enable the external-sim bridge, check out [electricsim](../electricsim) next to ev1sim or pass `-DELECTRICSIM_DIR=<path>`. |
+| `CMake Warning: ELECTRICSIM_DIR='…' is stale` | A previous build pointed at an electricsim tree/worktree that no longer exists. Harmless — CMake clears it and re-searches the relative paths. Pass `-DELECTRICSIM_DIR=<path>` to pin a specific tree. |
+| Changed Chrono location and configure still fails / uses the old one | The path is cached. Delete the build dir (`rm -rf build`) or reconfigure with a fresh `Chrono_DIR`. |
+
+For a build that doesn't need Chrono at all (just the framework-agnostic unit
+tests), configure with `-DEV1SIM_TESTS_ONLY=ON` — it relaxes the Chrono
+requirement and skips the sim app.
 
 ## Running
 
