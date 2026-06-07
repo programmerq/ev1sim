@@ -128,6 +128,14 @@ SimApp::SimApp(const Config& config) : m_config(config) {
     if (m_config.body.door_locks_locked_at_start)
         m_physical->door_locks().lock_all();
 
+    // 4c. Vehicle panels (hood, trunk, doors) — constructed early, alongside
+    //     m_physical and for the same reason: a floating-UI label lambda (the
+    //     hood-state status row) dereferences m_panels during its initial label
+    //     evaluation in AddButton(), which runs inside SetupVisualization()
+    //     below.  Built here it is non-null by then.  Pure state until panel
+    //     OBJs exist — no Irrlicht dependency at construction, safe headless.
+    m_panels = std::make_unique<VehiclePanels>();
+
     // 5. Visualization (creates window).  Skipped entirely in headless mode;
     //    no Irrlicht device, no window, no OpenGL context.
     if (!headless) {
@@ -837,8 +845,9 @@ SimApp::SimApp(const Config& config) : m_config(config) {
         }
     }
 
-    // 8. Vehicle panels (hood, trunk, doors) — state-only until panel OBJs exist.
-    m_panels = std::make_unique<VehiclePanels>();
+    // 8. Vehicle panels (hood, trunk, doors) are constructed earlier (step 4c,
+    //    before SetupVisualization) so the floating-UI hood-state label can
+    //    dereference m_panels during its initial evaluation.
 
     // 8b. Wiper renderer — phase-based sweep animation driven by RHJB motor command.
     m_wiper = std::make_unique<WiperRenderer>();
