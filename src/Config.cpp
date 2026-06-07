@@ -293,6 +293,11 @@ void Config::ApplyCliOverrides(int argc, char* argv[]) {
             start_paused = true;
         } else if (arg == "--headless") {
             simulation.headless = true;
+        } else if (arg == "--windowed") {
+            // Force the Irrlicht window on, overriding a config that sets
+            // headless:true (e.g. the ABS scenario configs default headless
+            // for CI).  Inverse of --headless; CLI wins over the config file.
+            simulation.headless = false;
         } else if (arg == "--max-time") {
             auto v = next();
             if (!v.empty()) simulation.max_time_s = std::stod(v);
