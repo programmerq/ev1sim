@@ -3286,7 +3286,15 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             st.driver_brake_q8    != st.driver_brake_pub ||
             st.driver_steering_q8 != st.driver_steering_pub ||
             st.driver_gear        != st.driver_gear_pub ||
-            st.driver_throttle_q8 != st.driver_throttle_pub) {
+            // While the throttle delta is suppressed its _pub cache is
+            // frozen, so a changing pedal would hold this mismatch true
+            // and re-publish the OTHER group members every tick. Gate the
+            // term on suppression: during a fault window the group reverts
+            // to heartbeat + real brake/steer/gear changes only, and the
+            // restore re-publish happens via this same term on the first
+            // un-suppressed Tick (or the heartbeat, whichever is sooner).
+            (!st.suppress_throttle_publish &&
+             st.driver_throttle_q8 != st.driver_throttle_pub)) {
             drv.push_back(MakeU8Delta(kSigDriverBrakePedalQ8,  st.driver_brake_q8));
             drv.push_back(MakeI16Delta(kSigDriverSteeringDegQ8, st.driver_steering_q8));
             drv.push_back(MakeU8Delta(kSigDriverGearSelector,   st.driver_gear));
