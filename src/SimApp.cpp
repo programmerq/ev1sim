@@ -2523,6 +2523,12 @@ void SimApp::CruiseSpeedDown() {
     if (m_physical) m_physical->cruise_stalk().press_speed_down();
 }
 
+void SimApp::FailThrottleInput(bool fail) {
+    if (m_external_sim) m_external_sim->SetSuppressThrottlePublish(fail);
+    std::cout << "[Scenario] fail_throttle_input -> "
+              << (fail ? "SUPPRESSED" : "restored") << "\n";
+}
+
 void SimApp::DispatchAction(ev1sim::InputAction action) {
     using A = ev1sim::InputAction;
     switch (action) {

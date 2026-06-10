@@ -1226,6 +1226,9 @@ struct ExternalSimConnector::State {
     std::int16_t  driver_steering_pub = 0x7FFF;
     std::uint8_t  driver_gear_pub    = 0xFF;
     std::uint8_t  driver_throttle_pub = 0xFF;
+    // Fault injection: omit the throttle delta from the driver-input group
+    // while set (SetSuppressThrottlePublish — VAT safety scenarios).
+    bool          suppress_throttle_publish = false;
     // New discrete driver inputs (ID 6904, 6964, 6965) on the main harness segment.
     bool          driver_brake_switch                = false;
     bool          driver_seatbelt_buckled            = true;   // default: always buckled
@@ -1998,6 +2001,10 @@ void ExternalSimConnector::SetDriverBrakePedalQ8(std::uint8_t q8) {
 
 void ExternalSimConnector::SetDriverThrottleQ8(std::uint8_t q8) {
     m_state->driver_throttle_q8 = q8;
+}
+
+void ExternalSimConnector::SetSuppressThrottlePublish(bool suppress) {
+    m_state->suppress_throttle_publish = suppress;
 }
 
 void ExternalSimConnector::SetDriverSteeringDegQ8(std::int16_t q8) {
@@ -3283,11 +3290,19 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             drv.push_back(MakeU8Delta(kSigDriverBrakePedalQ8,  st.driver_brake_q8));
             drv.push_back(MakeI16Delta(kSigDriverSteeringDegQ8, st.driver_steering_q8));
             drv.push_back(MakeU8Delta(kSigDriverGearSelector,   st.driver_gear));
-            drv.push_back(MakeU8Delta(kSigDriverThrottleQ8,     st.driver_throttle_q8));
+            if (!st.suppress_throttle_publish) {
+                // Fault injection (scenario "fail_throttle_input"): while
+                // suppressed the throttle delta is withheld — heartbeats
+                // included — so a consumer-side freshness window genuinely
+                // expires. The _pub cache is left untouched so restoring
+                // re-publishes on the next heartbeat at the latest.
+                drv.push_back(MakeU8Delta(kSigDriverThrottleQ8,
+                                          st.driver_throttle_q8));
+                st.driver_throttle_pub = st.driver_throttle_q8;
+            }
             st.driver_brake_pub    = st.driver_brake_q8;
             st.driver_steering_pub = st.driver_steering_q8;
             st.driver_gear_pub     = st.driver_gear;
-            st.driver_throttle_pub = st.driver_throttle_q8;
         }
         // Brake switch and seatbelt — publish on change (separate booleans so
         // they don't force-publish the Q8 group and vice-versa).

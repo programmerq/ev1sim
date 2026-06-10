@@ -59,7 +59,9 @@ struct ScenarioEvent {
 //   applied_throttle, applied_front_brake, applied_rear_brake,
 //   throttle_cmd_q8, throttle_cmd_fresh,
 //   cruise_active (bus, when published), motor_rpm, motor_torque_nm,
-//   front_brake_pressure, rear_brake_position
+//   front_brake_pressure, rear_brake_position,
+//   ipc_brake_telltale, ipc_antilock_telltale, ipc_service_now_telltale,
+//   ipc_reduced_perf_telltale, ipc_check_messages_telltale
 struct ScenarioStats {
     std::string              output_csv;
     std::vector<std::string> fields;
@@ -84,6 +86,12 @@ public:
     virtual void CruiseCancel()       = 0;
     virtual void CruiseSpeedUp()      = 0;
     virtual void CruiseSpeedDown()    = 0;
+    // Fault injection (used by external acceptance scenarios): fail=true
+    // suppresses the driver THROTTLE publish (6903) on the main harness —
+    // models the accelerator-pedal acquisition feed going dead at the
+    // consuming controller. fail=false restores it (next heartbeat
+    // republishes).
+    virtual void FailThrottleInput(bool fail) = 0;
 };
 
 class Scenario {
