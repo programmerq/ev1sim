@@ -29,6 +29,7 @@ struct CountingHooks : public ev1sim::ScenarioHooks {
     int ipc_trip_reset = 0;
     int cruise_set = 0, cruise_resume = 0, cruise_cancel = 0;
     int cruise_speed_up = 0, cruise_speed_down = 0;
+    int fail_throttle = 0, restore_throttle = 0;
 
     void KeyOnCycle()        override { ++key_on_cycle; }
     void HeadlightCycle()    override { ++headlight_cycle; }
@@ -43,6 +44,9 @@ struct CountingHooks : public ev1sim::ScenarioHooks {
     void CruiseCancel()      override { ++cruise_cancel; }
     void CruiseSpeedUp()     override { ++cruise_speed_up; }
     void CruiseSpeedDown()   override { ++cruise_speed_down; }
+    void FailThrottleInput(bool fail) override {
+        if (fail) ++fail_throttle; else ++restore_throttle;
+    }
 };
 
 }  // namespace
@@ -419,4 +423,26 @@ TEST_CASE("Scenario: stats CSV writes header + sampled rows at the configured pe
     CHECK(row2.find("12") != std::string::npos);   // third call after period
     f.close();
     std::filesystem::remove(tmp_csv);
+}
+
+TEST_CASE("Scenario: fail_throttle_input dispatches with fail/restore value",
+          "[Scenario]") {
+    using ev1sim::Scenario;
+
+    Scenario s;
+    s.set_events({
+        {0.10, "fail_throttle_input", 1.0},
+        {0.50, "fail_throttle_input", 0.0},
+    });
+
+    CountingHooks hooks;
+    DriverCommand cmd{};
+
+    s.Tick(0.20, VehicleState{}, hooks, cmd);
+    CHECK(hooks.fail_throttle == 1);
+    CHECK(hooks.restore_throttle == 0);
+
+    s.Tick(0.60, VehicleState{}, hooks, cmd);
+    CHECK(hooks.fail_throttle == 1);
+    CHECK(hooks.restore_throttle == 1);
 }

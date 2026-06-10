@@ -147,6 +147,15 @@ public:
     /// degrees × 256, gear enum 0=P 1=R 2=N 3=D.
     void SetDriverBrakePedalQ8(std::uint8_t q8);
     void SetDriverThrottleQ8(std::uint8_t q8);
+
+    /// Fault injection (scenario action "fail_throttle_input"): while
+    /// suppressed, the driver THROTTLE
+    /// delta (6903) is omitted from the driver-input group publish —
+    /// including the 200 ms heartbeat — modeling the accelerator-pedal
+    /// acquisition feed going dead toward the consuming controller. The
+    /// other driver inputs keep publishing. Restore re-publishes on the
+    /// next heartbeat (<= 200 ms).
+    void SetSuppressThrottlePublish(bool suppress);
     void SetDriverSteeringDegQ8(std::int16_t q8);
     void SetDriverGearSelector(std::uint8_t enum_v);
 

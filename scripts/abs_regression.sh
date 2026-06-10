@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+#
+# NOTE (2026-06-10): the formal, gating acceptance campaign for these
+# scenarios (tolerance-banded criteria, versioned baselines, nightly CI) now
+# lives with the ECU-electronics side's test infrastructure. This script
+# remains as the interactive illustration of the scriptable scenario
+# feature; its abs_baseline.txt is no longer the gating source of truth.
 # ABS regression gate — the integration test for ev1sim plant-physics changes
 # the unit suite cannot exercise (brake-plant tau constants, tire model, etc.).
 # It needs ev1sim AND electricsim running together over the shared-memory bus,

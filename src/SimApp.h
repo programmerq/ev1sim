@@ -43,6 +43,7 @@ public:
     void CruiseCancel()      override;
     void CruiseSpeedUp()     override;
     void CruiseSpeedDown()   override;
+    void FailThrottleInput(bool fail) override;
 
     // Dispatch a named input action (from a wheel button / Arduino contact) by
     // reusing the same handlers the keyboard drives.  Horn is a held input

@@ -160,6 +160,9 @@ void Scenario::Tick(double sim_time, const VehicleState& state,
         } else if (e.action == "cruise_cancel")       { hooks.CruiseCancel();
         } else if (e.action == "cruise_speed_up")     { hooks.CruiseSpeedUp();
         } else if (e.action == "cruise_speed_down")   { hooks.CruiseSpeedDown();
+        } else if (e.action == "fail_throttle_input") {
+            // value != 0 → fail, 0 → restore.
+            hooks.FailThrottleInput(e.value != 0.0);
         } else {
             std::cerr << "[Scenario] unknown action '" << e.action
                       << "' — skipping\n";
@@ -267,6 +270,26 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
         else if (f == "emb_cmd_rr")           m_csv << bus_rear.rr;
         else if (f == "emb_fresh_lr")         m_csv << (bus_rear.lr_fresh ? 1 : 0);
         else if (f == "emb_fresh_rr")         m_csv << (bus_rear.rr_fresh ? 1 : 0);
+        // IPC telltale states mirrored from the chassis bus (IDs 4134
+        // brake / 4136 antilock / 4140 service-now / 4144 reduced-perf) —
+        // lets acceptance scenarios assert the driver-facing indication
+        // timeline (e.g. brake telltale lighting after a BTCM death, the
+        // reduced-perf latch after a pedal-feed loss). Latched IPC state:
+        // false until first received.
+        else if (f == "ipc_brake_telltale")
+            m_csv << (bus.GetIpcBrakeTelltale() ? 1 : 0);
+        else if (f == "ipc_antilock_telltale")
+            m_csv << (bus.GetIpcAntilockTelltale() ? 1 : 0);
+        else if (f == "ipc_service_now_telltale")
+            m_csv << (bus.GetIpcServiceNowTelltale() ? 1 : 0);
+        else if (f == "ipc_reduced_perf_telltale")
+            m_csv << (bus.GetIpcReducedPerfTelltale() ? 1 : 0);
+        // CHECK MESSAGES (4141) is the IPC's aggregate comm-loss telltale —
+        // the one that lights when a peer's UART stream dies (e.g. IPC
+        // DTC 15 on BTCM eavesdrop loss), so it's the loss-of-module
+        // indicator the safety scenarios assert on.
+        else if (f == "ipc_check_messages_telltale")
+            m_csv << (bus.GetIpcCheckMessagesTelltale() ? 1 : 0);
         else                                  m_csv << "";  // unknown field
     };
 
