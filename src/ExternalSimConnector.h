@@ -100,6 +100,12 @@ public:
 
     Status      GetStatus()     const;
     bool        IsConnected()   const { return GetStatus() == Status::Connected; }
+    /// True once BOTH bus transports are open (the chassis segment that
+    /// GetStatus() tracks AND the main-harness segment, which opens lazily
+    /// inside Tick()).  This is the instant `requires_external_sim`
+    /// scenarios anchor their clock to — driver-input one-shots published
+    /// before this point would land on a bus nobody has created/joined yet.
+    bool        BusesUp()       const;
     const char* StatusString()  const;
     const Options& GetOptions() const { return m_opts; }
 

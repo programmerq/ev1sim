@@ -127,6 +127,16 @@ private:
     std::unique_ptr<ExternalSimConnector>   m_external_sim;
     std::unique_ptr<ScriptedDriver>         m_scripted;
     std::unique_ptr<ev1sim::Scenario>       m_scenario;
+    /// Scenario clock origin in sim time (s); < 0 = not armed yet.  A
+    /// `requires_external_sim` scenario arms only once both bus transports
+    /// are up (ExternalSimConnector::BusesUp) — events that fired earlier
+    /// would publish one-shot driver inputs onto a bus no peer has joined,
+    /// and they are not retransmitted.  Armed immediately when the scenario
+    /// does not need the bus (or it can never come up), and unconditionally
+    /// at kScenarioArmFallbackS so a half-configured run still terminates.
+    double m_scenario_t0 = -1.0;
+    /// Returns scenario-relative time, or a negative value while unarmed.
+    double ScenarioTime(double sim_t);
     std::unique_ptr<WiperRenderer>          m_wiper;
     std::unique_ptr<FloatingUiPanel>        m_floating_ui;
 #ifdef EV1SIM_HAVE_WHEEL_IO
