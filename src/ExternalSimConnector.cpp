@@ -1661,11 +1661,6 @@ ExternalSimConnector::Status ExternalSimConnector::GetStatus() const {
     return m_state->status;
 }
 
-bool ExternalSimConnector::BusesUp() const {
-    return m_state->status == Status::Connected &&
-           m_state->main_transport != nullptr;
-}
-
 const char* ExternalSimConnector::StatusString() const {
     switch (m_state->status) {
         case Status::Disabled:    return "disabled";
@@ -3772,6 +3767,13 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         st.transport->publish_frame(def);
         st.next_presence_time = sim_time_s + m_opts.presence_period_s;
     }
+}
+
+bool ExternalSimConnector::BusesUp() const {
+    // m_state->main_transport only exists in the real (connector-on) State;
+    // this definition must stay inside the EV1SIM_HAVE_EXTERNAL_SIM block.
+    return m_state->status == Status::Connected &&
+           m_state->main_transport != nullptr;
 }
 #else   // EV1SIM_HAVE_EXTERNAL_SIM
 bool ExternalSimConnector::BusesUp() const { return false; }
