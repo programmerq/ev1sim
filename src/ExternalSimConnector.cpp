@@ -3086,6 +3086,28 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         st.wiper_ever_published = true;
     }
 
+    // Cruise-control stalk contact cavities (IDs 4047-4049) — on change
+    // (sentinel -1 forces the first publish). MOVED from the main-harness
+    // driver batch: the consumers' tap/hold decoder drains these from the
+    // CHASSIS segment per the contract, so publishing them main-side meant
+    // scenario/UI cruise presses never reached the controller in co-sim —
+    // cruise was silently dead end-to-end.
+    {
+        auto pub_cruise = [&](std::uint32_t id, bool val, std::int8_t& pub) {
+            const std::int8_t v = val ? 1 : 0;
+            if (pub < 0 || v != pub) {
+                outbound.push_back(MakeBoolDelta(id, val));
+                pub = v;
+            }
+        };
+        pub_cruise(kSigCruiseSw_SetCoastOut,    st.cruise_set_coast_contact,
+                   st.cruise_set_coast_pub);
+        pub_cruise(kSigCruiseSw_ResumeAccelOut, st.cruise_resume_accel_contact,
+                   st.cruise_resume_accel_pub);
+        pub_cruise(kSigCruiseSw_OnOffOut,       st.cruise_on_off_contact,
+                   st.cruise_on_off_pub);
+    }
+
     // Charge coupler presence (ID 4060) — publish delta on change.
     if (st.charge_coupler_present_pub < 0 ||
         static_cast<bool>(st.charge_coupler_present_pub) != st.charge_coupler_present) {
@@ -3482,14 +3504,6 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         };
         publish_bool_change(kSigDriverIpcTripResetButton, st.driver_ipc_trip_reset,
                             st.driver_ipc_trip_reset_pub);
-        // Cruise-control raw contacts — held state from the stalk model; PIM's
-        // tap/hold decoder interprets them (held duration = tap vs. hold).
-        publish_bool_change(kSigCruiseSw_SetCoastOut,    st.cruise_set_coast_contact,
-                            st.cruise_set_coast_pub);
-        publish_bool_change(kSigCruiseSw_ResumeAccelOut, st.cruise_resume_accel_contact,
-                            st.cruise_resume_accel_pub);
-        publish_bool_change(kSigCruiseSw_OnOffOut,       st.cruise_on_off_contact,
-                            st.cruise_on_off_pub);
         // Wiper switch — published as the three raw contact cavities computed
         // from the detent enum, matching RHJB's WSW decoder (ESM p.511):
         // OFF=000, INT=110, LOW=010, HIGH=011.  Washer on its own cavity (4057).
