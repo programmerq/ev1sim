@@ -135,6 +135,13 @@ private:
     /// does not need the bus (or it can never come up), and unconditionally
     /// at kScenarioArmFallbackS so a half-configured run still terminates.
     double m_scenario_t0 = -1.0;
+    /// True when m_config.simulation.max_time_s was COPIED from the scenario's
+    /// own max_time_s (vs. set explicitly in the config JSON).  The shared
+    /// max-time exit is then compared against scenario-relative time, so a
+    /// late clock arm (co-sim bus wait) can't terminate the run before the
+    /// scenario's intended duration elapses — matching the scenario's own
+    /// IsDone() check.  An explicit config cap stays a raw wall on sim time.
+    bool m_max_time_from_scenario = false;
     /// Returns scenario-relative time, or a negative value while unarmed.
     double ScenarioTime(double sim_t);
     std::unique_ptr<WiperRenderer>          m_wiper;

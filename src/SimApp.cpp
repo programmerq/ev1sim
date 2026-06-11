@@ -886,6 +886,9 @@ SimApp::SimApp(const Config& config) : m_config(config) {
             if (m_scenario->max_time_s() > 0.0 &&
                 m_config.simulation.max_time_s == 0.0) {
                 m_config.simulation.max_time_s = m_scenario->max_time_s();
+                // The cap is the scenario's duration → measure it on the
+                // scenario clock at the max-time exits, not raw sim time.
+                m_max_time_from_scenario = true;
             }
             m_scenario->OpenStats();
             if (m_config.scripted.enabled) {
@@ -2017,7 +2020,13 @@ int SimApp::RunWithVisualization() {
         }
 
         // --- Max-time exit (shared with headless) ---
-        if (max_time > 0.0 && m_world->GetSimTime() >= max_time) {
+        // Scenario-sourced cap → compare on the scenario clock once armed, so
+        // a late arm (co-sim bus wait) doesn't pre-empt the scenario duration.
+        const double max_time_clock =
+            (m_max_time_from_scenario && m_scenario_t0 >= 0.0)
+                ? (m_world->GetSimTime() - m_scenario_t0)
+                : m_world->GetSimTime();
+        if (max_time > 0.0 && max_time_clock >= max_time) {
             const bool scripted_unfinished = m_scripted && !m_scripted->IsDone();
             if (scripted_unfinished) {
                 std::cerr << "[SimApp] max_time_s reached with scripted "
@@ -2428,7 +2437,13 @@ int SimApp::RunHeadless() {
         }
 
         // --- Max-time exit ---
-        if (max_time > 0.0 && t >= max_time) {
+        // Scenario-sourced cap → compare on the scenario clock once armed (see
+        // the headless loop above for the rationale).
+        const double max_time_clock =
+            (m_max_time_from_scenario && m_scenario_t0 >= 0.0)
+                ? (t - m_scenario_t0)
+                : t;
+        if (max_time > 0.0 && max_time_clock >= max_time) {
             const bool scripted_unfinished = m_scripted && !m_scripted->IsDone();
             if (scripted_unfinished) {
                 std::cerr << "[SimApp] max_time_s reached with scripted "
