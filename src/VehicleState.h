@@ -19,6 +19,16 @@ struct VehicleState {
     double pos_y   = 0.0;
     double pos_z   = 0.0;
     double yaw_deg = 0.0;
+    // Body attitude about the lateral axis (degrees, positive = nose up).
+    // Includes suspension squat/dive — deliberately distinct from
+    // road_grade_pct below (their difference is the suspension's doing).
+    double pitch_deg = 0.0;
+
+    // Slope of the ROAD under the wheelbase, percent: 100 x rise/run between
+    // the rear- and front-axle contact heights, positive = uphill in the
+    // direction of travel. Derived from wheel spindle positions, so body
+    // squat/dive does not leak in.
+    double road_grade_pct = 0.0;
 
     // Chassis acceleration (chassis frame)
     double accel_long = 0.0;        // longitudinal (m/s^2)

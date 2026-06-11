@@ -228,6 +228,8 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
         else if (f == "accel_lat")            m_csv << state.accel_lat;
         else if (f == "yaw_rate")             m_csv << state.yaw_rate;
         else if (f == "yaw_deg")              m_csv << state.yaw_deg;
+        else if (f == "pitch_deg")            m_csv << state.pitch_deg;
+        else if (f == "road_grade_pct")       m_csv << state.road_grade_pct;
         else if (f == "applied_throttle")     m_csv << applied_cmd.throttle;
         else if (f == "applied_front_brake")  m_csv << applied_cmd.front_brake;
         else if (f == "applied_rear_brake")   m_csv << applied_cmd.rear_brake;

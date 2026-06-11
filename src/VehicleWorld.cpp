@@ -504,6 +504,14 @@ VehicleState VehicleWorld::GetState() const {
     ChVector3d fwd = rot.GetAxisX();
     s.yaw_deg = std::atan2(fwd.y(), fwd.x()) * 180.0 / M_PI;
 
+    // Body pitch from the same forward axis: climb of the chassis X axis vs
+    // horizontal, positive = nose up. Includes suspension squat/dive (see
+    // VehicleState.h — road_grade_pct below is the squat-free road slope).
+    {
+        const double fwd_h = std::sqrt(fwd.x() * fwd.x() + fwd.y() * fwd.y());
+        s.pitch_deg = std::atan2(fwd.z(), fwd_h) * 180.0 / M_PI;
+    }
+
     // Chassis-frame acceleration at the reference point.
     ChVector3d acc_global = m_vehicle->GetChassisBody()->GetPosDt2();
     ChMatrix33<> A(rot);
@@ -525,6 +533,20 @@ VehicleState VehicleWorld::GetState() const {
         auto pR = m_vehicle->GetSpindlePos(a, vehicle::RIGHT);
         s.wheel_mu[idx++] = m_terrain->GetCoefficientFriction(pL);
         s.wheel_mu[idx++] = m_terrain->GetCoefficientFriction(pR);
+    }
+
+    // Road grade under the wheelbase: rise/run between the rear- and
+    // front-axle spindle midpoints. Spindles ride the terrain, so this is
+    // the ROAD slope (squat/dive cancels), unlike pitch_deg above.
+    if (n_axles >= 2) {
+        auto fm = (m_vehicle->GetSpindlePos(0, vehicle::LEFT) +
+                   m_vehicle->GetSpindlePos(0, vehicle::RIGHT)) * 0.5;
+        auto rm = (m_vehicle->GetSpindlePos(1, vehicle::LEFT) +
+                   m_vehicle->GetSpindlePos(1, vehicle::RIGHT)) * 0.5;
+        const double run = std::hypot(fm.x() - rm.x(), fm.y() - rm.y());
+        if (run > 0.5) {  // guard a degenerate pose; EV1 wheelbase ~2.5 m
+            s.road_grade_pct = 100.0 * (fm.z() - rm.z()) / run;
+        }
     }
 
     // Per-wheel longitudinal slip ratio (braking convention: 0=free, +1=locked).

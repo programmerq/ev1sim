@@ -425,6 +425,40 @@ TEST_CASE("Scenario: stats CSV writes header + sampled rows at the configured pe
     std::filesystem::remove(tmp_csv);
 }
 
+TEST_CASE("Scenario: pitch/grade stats fields read the vehicle state",
+          "[Scenario]") {
+    using ev1sim::Scenario;
+    using ev1sim::ScenarioStats;
+
+    auto tmp_csv = std::filesystem::temp_directory_path() /
+                   "ev1sim_scenario_stats_grade_test.csv";
+    Scenario s;
+    ScenarioStats st{tmp_csv.string(),
+                     {"sim_time_s", "pitch_deg", "road_grade_pct"},
+                     0.10};
+    s.set_stats(st);
+    s.OpenStats();
+
+    ExternalSimConnector bus;
+    DriverCommand cmd{};
+    VehicleState state{};
+    state.pitch_deg      = -1.25;   // nose down (braking squat)
+    state.road_grade_pct = 6.0;     // 6% uphill
+
+    s.MaybeSampleStats(0.0, state, bus, cmd);
+    s.Close();
+
+    std::ifstream f(tmp_csv);
+    REQUIRE(f.is_open());
+    std::string header, row;
+    std::getline(f, header);
+    std::getline(f, row);
+    CHECK(header == "sim_time_s,pitch_deg,road_grade_pct");
+    CHECK(row == "0,-1.25,6");
+    f.close();
+    std::filesystem::remove(tmp_csv);
+}
+
 TEST_CASE("Scenario: AD / bulb / horn stats fields read the bus mirrors",
           "[Scenario]") {
     using ev1sim::Scenario;
