@@ -16,7 +16,7 @@ using Catch::Matchers::WithinAbs;
 // ---------------------------------------------------------------------------
 
 TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
-    constexpr int kNumDynamics      = 18;  // 10 chassis/actuator + 4 wheel_omega + 4 slip_ratio
+    constexpr int kNumDynamics      = 20;  // 10 chassis/actuator + 4 wheel_omega + 4 slip_ratio + grade/pitch (4168/4169)
     constexpr int kNumCombSw        = 3;   // headlamp switch: low_beam, flash_to_pass, park_headlamp (4040-4042)
     constexpr int kNumChargeCplr    = 1;   // charge coupler present (4060, stub)
     constexpr int kNumPrnd          = 4;   // PRND selector lines (4050-4053)
@@ -244,7 +244,9 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
             ++dynamics_count;
         } else if ((e.signal_id >= 4100 && e.signal_id <= 4109) ||
                    (e.signal_id >= 4110 && e.signal_id <= 4113) ||
-                   (e.signal_id >= 4120 && e.signal_id <= 4123)) {
+                   (e.signal_id >= 4120 && e.signal_id <= 4123) ||
+                   e.signal_id == 4168 || e.signal_id == 4169) {
+            // 4168/4169 = road_grade_pct / pitch_deg (contract 1.4.0).
             CHECK_FALSE(e.input_to_sim);    // dynamics signals are outputs
             ++dynamics_count;
         } else if ((e.signal_id >= 6900 && e.signal_id <= 6904) ||
@@ -374,6 +376,16 @@ TEST_CASE("FindEndpoint returns dynamics rows", "[ExternalSim]") {
 
     // 4114-4119 stays a gap between wheel-omega and slip-ratio blocks.
     CHECK(ExternalSimConnector::FindEndpoint(4114) == nullptr);
+
+    // Road grade + body pitch (4168/4169, contract 1.4.0) — outputs.
+    const auto* grade = ExternalSimConnector::FindEndpoint(4168);
+    REQUIRE(grade != nullptr);
+    CHECK(std::string(grade->qualified_name) == "vehicle.dynamics.road_grade_pct");
+    CHECK_FALSE(grade->input_to_sim);
+    const auto* pitch = ExternalSimConnector::FindEndpoint(4169);
+    REQUIRE(pitch != nullptr);
+    CHECK(std::string(pitch->qualified_name) == "vehicle.dynamics.pitch_deg");
+    CHECK_FALSE(pitch->input_to_sim);
 }
 
 TEST_CASE("Bulb signal IDs mirror the electric sim's LightIdx order",

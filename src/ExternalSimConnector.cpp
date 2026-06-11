@@ -689,6 +689,12 @@ constexpr DynNames kDynamicsNames[] = {
     {21, "vehicle.dynamics.slip_ratio_fr",        "slip_ratio_fr"},
     {22, "vehicle.dynamics.slip_ratio_rl",        "slip_ratio_rl"},
     {23, "vehicle.dynamics.slip_ratio_rr",        "slip_ratio_rr"},
+    // Road slope under the wheelbase (percent, +uphill) and chassis body
+    // attitude (degrees, +nose-up). Distinct on purpose: grade is derived
+    // from spindle heights (squat-free), pitch from the body axis (includes
+    // squat/dive). Canonical chassis IDs 4168/4169 (contract 1.4.0).
+    {68, "vehicle.dynamics.road_grade_pct",       "road_grade_pct"},
+    {69, "vehicle.dynamics.pitch_deg",            "pitch_deg"},
 };
 constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
                                                sizeof(kDynamicsNames[0]));
@@ -2765,6 +2771,8 @@ EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockCmdPassenger,      kSigChassisDoorLockCmdP
 EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockStateDriver,       kSigChassisDoorLockStateDriver);
 EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockStatePassenger,    kSigChassisDoorLockStatePassenger);
 EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockStateTrunk,        kSigChassisDoorLockStateTrunk);
+EV1SIM_CHASSIS_ID_MATCHES(kDynamicsBase + 68U,           kSigChassisRoadGradePct);
+EV1SIM_CHASSIS_ID_MATCHES(kDynamicsBase + 69U,           kSigChassisPitchDeg);
 EV1SIM_CHASSIS_ID_MATCHES(kSigPowerWindowMotorDriver,    kSigChassisPowerWindowMotorDriver);
 EV1SIM_CHASSIS_ID_MATCHES(kSigPowerWindowMotorPassenger, kSigChassisPowerWindowMotorPassenger);
 EV1SIM_CHASSIS_ID_MATCHES(kSigRsaShiftBlocked,           kSigChassisRsaShiftBlocked);
@@ -3179,6 +3187,8 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         dyn.push_back(MakeFloatDelta(4107, static_cast<float>(vs.front_brake_pressure)));
         dyn.push_back(MakeFloatDelta(4108, static_cast<float>(vs.rear_brake_position)));
         dyn.push_back(MakeFloatDelta(4109, static_cast<float>(vs.steering_torque)));
+        dyn.push_back(MakeFloatDelta(4168, static_cast<float>(vs.road_grade_pct)));
+        dyn.push_back(MakeFloatDelta(4169, static_cast<float>(vs.pitch_deg)));
         for (int w = 0; w < 4; ++w)
             dyn.push_back(MakeFloatDelta(4110 + static_cast<std::uint32_t>(w),
                                          static_cast<float>(vs.wheel_omega[w])));
