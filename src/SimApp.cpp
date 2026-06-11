@@ -1360,8 +1360,10 @@ int SimApp::RunWithVisualization() {
         // overrides.  Runs before the bus-throttle override so the bus
         // value (PIM-computed) wins when in electronics mode.
         if (m_scenario && !m_paused) {
-            m_scenario->Tick(m_world->GetSimTime(),
-                              m_world->GetState(), *this, cmd);
+            const double st = ScenarioTime(m_world->GetSimTime());
+            if (st >= 0.0) {
+                m_scenario->Tick(st, m_world->GetState(), *this, cmd);
+            }
         }
 
         // --- Bus-mediated throttle override (electronics drive mode) ---
@@ -1982,9 +1984,9 @@ int SimApp::RunWithVisualization() {
         // --- Telemetry logging ---
         m_telemetry->Record(m_world->GetState(), render_dt);
 
-        // --- Scenario stats sampling ---
-        if (m_scenario) {
-            m_scenario->MaybeSampleStats(m_world->GetSimTime(),
+        // --- Scenario stats sampling (scenario-relative clock) ---
+        if (m_scenario && m_scenario_t0 >= 0.0) {
+            m_scenario->MaybeSampleStats(m_world->GetSimTime() - m_scenario_t0,
                                           m_world->GetState(),
                                           *m_external_sim, cmd);
         }
@@ -2001,11 +2003,12 @@ int SimApp::RunWithVisualization() {
             return kExitSuccess;
         }
 
-        // --- Scenario complete (data-driven) ---
-        if (m_scenario && m_scenario->IsDone(m_world->GetSimTime())) {
+        // --- Scenario complete (data-driven, scenario-relative clock) ---
+        if (m_scenario && m_scenario_t0 >= 0.0 &&
+            m_scenario->IsDone(m_world->GetSimTime() - m_scenario_t0)) {
             const bool failed = m_scenario->IsScenarioFailed();
             std::cout << "[SimApp] Scenario complete at t="
-                      << m_world->GetSimTime() << "s "
+                      << (m_world->GetSimTime() - m_scenario_t0) << "s "
                       << "(asserts: " << m_scenario->PassedAssertions()
                       << " passed, "  << m_scenario->FailedAssertions()
                       << " failed) — exiting.\n";
@@ -2069,8 +2072,10 @@ int SimApp::RunHeadless() {
         // Scenario harness — fires timed events + holds set_throttle/brake
         // overrides.  Headless paths don't pause, so always tick.
         if (m_scenario) {
-            m_scenario->Tick(m_world->GetSimTime(),
-                              m_world->GetState(), *this, cmd);
+            const double st = ScenarioTime(m_world->GetSimTime());
+            if (st >= 0.0) {
+                m_scenario->Tick(st, m_world->GetState(), *this, cmd);
+            }
         }
 
         // --- Bus-mediated throttle override (electronics drive mode) ---
@@ -2393,9 +2398,9 @@ int SimApp::RunHeadless() {
             std::this_thread::sleep_until(target);
         }
 
-        // --- Scenario stats sampling ---
-        if (m_scenario) {
-            m_scenario->MaybeSampleStats(t, m_world->GetState(),
+        // --- Scenario stats sampling (scenario-relative clock) ---
+        if (m_scenario && m_scenario_t0 >= 0.0) {
+            m_scenario->MaybeSampleStats(t - m_scenario_t0, m_world->GetState(),
                                           *m_external_sim, cmd);
         }
 
@@ -2408,11 +2413,12 @@ int SimApp::RunHeadless() {
             return kExitSuccess;
         }
 
-        // --- Scenario complete (data-driven) ---
-        if (m_scenario && m_scenario->IsDone(t)) {
+        // --- Scenario complete (data-driven, scenario-relative clock) ---
+        if (m_scenario && m_scenario_t0 >= 0.0 &&
+            m_scenario->IsDone(t - m_scenario_t0)) {
             const bool failed = m_scenario->IsScenarioFailed();
             std::cout << "[SimApp] Scenario complete at t="
-                      << t << "s "
+                      << (t - m_scenario_t0) << "s "
                       << "(asserts: " << m_scenario->PassedAssertions()
                       << " passed, "  << m_scenario->FailedAssertions()
                       << " failed) — exiting.\n";
@@ -2481,6 +2487,37 @@ void SimApp::PushExtContractDriverInputs(const DriverCommand& cmd) {
     // Future work: derive ACC/START transitions when an ignition model
     // lands in PhysicalWorld.
     m_external_sim->SetSensorKeyPosition(2);
+}
+
+namespace {
+/// Hard ceiling on how long a requires_external_sim scenario waits for the
+/// buses before arming anyway (s).  Generous vs. the observed lazy
+/// main-harness connect (~first tick after world init); keeps a
+/// half-configured run terminating instead of idling forever.
+constexpr double kScenarioArmFallbackS = 30.0;
+}  // namespace
+
+double SimApp::ScenarioTime(double sim_t) {
+    if (m_scenario_t0 >= 0.0) return sim_t - m_scenario_t0;
+
+    bool arm = true;
+    if (m_scenario && m_scenario->requires_external_sim() && m_external_sim) {
+        const auto status = m_external_sim->GetStatus();
+        const bool can_connect =
+            status == ExternalSimConnector::Status::Connecting ||
+            status == ExternalSimConnector::Status::Connected;
+        if (can_connect && !m_external_sim->BusesUp() &&
+            sim_t < kScenarioArmFallbackS) {
+            arm = false;  // wait for the buses (or the fallback ceiling)
+        }
+    }
+    if (!arm) return -1.0;
+    m_scenario_t0 = sim_t;
+    if (m_scenario) {
+        std::cout << "[Scenario] clock armed at sim t=" << sim_t
+                  << " s (scenario t0)\n";
+    }
+    return 0.0;
 }
 
 void SimApp::KeyOnCycle() {

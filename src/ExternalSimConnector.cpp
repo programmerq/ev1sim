@@ -1661,6 +1661,11 @@ ExternalSimConnector::Status ExternalSimConnector::GetStatus() const {
     return m_state->status;
 }
 
+bool ExternalSimConnector::BusesUp() const {
+    return m_state->status == Status::Connected &&
+           m_state->main_transport != nullptr;
+}
+
 const char* ExternalSimConnector::StatusString() const {
     switch (m_state->status) {
         case Status::Disabled:    return "disabled";
@@ -3769,6 +3774,8 @@ void ExternalSimConnector::Tick(double sim_time_s) {
     }
 }
 #else   // EV1SIM_HAVE_EXTERNAL_SIM
+bool ExternalSimConnector::BusesUp() const { return false; }
+
 void ExternalSimConnector::Tick(double /*sim_time_s*/) {
     // Built without electricsim — nothing to do.
 }
