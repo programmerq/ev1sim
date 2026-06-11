@@ -12,9 +12,9 @@
 // static_asserts compile in the stub build. Keep in sync with the real
 // producer version when bumping (the cross-repo audit checks the real one).
 #define EV1_CHASSIS_CONTRACT_VERSION_MAJOR 1
-#define EV1_CHASSIS_CONTRACT_VERSION_MINOR 0
+#define EV1_CHASSIS_CONTRACT_VERSION_MINOR 4
 #define EV1_CHASSIS_CONTRACT_VERSION_PATCH 0
-#define EV1_CHASSIS_CONTRACT_VERSION "1.0.0"
+#define EV1_CHASSIS_CONTRACT_VERSION "1.4.0"
 
 namespace electricsim { namespace io {
 constexpr std::uint32_t kSigChassisMotorRpm = 4070U;
@@ -65,4 +65,11 @@ constexpr std::uint32_t kSigWiperSw_RequestOut = 4055U;
 constexpr std::uint32_t kSigWiperSw_HiOut = 4056U;
 constexpr std::uint32_t kSigWiperSw_WasherSwitchOut = 4057U;
 constexpr std::uint32_t kSigChassisSpeedMps = 4100U;
+// Contract 1.3.0 — door-lock STATE feedback (moved off the 4155-4157 HV-rail
+// IDs); 1.4.0 — road grade + body pitch. Guarded by EV1SIM_CHASSIS_ID_MATCHES.
+constexpr std::uint32_t kSigChassisDoorLockStateDriver = 4165U;
+constexpr std::uint32_t kSigChassisDoorLockStatePassenger = 4166U;
+constexpr std::uint32_t kSigChassisDoorLockStateTrunk = 4167U;
+constexpr std::uint32_t kSigChassisRoadGradePct = 4168U;
+constexpr std::uint32_t kSigChassisPitchDeg = 4169U;
 }}
