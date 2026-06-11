@@ -652,6 +652,28 @@ public:
     std::uint32_t GetBpmPackVoltageMv() const;
     bool          HasReceivedBpmPackVoltage() const;
 
+    /// Incoming Auto Disconnect main HV contactor state (ID 5224, main
+    /// harness segment).  Published by the AD controller on change.
+    /// bool: true = main contactor commanded closed (HV bus energized from
+    /// the pack).  Returns false if never received.
+    bool GetAdMainContactorClosed() const;
+    bool HasReceivedAdMainContactor() const;
+
+    /// Incoming Auto Disconnect precharge relay state (ID 5225, main
+    /// harness segment).  Published by the AD controller on change.
+    /// bool: true = precharge relay commanded closed (DC link charging
+    /// through the precharge resistor).  Returns false if never received.
+    bool GetAdPrechargeRelayClosed() const;
+    bool HasReceivedAdPrechargeRelay() const;
+
+    /// Incoming Auto Disconnect state-machine state (ID 5230, main harness
+    /// segment).  uint32 enum published by the AD controller on change:
+    /// 0 = OK (main closed), 6 = capacitor precharge in progress,
+    /// 7 = precharge failed (latched), others = fault/commanded-open states.
+    /// Returns 0 if never received — gate with HasReceivedAdStateEnum().
+    std::uint32_t GetAdStateEnum() const;
+    bool          HasReceivedAdStateEnum() const;
+
     /// Current vehicle speed from the ev1sim physics model (m/s).
     /// Derived from the VehicleState snapshot set each tick via SetVehicleState().
     /// Returns -1.0f if SetVehicleState() has never been called.

@@ -407,6 +407,37 @@ TEST_CASE("Bulb signal IDs mirror the electric sim's LightIdx order",
     }
 }
 
+TEST_CASE("Auto Disconnect HV status signals (5224/5225 bool, 5230 u32)",
+          "[ExternalSim]") {
+    ExternalSimConnector c;
+    // Never-received defaults: contactors open, state 0, Has* false.
+    CHECK_FALSE(c.HasReceivedAdMainContactor());
+    CHECK_FALSE(c.GetAdMainContactorClosed());
+    CHECK_FALSE(c.HasReceivedAdPrechargeRelay());
+    CHECK_FALSE(c.GetAdPrechargeRelayClosed());
+    CHECK_FALSE(c.HasReceivedAdStateEnum());
+    CHECK(c.GetAdStateEnum() == 0u);
+
+    // Precharge phase: relay closed, main open, state 6 (precharging).
+    c.DebugInjectDelta(5225, true);
+    c.DebugInjectU32(5230, 6u);
+    CHECK(c.GetAdPrechargeRelayClosed());
+    CHECK(c.HasReceivedAdPrechargeRelay());
+    CHECK_FALSE(c.GetAdMainContactorClosed());
+    CHECK(c.GetAdStateEnum() == 6u);
+    CHECK(c.HasReceivedAdStateEnum());
+
+    // Power-up complete: main closed, relay open, state 0 (OK).
+    c.DebugInjectDelta(5224, true);
+    c.DebugInjectDelta(5225, false);
+    c.DebugInjectU32(5230, 0u);
+    CHECK(c.GetAdMainContactorClosed());
+    CHECK(c.HasReceivedAdMainContactor());
+    CHECK_FALSE(c.GetAdPrechargeRelayClosed());
+    CHECK(c.GetAdStateEnum() == 0u);
+    CHECK(c.HasReceivedAdStateEnum());  // latched: received stays true
+}
+
 // ---------------------------------------------------------------------------
 // Disabled connector (default) must be safe to drive every frame.
 // ---------------------------------------------------------------------------
