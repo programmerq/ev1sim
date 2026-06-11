@@ -402,13 +402,18 @@ constexpr int           kNumDoorLockPwSignals         = 4;  // 4084+4085+4086+40
 // The resulting per-door latched state of ev1sim::DoorLocks, after the
 // door_lock_motor (4092-4095) reaches end-of-travel or the RSA cmd (4084/4085)
 // mirror is applied.  Closes the central-locking loop so RSA/IPC can confirm
-// the actuated state.  Allocated ev1sim-side first (see drift-guard note).
-//   4155  vehicle.body.door_lock_state.driver     uint8: 0=unlocked, 1=locked
-//   4156  vehicle.body.door_lock_state.passenger  uint8: 0=unlocked, 1=locked
-//   4157  vehicle.body.door_lock_state.trunk      uint8: 0=unlocked, 1=locked
-constexpr std::uint32_t kSigDoorLockStateDriver    = 4155U;
-constexpr std::uint32_t kSigDoorLockStatePassenger = 4156U;
-constexpr std::uint32_t kSigDoorLockStateTrunk     = 4157U;
+// the actuated state.
+// MOVED 4155-4157 → 4165-4167: the old block had been allocated ev1sim-side
+// only and collided with the HV bus rail IDs in the canonical chassis-signal
+// contract (rail consumers read 4155-4157 as millivolts / hv-present /
+// milliamps). The trio is now adopted in the contract at 4165-4167 (contract
+// 1.3.0) and guarded by the compile-time drift checks below.
+//   4165  vehicle.body.door_lock_state.driver     uint8: 0=unlocked, 1=locked
+//   4166  vehicle.body.door_lock_state.passenger  uint8: 0=unlocked, 1=locked
+//   4167  vehicle.body.door_lock_state.trunk      uint8: 0=unlocked, 1=locked
+constexpr std::uint32_t kSigDoorLockStateDriver    = 4165U;
+constexpr std::uint32_t kSigDoorLockStatePassenger = 4166U;
+constexpr std::uint32_t kSigDoorLockStateTrunk     = 4167U;
 constexpr int           kNumDoorLockStateSignals   = 3;
 
 // RSA shift-blocked cue (electricsim/RSA → ev1sim, chassis segment).
@@ -2752,6 +2757,9 @@ EV1SIM_CHASSIS_ID_MATCHES(kSigHvacBlowerLevel,           kSigChassisHvacBlowerLe
 EV1SIM_CHASSIS_ID_MATCHES(kSigDefrostGridActive,         kSigChassisDefrostGridActive);
 EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockCmdDriver,         kSigChassisDoorLockCmdDriver);
 EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockCmdPassenger,      kSigChassisDoorLockCmdPassenger);
+EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockStateDriver,       kSigChassisDoorLockStateDriver);
+EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockStatePassenger,    kSigChassisDoorLockStatePassenger);
+EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockStateTrunk,        kSigChassisDoorLockStateTrunk);
 EV1SIM_CHASSIS_ID_MATCHES(kSigPowerWindowMotorDriver,    kSigChassisPowerWindowMotorDriver);
 EV1SIM_CHASSIS_ID_MATCHES(kSigPowerWindowMotorPassenger, kSigChassisPowerWindowMotorPassenger);
 EV1SIM_CHASSIS_ID_MATCHES(kSigRsaShiftBlocked,           kSigChassisRsaShiftBlocked);

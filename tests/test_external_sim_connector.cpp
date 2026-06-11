@@ -202,7 +202,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
         } else if (e.signal_id >= 4124 && e.signal_id <= 4128) {
             CHECK_FALSE(e.input_to_sim);    // HVAC driver-control requests flow out to HTCM
             ++hvac_controls_count;
-        } else if (e.signal_id >= 4155 && e.signal_id <= 4157) {
+        } else if (e.signal_id >= 4165 && e.signal_id <= 4167) {
             CHECK_FALSE(e.input_to_sim);    // door-lock state feedback flows out to electricsim
             ++door_lock_state_count;
         } else if (e.signal_id == 4139) {
@@ -874,16 +874,26 @@ TEST_CASE("HVAC control setters store without crashing", "[ExternalSim]") {
 }
 
 // ---------------------------------------------------------------------------
-// Door lock STATE feedback (4155-4157) — ev1sim → electricsim.
+// Door lock STATE feedback (4165-4167) — ev1sim → electricsim. Moved off
+// 4155-4157, which the canonical chassis contract allocates to the HV bus
+// rail (drift guards now pin the new IDs).
 // ---------------------------------------------------------------------------
 
 TEST_CASE("Door-lock state endpoints have correct IDs and direction", "[ExternalSim]") {
     struct Row { std::uint32_t sid; const char* qualified; };
     const Row rows[] = {
-        {4155, "vehicle.body.door_lock_state.driver"},
-        {4156, "vehicle.body.door_lock_state.passenger"},
-        {4157, "vehicle.body.door_lock_state.trunk"},
+        {4165, "vehicle.body.door_lock_state.driver"},
+        {4166, "vehicle.body.door_lock_state.passenger"},
+        {4167, "vehicle.body.door_lock_state.trunk"},
     };
+    // The vacated rail IDs must NOT resolve to door-lock endpoints anymore.
+    for (std::uint32_t sid = 4155; sid <= 4157; ++sid) {
+        const auto* ep = ExternalSimConnector::FindEndpoint(sid);
+        if (ep != nullptr) {
+            CHECK(std::string(ep->qualified_name).find("door_lock") ==
+                  std::string::npos);
+        }
+    }
     for (const auto& r : rows) {
         const auto* ep = ExternalSimConnector::FindEndpoint(r.sid);
         REQUIRE(ep != nullptr);
