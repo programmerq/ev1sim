@@ -631,14 +631,14 @@ public:
     bool GetIpcCheckTirePressTelltale() const;
     bool HasReceivedIpcCheckTirePressTelltale() const;
 
-    /// Incoming PIM cruise-control active flag (ID 5860, main harness segment).
+    /// Incoming PIM cruise-control active flag (ID 5360, main harness segment).
     /// Published by PIM each tick on change.
     /// bool: true = cruise ACTIVE (engaged), false = STANDBY or OFF.
     /// Returns false if never received.
     bool GetPimCruiseActive() const;
     bool HasReceivedPimCruiseActive() const;
 
-    /// Incoming PIM cruise-control setpoint (ID 5861, main harness segment).
+    /// Incoming PIM cruise-control setpoint (ID 5361, main harness segment).
     /// float32 LE, target speed in m/s.  Non-zero while ACTIVE or STANDBY;
     /// zero only when state == OFF (setpoint fully cleared).
     /// Returns 0.0f if never received.

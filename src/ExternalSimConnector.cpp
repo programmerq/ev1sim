@@ -502,11 +502,16 @@ constexpr std::uint32_t kSigRunModeBroadcast = 5711U;
 
 // PIM cruise-control state — published by PIM on the main harness segment.
 // ev1sim subscribes (input direction); not registered as published endpoints.
-// Locked in lockstep with electricsim/ev1/pim/pim_signals.hpp:
-//   kSigPimCruiseActive      = 5860  (bool, uint8: 0=off/standby, 1=engaged)
-//   kSigPimCruiseSetpointMps = 5861  (float32 LE, target speed in m/s)
-constexpr std::uint32_t kSigPimCruiseActive      = 5860U;
-constexpr std::uint32_t kSigPimCruiseSetpointMps = 5861U;
+//   kSigPimCruiseActive      = 5360  (bool, uint8: 0=off/standby, 1=engaged)
+//   kSigPimCruiseSetpointMps = 5361  (float32 LE, target speed in m/s)
+// MOVED 5860/5861 → 5360/5361: the PIM controller relocated its cruise
+// signals into its own 5300-block (the 58xx range belongs to the
+// steering-pump module, which now publishes pump telemetry there) — this
+// mirror had silently kept the stale IDs, so cruise state was never
+// received and pump telemetry would have been misread as cruise state the
+// moment a steering-pump host joined the bus.
+constexpr std::uint32_t kSigPimCruiseActive      = 5360U;
+constexpr std::uint32_t kSigPimCruiseSetpointMps = 5361U;
 
 // Auto Disconnect (AD) HV status — published by the AD controller on the
 // main harness segment, on change.  ev1sim subscribes (input direction) so
@@ -1494,7 +1499,7 @@ struct ExternalSimConnector::State {
     std::uint8_t  rsa_run_mode            = 0xFFu;
     bool          has_rsa_run_mode        = false;
 
-    // PIM cruise-control state (IDs 5860/5861, main harness segment).
+    // PIM cruise-control state (IDs 5360/5361, main harness segment).
     // Subscribed from PIM.  cruise_active: false = OFF/STANDBY, true = ACTIVE.
     // cruise_setpoint_mps: target speed in m/s; 0.0 only when state == OFF.
     bool          pim_cruise_active            = false;
