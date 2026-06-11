@@ -17,16 +17,19 @@ namespace ev1sim {
 /// Sign convention: **positive current = discharge** (power leaving the pack),
 /// negative = regen charging.  This is the conventional EV energy-display sign.
 ///
-/// Defaults are EV1 Gen 2 (NiMH) figures: a 343.2 V pack (26 × 13.2 V modules)
-/// and a 102 kW peak motor.  Reactive magnetizing current is intentionally
+/// Defaults are EV1 figures: a 312 V nominal pack (26 modules × 12 V
+/// nominal) and a 102 kW peak motor.  The previous 343.2 V (26 × 13.2 V)
+/// was a charged/float per-module figure misread as nominal — every
+/// derived current was ~10% low for a given power.  Reactive magnetizing current is intentionally
 /// ignored — it circulates in the inverter and does not appear on the DC bus.
 /// Stateless, double precision.  Each entry point has an EV1-default overload
 /// and an explicit-`Params` overload (a default `Params{}` argument can't be
 /// formed inside this class while it is still incomplete).
 class MotorCurrent {
 public:
-    /// EV1 Gen 2 NiMH pack: 26 modules × 13.2 V nominal.
-    static constexpr double kPackVoltageV = 343.2;
+    /// EV1 pack nominal: 26 modules × 12 V nominal = 312 V.  (13.2 V per
+    /// module is a charged/float value, not nominal — see class comment.)
+    static constexpr double kPackVoltageV = 312.0;
 
     /// Combined inverter + motor efficiency while motoring.
     static constexpr double kDriveEfficiency = 0.90;

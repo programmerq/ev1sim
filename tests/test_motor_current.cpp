@@ -14,21 +14,21 @@ using Catch::Matchers::WithinAbs;
 using ev1sim::MotorCurrent;
 
 TEST_CASE("MotorCurrent: zero shaft power draws only the accessory load", "[MotorCurrent]") {
-    // P_mech = 0 → I = accessory_load / pack_voltage = 1200 / 343.2 ≈ 3.50 A.
+    // P_mech = 0 → I = accessory_load / pack_voltage = 1200 / 312 ≈ 3.85 A.
     const double idle = MotorCurrent::kAccessoryLoadW / MotorCurrent::kPackVoltageV;
     CHECK_THAT(MotorCurrent::dc_bus_current_a(0.0, 0.0),   WithinAbs(idle, 1e-6));
     CHECK_THAT(MotorCurrent::dc_bus_current_a(0.0, 250.0), WithinAbs(idle, 1e-6));  // coasting
-    CHECK_THAT(idle, WithinAbs(3.4965, 1e-3));
+    CHECK_THAT(idle, WithinAbs(3.8462, 1e-3));
 }
 
 TEST_CASE("MotorCurrent: motoring discharges (positive), regen charges (negative)",
           "[MotorCurrent]") {
-    // Motoring: T=100 N·m, ω=200 rad/s → 20 kW mech / 0.9 + 1200 W ≈ 68.25 A.
-    CHECK_THAT(MotorCurrent::dc_bus_current_a(100.0, 200.0), WithinAbs(68.25, 0.05));
-    // Regen: T=−100, ω=200 → −20 kW · 0.9 + 1200 W ≈ −48.95 A (charging).
+    // Motoring: T=100 N·m, ω=200 rad/s → (20 kW / 0.9 + 1200 W) / 312 V ≈ 75.07 A.
+    CHECK_THAT(MotorCurrent::dc_bus_current_a(100.0, 200.0), WithinAbs(75.07, 0.05));
+    // Regen: T=−100, ω=200 → (−20 kW · 0.9 + 1200 W) / 312 V ≈ −53.85 A (charging).
     const double regen = MotorCurrent::dc_bus_current_a(-100.0, 200.0);
     CHECK(regen < 0.0);
-    CHECK_THAT(regen, WithinAbs(-48.95, 0.05));
+    CHECK_THAT(regen, WithinAbs(-53.85, 0.05));
 }
 
 TEST_CASE("MotorCurrent: current rises monotonically with torque at fixed speed",
@@ -59,7 +59,7 @@ TEST_CASE("MotorCurrent: drivetrain losses make motoring draw exceed regen retur
 }
 
 TEST_CASE("MotorCurrent: EV1 Gen 2 pack constants are wired", "[MotorCurrent]") {
-    CHECK_THAT(MotorCurrent::kPackVoltageV,   WithinAbs(343.2, 1e-9));
+    CHECK_THAT(MotorCurrent::kPackVoltageV,   WithinAbs(312.0, 1e-9));
     CHECK_THAT(MotorCurrent::kDriveEfficiency, WithinAbs(0.90, 1e-9));
     CHECK_THAT(MotorCurrent::kRegenEfficiency, WithinAbs(0.90, 1e-9));
     CHECK_THAT(MotorCurrent::kAccessoryLoadW, WithinAbs(1200.0, 1e-9));
@@ -85,6 +85,6 @@ TEST_CASE("MotorCurrent: a non-positive drive efficiency can't leak inf/NaN",
     p.drive_efficiency = 0.0;   // misconfigured — would divide by zero unguarded
     const double i = MotorCurrent::dc_bus_current_a(100.0, 200.0, p);
     CHECK(std::isfinite(i));
-    // Falls back to a lossless pass-through: (20 kW + 1200 W) / 343.2 V.
-    CHECK_THAT(i, WithinAbs((20000.0 + 1200.0) / 343.2, 0.05));
+    // Falls back to a lossless pass-through: (20 kW + 1200 W) / 312 V.
+    CHECK_THAT(i, WithinAbs((20000.0 + 1200.0) / 312.0, 0.05));
 }
