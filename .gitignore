@@ -18,3 +18,7 @@ compile_commands.json
 *.dylib
 .DS_Store
 .claude
+
+# Scenario/co-sim stats CSVs are run artifacts (ev1sim writes
+# scenario_<name>.csv to cwd per --scenario stats.output_csv).
+scenario_*.csv
