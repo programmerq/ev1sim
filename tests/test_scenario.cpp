@@ -425,6 +425,54 @@ TEST_CASE("Scenario: stats CSV writes header + sampled rows at the configured pe
     std::filesystem::remove(tmp_csv);
 }
 
+TEST_CASE("Scenario: AD / bulb / horn stats fields read the bus mirrors",
+          "[Scenario]") {
+    using ev1sim::Scenario;
+    using ev1sim::ScenarioStats;
+
+    auto tmp_csv = std::filesystem::temp_directory_path() /
+                   "ev1sim_scenario_stats_hv_lighting_test.csv";
+    Scenario s;
+    ScenarioStats st{tmp_csv.string(),
+                     {"sim_time_s", "ad_main_contactor_closed",
+                      "ad_precharge_relay_closed", "ad_state_enum",
+                      "lrsl_bulb_feed_line", "horn_low_cmd",
+                      "nope_bulb_feed_line"},
+                     0.10};
+    s.set_stats(st);
+    s.OpenStats();
+
+    ExternalSimConnector bus;
+    DriverCommand cmd{};
+    VehicleState state{};
+
+    // Row 1: nothing received — AD fields 0, bulb 0, horn 0, unknown blank.
+    s.MaybeSampleStats(0.0, state, bus, cmd);
+
+    // Row 2: precharge in progress + stop lamp lit + low horn sounding.
+    bus.DebugInjectDelta(5225, true);   // precharge relay closed
+    bus.DebugInjectU32(5230, 6u);       // state: precharging
+    bus.DebugInjectDelta(4014, true);   // LRSL (left rear stop lamp) feed
+    bus.DebugInjectDelta(4020, true);   // horn low command
+    s.MaybeSampleStats(0.15, state, bus, cmd);
+
+    s.Close();
+
+    std::ifstream f(tmp_csv);
+    REQUIRE(f.is_open());
+    std::string header, row1, row2;
+    std::getline(f, header);
+    CHECK(header == "sim_time_s,ad_main_contactor_closed,"
+                    "ad_precharge_relay_closed,ad_state_enum,"
+                    "lrsl_bulb_feed_line,horn_low_cmd,nope_bulb_feed_line");
+    std::getline(f, row1);
+    std::getline(f, row2);
+    CHECK(row1 == "0,0,0,0,0,0,");        // defaults; unknown bulb blank
+    CHECK(row2 == "0.15,0,1,6,1,1,");     // precharge phase mirrored
+    f.close();
+    std::filesystem::remove(tmp_csv);
+}
+
 TEST_CASE("Scenario: fail_throttle_input dispatches with fail/restore value",
           "[Scenario]") {
     using ev1sim::Scenario;

@@ -503,6 +503,18 @@ constexpr std::uint32_t kSigRunModeBroadcast = 5711U;
 constexpr std::uint32_t kSigPimCruiseActive      = 5860U;
 constexpr std::uint32_t kSigPimCruiseSetpointMps = 5861U;
 
+// Auto Disconnect (AD) HV status — published by the AD controller on the
+// main harness segment, on change.  ev1sim subscribes (input direction) so
+// acceptance scenarios can log the HV power-up sequence (precharge → main
+// contactor closed) and its failure modes (precharge timeout latch).
+//   kSigAdMainContactor  = 5224  (bool: 1 = main HV contactor closed)
+//   kSigAdPrechargeRelay = 5225  (bool: 1 = precharge relay closed)
+//   kSigAdStateEnum      = 5230  (uint32 LE state enum: 0=OK,
+//                                 6=precharging, 7=precharge failed)
+constexpr std::uint32_t kSigAdMainContactor  = 5224U;
+constexpr std::uint32_t kSigAdPrechargeRelay = 5225U;
+constexpr std::uint32_t kSigAdStateEnum      = 5230U;
+
 // BTCM front ABS solenoid signals — published by BTCM on the main harness segment.
 // ev1sim subscribes (input_to_sim direction); not registered as published endpoints.
 // Locked in lockstep with electricsim/ev1/btcm/btcm_signals.hpp:
@@ -1387,6 +1399,17 @@ struct ExternalSimConnector::State {
     std::uint32_t bpm_pack_voltage_mv     = 0u;
     bool          has_bpm_pack_voltage    = false;
 
+    // Auto Disconnect HV status (IDs 5224/5225 bool, 5230 uint32 enum; main
+    // harness segment) — received from the AD controller, published on
+    // change. Lets scenarios observe the HV power-up sequence (precharge →
+    // main contactor) and its failure modes.
+    bool          ad_main_contactor       = false;
+    bool          has_ad_main_contactor   = false;
+    bool          ad_precharge_relay      = false;
+    bool          has_ad_precharge_relay  = false;
+    std::uint32_t ad_state_enum           = 0u;
+    bool          has_ad_state_enum       = false;
+
     // IPC extra LCD telltales (IDs 4140–4145, chassis segment) — received from IPC.
     // bool: false=lamp off, true=lamp on.
     bool          ipc_service_now_telltale            = false;
@@ -1938,6 +1961,25 @@ bool ExternalSimConnector::HasReceivedBpmPackVoltage() const {
     return m_state->has_bpm_pack_voltage;
 }
 
+bool ExternalSimConnector::GetAdMainContactorClosed() const {
+    return m_state->ad_main_contactor;
+}
+bool ExternalSimConnector::HasReceivedAdMainContactor() const {
+    return m_state->has_ad_main_contactor;
+}
+bool ExternalSimConnector::GetAdPrechargeRelayClosed() const {
+    return m_state->ad_precharge_relay;
+}
+bool ExternalSimConnector::HasReceivedAdPrechargeRelay() const {
+    return m_state->has_ad_precharge_relay;
+}
+std::uint32_t ExternalSimConnector::GetAdStateEnum() const {
+    return m_state->ad_state_enum;
+}
+bool ExternalSimConnector::HasReceivedAdStateEnum() const {
+    return m_state->has_ad_state_enum;
+}
+
 float ExternalSimConnector::GetVehicleSpeedMps() const {
     return m_state->has_vstate
                ? static_cast<float>(m_state->vstate.speed_mps)
@@ -2460,6 +2502,12 @@ void ExternalSimConnector::DebugInjectDelta(std::uint32_t signal_id, bool value)
     } else if (signal_id == kSigSounderPiezoDrive) {
         m_state->sounder_piezo_drive     = value;
         m_state->has_sounder_piezo_drive = true;
+    } else if (signal_id == kSigAdMainContactor) {
+        m_state->ad_main_contactor     = value;
+        m_state->has_ad_main_contactor = true;
+    } else if (signal_id == kSigAdPrechargeRelay) {
+        m_state->ad_precharge_relay     = value;
+        m_state->has_ad_precharge_relay = true;
     }
     // Panel-sensor signals are outputs — ignore inbound.
 }
@@ -2589,6 +2637,9 @@ void ExternalSimConnector::DebugInjectU32(std::uint32_t signal_id,
     if (signal_id == kSigBpmPackVoltageMv) {
         m_state->bpm_pack_voltage_mv  = value;
         m_state->has_bpm_pack_voltage = true;
+    } else if (signal_id == kSigAdStateEnum) {
+        m_state->ad_state_enum     = value;
+        m_state->has_ad_state_enum = true;
     }
     // Other uint32 signals are not currently subscribed as inputs.
 }
@@ -3225,6 +3276,21 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                         bits |= static_cast<std::uint32_t>(d.payload[b]) << (b * 8);
                     std::memcpy(&st.pim_cruise_setpoint_mps, &bits, 4);
                     st.has_pim_cruise_setpoint_mps = true;
+                } else if (d.signal_id == kSigAdMainContactor &&
+                           !d.payload.empty()) {
+                    st.ad_main_contactor     = (d.payload[0] & 1u) != 0;
+                    st.has_ad_main_contactor = true;
+                } else if (d.signal_id == kSigAdPrechargeRelay &&
+                           !d.payload.empty()) {
+                    st.ad_precharge_relay     = (d.payload[0] & 1u) != 0;
+                    st.has_ad_precharge_relay = true;
+                } else if (d.signal_id == kSigAdStateEnum &&
+                           d.payload.size() >= 4) {
+                    std::uint32_t v = 0;
+                    for (int b = 0; b < 4; ++b)
+                        v |= static_cast<std::uint32_t>(d.payload[b]) << (b * 8);
+                    st.ad_state_enum     = v;
+                    st.has_ad_state_enum = true;
                 } else if (d.signal_id == kSigBtcmUartFrame && !d.payload.empty()) {
                     // BTCM 5 Hz canonical-frame heartbeat.  Record the
                     // arrival timestamp; payload itself (the 16-byte

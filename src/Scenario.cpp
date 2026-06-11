@@ -1,5 +1,6 @@
 #include "Scenario.h"
 
+#include <cctype>
 #include <chrono>
 #include <iostream>
 #include <nlohmann/json.hpp>
@@ -290,6 +291,44 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
         // indicator the safety scenarios assert on.
         else if (f == "ipc_check_messages_telltale")
             m_csv << (bus.GetIpcCheckMessagesTelltale() ? 1 : 0);
+        // Auto Disconnect HV status mirrored from the main harness (5224
+        // main contactor / 5225 precharge relay / 5230 state enum) — lets
+        // acceptance scenarios assert the HV power-up sequence (precharge
+        // then main) and its failure modes (precharge-timeout latch with
+        // the main contactor never closing). 0 until first received.
+        else if (f == "ad_main_contactor_closed")
+            m_csv << (bus.GetAdMainContactorClosed() ? 1 : 0);
+        else if (f == "ad_precharge_relay_closed")
+            m_csv << (bus.GetAdPrechargeRelayClosed() ? 1 : 0);
+        else if (f == "ad_state_enum")
+            m_csv << bus.GetAdStateEnum();
+        // Two-tone horn commands (1 = commanded sounding, 0 otherwise).
+        else if (f == "horn_low_cmd")
+            m_csv << (bus.GetHornLowCmd() ? 1 : 0);
+        else if (f == "horn_high_cmd")
+            m_csv << (bus.GetHornHighCmd() ? 1 : 0);
+        // Bulb feed lines by EV1-manual short name — "<abbrev>_bulb_feed_line"
+        // (e.g. lhbh_bulb_feed_line, lrsl_bulb_feed_line): 1 = the junction
+        // box is commanding the bulb lit. Covers all NUM_LIGHTS elements so
+        // lighting/HMI scenarios can assert indication timelines (turn
+        // signal flash cadence, stop lamps on brake) without bespoke
+        // per-bulb plumbing. 0 until a bulb command is first received.
+        else if (f.size() > 15 &&
+                 f.compare(f.size() - 15, 15, "_bulb_feed_line") == 0) {
+            bool matched = false;
+            const std::string abbrev = f.substr(0, f.size() - 15);
+            for (int i = 0; i < NUM_LIGHTS; ++i) {
+                std::string name = LightIDName(static_cast<LightID>(i));
+                for (auto& ch : name) ch = static_cast<char>(std::tolower(
+                    static_cast<unsigned char>(ch)));
+                if (name == abbrev) {
+                    m_csv << (bus.GetBulbCmd(static_cast<LightID>(i)) ? 1 : 0);
+                    matched = true;
+                    break;
+                }
+            }
+            if (!matched) m_csv << "";  // unknown bulb abbrev
+        }
         else                                  m_csv << "";  // unknown field
     };
 
