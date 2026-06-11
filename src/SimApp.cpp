@@ -538,9 +538,9 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                 add_window_btn(L"Pass Window Down", PwWin::PASSENGER, PwDir::DOWN);
             }
 
-            // --- PIM cruise-control status (display-only; main harness bus 5860/5861) ---
-            // Subscribes to PIM signals kSigPimCruiseActive (5860) and
-            // kSigPimCruiseSetpointMps (5861) on the main harness segment.
+            // --- PIM cruise-control status (display-only; main harness bus 5360/5361) ---
+            // Subscribes to PIM signals kSigPimCruiseActive (5360) and
+            // kSigPimCruiseSetpointMps (5361) on the main harness segment.
             // Shows "Cruise: OFF", "Cruise: 23.5 m/s ON", or "Cruise: ---" before
             // first frame arrives.  Labels update each frame via UpdateLabels().
             m_floating_ui->AddButton(
