@@ -914,7 +914,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
     m_paused = m_config.start_paused;
 
     // Startup banner — always printed regardless of headless/interactive mode.
-    std::cout << "[SimApp] Vehicle: KEY OFF — press K to cycle RSA state (OFF→RUN→ACC→OFF)\n";
+    std::cout << "[SimApp] Vehicle: KEY OFF — press K to cycle RSA state (OFF→ACC→RUN→OFF)\n";
 
     // Warn loudly when an external-sim scenario runs without realtime
     // pacing.  ev1sim and the electricsim controllers (BTCM, PIM, RSA)
