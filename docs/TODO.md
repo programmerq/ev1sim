@@ -86,7 +86,9 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   first; electricsim consumer wiring is a TODO on that side.
 - [x] **Motor current calculation** — `src/MotorCurrent.h` derives DC pack
   current from shaft torque × speed (P_mech → P_pack via drive/regen efficiency
-  + a 12 V accessory load, ÷ 343.2 V Gen 2 NiMH pack).  SimApp publishes it on
+  + a 12 V accessory load, ÷ 312 V nominal Gen 2 NiMH pack — 26 modules × 12 V
+  nominal; the earlier 343.2 V was a charged/float per-module figure misread as
+  nominal, since corrected).  SimApp publishes it on
   `vehicle.dynamics.motor_current_a` (chassis ID **4072**, float32, signed:
   + discharge / − regen charge) each tick, publish-on-change.  Allocated
   ev1sim-side first (no electricsim counterpart yet, so intentionally absent
