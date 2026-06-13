@@ -462,3 +462,59 @@ available, or to match the user's preferred sim-rig pedal feel.
 
 Both features are deferred — captured in [docs/TODO.md](TODO.md) so
 they're not lost when we pivot back to integration work.
+
+## 15. Regen ↔ friction blending — known limitation (S15)
+
+**Status: documented gap, intentionally not modelled.** Flagged by the
+regulator-lens safety review; the honest answer here is "we don't have
+the data to do this faithfully," so this section records *why* rather
+than inventing physics.
+
+What exists today:
+- **Friction braking is regen-agnostic.** The front `BrakeSimple` disc
+  and the rear `BrakeDrum` EMB ([src/BrakeDrum.h](../src/BrakeDrum.h))
+  compute wheel torque from the brake command alone. Nothing subtracts a
+  regen contribution from friction, and nothing adds a regen torque to
+  the wheels.
+- **Regen is a readout, not a force.** [src/MotorCurrent.h](../src/MotorCurrent.h)
+  recovers *signed DC-bus current* from the mechanical operating point
+  (T·ω) and ev1sim publishes it as the ammeter value `motor_current_a`
+  (chassis 4072). It never feeds `DriverCommand` or Chrono wheel torque.
+- The coast-torque map (§3, `EV1_EngineSimpleMap.json "Map Zero
+  Throttle"`) is residual bearing/windage drag scaled to RPM — *not*
+  commanded regen. It fires on throttle release regardless of brake.
+
+Why this blocks the **regen-cutout fail-safe** test: the safety property
+is "if regen drops out, the friction system backfills the lost
+deceleration so total braking is preserved." In-sim the two systems are
+**not coupled** — there is no regen torque on the wheels to cut, and no
+blend controller to hand off to friction — so the property is
+**untestable as built**. (Contrast S16's BTCM-death property, which *is*
+testable because the rear-EMB→friction path is real and modelled.)
+
+What a faithful model would need (and why we're not guessing it):
+- A regen-torque-vs-speed envelope for the EV1 induction motor under
+  braking (the production car blended up to ~25 kW of regen, but the
+  *torque* curve and its low-speed taper are not in the manual corpus).
+- The blend-handover law: how the BTCM/PIM split a brake demand between
+  regen and friction, and the speed/SOC/temperature conditions that cut
+  regen out (cold pack, full SOC, fault). None of this is published.
+
+Fabricating those constants would produce confident-looking but
+unsupported numbers — worse than the documented gap. Per the project's
+"faithful where the manual is authoritative, documented inference
+elsewhere" rule, this stays a gap until either (a) measured/traceable
+EV1 regen-blend structure surfaces, or (b) a *structure-only* model is
+warranted (regen torque + friction summed to driver demand, with a
+friction backfill on cutout) using explicitly `@design`-tagged
+engineering choices. The follow-up marker lives in
+[docs/TODO.md](TODO.md) under "Bus-mediated physics".
+
+If/when modelled, the natural shape:
+- Add a `propulsion_torque` (signed) channel to `DriverCommand`
+  (already anticipated in [ARCHITECTURE.md](../ARCHITECTURE.md) "Future
+  per-axle brake control"): regen maps to negative propulsion torque.
+- A blend controller (EV1: BTCM-side) sums regen + friction to the
+  driver's deceleration demand and backfills friction when regen is
+  unavailable — at which point the cutout fail-safe becomes a real,
+  testable closed-loop property.

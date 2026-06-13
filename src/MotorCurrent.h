@@ -25,6 +25,28 @@ namespace ev1sim {
 /// Stateless, double precision.  Each entry point has an EV1-default overload
 /// and an explicit-`Params` overload (a default `Params{}` argument can't be
 /// formed inside this class while it is still incomplete).
+///
+/// ── KNOWN LIMITATION: regen is display-only; no regen↔friction blend (S15) ──
+/// The signed current this class produces is a *readout* of the mechanical
+/// operating point (chassis bus `motor_current_a`, 4072) — an ammeter value.
+/// It does NOT feed wheel torque.  Friction braking (front BrakeSimple disc,
+/// rear BrakeDrum EMB) is computed entirely independently of motor current,
+/// and `DriverCommand` has no regen / propulsion-torque channel into the brake
+/// path.  Consequences:
+///   - There is no regen+friction *blend*: a brake application does not reduce
+///     friction torque by the regen contribution, and releasing throttle does
+///     not add a regen braking torque to the wheels (the coast-torque map in
+///     EV1_EngineSimpleMap.json is residual drag, explicitly NOT commanded
+///     regen — see docs/ev1_chrono_audit.md §3).
+///   - The safety-relevant **regen-cutout fail-safe** (regen drops out → the
+///     friction system must backfill the lost deceleration) is therefore
+///     **untestable in-sim**: the two systems are not coupled, so there is no
+///     regen torque to cut and no friction backfill to verify.
+/// This is documented rather than fabricated: faithfully modelling the blend
+/// would need EV1 regen-torque-vs-speed and blend-handover constants the
+/// manuals do not provide, and inventing them would be worse than the honest
+/// gap.  See docs/ev1_chrono_audit.md §15 and docs/TODO.md for the follow-up
+/// marker (gated on measured/traceable EV1 regen-blend structure).
 class MotorCurrent {
 public:
     /// EV1 pack nominal: 26 modules × 12 V nominal = 312 V.  (13.2 V per

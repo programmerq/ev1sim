@@ -310,14 +310,33 @@ private:
 /// The EV1 RSA (Remote Security Access) module controls the vehicle's run
 /// mode.  To start the vehicle the user must:
 ///   1. Enter the correct 6-digit interior code on the RSA keypad by
-///      pressing the per-digit button signals (6975-6979).
-///   2. Press the RUN button on the RSA HMI (6971).
+///      pressing the per-digit button signals (6975-6979).  This opens the
+///      RSA's authentication window (~5 s on the electricsim side).
+///   2. Press the ACC or RUN mode button on the RSA HMI (6971).
 ///
-/// The K key in ev1sim cycles a local "expected key state" through:
-///   OFF → RUN  (schedules the configured code digits spaced 100 ms apart, then RUN)
-///   RUN → ACC  (immediate ACC mode-button pulse; no digit re-entry needed)
-///   ACC → OFF  (immediate OFF mode-button pulse)
-///   OFF → RUN  (wraps back to start)
+/// The K key in ev1sim cycles a local "expected key state" through the
+/// faithful EV1 detent order — OFF → ACC → RUN → OFF — so a cold start that
+/// reaches RUN is "two cycles up" and the next cycle turns the car OFF.  A
+/// cycle NEVER steps RUN→ACC: that spurious downgrade (the old OFF→RUN→ACC→OFF
+/// order) silently failed every co-sim "key_on_cycle x2" boot recipe, since
+/// two cycles landed in ACC instead of RUN.  See
+/// electricsim notes/manual_supplements.yaml#2026-06-11-ev1sim-boot-keying-race.
+///
+///   OFF → ACC : schedule the configured code digits (spaced 100 ms apart) to
+///               open the auth window, then an ACC mode-button pulse.
+///   ACC → RUN : a RUN mode-button pulse, queued AFTER any code digits still
+///               in flight so RUN is never pressed before authentication.
+///   RUN → OFF : an OFF mode-button pulse (always allowed; turns the car off).
+///   OFF → ACC : wraps back to start (re-entering the code).
+///
+/// Faithfulness note (@design 2026-06-13 claude): on the electricsim RSA
+/// supervisor (ev1/rsa/rsa_supervisor.c eval_mode_button_) ACC is allowed
+/// unconditionally while RUN/START are gated on the keypad auth window — so
+/// the code must be entered before the RUN press, and entering it at the ACC
+/// detent (rather than re-entering at RUN) matches "authenticate, then select
+/// the detent".  The RUN press is intentionally serialised one scheduler tick
+/// after the ACC press because the supervisor evaluates a single mode-button
+/// pulse per tick and clears it; two presses on one tick would drop one.
 ///
 /// Long-press encoding (Option A):
 ///   Each button signal (6975-6979) carries a uint8 payload:
@@ -349,7 +368,8 @@ public:
     /// Call before cycle_k() to take effect on the next K press.
     void set_code_string(const char* code_str);
 
-    /// Advance the cycle: OFF → RUN → ACC → OFF → …
+    /// Advance the cycle: OFF → ACC → RUN → OFF → …  (faithful detent order;
+    /// never downgrades RUN→ACC — see the class comment).
     void cycle_k();
 
     /// Tick the internal scheduler by dt_s seconds.  Should be called once
@@ -375,17 +395,30 @@ private:
     enum class CycleState { Idle, EmittingDigits, EmittingMode };
 
     static constexpr int kMaxCodeLen = 6;
+    /// Mode presses can stack up at most one deep in practice (ACC then RUN
+    /// from cold), but size the FIFO to the full detent run for safety.
+    static constexpr int kMaxModeQueue = 3;
 
     ExpectedState m_expected     = ExpectedState::OFF;
     CycleState    m_sched_state  = CycleState::Idle;
     int           m_digits_sent  = 0;    ///< how many digit pulses have fired
     double        m_timer_s      = 0.0;  ///< seconds until next event fires
 
-    /// Sequence of digits to emit on next OFF→RUN cycle.
+    /// Sequence of digits to emit on the OFF→ACC cycle (opens the auth window).
     DigitEntry    m_code[kMaxCodeLen];
     int           m_code_len     = kMaxCodeLen;  ///< always 6
 
+    /// FIFO of mode-button pulses still to emit (1=OFF, 2=ACC, 3=RUN).  Each is
+    /// fired on its own scheduler tick so the RSA never sees two pulses in one
+    /// tick (it evaluates a single pulse per tick and clears it).  Enqueued by
+    /// cycle_k(); drained one-per-event by update().
+    std::uint8_t  m_mode_queue[kMaxModeQueue] = {};
+    int           m_mode_queue_len = 0;
+
     KeypadFireSet m_pending{};           ///< accumulated this tick; cleared by consume
+
+    /// Enqueue a mode-button pulse for emission (FIFO).  Drops on overflow.
+    void enqueue_mode_(std::uint8_t mode_button);
 
     /// Initialise m_code to default "111111" (six button-0 taps).
     void init_default_code_();
