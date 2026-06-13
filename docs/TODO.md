@@ -314,6 +314,21 @@ Only the render/audio surfacing remains (tracked in the "defer all" section abov
   but nothing directly mappable to torque without a clamp-position model.
   Until that model is added, rear brake = local `rear_brake` (no per-wheel
   modulation).
+- [ ] **Regen ↔ friction blending (S15 — documented gap, do NOT fabricate).**
+  Friction braking is regen-agnostic and regen (`MotorCurrent`, chassis
+  4072) is a display-only ammeter readout that never feeds wheel torque,
+  so the **regen-cutout fail-safe is untestable in-sim** (no regen torque
+  to cut, no blend to hand off to friction).  Documented fully in
+  [docs/ev1_chrono_audit.md](ev1_chrono_audit.md) §15 + the limitation
+  block in [src/MotorCurrent.h](../src/MotorCurrent.h).  Blocked on
+  EV1 regen-torque-vs-speed + blend-handover data the manuals don't
+  publish — modelling it would mean inventing constants.  When traceable
+  structure (or a justified structure-only `@design` model) lands: add a
+  signed `propulsion_torque` channel to `DriverCommand` (regen = negative
+  torque, per ARCHITECTURE.md "Future per-axle brake control"), sum
+  regen + friction to the driver demand in a BTCM-side blend controller,
+  backfill friction on regen cutout — then the fail-safe becomes a real
+  closed-loop test.
 - [x] **Throttle bus path (PIM)** — `kSigChassisThrottleCmdQ8` (4073) is
   published by PIM each tick (passthrough or cruise-controlled).  ev1sim
   subscribes via `ExternalSimConnector::GetThrottleCmd(window)`,
