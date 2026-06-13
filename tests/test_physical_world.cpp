@@ -3,8 +3,10 @@
 
 #include "PhysicalWorld.h"
 
+#include <cstdint>
 #include <limits>
 #include <string>
+#include <vector>
 
 using namespace ev1sim;
 
@@ -775,6 +777,177 @@ TEST_CASE("test_power_windows_independent_per_window", "[PhysicalWorld][PowerWin
 
     CHECK(pw.state(W::DRIVER)    == D::UP);
     CHECK(pw.state(W::PASSENGER) == D::DOWN);
+}
+
+// ---------------------------------------------------------------------------
+// RsaKeypadDriver — interior keypad + mode-button state machine (C2).
+// ---------------------------------------------------------------------------
+//
+// Regression coverage for the boot-keying redesign
+// (electricsim notes/manual_supplements.yaml#2026-06-11-ev1sim-boot-keying-race):
+// the faithful detent order is OFF → ACC → RUN → OFF and a cycle must NEVER
+// downgrade RUN→ACC.  The old OFF→RUN→ACC→OFF order silently failed the
+// "key_on_cycle x2" boot recipe (two cycles landed in ACC).  These tests run
+// the actual RsaKeypadDriver (not the SimApp mock used in test_scenario.cpp),
+// draining the scheduler tick-by-tick and recording what reaches the bus.
+
+namespace {
+
+// Drives the keypad scheduler for `ticks` updates of `dt`, collecting the
+// ordered list of mode-button pulses (1=OFF, 2=ACC, 3=RUN) and the total digit
+// pulses emitted.  Mirrors the SimApp publish path: update() then
+// consume_fires_now() each tick.
+struct KeypadTrace {
+    std::vector<std::uint8_t> mode_presses;  // in emission order
+    int digit_pulses = 0;
+};
+
+KeypadTrace drain_keypad(RsaKeypadDriver& kp, double dt, int ticks) {
+    KeypadTrace tr;
+    for (int i = 0; i < ticks; ++i) {
+        kp.update(dt);
+        auto fires = kp.consume_fires_now();
+        for (int b = 0; b < 5; ++b)
+            if (fires.button_value[b] != 0) ++tr.digit_pulses;
+        if (fires.mode_button != 0) tr.mode_presses.push_back(fires.mode_button);
+    }
+    return tr;
+}
+
+}  // namespace
+
+TEST_CASE("test_rsa_keypad_cold_start_reaches_RUN_in_two_cycles",
+          "[PhysicalWorld][RsaKeypadDriver][C2]") {
+    RsaKeypadDriver kp;
+    CHECK(kp.expected_state() == RsaKeypadDriver::ExpectedState::OFF);
+
+    // Cycle 1: OFF → ACC (faithful first detent).
+    kp.cycle_k();
+    CHECK(kp.expected_state() == RsaKeypadDriver::ExpectedState::ACC);
+
+    // Cycle 2: ACC → RUN.  This is the second of the "x2" boot recipe.
+    kp.cycle_k();
+    CHECK(kp.expected_state() == RsaKeypadDriver::ExpectedState::RUN);
+
+    // Drain the scheduler (100 ms ticks; plenty for 6 digits + 2 mode presses).
+    const auto tr = drain_keypad(kp, 0.10, 20);
+
+    // The default code "111111" is six taps of button 0 → six digit pulses,
+    // entered exactly once (on the OFF→ACC transition, opening the auth window).
+    CHECK(tr.digit_pulses == 6);
+
+    // Mode presses, in order: ACC (2) then RUN (3) — never an ACC press AFTER
+    // RUN, and never a spurious OFF.
+    REQUIRE(tr.mode_presses.size() == 2);
+    CHECK(tr.mode_presses[0] == 2);  // ACC
+    CHECK(tr.mode_presses[1] == 3);  // RUN
+}
+
+TEST_CASE("test_rsa_keypad_RUN_press_follows_the_code_not_races_it",
+          "[PhysicalWorld][RsaKeypadDriver][C2]") {
+    // The co-sim recipe cycles ~300 ms apart, faster than the 600 ms code
+    // emission.  RUN must still be pressed AFTER all six digits — otherwise the
+    // electricsim RSA rejects it (RUN is gated on the auth window being open).
+    RsaKeypadDriver kp;
+    KeypadTrace tr;
+
+    // t=0: cycle 1 (OFF→ACC), schedules the digits.
+    kp.cycle_k();
+    // Three 100 ms ticks of code emission (3 digits sent so far)...
+    for (int i = 0; i < 3; ++i) {
+        kp.update(0.10);
+        auto f = kp.consume_fires_now();
+        for (int b = 0; b < 5; ++b) if (f.button_value[b]) ++tr.digit_pulses;
+        if (f.mode_button) tr.mode_presses.push_back(f.mode_button);
+    }
+    // ...then cycle 2 (ACC→RUN) arrives mid-sequence (~t=300 ms).
+    kp.cycle_k();
+    CHECK(kp.expected_state() == RsaKeypadDriver::ExpectedState::RUN);
+
+    // Drain the rest.
+    auto rest = drain_keypad(kp, 0.10, 20);
+    tr.digit_pulses += rest.digit_pulses;
+    for (auto m : rest.mode_presses) tr.mode_presses.push_back(m);
+
+    // All six digits emitted; ACC then RUN, in order; RUN never arrives before
+    // the code completes (the FIFO serialises it behind the in-flight digits).
+    CHECK(tr.digit_pulses == 6);
+    REQUIRE(tr.mode_presses.size() == 2);
+    CHECK(tr.mode_presses[0] == 2);  // ACC
+    CHECK(tr.mode_presses[1] == 3);  // RUN
+}
+
+TEST_CASE("test_rsa_keypad_cycle_never_downgrades_RUN_to_ACC",
+          "[PhysicalWorld][RsaKeypadDriver][C2]") {
+    RsaKeypadDriver kp;
+    kp.cycle_k();  // OFF → ACC
+    kp.cycle_k();  // ACC → RUN
+    drain_keypad(kp, 0.10, 20);  // flush ACC + RUN presses
+
+    // From RUN, the next cycle must turn the car OFF — NOT step back to ACC.
+    kp.cycle_k();
+    CHECK(kp.expected_state() == RsaKeypadDriver::ExpectedState::OFF);
+    const auto tr = drain_keypad(kp, 0.10, 5);
+    REQUIRE(tr.mode_presses.size() == 1);
+    CHECK(tr.mode_presses[0] == 1);  // OFF
+    CHECK(tr.digit_pulses == 0);     // no re-entry of the code going to OFF
+}
+
+TEST_CASE("test_rsa_keypad_full_loop_OFF_ACC_RUN_OFF",
+          "[PhysicalWorld][RsaKeypadDriver][C2]") {
+    RsaKeypadDriver kp;
+    using S = RsaKeypadDriver::ExpectedState;
+
+    // Walk the full detent loop the way it is actually driven — one cycle, then
+    // let the scheduler drain before the next (keyboard K presses and scenario
+    // key_on_cycle events are always ≥100 ms apart).
+    kp.cycle_k(); CHECK(kp.expected_state() == S::ACC);
+    auto t1 = drain_keypad(kp, 0.10, 20);
+    CHECK(t1.digit_pulses == 6);              // code entered, then ACC
+    REQUIRE(t1.mode_presses.size() == 1);
+    CHECK(t1.mode_presses[0] == 2);           // ACC
+
+    kp.cycle_k(); CHECK(kp.expected_state() == S::RUN);
+    auto t2 = drain_keypad(kp, 0.10, 5);
+    CHECK(t2.digit_pulses == 0);              // no re-entry going ACC→RUN
+    REQUIRE(t2.mode_presses.size() == 1);
+    CHECK(t2.mode_presses[0] == 3);           // RUN
+
+    kp.cycle_k(); CHECK(kp.expected_state() == S::OFF);
+    auto t3 = drain_keypad(kp, 0.10, 5);
+    CHECK(t3.digit_pulses == 0);              // no re-entry going RUN→OFF
+    REQUIRE(t3.mode_presses.size() == 1);
+    CHECK(t3.mode_presses[0] == 1);           // OFF
+
+    // Wraps: OFF → ACC again, re-entering the code.
+    kp.cycle_k(); CHECK(kp.expected_state() == S::ACC);
+    auto t4 = drain_keypad(kp, 0.10, 20);
+    CHECK(t4.digit_pulses == 6);              // code re-entered on the wrap
+    REQUIRE(t4.mode_presses.size() == 1);
+    CHECK(t4.mode_presses[0] == 2);           // ACC
+}
+
+TEST_CASE("test_rsa_keypad_custom_code_is_emitted",
+          "[PhysicalWorld][RsaKeypadDriver][C2]") {
+    RsaKeypadDriver kp;
+    // "246802" mixes taps and long-presses across several buttons.
+    kp.set_code_string("246802");
+    kp.cycle_k();  // OFF → ACC: schedules these digits.
+
+    // Count tap vs long-press pulses across the drain.
+    int taps = 0, longs = 0;
+    for (int i = 0; i < 20; ++i) {
+        kp.update(0.10);
+        auto f = kp.consume_fires_now();
+        for (int b = 0; b < 5; ++b) {
+            if (f.button_value[b] == 1) ++taps;
+            else if (f.button_value[b] == 2) ++longs;
+        }
+    }
+    // "246802": 2(long) 4(long) 6(long) 8(long) 0(long) 2(long) → all long-press
+    // digits.  Six digit pulses total, all long.
+    CHECK(taps == 0);
+    CHECK(longs == 6);
 }
 
 // ---------------------------------------------------------------------------

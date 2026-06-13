@@ -20,8 +20,12 @@ namespace ev1sim {
 //   set_throttle / set_brake / set_steering:  override the corresponding
 //       DriverCommand field for every subsequent tick until another set_*
 //       overrides it.  Use value = 0 to release.  Steering value is in [-1, 1].
-//   key_on_cycle:  cycle the RSA key (OFF → ACC → RUN → OFF, …) once.
-//       After two cycles from cold the vehicle is in RUN.
+//   key_on_cycle:  cycle the RSA key one detent (OFF → ACC → RUN → OFF, …).
+//       After two cycles from cold the vehicle is in RUN; a cycle never
+//       downgrades RUN→ACC.  The first cycle enters the keypad code (opening
+//       the RSA auth window) then presses ACC; the second presses RUN, queued
+//       after the code so RUN is authenticated even when the two cycles are
+//       only ~300 ms apart.  See RsaKeypadDriver (src/PhysicalWorld.h).
 //   headlight_cycle:  cycle the combination switch (OFF → PARK → ON → HI).
 //   prnd_up / prnd_down:  shift the PRND selector one position toward D / P.
 //   turn_signal_left / turn_signal_right:  toggle that turn-signal direction.

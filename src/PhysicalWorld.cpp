@@ -570,28 +570,46 @@ void RsaKeypadDriver::set_code_string(const char* code_str) {
     }
 }
 
+void RsaKeypadDriver::enqueue_mode_(std::uint8_t mode_button) {
+    if (m_mode_queue_len >= kMaxModeQueue) return;  // overflow guard (never hit)
+    m_mode_queue[m_mode_queue_len++] = mode_button;
+    // If the scheduler is idle, arm it to drain the queue on the next update().
+    if (m_sched_state == CycleState::Idle) {
+        m_sched_state = CycleState::EmittingMode;
+        m_timer_s     = 0.0;
+    }
+}
+
 void RsaKeypadDriver::cycle_k() {
+    // Faithful detent order: OFF → ACC → RUN → OFF.  See the class comment and
+    // electricsim notes/manual_supplements.yaml#2026-06-11-ev1sim-boot-keying-race.
     switch (m_expected) {
         case ExpectedState::OFF:
-            // OFF → RUN: schedule code digits then a RUN press.
-            // Initialise default code on first cycle if not yet set.
+            // OFF → ACC: schedule the code digits (open the RSA auth window),
+            // then an ACC mode press.  Initialise the default code on the
+            // first cycle if not yet set.
             if (m_code_len == 0) init_default_code_();
-            m_expected    = ExpectedState::RUN;
+            m_expected    = ExpectedState::ACC;
             m_sched_state = CycleState::EmittingDigits;
             m_digits_sent = 0;
             m_timer_s     = 0.0;  // first digit fires on next update() call
-            break;
-        case ExpectedState::RUN:
-            // RUN → ACC: immediate ACC press; no digit entry needed.
-            m_expected            = ExpectedState::ACC;
-            m_sched_state         = CycleState::Idle;
-            m_pending.mode_button = 2;  // ACC
+            // The ACC press is enqueued; the EmittingDigits→EmittingMode
+            // hand-off (in update()) drains it once the code is fully sent.
+            enqueue_mode_(2);     // ACC
             break;
         case ExpectedState::ACC:
-            // ACC → OFF: immediate OFF press.
-            m_expected            = ExpectedState::OFF;
-            m_sched_state         = CycleState::Idle;
-            m_pending.mode_button = 1;  // OFF
+            // ACC → RUN: a RUN press.  Queued behind any code digits still in
+            // flight (and behind the pending ACC press) so RUN is never sent
+            // before authentication completes — this is what makes the co-sim
+            // "key_on_cycle x2" boot recipe deterministically reach RUN even
+            // when the two cycles are only ~300 ms apart.
+            m_expected = ExpectedState::RUN;
+            enqueue_mode_(3);     // RUN
+            break;
+        case ExpectedState::RUN:
+            // RUN → OFF: an OFF press (always allowed; turns the car off).
+            m_expected = ExpectedState::OFF;
+            enqueue_mode_(1);     // OFF
             break;
     }
 }
@@ -612,14 +630,27 @@ void RsaKeypadDriver::update(double dt_s) {
             ++m_digits_sent;
             m_timer_s = kKeypadIntervalS;
             if (m_digits_sent >= m_code_len) {
-                // Last digit sent; schedule the mode press next.
+                // Last digit sent; drain the queued mode press(es) next.
                 m_sched_state = CycleState::EmittingMode;
             }
         }
     } else if (m_sched_state == CycleState::EmittingMode) {
-        m_pending.mode_button = 3;  // RUN
-        m_sched_state         = CycleState::Idle;
-        m_timer_s             = 0.0;
+        if (m_mode_queue_len > 0) {
+            // Emit the head of the FIFO this tick; shift the rest down.
+            m_pending.mode_button = m_mode_queue[0];
+            for (int i = 1; i < m_mode_queue_len; ++i) {
+                m_mode_queue[i - 1] = m_mode_queue[i];
+            }
+            --m_mode_queue_len;
+        }
+        if (m_mode_queue_len > 0) {
+            // More presses queued — fire the next one a tick later so the RSA
+            // sees them on distinct ticks.
+            m_timer_s = kKeypadIntervalS;
+        } else {
+            m_sched_state = CycleState::Idle;
+            m_timer_s     = 0.0;
+        }
     }
 }
 
