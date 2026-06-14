@@ -321,11 +321,6 @@ public:
     /// Motor shaft torque in Nm (signed; positive = driving torque).
     void SetMotorTorqueNm(float torque_nm);
 
-    /// Outgoing DC traction-pack current (ID 4072, chassis segment, float32 LE).
-    /// Signed amps; positive = discharge (driving), negative = regen charging.
-    /// Derived from motor torque + speed via ev1sim::MotorCurrent.
-    void SetMotorCurrentA(float amps);
-
     /// Outgoing ambient air temperature (ID 4090, chassis segment, float32 LE).
     /// Published by ev1sim's AmbientTempSensor on each tick (epsilon-gated).
     /// Intended consumers: HTCM (heat-pump model), BPM (battery thermal).
