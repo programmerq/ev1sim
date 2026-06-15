@@ -25,6 +25,7 @@
 #include <unistd.h>  // getpid
 
 #include "WireTruthChassis.h"
+#include "ExternalSimConnector.h"  // end-to-end: wire -> overlay -> getter
 
 // electricsim substrate (creator side) — same headers env_open.cpp uses.
 #include "topology/topology_generated.h"
@@ -382,4 +383,45 @@ TEST_CASE("WireTruthChassis::apply_consumer_overlay: no-write returns 0, no sink
 
     REQUIRE(n == 0);
     REQUIRE_FALSE(any_fired);
+}
+
+// ---------------------------------------------------------------------------
+// End-to-end horn round-trip: a value written on the wire the way electricsim's
+// LHJB writes it (Batch B, write_bit on kWireHORN_DRIVE_LINE_*) flows through
+// ev1sim's REAL connector consumer path — the same ConsumerSinks the connector
+// installs in Tick() (on_bit -> DebugInjectDelta) — out to GetHornLowCmd/High.
+// This composes the full ev1sim side of the cross-repo round-trip against the
+// real generated topology + hash, without the ring/Chrono plumbing.
+// @design 2026-06-15 — Batch B horn end-to-end verification.
+// ---------------------------------------------------------------------------
+TEST_CASE("Horn round-trip end-to-end: wire -> connector overlay -> getter",
+          "[wire_truth][e2e]") {
+    // electricsim side (LHJB): create the segment + write both horn lines.
+    const std::string seg = unique_segment("e2e_horn");
+    auto lhjb = create_fleet_table(seg, electricsim::topology::kTopologyHash);
+    REQUIRE(lhjb != nullptr);
+    REQUIRE(lhjb->write_bit(electricsim::topology::kWireHORN_DRIVE_LINE_LOW, true));
+    REQUIRE(lhjb->write_bit(electricsim::topology::kWireHORN_DRIVE_LINE_HIGH, true));
+
+    // ev1sim side: attach the wire + run the SAME sinks the connector installs
+    // in Tick() (on_bit -> DebugInjectDelta, etc.), then read the getters.
+    ExternalSimConnector c;
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+
+    ev1sim::WireTruthChassis::ConsumerSinks sinks;
+    sinks.on_bit    = [&c](std::uint32_t id, bool v)          { c.DebugInjectDelta(id, v); };
+    sinks.on_byte   = [&c](std::uint32_t id, std::uint8_t v)  { c.DebugInjectU8(id, v); };
+    sinks.on_float  = [&c](std::uint32_t id, float v)         { c.DebugInjectFloat(id, v); };
+    sinks.on_uint32 = [&c](std::uint32_t id, std::uint32_t v) { c.DebugInjectU32(id, v); };
+
+    REQUIRE(wire->apply_consumer_overlay(sinks) >= 2);  // both horn lines applied
+    CHECK(c.GetHornLowCmd());
+    CHECK(c.GetHornHighCmd());
+
+    // Producer drops the low tone; ev1sim tracks it on the next overlay pass.
+    REQUIRE(lhjb->write_bit(electricsim::topology::kWireHORN_DRIVE_LINE_LOW, false));
+    wire->apply_consumer_overlay(sinks);
+    CHECK_FALSE(c.GetHornLowCmd());
+    CHECK(c.GetHornHighCmd());
 }

@@ -1,12 +1,20 @@
 # Wire-truth migration scope — ev1sim's side of the chassis substrate
 
-**Status:** 2026-06-15. Landed: Phase 1 (scope, this doc); the horn consumer
-proof-of-life; and the **full producer-side dual-write** — a table-driven
-`mirror_signal` writes all **84** ev1sim-produced cells onto the wire alongside
-their ring publish (no electricsim dependency). Remaining: the consumer-side
-groups (gated on electricsim's per-cell C-b producer moves) + per-cell
-verification. This doc is written so a later session can execute any group
-without re-deriving anything.
+**Status:** 2026-06-15. **ev1sim's migration is mechanism-complete in both
+directions.** Landed: Phase 1 (scope, this doc); the **producer dual-write** (a
+table-driven `mirror_signal` writes all **84** ev1sim-produced cells onto the
+wire alongside their ring publish); and the **consumer overlay** (a 66-cell
+table-driven `apply_consumer_overlay` reads each ev1sim-consumed cell from the
+wire `written()`-gated and routes it through the same `DebugInject*` dispatch
+the ring uses). Because the consumer overlay already covers **all 66** cells,
+**each electricsim producer batch lights up on ev1sim automatically** — no
+further ev1sim code per batch. The **horn (electricsim Batch B, LHJB→wire)** is
+the first live cross-repo round-trip. ev1sim builds against electricsim
+`fe2d3d1` (hash `0x27469F03`), 484/484 green. Cross-repo protocol:
+electricsim `notes/wire_truth_cross_repo_handshake.md`. Remaining is
+electricsim-gated (its per-batch producer moves) + per-batch verification + the
+eventual ring cutover; this doc lets a later session execute any of it without
+re-deriving anything.
 
 **What this is.** electricsim is moving the chassis bus off the legacy ring
 (`SharedMemoryTransport "electricsim_chassis_bus"`, `DeltaRecord` publish/poll
@@ -402,19 +410,19 @@ The **gating asymmetry** (electricsim `phase_c_chassis_migration_scope.md` §9):
 | J IPC telltales / LCD | 27 | consume | C-b Batch M | ~3 h | see §8 — likely superseded by LCD-as-device |
 | L RHJB sub-modules | 10 | consume | C-b Batch C | ~2 h | PMM/DLM/DILM render |
 
-**Update (2026-06-15): the producer side is mechanism-complete.** The
-table-driven `mirror_signal` dual-write (commit landing this session) already
-mirrors all **84** producer cells (groups C, D, H, I, K, M, and the F
-producers) — so those rows are done at the mechanism level; only per-cell
-spot-verification remains for them. The producer-effort column above is the
-historical estimate, retained for context.
+**Update (2026-06-15): BOTH sides are mechanism-complete — the effort column
+above is now historical.** The table-driven `mirror_signal` dual-write covers
+all **84** producer cells, and `apply_consumer_overlay` covers all **66**
+consumer cells (every row in the table above). So there is **no per-batch ev1sim
+code left** for any group: as electricsim moves each producer onto the wire,
+ev1sim's overlay reads it automatically. The horn (electricsim Batch B) is the
+first live cell and is verified end-to-end (see §7).
 
-**Remaining effort: ~10–12 h**, almost all consumer-side (groups A, G, J, L +
-the F/I consumer cells), each gated on electricsim's matching C-b producer move
-(§6.1). The consumer mechanism is a near-mirror of the producer one (reuse the
-`DebugInject*(signal_id, …)` dispatch); once it lands, remaining work is
-registry rows + tests. (Still far below electricsim's ~50 h: ev1sim
-dual-writes/overlays rather than re-architecting ownership.)
+**Remaining ev1sim effort is now just per-batch verification (~0.5 h each)** as
+electricsim lands its producer batches, plus the eventual ring cutover (delete
+ev1sim's legacy ring publish/poll once every cell is wire-authoritative and
+soaked — a coordinated late step, not yet). Group J (IPC telltales) is likely
+*dropped* rather than migrated, pending the LCD-as-device decision (§8).
 
 ---
 
