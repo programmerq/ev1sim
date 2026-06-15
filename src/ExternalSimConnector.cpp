@@ -3068,11 +3068,13 @@ void ExternalSimConnector::Tick(double sim_time_s) {
     //     This lets ev1sim flip a consumer to the wire BEFORE electricsim's
     //     producer moves; the path stays dormant-but-correct until it does.
     //
-    //     Proof-of-life batch: the horn drive lines (chassis 4020/4021 ->
-    //     HORN_DRIVE_LINE_LOW/HIGH, produced by LHJB). LHJB is still ring-only
-    //     today (electricsim Phase C-b Batch B not yet landed), so this overlay
-    //     is a no-op in the live fleet until that lands — then ev1sim reads the
-    //     horn straight off the wire with no further change here.
+    //     Table-driven: WireTruthChassis::apply_consumer_overlay walks the
+    //     66-cell consumer registry and routes each WRITTEN cell back through
+    //     the same DebugInject* dispatch the ring drain uses (so a wire value is
+    //     applied exactly like a ring delta, just with last-writer = the wire).
+    //     A cell whose producer hasn't moved onto the wire is simply skipped.
+    //     As of electricsim Batch B, the horn drive lines (4020/4021, LHJB) are
+    //     the first live cell — ev1sim renders the horn straight off the wire.
     if (!st.wire && !st.wire_attach_tried) {
         st.wire_attach_tried = true;
         st.wire = ev1sim::WireTruthChassis::OpenFromEnv("attacher");
@@ -3082,8 +3084,12 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         }
     }
     if (st.wire) {
-        if (auto v = st.wire->horn_low_drive())  st.horn_low  = *v;
-        if (auto v = st.wire->horn_high_drive()) st.horn_high = *v;
+        ev1sim::WireTruthChassis::ConsumerSinks sinks;
+        sinks.on_bit    = [this](std::uint32_t id, bool v)          { DebugInjectDelta(id, v); };
+        sinks.on_byte   = [this](std::uint32_t id, std::uint8_t v)  { DebugInjectU8(id, v); };
+        sinks.on_float  = [this](std::uint32_t id, float v)         { DebugInjectFloat(id, v); };
+        sinks.on_uint32 = [this](std::uint32_t id, std::uint32_t v) { DebugInjectU32(id, v); };
+        st.wire->apply_consumer_overlay(sinks);
     }
 #endif  // EV1SIM_HAVE_WIRE_TRUTH
 

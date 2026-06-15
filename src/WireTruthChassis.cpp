@@ -275,6 +275,181 @@ bool WireTruthChassis::mirror_signal(std::uint32_t signal_id,
     }
 }
 
+std::optional<std::uint8_t> WireTruthChassis::read_byte(std::uint32_t wire_id) const {
+    if (!attached()) return std::nullopt;
+    electricsim::io::WireTable::Sample<std::uint8_t> sample;
+    if (!impl_->table->read_byte_sample(wire_id, &sample)) return std::nullopt;
+    if (!sample.written()) return std::nullopt;
+    return sample.value;
+}
+
+std::optional<float> WireTruthChassis::read_float32(std::uint32_t wire_id) const {
+    if (!attached()) return std::nullopt;
+    electricsim::io::WireTable::Sample<float> sample;
+    if (!impl_->table->read_float32_sample(wire_id, &sample)) return std::nullopt;
+    if (!sample.written()) return std::nullopt;
+    return sample.value;
+}
+
+std::optional<std::uint32_t> WireTruthChassis::read_uint32(std::uint32_t wire_id) const {
+    if (!attached()) return std::nullopt;
+    electricsim::io::WireTable::Sample<std::uint32_t> sample;
+    if (!impl_->table->read_uint32_sample(wire_id, &sample)) return std::nullopt;
+    if (!sample.written()) return std::nullopt;
+    return sample.value;
+}
+
+// ---------------------------------------------------------------------------
+// Consumer registry — maps every ev1sim-CONSUMED ring signal_id to the
+// corresponding electricsim WireId + WireType.  Generated from
+// /tmp/consumer_cells_v2.tsv (66 entries).  Using the real kWire* constants
+// from topology_generated.h is the drift guard: a renamed/removed constant
+// fails to compile, forcing this table to be updated in lockstep with the
+// topology.  NOTE: types are bit/byte/float32/uint32 ONLY (no uint16/uint64
+// in the consumer set).
+// @design 2026-06-15 — consumer overlay batch.
+// ---------------------------------------------------------------------------
+struct ConsumerCell {
+    WireId   wire_id;
+    WireType wire_type;
+};
+
+static const std::unordered_map<std::uint32_t, ConsumerCell>& ConsumerRegistry() {
+    static const std::unordered_map<std::uint32_t, ConsumerCell> kRegistry = {
+        // Bulb feed lines (bit)
+        {4000U, {kWireBULB_FEED_LINE_LBL,              WireType::kBit}},
+        {4001U, {kWireBULB_FEED_LINE_RBL,              WireType::kBit}},
+        {4002U, {kWireBULB_FEED_LINE_LHBH,             WireType::kBit}},
+        {4003U, {kWireBULB_FEED_LINE_RHBH,             WireType::kBit}},
+        {4004U, {kWireBULB_FEED_LINE_LLBH,             WireType::kBit}},
+        {4005U, {kWireBULB_FEED_LINE_RLBH,             WireType::kBit}},
+        {4006U, {kWireBULB_FEED_LINE_LRSM,             WireType::kBit}},
+        {4007U, {kWireBULB_FEED_LINE_RRSM,             WireType::kBit}},
+        {4008U, {kWireBULB_FEED_LINE_LFML,             WireType::kBit}},
+        {4009U, {kWireBULB_FEED_LINE_RFML,             WireType::kBit}},
+        {4010U, {kWireBULB_FEED_LINE_LFTS,             WireType::kBit}},
+        {4011U, {kWireBULB_FEED_LINE_RFTS,             WireType::kBit}},
+        {4012U, {kWireBULB_FEED_LINE_LRTS,             WireType::kBit}},
+        {4013U, {kWireBULB_FEED_LINE_RRTS,             WireType::kBit}},
+        {4014U, {kWireBULB_FEED_LINE_LRSL,             WireType::kBit}},
+        {4015U, {kWireBULB_FEED_LINE_CHMSL,            WireType::kBit}},
+        {4016U, {kWireBULB_FEED_LINE_RRSL,             WireType::kBit}},
+        // Horn drive lines (bit)
+        {4020U, {kWireHORN_DRIVE_LINE_LOW,              WireType::kBit}},
+        {4021U, {kWireHORN_DRIVE_LINE_HIGH,             WireType::kBit}},
+        // Motor current (float32)
+        {4072U, {kWireCHASSIS_MOTOR_CURRENT_A,          WireType::kFloat32}},
+        // Wiper motor command + washer pump command (byte / bit)
+        {4080U, {kWireCHASSIS_WIPER_MOTOR_COMMAND,      WireType::kByte}},
+        {4081U, {kWireCHASSIS_WASHER_PUMP_COMMAND,      WireType::kBit}},
+        // HVAC blower level + defrost grid (byte / bit)
+        {4082U, {kWireCHASSIS_HVAC_BLOWER_LEVEL,        WireType::kByte}},
+        {4083U, {kWireCHASSIS_DEFROST_GRID_ACTIVE,      WireType::kBit}},
+        // Door lock commands (byte)
+        {4084U, {kWireCHASSIS_DOOR_LOCK_CMD_DRIVER,     WireType::kByte}},
+        {4085U, {kWireCHASSIS_DOOR_LOCK_CMD_PASSENGER,  WireType::kByte}},
+        // Power window motor commands (byte)
+        {4086U, {kWireCHASSIS_POWER_WINDOW_MOTOR_DRIVER,    WireType::kByte}},
+        {4087U, {kWireCHASSIS_POWER_WINDOW_MOTOR_PASSENGER, WireType::kByte}},
+        // RSA shift-blocked cue (bit)
+        {4088U, {kWireCHASSIS_RSA_SHIFT_BLOCKED,        WireType::kBit}},
+        // IPC seatbelt telltales (bit)
+        {4130U, {kWireCHASSIS_IPC_SEATBELT_TELLTALE_DRIVER,    WireType::kBit}},
+        {4131U, {kWireCHASSIS_IPC_SEATBELT_TELLTALE_PASSENGER, WireType::kBit}},
+        // IPC trip distance (float32)
+        {4132U, {kWireCHASSIS_IPC_TRIP_DISTANCE_M,      WireType::kFloat32}},
+        // IPC BTCM / airbag telltales (bit)
+        {4134U, {kWireCHASSIS_IPC_BRAKE_TELLTALE,       WireType::kBit}},
+        {4135U, {kWireCHASSIS_IPC_PARK_BRAKE_TELLTALE,  WireType::kBit}},
+        {4136U, {kWireCHASSIS_IPC_ANTILOCK_TELLTALE,    WireType::kBit}},
+        {4138U, {kWireCHASSIS_IPC_AIR_BAG_TELLTALE,     WireType::kBit}},
+        // IPC extra LCD telltales (bit)
+        {4140U, {kWireCHASSIS_IPC_SERVICE_NOW_TELLTALE,      WireType::kBit}},
+        {4141U, {kWireCHASSIS_IPC_CHECK_MESSAGES_TELLTALE,   WireType::kBit}},
+        {4142U, {kWireCHASSIS_IPC_TEMP_TELLTALE,             WireType::kBit}},
+        {4143U, {kWireCHASSIS_IPC_BATTERY_LIFE_TELLTALE,     WireType::kBit}},
+        {4144U, {kWireCHASSIS_IPC_REDUCED_PERF_TELLTALE,     WireType::kBit}},
+        {4145U, {kWireCHASSIS_IPC_CHECK_TIRE_PRESS_TELLTALE, WireType::kBit}},
+        // BTCM actuator state — chassis bus (bit / float32)
+        {4147U, {kWireCHASSIS_BTCM_ISO_CLOSE_FL,        WireType::kBit}},
+        {4148U, {kWireCHASSIS_BTCM_ISO_CLOSE_FR,        WireType::kBit}},
+        {4149U, {kWireCHASSIS_BTCM_DUMP_OPEN_FL,        WireType::kBit}},
+        {4150U, {kWireCHASSIS_BTCM_DUMP_OPEN_FR,        WireType::kBit}},
+        {4151U, {kWireCHASSIS_BTCM_EMB_MOTOR_CMD_LR,    WireType::kFloat32}},
+        {4152U, {kWireCHASSIS_BTCM_EMB_MOTOR_CMD_RR,    WireType::kFloat32}},
+        {4153U, {kWireCHASSIS_BTCM_CYL_PRESSURE_FL_K_PA, WireType::kFloat32}},
+        {4154U, {kWireCHASSIS_BTCM_CYL_PRESSURE_FR_K_PA, WireType::kFloat32}},
+        // IPC turn / high-beam / park-lamp / door-ajar telltales + dim duty (bit / byte)
+        {4158U, {kWireCHASSIS_IPC_LEFT_TURN_TELLTALE,   WireType::kBit}},
+        {4159U, {kWireCHASSIS_IPC_RIGHT_TURN_TELLTALE,  WireType::kBit}},
+        {4160U, {kWireCHASSIS_IPC_HIGH_BEAM_TELLTALE,   WireType::kBit}},
+        {4161U, {kWireCHASSIS_IPC_PARK_LAMP_TELLTALE,   WireType::kBit}},
+        {4162U, {kWireCHASSIS_IPC_DOOR_AJAR_TELLTALE,   WireType::kBit}},
+        {4163U, {kWireCHASSIS_IPC_DIM_DUTY_PCT,         WireType::kByte}},
+        // RHJB PMM run buses + DLM legs + DILM level (bit / byte)
+        {4180U, {kWireCHASSIS_RHJB_PMM_RUN1_BUS,        WireType::kBit}},
+        {4181U, {kWireCHASSIS_RHJB_PMM_RUN2_BUS,        WireType::kBit}},
+        {4182U, {kWireCHASSIS_RHJB_DLM_LH_LOCK,         WireType::kBit}},
+        {4183U, {kWireCHASSIS_RHJB_DLM_LH_UNLOCK,       WireType::kBit}},
+        {4184U, {kWireCHASSIS_RHJB_DLM_RH_LOCK,         WireType::kBit}},
+        {4185U, {kWireCHASSIS_RHJB_DLM_RH_UNLOCK,       WireType::kBit}},
+        {4186U, {kWireCHASSIS_RHJB_DILM_LEVEL,          WireType::kByte}},
+        // Aux battery (uint32 / bit / byte)
+        {4192U, {kWireCHASSIS_AUX_BATTERY_TERMINAL_MV,  WireType::kUint32}},
+        {4193U, {kWireCHASSIS_AUX_BATTERY_PRESENT,      WireType::kBit}},
+        {4194U, {kWireCHASSIS_AUX_BATTERY_SOC_PCT,      WireType::kByte}},
+        // NOTE: HV bus 4155-4157 and charge-wake 4187 are intentionally ABSENT.
+        // They are electricsim-PRODUCED cells (topology `driver:`), not ev1sim
+        // consumer cells. ev1sim does not read them from this class.
+        // (See the same NOTE in ProducerRegistry above.)
+    };
+    return kRegistry;
+}
+
+int WireTruthChassis::apply_consumer_overlay(const ConsumerSinks& sinks) const {
+    if (!attached()) return 0;
+    int count = 0;
+    for (const auto& [signal_id, cell] : ConsumerRegistry()) {
+        switch (cell.wire_type) {
+            case WireType::kBit: {
+                if (!sinks.on_bit) break;
+                if (auto v = read_bit(cell.wire_id)) {
+                    sinks.on_bit(signal_id, *v);
+                    ++count;
+                }
+                break;
+            }
+            case WireType::kByte: {
+                if (!sinks.on_byte) break;
+                if (auto v = read_byte(cell.wire_id)) {
+                    sinks.on_byte(signal_id, *v);
+                    ++count;
+                }
+                break;
+            }
+            case WireType::kFloat32: {
+                if (!sinks.on_float) break;
+                if (auto v = read_float32(cell.wire_id)) {
+                    sinks.on_float(signal_id, *v);
+                    ++count;
+                }
+                break;
+            }
+            case WireType::kUint32: {
+                if (!sinks.on_uint32) break;
+                if (auto v = read_uint32(cell.wire_id)) {
+                    sinks.on_uint32(signal_id, *v);
+                    ++count;
+                }
+                break;
+            }
+            default:
+                break;
+        }
+    }
+    return count;
+}
+
 std::optional<bool> WireTruthChassis::horn_low_drive() const {
     return read_bit(electricsim::topology::kWireHORN_DRIVE_LINE_LOW);
 }
@@ -309,6 +484,18 @@ std::unique_ptr<WireTruthChassis> WireTruthChassis::Attach(const std::string&) {
 bool WireTruthChassis::attached() const { return false; }
 std::optional<bool> WireTruthChassis::read_bit(std::uint32_t) const {
     return std::nullopt;
+}
+std::optional<std::uint8_t> WireTruthChassis::read_byte(std::uint32_t) const {
+    return std::nullopt;
+}
+std::optional<float> WireTruthChassis::read_float32(std::uint32_t) const {
+    return std::nullopt;
+}
+std::optional<std::uint32_t> WireTruthChassis::read_uint32(std::uint32_t) const {
+    return std::nullopt;
+}
+int WireTruthChassis::apply_consumer_overlay(const ConsumerSinks&) const {
+    return 0;
 }
 bool WireTruthChassis::write_bit(std::uint32_t, bool)          { return false; }
 bool WireTruthChassis::write_byte(std::uint32_t, std::uint8_t) { return false; }

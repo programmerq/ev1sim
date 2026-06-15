@@ -28,6 +28,7 @@
 #define EV1SIM_WIRE_TRUTH_CHASSIS_H
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -63,7 +64,34 @@ public:
     //                      producer has never written it (gen == 0). Caller
     //                      keeps its legacy/fallback value.
     //   - true/false    -> the live wire value.
-    std::optional<bool> read_bit(std::uint32_t wire_id) const;
+    std::optional<bool>          read_bit(std::uint32_t wire_id) const;
+
+    // Generic typed reads for byte, float32, and uint32 cells. Same contract
+    // as read_bit: nullopt when not attached, undeclared, type-mismatched, or
+    // not yet written by the producer. @design 2026-06-15 — consumer overlay.
+    std::optional<std::uint8_t>  read_byte(std::uint32_t wire_id) const;
+    std::optional<float>         read_float32(std::uint32_t wire_id) const;
+    std::optional<std::uint32_t> read_uint32(std::uint32_t wire_id) const;
+
+    // Sinks for apply_consumer_overlay. Leave any sink empty (default-
+    // constructed std::function) to skip that type; only non-empty sinks are
+    // invoked. Each sink receives (signal_id, value) — the same signal_id the
+    // legacy ring uses so callers can reuse existing per-id dispatch.
+    struct ConsumerSinks {
+        std::function<void(std::uint32_t, bool)>          on_bit;
+        std::function<void(std::uint32_t, std::uint8_t)>  on_byte;
+        std::function<void(std::uint32_t, float)>         on_float;
+        std::function<void(std::uint32_t, std::uint32_t)> on_uint32;
+    };
+
+    // For each ev1sim-consumed chassis cell that is attached + written(),
+    // reads it by type and invokes the matching non-empty sink with
+    // (signal_id, value). Returns the number of cells for which a sink was
+    // invoked. Returns 0 (no-op) when not attached or substrate compiled out.
+    // The written() gate makes this kHold-safe: a cell whose producer has not
+    // yet moved onto the wire is skipped so the ring-derived value persists.
+    // @design 2026-06-15 — consumer overlay batch.
+    int apply_consumer_overlay(const ConsumerSinks& sinks) const;
 
     // Generic typed write of a bit cell (producer side). Returns false when not
     // attached, the substrate is compiled out, or the id is undeclared / wrong

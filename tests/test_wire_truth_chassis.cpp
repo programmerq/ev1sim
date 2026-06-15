@@ -289,3 +289,97 @@ TEST_CASE("WireTruthChassis::mirror_signal: unregistered signal_id returns false
     const std::uint8_t payload[] = {0x01u};
     REQUIRE_FALSE(wire->mirror_signal(9999U, payload, 1u));
 }
+
+// ---------------------------------------------------------------------------
+// apply_consumer_overlay tests.
+// @design 2026-06-15 — consumer overlay batch.
+//
+// Four representative consumed cells, one per wire type that the consumer set
+// uses (bit/byte/float32/uint32).  The creator plays electricsim's role —
+// writes the cells onto the wire — then ev1sim's apply_consumer_overlay reads
+// them and invokes the matching sinks.
+//
+//   bit     4000  kWireBULB_FEED_LINE_LBL
+//   byte    4082  kWireCHASSIS_HVAC_BLOWER_LEVEL
+//   float32 4132  kWireCHASSIS_IPC_TRIP_DISTANCE_M
+//   uint32  4192  kWireCHASSIS_AUX_BATTERY_TERMINAL_MV
+// ---------------------------------------------------------------------------
+
+TEST_CASE("WireTruthChassis::apply_consumer_overlay: written cells invoke matching sinks",
+          "[wire_truth][consumer_overlay]") {
+    const std::string seg = unique_segment("co_written");
+    auto creator = create_fleet_table(seg, electricsim::topology::kTopologyHash);
+    REQUIRE(creator != nullptr);
+
+    // electricsim (LHJB / IPC / BTCM / BPM) writes one cell of each consumed type.
+    REQUIRE(creator->write_bit(
+        electricsim::topology::kWireBULB_FEED_LINE_LBL, true));
+    REQUIRE(creator->write_byte(
+        electricsim::topology::kWireCHASSIS_HVAC_BLOWER_LEVEL,
+        static_cast<std::uint8_t>(2u)));
+    REQUIRE(creator->write_float32(
+        electricsim::topology::kWireCHASSIS_IPC_TRIP_DISTANCE_M, 123.5f));
+    REQUIRE(creator->write_uint32(
+        electricsim::topology::kWireCHASSIS_AUX_BATTERY_TERMINAL_MV, 12650u));
+
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+    REQUIRE(wire->attached());
+
+    // Capturing sinks record what was delivered.
+    std::unordered_map<std::uint32_t, bool>          bit_map;
+    std::unordered_map<std::uint32_t, std::uint8_t>  byte_map;
+    std::unordered_map<std::uint32_t, float>         float_map;
+    std::unordered_map<std::uint32_t, std::uint32_t> u32_map;
+
+    ev1sim::WireTruthChassis::ConsumerSinks sinks;
+    sinks.on_bit    = [&](std::uint32_t id, bool v)          { bit_map[id]   = v; };
+    sinks.on_byte   = [&](std::uint32_t id, std::uint8_t v)  { byte_map[id]  = v; };
+    sinks.on_float  = [&](std::uint32_t id, float v)         { float_map[id] = v; };
+    sinks.on_uint32 = [&](std::uint32_t id, std::uint32_t v) { u32_map[id]   = v; };
+
+    const int n = wire->apply_consumer_overlay(sinks);
+
+    // All four written cells must have fired their respective sinks.
+    REQUIRE(bit_map.count(4000U) == 1);
+    REQUIRE(bit_map.at(4000U) == true);
+
+    REQUIRE(byte_map.count(4082U) == 1);
+    REQUIRE(byte_map.at(4082U) == static_cast<std::uint8_t>(2u));
+
+    REQUIRE(float_map.count(4132U) == 1);
+    REQUIRE(float_map.at(4132U) == 123.5f);
+
+    REQUIRE(u32_map.count(4192U) == 1);
+    REQUIRE(u32_map.at(4192U) == 12650u);
+
+    // Return count must be >= 4 (the four we wrote; other cells may also be
+    // registered consumer cells but were not written so do not count).
+    REQUIRE(n >= 4);
+    // The count must not exceed the total number of consumer cells (66).
+    REQUIRE(n <= 66);
+}
+
+TEST_CASE("WireTruthChassis::apply_consumer_overlay: no-write returns 0, no sink fires",
+          "[wire_truth][consumer_overlay]") {
+    const std::string seg = unique_segment("co_dormant");
+    auto creator = create_fleet_table(seg, electricsim::topology::kTopologyHash);
+    REQUIRE(creator != nullptr);
+    // Nothing written — every cell remains at gen==0.
+
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+    REQUIRE(wire->attached());
+
+    bool any_fired = false;
+    ev1sim::WireTruthChassis::ConsumerSinks sinks;
+    sinks.on_bit    = [&](std::uint32_t, bool)          { any_fired = true; };
+    sinks.on_byte   = [&](std::uint32_t, std::uint8_t)  { any_fired = true; };
+    sinks.on_float  = [&](std::uint32_t, float)         { any_fired = true; };
+    sinks.on_uint32 = [&](std::uint32_t, std::uint32_t) { any_fired = true; };
+
+    const int n = wire->apply_consumer_overlay(sinks);
+
+    REQUIRE(n == 0);
+    REQUIRE_FALSE(any_fired);
+}
