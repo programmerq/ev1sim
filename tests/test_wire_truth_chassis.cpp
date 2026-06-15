@@ -17,6 +17,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <cstdint>
+#include <cstring>
 #include <memory>
 #include <string>
 
@@ -137,4 +139,153 @@ TEST_CASE("WireTruthChassis: attach to a missing segment returns nullptr",
           "[wire_truth]") {
     auto wire = ev1sim::WireTruthChassis::Attach(unique_segment("absent"));
     REQUIRE(wire == nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// mirror_signal round-trip tests — one cell per WireType.
+// @design 2026-06-15 — producer dual-write batch.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("WireTruthChassis::mirror_signal: kBit round-trip (4030 PANEL_AJAR_HOOD)",
+          "[wire_truth][mirror_signal]") {
+    const std::string seg = unique_segment("ms_bit");
+    auto creator = create_fleet_table(seg, electricsim::topology::kTopologyHash);
+    REQUIRE(creator != nullptr);
+
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+    REQUIRE(wire->attached());
+
+    // Build a 1-byte LE payload encoding "true"
+    const std::uint8_t payload_true[]  = {0x01u};
+    const std::uint8_t payload_false[] = {0x00u};
+
+    // Write true via mirror_signal, read back via creator table.
+    REQUIRE(wire->mirror_signal(4030U, payload_true, 1u));
+    bool out = false;
+    REQUIRE(creator->read_bit(electricsim::topology::kWirePANEL_AJAR_HOOD, &out));
+    REQUIRE(out == true);
+
+    // Flip to false.
+    REQUIRE(wire->mirror_signal(4030U, payload_false, 1u));
+    REQUIRE(creator->read_bit(electricsim::topology::kWirePANEL_AJAR_HOOD, &out));
+    REQUIRE(out == false);
+}
+
+TEST_CASE("WireTruthChassis::mirror_signal: kByte round-trip (6900 DRIVER_BRAKE_PEDAL_Q8)",
+          "[wire_truth][mirror_signal]") {
+    const std::string seg = unique_segment("ms_byte");
+    auto creator = create_fleet_table(seg, electricsim::topology::kTopologyHash);
+    REQUIRE(creator != nullptr);
+
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+
+    const std::uint8_t payload[] = {0xABu};
+    REQUIRE(wire->mirror_signal(6900U, payload, 1u));
+
+    std::uint8_t out = 0;
+    REQUIRE(creator->read_byte(electricsim::topology::kWireDRIVER_BRAKE_PEDAL_Q8, &out));
+    REQUIRE(out == 0xABu);
+}
+
+TEST_CASE("WireTruthChassis::mirror_signal: kUint16 round-trip (6901 DRIVER_STEERING_DEG_Q8)",
+          "[wire_truth][mirror_signal]") {
+    const std::string seg = unique_segment("ms_u16");
+    auto creator = create_fleet_table(seg, electricsim::topology::kTopologyHash);
+    REQUIRE(creator != nullptr);
+
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+
+    // 0x1234 LE: low byte 0x34, high byte 0x12
+    const std::uint8_t payload[] = {0x34u, 0x12u};
+    REQUIRE(wire->mirror_signal(6901U, payload, 2u));
+
+    std::uint16_t out = 0;
+    REQUIRE(creator->read_uint16(electricsim::topology::kWireDRIVER_STEERING_DEG_Q8, &out));
+    REQUIRE(out == 0x1234u);
+}
+
+TEST_CASE("WireTruthChassis: uint32 accessor round-trips; electricsim-owned cells are not mirrored",
+          "[wire_truth][mirror_signal]") {
+    const std::string seg = unique_segment("ms_u32");
+    auto creator = create_fleet_table(seg, electricsim::topology::kTopologyHash);
+    REQUIRE(creator != nullptr);
+
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+
+    // There is no ev1sim-PRODUCED uint32 chassis cell: the only uint32 cells
+    // (HV bus 4155/4157) are electricsim-produced (topology `driver:`), so they
+    // are deliberately EXCLUDED from the producer registry. mirror_signal must
+    // therefore REFUSE 4155 — ev1sim never writes a cell electricsim drives.
+    const std::uint8_t payload[] = {0xEFu, 0xBEu, 0xADu, 0xDEu};  // 0xDEADBEEF LE
+    REQUIRE_FALSE(wire->mirror_signal(4155U, payload, 4u));
+
+    // The write_uint32 accessor itself still round-trips (decode-path coverage).
+    REQUIRE(wire->write_uint32(electricsim::topology::kWireHV_BUS_VOLTAGE_MV,
+                               0xDEADBEEFu));
+    std::uint32_t out = 0;
+    REQUIRE(creator->read_uint32(electricsim::topology::kWireHV_BUS_VOLTAGE_MV, &out));
+    REQUIRE(out == 0xDEADBEEFu);
+}
+
+TEST_CASE("WireTruthChassis::mirror_signal: kUint64 round-trip (4075 CHASSIS_SIM_TIME_NS)",
+          "[wire_truth][mirror_signal]") {
+    const std::string seg = unique_segment("ms_u64");
+    auto creator = create_fleet_table(seg, electricsim::topology::kTopologyHash);
+    REQUIRE(creator != nullptr);
+
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+
+    // 0x0102030405060708 LE
+    const std::uint8_t payload[] = {0x08u, 0x07u, 0x06u, 0x05u,
+                                    0x04u, 0x03u, 0x02u, 0x01u};
+    REQUIRE(wire->mirror_signal(4075U, payload, 8u));
+
+    std::uint64_t out = 0;
+    REQUIRE(creator->read_uint64(electricsim::topology::kWireCHASSIS_SIM_TIME_NS, &out));
+    REQUIRE(out == UINT64_C(0x0102030405060708));
+}
+
+TEST_CASE("WireTruthChassis::mirror_signal: kFloat32 round-trip (4100 CHASSIS_SPEED_MPS)",
+          "[wire_truth][mirror_signal]") {
+    const std::string seg = unique_segment("ms_f32");
+    auto creator = create_fleet_table(seg, electricsim::topology::kTopologyHash);
+    REQUIRE(creator != nullptr);
+
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+
+    // Encode 27.5f as LE IEEE 754 bit-pattern.
+    const float expected = 27.5f;
+    std::uint32_t bits = 0;
+    std::memcpy(&bits, &expected, sizeof(bits));
+    const std::uint8_t payload[] = {
+        static_cast<std::uint8_t>(bits & 0xFFu),
+        static_cast<std::uint8_t>((bits >> 8u)  & 0xFFu),
+        static_cast<std::uint8_t>((bits >> 16u) & 0xFFu),
+        static_cast<std::uint8_t>((bits >> 24u) & 0xFFu),
+    };
+    REQUIRE(wire->mirror_signal(4100U, payload, 4u));
+
+    float out = 0.0f;
+    REQUIRE(creator->read_float32(electricsim::topology::kWireCHASSIS_SPEED_MPS, &out));
+    REQUIRE(out == expected);
+}
+
+TEST_CASE("WireTruthChassis::mirror_signal: unregistered signal_id returns false",
+          "[wire_truth][mirror_signal]") {
+    const std::string seg = unique_segment("ms_unreg");
+    auto creator = create_fleet_table(seg, electricsim::topology::kTopologyHash);
+    REQUIRE(creator != nullptr);
+
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+
+    // 9999 is not in the producer registry.
+    const std::uint8_t payload[] = {0x01u};
+    REQUIRE_FALSE(wire->mirror_signal(9999U, payload, 1u));
 }

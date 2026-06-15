@@ -71,6 +71,25 @@ public:
     // declared producer per cell.
     bool write_bit(std::uint32_t wire_id, bool value);
 
+    // Typed write accessors for ev1sim-produced cells (producer side).
+    // Mirrors the electricsim WireTable::write_* surface; returns false when
+    // not attached, the substrate is compiled out, or the id is undeclared /
+    // type-mismatched. @design 2026-06-15 — producer dual-write batch.
+    bool write_byte(std::uint32_t wire_id, std::uint8_t value);
+    bool write_uint16(std::uint32_t wire_id, std::uint16_t value);
+    bool write_uint32(std::uint32_t wire_id, std::uint32_t value);
+    bool write_uint64(std::uint32_t wire_id, std::uint64_t value);
+    bool write_float32(std::uint32_t wire_id, float value);
+
+    // Mirror one ring DeltaRecord payload onto its wire cell, if signal_id is
+    // a registered ev1sim-produced cell and we're attached. The payload is the
+    // raw little-endian bytes from the DeltaRecord (same encoding as the ring).
+    // Returns true if a write was performed. @design 2026-06-15 — table-driven
+    // dual-write so every chassis producer cell reaches the WireTable without
+    // per-signal connector code.
+    bool mirror_signal(std::uint32_t signal_id, const std::uint8_t* payload,
+                       std::size_t n);
+
     // Semantic helpers for the proof-of-life horn batch (chassis 4020/4021,
     // LHJB -> ev1sim). Resolve to the real generated WireIds in the .cpp, so
     // ev1sim never hardcodes the order-assigned numeric id.

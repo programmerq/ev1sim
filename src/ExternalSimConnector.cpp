@@ -3239,6 +3239,9 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         f.header.sequence          = st.sequence++;
         f.header.monotonic_time_ns = NowNs();
         f.deltas                   = std::move(outbound);
+#if EV1SIM_HAVE_WIRE_TRUTH
+        if (st.wire) for (const auto& d : f.deltas) st.wire->mirror_signal(d.signal_id, d.payload.data(), d.payload.size());
+#endif
         if (!st.transport->publish_frame(f)) {
             std::cerr << "[ExternalSim] publish_frame failed — reconnecting\n";
             st.transport.reset();
@@ -3284,6 +3287,9 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         df.header.sequence          = st.sequence++;
         df.header.monotonic_time_ns = NowNs();
         df.deltas                   = std::move(dyn);
+#if EV1SIM_HAVE_WIRE_TRUTH
+        if (st.wire) for (const auto& d : df.deltas) st.wire->mirror_signal(d.signal_id, d.payload.data(), d.payload.size());
+#endif
         if (!st.transport->publish_frame(df)) {
             std::cerr << "[ExternalSim] publish_frame (dynamics) failed — reconnecting\n";
             st.transport.reset();
@@ -3692,6 +3698,9 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             mf.header.sequence          = st.main_sequence++;
             mf.header.monotonic_time_ns = NowNs();
             mf.deltas                   = std::move(drv);
+#if EV1SIM_HAVE_WIRE_TRUTH
+            if (st.wire) for (const auto& d : mf.deltas) st.wire->mirror_signal(d.signal_id, d.payload.data(), d.payload.size());
+#endif
             if (!st.main_transport->publish_frame(mf)) {
                 std::cerr << "[ExternalSim] publish_frame (driver inputs) failed\n";
                 st.main_transport.reset();
@@ -3730,6 +3739,9 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             mf.header.sequence          = st.sequence++;
             mf.header.monotonic_time_ns = NowNs();
             mf.deltas                   = std::move(mdyn);
+#if EV1SIM_HAVE_WIRE_TRUTH
+            if (st.wire) for (const auto& d : mf.deltas) st.wire->mirror_signal(d.signal_id, d.payload.data(), d.payload.size());
+#endif
             if (!st.transport->publish_frame(mf)) {
                 std::cerr << "[ExternalSim] publish_frame (motor state) failed — reconnecting\n";
                 st.transport.reset();
@@ -3763,6 +3775,9 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             ef.header.sequence          = st.sequence++;
             ef.header.monotonic_time_ns = NowNs();
             ef.deltas                   = std::move(env);
+#if EV1SIM_HAVE_WIRE_TRUTH
+            if (st.wire) for (const auto& d : ef.deltas) st.wire->mirror_signal(d.signal_id, d.payload.data(), d.payload.size());
+#endif
             if (!st.transport->publish_frame(ef)) {
                 std::cerr << "[ExternalSim] publish_frame (ambient env) failed — reconnecting\n";
                 st.transport.reset();
@@ -3794,6 +3809,9 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             bf.header.sequence          = st.sequence++;
             bf.header.monotonic_time_ns = NowNs();
             bf.deltas                   = std::move(bdyn);
+#if EV1SIM_HAVE_WIRE_TRUTH
+            if (st.wire) for (const auto& d : bf.deltas) st.wire->mirror_signal(d.signal_id, d.payload.data(), d.payload.size());
+#endif
             if (!st.transport->publish_frame(bf)) {
                 std::cerr << "[ExternalSim] publish_frame (brake pressure) "
                              "failed — reconnecting\n";
