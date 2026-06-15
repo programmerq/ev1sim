@@ -1,4 +1,5 @@
 #include "ExternalSimConnector.h"
+#include "WireTruthChassis.h"  // wire-truth substrate seam (chassis migration)
 
 #include <array>
 #include <cmath>
@@ -1611,6 +1612,14 @@ struct ExternalSimConnector::State {
     std::uint64_t main_sequence = 1;
     double next_main_reconnect_time = 0.0;
 #endif
+
+#if EV1SIM_HAVE_WIRE_TRUTH
+    // Wire-truth substrate handle (chassis migration). Attached lazily once the
+    // ring is up; nullptr means wire-truth is disabled (env unset / segment
+    // down / hash mismatch) and every chassis cell stays on the legacy ring.
+    std::unique_ptr<ev1sim::WireTruthChassis> wire;
+    bool wire_attach_tried = false;
+#endif
 };
 
 ExternalSimConnector::ExternalSimConnector()
@@ -2786,7 +2795,28 @@ EV1SIM_CHASSIS_ID_MATCHES(kSigIpcParkBrakeTelltale,      kSigChassisIpcParkBrake
 EV1SIM_CHASSIS_ID_MATCHES(kSigIpcAntilockTelltale,       kSigChassisIpcAntilockTelltale);
 EV1SIM_CHASSIS_ID_MATCHES(kSigIpcLowTracTelltale,        kSigChassisIpcLowTracTelltale);
 EV1SIM_CHASSIS_ID_MATCHES(kSigIpcAirBagTelltale,         kSigChassisIpcAirBagTelltale);
-EV1SIM_CHASSIS_ID_MATCHES(kSigBpmPackVoltageMv,          kSigChassisBpmPackVoltageMv);
+// kSigChassisBpmPackVoltageMv (4139) is no longer declared by electricsim on
+// the wire-truth branch: it was dropped on 2026-06-15 (Phase C-b
+// "retire-not-migrate"; see electricsim src/io/ev1_chassis_signals.hpp ~L540
+// tombstone + notes/phase_c_chassis_migration_scope.md §9.1) on the grounds
+// that PIM, the only in-repo consumer, moved to the HV-bus rail (4155) and the
+// signal had "no ev1sim contract use". We DROP only the cross-repo drift-guard
+// here (the electricsim constant it referenced is gone); ev1sim's local
+// kSigBpmPackVoltageMv (4139) + its floating-UI pack-voltage plumbing are LEFT
+// INTACT but now inert (the delta never arrives), so the panel reads its
+// sentinel. This is non-fatal and reversible.
+//
+// Two open items, both future work (do NOT design now):
+//   1. electricsim may have *over-removed* 4139 (dropped rather than migrated).
+//      Worth verifying on the electricsim side whether a wire cell was the
+//      right call — tracked as a cross-repo follow-up in
+//      docs/wire_truth_migration_scope.md.
+//   2. ev1sim should not carry its own battery-voltage signal at all: the
+//      planned direction is to expose on-module displays (the IPC LCD) as a
+//      rendered "device" — like the horns and bulbs — rather than subscribe to
+//      a dedicated pack-voltage chassis signal. When that lands, this inert
+//      4139 plumbing is removed outright.
+// @design 2026-06-15 — wire-truth migration kickoff.
 EV1SIM_CHASSIS_ID_MATCHES(kSigIpcServiceNowTelltale,     kSigChassisIpcServiceNowTelltale);
 EV1SIM_CHASSIS_ID_MATCHES(kSigIpcCheckMessagesTelltale,  kSigChassisIpcCheckMessagesTelltale);
 EV1SIM_CHASSIS_ID_MATCHES(kSigIpcTempTelltale,           kSigChassisIpcTempTelltale);
@@ -3026,6 +3056,36 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             }
         }
     }
+
+#if EV1SIM_HAVE_WIRE_TRUTH
+    // 2b. Wire-truth overlay (chassis migration; see docs/wire_truth_migration_scope.md).
+    //     Attach the shared WireTable once the ring is up — the SAME env
+    //     contract every electricsim controller uses (ELECTRICSIM_WIRES_NAME /
+    //     _ROLE, via topology::try_open_from_env behind OpenFromEnv). For a
+    //     migrated CONSUMER cell we PREFER the wire value, but only when its
+    //     producer has actually written it: read_*() returns nullopt until then
+    //     and we keep the ring-derived value just decoded above (kHold-safe).
+    //     This lets ev1sim flip a consumer to the wire BEFORE electricsim's
+    //     producer moves; the path stays dormant-but-correct until it does.
+    //
+    //     Proof-of-life batch: the horn drive lines (chassis 4020/4021 ->
+    //     HORN_DRIVE_LINE_LOW/HIGH, produced by LHJB). LHJB is still ring-only
+    //     today (electricsim Phase C-b Batch B not yet landed), so this overlay
+    //     is a no-op in the live fleet until that lands — then ev1sim reads the
+    //     horn straight off the wire with no further change here.
+    if (!st.wire && !st.wire_attach_tried) {
+        st.wire_attach_tried = true;
+        st.wire = ev1sim::WireTruthChassis::OpenFromEnv("attacher");
+        if (st.wire && st.wire->attached()) {
+            std::cout << "[ExternalSim] wire-truth substrate attached "
+                         "(migrated chassis cells read from the WireTable)\n";
+        }
+    }
+    if (st.wire) {
+        if (auto v = st.wire->horn_low_drive())  st.horn_low  = *v;
+        if (auto v = st.wire->horn_high_drive()) st.horn_high = *v;
+    }
+#endif  // EV1SIM_HAVE_WIRE_TRUTH
 
     // 3. Publish any panel-sensor changes and combination switch pin changes
     //    since last tick.

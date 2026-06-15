@@ -216,6 +216,36 @@ else()
     message(STATUS "electricsim connector: not found (set ELECTRICSIM_DIR to enable external sim)")
 endif()
 
+# ── electricsim wire-truth substrate (optional) ─────────────────────────────
+# electricsim is migrating the chassis bus off the legacy ring onto a shared
+# WireTable (see docs/wire_truth_migration_scope.md).  When the electricsim tree
+# carries the substrate (src/io/wire_table.cpp + the generated topology +
+# topology/env_open.cpp), compile them into a small static lib so ev1sim can
+# attach the shared table as a fleet peer — the same create/attach idiom every
+# electricsim controller uses via topology::try_open_from_env().  This is the
+# SAME ELECTRICSIM_DIR tree the connector links, so the compiled-in topology
+# hash always matches what electricsim built (no vendored copy to drift).
+# Absent (e.g. the CI stub tree) → EV1SIM_HAVE_WIRE_TRUTH off and
+# src/WireTruthChassis.cpp compiles to a disabled no-op.
+set(EV1SIM_HAVE_WIRE_TRUTH FALSE)
+if(ELECTRICSIM_DIR
+   AND EXISTS "${ELECTRICSIM_DIR}/src/io/wire_table.cpp"
+   AND EXISTS "${ELECTRICSIM_DIR}/src/io/topology/topology_generated.h"
+   AND EXISTS "${ELECTRICSIM_DIR}/src/io/topology/env_open.cpp")
+    message(STATUS "electricsim wire-truth substrate: ${ELECTRICSIM_DIR}/src/io")
+    add_library(electricsim_wire_substrate STATIC
+        "${ELECTRICSIM_DIR}/src/io/wire_table.cpp"
+        "${ELECTRICSIM_DIR}/src/io/topology/env_open.cpp")
+    target_include_directories(electricsim_wire_substrate PUBLIC
+        "${ELECTRICSIM_DIR}/src/io")
+    find_package(Threads REQUIRED)
+    target_link_libraries(electricsim_wire_substrate PUBLIC Threads::Threads)
+    set(EV1SIM_HAVE_WIRE_TRUTH TRUE)
+else()
+    message(STATUS "electricsim wire-truth substrate: not found "
+                   "(WireTruthChassis compiled as a disabled no-op)")
+endif()
+
 # ── macOS Objective-C++ support ─────────────────────────────────────────────
 # (OBJCXX is enabled near the top, before FetchContent; here we only pick the
 #  platform source.)
@@ -246,6 +276,7 @@ add_executable(ev1sim
     src/PhysicalWorld.cpp
     src/FloatingUiPanel.cpp
     src/ExternalSimConnector.cpp
+    src/WireTruthChassis.cpp
     ${EV1SIM_WHEEL_IO_SRC}
     ${MACOS_PLATFORM_SRC}
 )
@@ -259,6 +290,10 @@ target_link_libraries(ev1sim PRIVATE
 if(EV1SIM_HAVE_EXTERNAL_SIM)
     target_link_libraries(ev1sim PRIVATE electricsim_connector)
     target_compile_definitions(ev1sim PRIVATE EV1SIM_HAVE_EXTERNAL_SIM=1)
+endif()
+if(EV1SIM_HAVE_WIRE_TRUTH)
+    target_link_libraries(ev1sim PRIVATE electricsim_wire_substrate)
+    target_compile_definitions(ev1sim PRIVATE EV1SIM_HAVE_WIRE_TRUTH=1)
 endif()
 if(_ev1sim_wheel_io)
     target_link_libraries(ev1sim PRIVATE SDL3::SDL3)
@@ -301,6 +336,14 @@ if(BUILD_TESTS)
     )
     FetchContent_MakeAvailable(Catch2)
 
+    # The wire-truth round-trip test creates the shared WireTable (creator role,
+    # declare_all + the real topology hash) and reads it back through
+    # WireTruthChassis, so it only compiles when the substrate is present.
+    set(EV1SIM_WIRE_TRUTH_TEST_SRC "")
+    if(EV1SIM_HAVE_WIRE_TRUTH)
+        set(EV1SIM_WIRE_TRUTH_TEST_SRC tests/test_wire_truth_chassis.cpp)
+    endif()
+
     add_executable(ev1sim_tests
         tests/test_config.cpp
         tests/test_driver_command.cpp
@@ -324,9 +367,11 @@ if(BUILD_TESTS)
         tests/test_input_actions.cpp
         tests/test_hood.cpp
         ${EV1SIM_WHEEL_IO_TEST_SRC}
+        ${EV1SIM_WIRE_TRUTH_TEST_SRC}
         src/Config.cpp
         src/KeyboardInputController.cpp
         src/ExternalSimConnector.cpp
+        src/WireTruthChassis.cpp
         src/Scenario.cpp
         src/ScriptedDriver.cpp
         src/VehicleLights.cpp
@@ -350,6 +395,10 @@ if(BUILD_TESTS)
     if(EV1SIM_HAVE_EXTERNAL_SIM)
         target_link_libraries(ev1sim_tests PRIVATE electricsim_connector)
         target_compile_definitions(ev1sim_tests PRIVATE EV1SIM_HAVE_EXTERNAL_SIM=1)
+    endif()
+    if(EV1SIM_HAVE_WIRE_TRUTH)
+        target_link_libraries(ev1sim_tests PRIVATE electricsim_wire_substrate)
+        target_compile_definitions(ev1sim_tests PRIVATE EV1SIM_HAVE_WIRE_TRUTH=1)
     endif()
     if(_ev1sim_wheel_io)
         target_link_libraries(ev1sim_tests PRIVATE SDL3::SDL3)
