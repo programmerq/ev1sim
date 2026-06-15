@@ -1,9 +1,12 @@
 # Wire-truth migration scope — ev1sim's side of the chassis substrate
 
-**Status:** kickoff (2026-06-15). Phase 1 (scope, this doc) + Phase 2 (horn
-proof-of-life) landed; Phase 3+ (the rest of the groups) is planned here, not
-executed. This doc is written so a later session can execute any group without
-re-deriving anything.
+**Status:** 2026-06-15. Landed: Phase 1 (scope, this doc); the horn consumer
+proof-of-life; and the **full producer-side dual-write** — a table-driven
+`mirror_signal` writes all **84** ev1sim-produced cells onto the wire alongside
+their ring publish (no electricsim dependency). Remaining: the consumer-side
+groups (gated on electricsim's per-cell C-b producer moves) + per-cell
+verification. This doc is written so a later session can execute any group
+without re-deriving anything.
 
 **What this is.** electricsim is moving the chassis bus off the legacy ring
 (`SharedMemoryTransport "electricsim_chassis_bus"`, `DeltaRecord` publish/poll
@@ -31,7 +34,7 @@ onto the wire.
 
 ---
 
-## 1. Headline — ev1sim touches **154** chassis/driver-input cells
+## 1. Headline — ev1sim touches **150** chassis/driver-input cells
 
 Derived by joining `topology.yaml` (`producer:`/`consumers:`/`legacy_signal_id`)
 with `topology_generated.h` (`WireId`s), restricted to the chassis (4000–4197)
@@ -42,22 +45,28 @@ ev1sim **solely consumes** has `consumers: []`):
 | | count |
 |---|---|
 | chassis + driver-input cells declared in topology | 166 |
-| **ev1sim-touched** | **154** |
-| — ev1sim **produces** (`producer:` omitted) | 88 |
-| — ev1sim **consumes** (`consumers: []`) | 63 |
+| **ev1sim-touched** | **150** |
+| — ev1sim **produces** (no `producer:` AND no `driver:`) | 84 |
+| — ev1sim **consumes** (explicit `consumers: []`) | 63 |
 | — ev1sim consumes **+ an in-repo IPC telltale** (bulbs 4002/4012/4013) | 3 |
-| inter-ECU only (NOT ev1sim — e.g. the 12 pure-inter-ECU + HV/aux rails) | 12 |
+| inter-ECU only (NOT ev1sim) | 16 |
 
-**This revises electricsim's "~170" estimate down to 154.** The larger numbers
+**This revises electricsim's "~170" estimate down to 150.** The larger numbers
 in electricsim's doc (163 / 177 / 181 / 185) count inter-ECU cells, the four
 already-migrated HV/charge-wake cells, and the 16 deprecated 6900-range aliases
-— none of which are ev1sim's to move. Type spread of the 154: 96 `bit`, 35
-`float32`, 18 `byte`, 3 `uint32`, 1 `uint16`, 1 `uint64` (the sim-time clock).
+— none of which are ev1sim's to move. Type spread of the 150: 94 `bit`, 35
+`float32`, 18 `byte`, 1 `uint32`, 1 `uint16`, 1 `uint64` (the sim-time clock).
 
-Cross-check: the 12 cells my classifier excludes as inter-ECU match
-electricsim's own "pure-inter-ECU" triage (`phase_c_chassis_migration_scope.md`
-§9.1) plus the already-migrated 4155/4156/4157/4187 — i.e. the cells with NO
-ev1sim end, the only ones whose ring publish can retire without ev1sim moving.
+**Classification rule (a sharp edge worth stating).** A cell is *ev1sim-produced*
+only when it has **neither** `producer:` **nor** `driver:` — `topology.yaml` uses
+both forms, and the four earliest-migrated cells (HV bus 4155/4156/4157,
+charge-wake 4187) carry a `driver:` (`hv_bus_host` / `lhjb_ecu`), so they are
+**electricsim**-produced, not ev1sim's. A cell is *ev1sim-consumed* only with an
+**explicit `consumers: []`** (the convention's "only ev1sim reads it"); an
+*absent* consumers field (as those 4 driver cells have) means inter-ECU, not
+ev1sim. The 16 excluded cells = electricsim's 12 "pure-inter-ECU" triage
+(`phase_c_chassis_migration_scope.md` §9.1) + those 4 already-migrated
+`driver:` cells — the cells with NO ev1sim end.
 
 ---
 
@@ -149,219 +158,215 @@ NOT a per-signal `publish_frame`/`poll_frame` fan-out — it batches:
 Grouped by functional area. `#` is the numeric `WireId` (order-assigned; ev1sim
 never hardcodes it — code resolves the `kWire…` symbol). `dir` is ev1sim's role.
 
-#### Group A — Bulb feeds (ECU→ev1sim) — 17 cells
+#### Group A — Bulb feeds (ECU->ev1sim) — 17 cells
 
 | sig | WireId `kWire…` | # | type | dir |
 |--|--|--|--|--|
-| 4000 | BULB_FEED_LINE_LBL | 73 | bit | ECU→ev1sim (consume) |
-| 4001 | BULB_FEED_LINE_RBL | 74 | bit | ECU→ev1sim (consume) |
-| 4002 | BULB_FEED_LINE_LHBH | 75 | bit | ECU→ev1sim (+IPC) |
-| 4003 | BULB_FEED_LINE_RHBH | 76 | bit | ECU→ev1sim (consume) |
-| 4004 | BULB_FEED_LINE_LLBH | 77 | bit | ECU→ev1sim (consume) |
-| 4005 | BULB_FEED_LINE_RLBH | 78 | bit | ECU→ev1sim (consume) |
-| 4006 | BULB_FEED_LINE_LRSM | 79 | bit | ECU→ev1sim (consume) |
-| 4007 | BULB_FEED_LINE_RRSM | 80 | bit | ECU→ev1sim (consume) |
-| 4008 | BULB_FEED_LINE_LFML | 81 | bit | ECU→ev1sim (consume) |
-| 4009 | BULB_FEED_LINE_RFML | 82 | bit | ECU→ev1sim (consume) |
-| 4010 | BULB_FEED_LINE_LFTS | 83 | bit | ECU→ev1sim (consume) |
-| 4011 | BULB_FEED_LINE_RFTS | 84 | bit | ECU→ev1sim (consume) |
-| 4012 | BULB_FEED_LINE_LRTS | 85 | bit | ECU→ev1sim (+IPC) |
-| 4013 | BULB_FEED_LINE_RRTS | 86 | bit | ECU→ev1sim (+IPC) |
-| 4014 | BULB_FEED_LINE_LRSL | 87 | bit | ECU→ev1sim (consume) |
-| 4015 | BULB_FEED_LINE_CHMSL | 88 | bit | ECU→ev1sim (consume) |
-| 4016 | BULB_FEED_LINE_RRSL | 89 | bit | ECU→ev1sim (consume) |
+| 4000 | BULB_FEED_LINE_LBL | 73 | bit | ECU->ev1sim (consume) |
+| 4001 | BULB_FEED_LINE_RBL | 74 | bit | ECU->ev1sim (consume) |
+| 4002 | BULB_FEED_LINE_LHBH | 75 | bit | ECU->ev1sim (+IPC) |
+| 4003 | BULB_FEED_LINE_RHBH | 76 | bit | ECU->ev1sim (consume) |
+| 4004 | BULB_FEED_LINE_LLBH | 77 | bit | ECU->ev1sim (consume) |
+| 4005 | BULB_FEED_LINE_RLBH | 78 | bit | ECU->ev1sim (consume) |
+| 4006 | BULB_FEED_LINE_LRSM | 79 | bit | ECU->ev1sim (consume) |
+| 4007 | BULB_FEED_LINE_RRSM | 80 | bit | ECU->ev1sim (consume) |
+| 4008 | BULB_FEED_LINE_LFML | 81 | bit | ECU->ev1sim (consume) |
+| 4009 | BULB_FEED_LINE_RFML | 82 | bit | ECU->ev1sim (consume) |
+| 4010 | BULB_FEED_LINE_LFTS | 83 | bit | ECU->ev1sim (consume) |
+| 4011 | BULB_FEED_LINE_RFTS | 84 | bit | ECU->ev1sim (consume) |
+| 4012 | BULB_FEED_LINE_LRTS | 85 | bit | ECU->ev1sim (+IPC) |
+| 4013 | BULB_FEED_LINE_RRTS | 86 | bit | ECU->ev1sim (+IPC) |
+| 4014 | BULB_FEED_LINE_LRSL | 87 | bit | ECU->ev1sim (consume) |
+| 4015 | BULB_FEED_LINE_CHMSL | 88 | bit | ECU->ev1sim (consume) |
+| 4016 | BULB_FEED_LINE_RRSL | 89 | bit | ECU->ev1sim (consume) |
 
-#### Group B — Horn drives (ECU→ev1sim) — 2 cells
-
-| sig | WireId `kWire…` | # | type | dir |
-|--|--|--|--|--|
-| 4020 | HORN_DRIVE_LINE_LOW | 90 | bit | ECU→ev1sim (consume) |
-| 4021 | HORN_DRIVE_LINE_HIGH | 91 | bit | ECU→ev1sim (consume) |
-
-#### Group C — Panel-ajar discretes (ev1sim→ECU) — 4 cells
+#### Group B — Horn drives (ECU->ev1sim) — 2 cells
 
 | sig | WireId `kWire…` | # | type | dir |
 |--|--|--|--|--|
-| 4030 | PANEL_AJAR_HOOD | 92 | bit | ev1sim→ECU (produce) |
-| 4031 | PANEL_AJAR_TRUNK | 93 | bit | ev1sim→ECU (produce) |
-| 4032 | PANEL_AJAR_DOOR_LEFT | 94 | bit | ev1sim→ECU (produce) |
-| 4033 | PANEL_AJAR_DOOR_RIGHT | 95 | bit | ev1sim→ECU (produce) |
+| 4020 | HORN_DRIVE_LINE_LOW | 90 | bit | ECU->ev1sim (consume) |
+| 4021 | HORN_DRIVE_LINE_HIGH | 91 | bit | ECU->ev1sim (consume) |
 
-#### Group D — Driver stalk/switch outputs (ev1sim→ECU) — 22 cells
+#### Group C — Panel-ajar discretes (ev1sim->ECU) — 4 cells
 
 | sig | WireId `kWire…` | # | type | dir |
 |--|--|--|--|--|
-| 4040 | COMB_SW_LOW_BEAM_OUT | 96 | bit | ev1sim→ECU (produce) |
-| 4041 | COMB_SW_FLASH_TO_PASS_OUT | 97 | bit | ev1sim→ECU (produce) |
-| 4042 | COMB_SW_PARK_HEADLAMP_OUT | 98 | bit | ev1sim→ECU (produce) |
-| 4043 | TURN_HAZ_SW_RIGHT_TURN_OUT | 99 | bit | ev1sim→ECU (produce) |
-| 4044 | TURN_HAZ_SW_LEFT_TURN_OUT | 100 | bit | ev1sim→ECU (produce) |
-| 4045 | TURN_HAZ_SW_HAZARD_OUT | 101 | bit | ev1sim→ECU (produce) |
-| 4046 | TURN_HAZ_SW_HORN_OUT | 102 | bit | ev1sim→ECU (produce) |
-| 4047 | CRUISE_SW_SET_COAST_OUT | 103 | bit | ev1sim→ECU (produce) |
-| 4048 | CRUISE_SW_RESUME_ACCEL_OUT | 104 | bit | ev1sim→ECU (produce) |
-| 4049 | CRUISE_SW_ON_OFF_OUT | 105 | bit | ev1sim→ECU (produce) |
-| 4050 | PRND_SELECTOR_A | 106 | bit | ev1sim→ECU (produce) |
-| 4051 | PRND_SELECTOR_B | 107 | bit | ev1sim→ECU (produce) |
-| 4052 | PRND_SELECTOR_C | 108 | bit | ev1sim→ECU (produce) |
-| 4053 | PRND_SELECTOR_D | 109 | bit | ev1sim→ECU (produce) |
-| 4054 | WIPER_SW_DELAY_OUT | 110 | bit | ev1sim→ECU (produce) |
-| 4055 | WIPER_SW_REQUEST_OUT | 111 | bit | ev1sim→ECU (produce) |
-| 4056 | WIPER_SW_HI_OUT | 112 | bit | ev1sim→ECU (produce) |
-| 4057 | WIPER_SW_WASHER_SWITCH_OUT | 113 | bit | ev1sim→ECU (produce) |
-| 4170 | DOOR_LOCK_SW_LH_LOCK_OUT | 186 | bit | ev1sim→ECU (produce) |
-| 4171 | DOOR_LOCK_SW_LH_UNLOCK_OUT | 187 | bit | ev1sim→ECU (produce) |
-| 4172 | DOOR_LOCK_SW_RH_LOCK_OUT | 188 | bit | ev1sim→ECU (produce) |
-| 4173 | DOOR_LOCK_SW_RH_UNLOCK_OUT | 189 | bit | ev1sim→ECU (produce) |
+| 4030 | PANEL_AJAR_HOOD | 92 | bit | ev1sim->ECU (produce) |
+| 4031 | PANEL_AJAR_TRUNK | 93 | bit | ev1sim->ECU (produce) |
+| 4032 | PANEL_AJAR_DOOR_LEFT | 94 | bit | ev1sim->ECU (produce) |
+| 4033 | PANEL_AJAR_DOOR_RIGHT | 95 | bit | ev1sim->ECU (produce) |
+
+#### Group D — Driver stalk/switch outputs (ev1sim->ECU) — 22 cells
+
+| sig | WireId `kWire…` | # | type | dir |
+|--|--|--|--|--|
+| 4040 | COMB_SW_LOW_BEAM_OUT | 96 | bit | ev1sim->ECU (produce) |
+| 4041 | COMB_SW_FLASH_TO_PASS_OUT | 97 | bit | ev1sim->ECU (produce) |
+| 4042 | COMB_SW_PARK_HEADLAMP_OUT | 98 | bit | ev1sim->ECU (produce) |
+| 4043 | TURN_HAZ_SW_RIGHT_TURN_OUT | 99 | bit | ev1sim->ECU (produce) |
+| 4044 | TURN_HAZ_SW_LEFT_TURN_OUT | 100 | bit | ev1sim->ECU (produce) |
+| 4045 | TURN_HAZ_SW_HAZARD_OUT | 101 | bit | ev1sim->ECU (produce) |
+| 4046 | TURN_HAZ_SW_HORN_OUT | 102 | bit | ev1sim->ECU (produce) |
+| 4047 | CRUISE_SW_SET_COAST_OUT | 103 | bit | ev1sim->ECU (produce) |
+| 4048 | CRUISE_SW_RESUME_ACCEL_OUT | 104 | bit | ev1sim->ECU (produce) |
+| 4049 | CRUISE_SW_ON_OFF_OUT | 105 | bit | ev1sim->ECU (produce) |
+| 4050 | PRND_SELECTOR_A | 106 | bit | ev1sim->ECU (produce) |
+| 4051 | PRND_SELECTOR_B | 107 | bit | ev1sim->ECU (produce) |
+| 4052 | PRND_SELECTOR_C | 108 | bit | ev1sim->ECU (produce) |
+| 4053 | PRND_SELECTOR_D | 109 | bit | ev1sim->ECU (produce) |
+| 4054 | WIPER_SW_DELAY_OUT | 110 | bit | ev1sim->ECU (produce) |
+| 4055 | WIPER_SW_REQUEST_OUT | 111 | bit | ev1sim->ECU (produce) |
+| 4056 | WIPER_SW_HI_OUT | 112 | bit | ev1sim->ECU (produce) |
+| 4057 | WIPER_SW_WASHER_SWITCH_OUT | 113 | bit | ev1sim->ECU (produce) |
+| 4170 | DOOR_LOCK_SW_LH_LOCK_OUT | 186 | bit | ev1sim->ECU (produce) |
+| 4171 | DOOR_LOCK_SW_LH_UNLOCK_OUT | 187 | bit | ev1sim->ECU (produce) |
+| 4172 | DOOR_LOCK_SW_RH_LOCK_OUT | 188 | bit | ev1sim->ECU (produce) |
+| 4173 | DOOR_LOCK_SW_RH_UNLOCK_OUT | 189 | bit | ev1sim->ECU (produce) |
 
 #### Group F — Motor / brake-master / sim-time (mixed) — 5 cells
 
 | sig | WireId `kWire…` | # | type | dir |
 |--|--|--|--|--|
-| 4070 | CHASSIS_MOTOR_RPM | 115 | float32 | ev1sim→ECU (produce) |
-| 4071 | CHASSIS_MOTOR_TORQUE_NM | 116 | float32 | ev1sim→ECU (produce) |
-| 4072 | CHASSIS_MOTOR_CURRENT_A | 117 | float32 | ECU→ev1sim (consume) |
-| 4074 | CHASSIS_BRAKE_MASTER_PRESSURE_KPA | 119 | float32 | ev1sim→ECU (produce) |
-| 4075 | CHASSIS_SIM_TIME_NS | 120 | uint64 | ev1sim→ECU (produce) |
+| 4070 | CHASSIS_MOTOR_RPM | 115 | float32 | ev1sim->ECU (produce) |
+| 4071 | CHASSIS_MOTOR_TORQUE_NM | 116 | float32 | ev1sim->ECU (produce) |
+| 4072 | CHASSIS_MOTOR_CURRENT_A | 117 | float32 | ECU->ev1sim (consume) |
+| 4074 | CHASSIS_BRAKE_MASTER_PRESSURE_KPA | 119 | float32 | ev1sim->ECU (produce) |
+| 4075 | CHASSIS_SIM_TIME_NS | 120 | uint64 | ev1sim->ECU (produce) |
 
-#### Group G — ECU actuator/cmd outputs ev1sim renders (ECU→ev1sim) — 9 cells
-
-| sig | WireId `kWire…` | # | type | dir |
-|--|--|--|--|--|
-| 4080 | CHASSIS_WIPER_MOTOR_COMMAND | 121 | byte | ECU→ev1sim (consume) |
-| 4081 | CHASSIS_WASHER_PUMP_COMMAND | 122 | bit | ECU→ev1sim (consume) |
-| 4082 | CHASSIS_HVAC_BLOWER_LEVEL | 123 | byte | ECU→ev1sim (consume) |
-| 4083 | CHASSIS_DEFROST_GRID_ACTIVE | 124 | bit | ECU→ev1sim (consume) |
-| 4084 | CHASSIS_DOOR_LOCK_CMD_DRIVER | 125 | byte | ECU→ev1sim (consume) |
-| 4085 | CHASSIS_DOOR_LOCK_CMD_PASSENGER | 126 | byte | ECU→ev1sim (consume) |
-| 4086 | CHASSIS_POWER_WINDOW_MOTOR_DRIVER | 127 | byte | ECU→ev1sim (consume) |
-| 4087 | CHASSIS_POWER_WINDOW_MOTOR_PASSENGER | 128 | byte | ECU→ev1sim (consume) |
-| 4088 | CHASSIS_RSA_SHIFT_BLOCKED | 129 | bit | ECU→ev1sim (consume) |
-
-#### Group H — Ambient sensors (ev1sim→ECU) — 2 cells
+#### Group G — ECU actuator/cmd outputs ev1sim renders (ECU->ev1sim) — 9 cells
 
 | sig | WireId `kWire…` | # | type | dir |
 |--|--|--|--|--|
-| 4090 | CHASSIS_AMBIENT_TEMP_C | 130 | float32 | ev1sim→ECU (produce) |
-| 4091 | CHASSIS_AMBIENT_HUMIDITY_PCT | 131 | float32 | ev1sim→ECU (produce) |
+| 4080 | CHASSIS_WIPER_MOTOR_COMMAND | 121 | byte | ECU->ev1sim (consume) |
+| 4081 | CHASSIS_WASHER_PUMP_COMMAND | 122 | bit | ECU->ev1sim (consume) |
+| 4082 | CHASSIS_HVAC_BLOWER_LEVEL | 123 | byte | ECU->ev1sim (consume) |
+| 4083 | CHASSIS_DEFROST_GRID_ACTIVE | 124 | bit | ECU->ev1sim (consume) |
+| 4084 | CHASSIS_DOOR_LOCK_CMD_DRIVER | 125 | byte | ECU->ev1sim (consume) |
+| 4085 | CHASSIS_DOOR_LOCK_CMD_PASSENGER | 126 | byte | ECU->ev1sim (consume) |
+| 4086 | CHASSIS_POWER_WINDOW_MOTOR_DRIVER | 127 | byte | ECU->ev1sim (consume) |
+| 4087 | CHASSIS_POWER_WINDOW_MOTOR_PASSENGER | 128 | byte | ECU->ev1sim (consume) |
+| 4088 | CHASSIS_RSA_SHIFT_BLOCKED | 129 | bit | ECU->ev1sim (consume) |
 
-#### Group I — Vehicle dynamics (ev1sim→ECU) — 18 cells
-
-| sig | WireId `kWire…` | # | type | dir |
-|--|--|--|--|--|
-| 4100 | CHASSIS_SPEED_MPS | 132 | float32 | ev1sim→ECU (produce) |
-| 4101 | CHASSIS_ACCEL_LONG | 133 | float32 | ev1sim→ECU (produce) |
-| 4102 | CHASSIS_ACCEL_LAT | 134 | float32 | ev1sim→ECU (produce) |
-| 4103 | CHASSIS_YAW_RATE | 135 | float32 | ev1sim→ECU (produce) |
-| 4104 | CHASSIS_APPLIED_THROTTLE | 136 | float32 | ev1sim→ECU (produce) |
-| 4105 | CHASSIS_APPLIED_FRONT_BRAKE | 137 | float32 | ev1sim→ECU (produce) |
-| 4106 | CHASSIS_APPLIED_REAR_BRAKE | 138 | float32 | ev1sim→ECU (produce) |
-| 4107 | CHASSIS_FRONT_BRAKE_PRESSURE | 139 | float32 | ev1sim→ECU (produce) |
-| 4108 | CHASSIS_REAR_BRAKE_POSITION | 140 | float32 | ev1sim→ECU (produce) |
-| 4109 | CHASSIS_STEERING_TORQUE | 141 | float32 | ev1sim→ECU (produce) |
-| 4110 | CHASSIS_WHEEL_OMEGA_FL | 142 | float32 | ev1sim→ECU (produce) |
-| 4111 | CHASSIS_WHEEL_OMEGA_FR | 143 | float32 | ev1sim→ECU (produce) |
-| 4112 | CHASSIS_WHEEL_OMEGA_RL | 144 | float32 | ev1sim→ECU (produce) |
-| 4113 | CHASSIS_WHEEL_OMEGA_RR | 145 | float32 | ev1sim→ECU (produce) |
-| 4120 | CHASSIS_SLIP_RATIO_FL | 146 | float32 | ev1sim→ECU (produce) |
-| 4121 | CHASSIS_SLIP_RATIO_FR | 147 | float32 | ev1sim→ECU (produce) |
-| 4122 | CHASSIS_SLIP_RATIO_RL | 148 | float32 | ev1sim→ECU (produce) |
-| 4123 | CHASSIS_SLIP_RATIO_RR | 149 | float32 | ev1sim→ECU (produce) |
-
-#### Group J — IPC telltales / LCD-derived (ECU→ev1sim) — 30 cells
+#### Group H — Ambient sensors (ev1sim->ECU) — 2 cells
 
 | sig | WireId `kWire…` | # | type | dir |
 |--|--|--|--|--|
-| 4130 | CHASSIS_IPC_SEATBELT_TELLTALE_DRIVER | 150 | bit | ECU→ev1sim (consume) |
-| 4131 | CHASSIS_IPC_SEATBELT_TELLTALE_PASSENGER | 151 | bit | ECU→ev1sim (consume) |
-| 4132 | CHASSIS_IPC_TRIP_DISTANCE_M | 152 | float32 | ECU→ev1sim (consume) |
-| 4134 | CHASSIS_IPC_BRAKE_TELLTALE | 153 | bit | ECU→ev1sim (consume) |
-| 4135 | CHASSIS_IPC_PARK_BRAKE_TELLTALE | 154 | bit | ECU→ev1sim (consume) |
-| 4136 | CHASSIS_IPC_ANTILOCK_TELLTALE | 155 | bit | ECU→ev1sim (consume) |
-| 4138 | CHASSIS_IPC_AIR_BAG_TELLTALE | 157 | bit | ECU→ev1sim (consume) |
-| 4140 | CHASSIS_IPC_SERVICE_NOW_TELLTALE | 158 | bit | ECU→ev1sim (consume) |
-| 4141 | CHASSIS_IPC_CHECK_MESSAGES_TELLTALE | 159 | bit | ECU→ev1sim (consume) |
-| 4142 | CHASSIS_IPC_TEMP_TELLTALE | 160 | bit | ECU→ev1sim (consume) |
-| 4143 | CHASSIS_IPC_BATTERY_LIFE_TELLTALE | 161 | bit | ECU→ev1sim (consume) |
-| 4144 | CHASSIS_IPC_REDUCED_PERF_TELLTALE | 162 | bit | ECU→ev1sim (consume) |
-| 4145 | CHASSIS_IPC_CHECK_TIRE_PRESS_TELLTALE | 163 | bit | ECU→ev1sim (consume) |
-| 4147 | CHASSIS_BTCM_ISO_CLOSE_FL | 171 | bit | ECU→ev1sim (consume) |
-| 4148 | CHASSIS_BTCM_ISO_CLOSE_FR | 172 | bit | ECU→ev1sim (consume) |
-| 4149 | CHASSIS_BTCM_DUMP_OPEN_FL | 173 | bit | ECU→ev1sim (consume) |
-| 4150 | CHASSIS_BTCM_DUMP_OPEN_FR | 174 | bit | ECU→ev1sim (consume) |
-| 4151 | CHASSIS_BTCM_EMB_MOTOR_CMD_LR | 175 | float32 | ECU→ev1sim (consume) |
-| 4152 | CHASSIS_BTCM_EMB_MOTOR_CMD_RR | 176 | float32 | ECU→ev1sim (consume) |
-| 4153 | CHASSIS_BTCM_CYL_PRESSURE_FL_K_PA | 177 | float32 | ECU→ev1sim (consume) |
-| 4154 | CHASSIS_BTCM_CYL_PRESSURE_FR_K_PA | 178 | float32 | ECU→ev1sim (consume) |
-| 4155 | HV_BUS_VOLTAGE_MV | 59 | uint32 | ev1sim→ECU (produce) |
-| 4156 | HV_BUS_PRESENT | 61 | bit | ev1sim→ECU (produce) |
-| 4157 | HV_BUS_CURRENT_MA | 60 | uint32 | ev1sim→ECU (produce) |
-| 4158 | CHASSIS_IPC_LEFT_TURN_TELLTALE | 164 | bit | ECU→ev1sim (consume) |
-| 4159 | CHASSIS_IPC_RIGHT_TURN_TELLTALE | 165 | bit | ECU→ev1sim (consume) |
-| 4160 | CHASSIS_IPC_HIGH_BEAM_TELLTALE | 166 | bit | ECU→ev1sim (consume) |
-| 4161 | CHASSIS_IPC_PARK_LAMP_TELLTALE | 167 | bit | ECU→ev1sim (consume) |
-| 4162 | CHASSIS_IPC_DOOR_AJAR_TELLTALE | 168 | bit | ECU→ev1sim (consume) |
-| 4163 | CHASSIS_IPC_DIM_DUTY_PCT | 169 | byte | ECU→ev1sim (consume) |
+| 4090 | CHASSIS_AMBIENT_TEMP_C | 130 | float32 | ev1sim->ECU (produce) |
+| 4091 | CHASSIS_AMBIENT_HUMIDITY_PCT | 131 | float32 | ev1sim->ECU (produce) |
 
-#### Group K — Door-lock state / road grade / pitch (ev1sim→ECU) — 5 cells
+#### Group I — Vehicle dynamics (ev1sim->ECU) — 18 cells
 
 | sig | WireId `kWire…` | # | type | dir |
 |--|--|--|--|--|
-| 4165 | CHASSIS_DOOR_LOCK_STATE_DRIVER | 181 | bit | ev1sim→ECU (produce) |
-| 4166 | CHASSIS_DOOR_LOCK_STATE_PASSENGER | 182 | bit | ev1sim→ECU (produce) |
-| 4167 | CHASSIS_DOOR_LOCK_STATE_TRUNK | 183 | bit | ev1sim→ECU (produce) |
-| 4168 | CHASSIS_ROAD_GRADE_PCT | 184 | float32 | ev1sim→ECU (produce) |
-| 4169 | CHASSIS_PITCH_DEG | 185 | float32 | ev1sim→ECU (produce) |
+| 4100 | CHASSIS_SPEED_MPS | 132 | float32 | ev1sim->ECU (produce) |
+| 4101 | CHASSIS_ACCEL_LONG | 133 | float32 | ev1sim->ECU (produce) |
+| 4102 | CHASSIS_ACCEL_LAT | 134 | float32 | ev1sim->ECU (produce) |
+| 4103 | CHASSIS_YAW_RATE | 135 | float32 | ev1sim->ECU (produce) |
+| 4104 | CHASSIS_APPLIED_THROTTLE | 136 | float32 | ev1sim->ECU (produce) |
+| 4105 | CHASSIS_APPLIED_FRONT_BRAKE | 137 | float32 | ev1sim->ECU (produce) |
+| 4106 | CHASSIS_APPLIED_REAR_BRAKE | 138 | float32 | ev1sim->ECU (produce) |
+| 4107 | CHASSIS_FRONT_BRAKE_PRESSURE | 139 | float32 | ev1sim->ECU (produce) |
+| 4108 | CHASSIS_REAR_BRAKE_POSITION | 140 | float32 | ev1sim->ECU (produce) |
+| 4109 | CHASSIS_STEERING_TORQUE | 141 | float32 | ev1sim->ECU (produce) |
+| 4110 | CHASSIS_WHEEL_OMEGA_FL | 142 | float32 | ev1sim->ECU (produce) |
+| 4111 | CHASSIS_WHEEL_OMEGA_FR | 143 | float32 | ev1sim->ECU (produce) |
+| 4112 | CHASSIS_WHEEL_OMEGA_RL | 144 | float32 | ev1sim->ECU (produce) |
+| 4113 | CHASSIS_WHEEL_OMEGA_RR | 145 | float32 | ev1sim->ECU (produce) |
+| 4120 | CHASSIS_SLIP_RATIO_FL | 146 | float32 | ev1sim->ECU (produce) |
+| 4121 | CHASSIS_SLIP_RATIO_FR | 147 | float32 | ev1sim->ECU (produce) |
+| 4122 | CHASSIS_SLIP_RATIO_RL | 148 | float32 | ev1sim->ECU (produce) |
+| 4123 | CHASSIS_SLIP_RATIO_RR | 149 | float32 | ev1sim->ECU (produce) |
 
-#### Group L — RHJB sub-modules + inter-ECU (ECU→ev1sim) — 11 cells
-
-| sig | WireId `kWire…` | # | type | dir |
-|--|--|--|--|--|
-| 4180 | CHASSIS_RHJB_PMM_RUN1_BUS | 190 | bit | ECU→ev1sim (consume) |
-| 4181 | CHASSIS_RHJB_PMM_RUN2_BUS | 191 | bit | ECU→ev1sim (consume) |
-| 4182 | CHASSIS_RHJB_DLM_LH_LOCK | 192 | bit | ECU→ev1sim (consume) |
-| 4183 | CHASSIS_RHJB_DLM_LH_UNLOCK | 193 | bit | ECU→ev1sim (consume) |
-| 4184 | CHASSIS_RHJB_DLM_RH_LOCK | 194 | bit | ECU→ev1sim (consume) |
-| 4185 | CHASSIS_RHJB_DLM_RH_UNLOCK | 195 | bit | ECU→ev1sim (consume) |
-| 4186 | CHASSIS_RHJB_DILM_LEVEL | 196 | byte | ECU→ev1sim (consume) |
-| 4187 | LHJB_CHARGE_WAKE_PASSTHRU | 16 | bit | ev1sim→ECU (produce) |
-| 4192 | CHASSIS_AUX_BATTERY_TERMINAL_MV | 201 | uint32 | ECU→ev1sim (consume) |
-| 4193 | CHASSIS_AUX_BATTERY_PRESENT | 202 | bit | ECU→ev1sim (consume) |
-| 4194 | CHASSIS_AUX_BATTERY_SOC_PCT | 203 | byte | ECU→ev1sim (consume) |
-
-#### Group M — Driver inputs (main segment) (ev1sim→ECU) — 29 cells
+#### Group J — IPC telltales / LCD-derived (ECU->ev1sim) — 27 cells
 
 | sig | WireId `kWire…` | # | type | dir |
 |--|--|--|--|--|
-| 6900 | DRIVER_BRAKE_PEDAL_Q8 | 206 | byte | ev1sim→ECU (produce) |
-| 6901 | DRIVER_STEERING_DEG_Q8 | 207 | uint16 | ev1sim→ECU (produce) |
-| 6902 | DRIVER_GEAR_SELECTOR | 208 | byte | ev1sim→ECU (produce) |
-| 6903 | DRIVER_THROTTLE_Q8 | 209 | byte | ev1sim→ECU (produce) |
-| 6904 | DRIVER_BRAKE_SWITCH | 210 | bit | ev1sim→ECU (produce) |
-| 6910 | EXT_WHEEL_SPEED_FL | 213 | float32 | ev1sim→ECU (produce) |
-| 6911 | EXT_WHEEL_SPEED_FR | 214 | float32 | ev1sim→ECU (produce) |
-| 6912 | EXT_WHEEL_SPEED_RL | 215 | float32 | ev1sim→ECU (produce) |
-| 6913 | EXT_WHEEL_SPEED_RR | 216 | float32 | ev1sim→ECU (produce) |
-| 6952 | DRIVER_IPC_TRIP_RESET_BUTTON | 217 | bit | ev1sim→ECU (produce) |
-| 6964 | DRIVER_SEATBELT_BUCKLED | 211 | bit | ev1sim→ECU (produce) |
-| 6965 | DRIVER_SEATBELT_BUCKLED_PASSENGER | 212 | bit | ev1sim→ECU (produce) |
-| 6971 | DRIVER_RSA_MODE_BUTTON | 218 | byte | ev1sim→ECU (produce) |
-| 6975 | DRIVER_RSA_KEYPAD_BUTTON1 | 219 | bit | ev1sim→ECU (produce) |
-| 6976 | DRIVER_RSA_KEYPAD_BUTTON2 | 220 | bit | ev1sim→ECU (produce) |
-| 6977 | DRIVER_RSA_KEYPAD_BUTTON3 | 221 | bit | ev1sim→ECU (produce) |
-| 6978 | DRIVER_RSA_KEYPAD_BUTTON4 | 222 | bit | ev1sim→ECU (produce) |
-| 6979 | DRIVER_RSA_KEYPAD_BUTTON5 | 223 | bit | ev1sim→ECU (produce) |
-| 6980 | DRIVER_POWER_WINDOW_DRIVER_UP | 224 | bit | ev1sim→ECU (produce) |
-| 6981 | DRIVER_POWER_WINDOW_DRIVER_DOWN | 225 | bit | ev1sim→ECU (produce) |
-| 6982 | DRIVER_POWER_WINDOW_PASSENGER_UP | 226 | bit | ev1sim→ECU (produce) |
-| 6983 | DRIVER_POWER_WINDOW_PASSENGER_DOWN | 227 | bit | ev1sim→ECU (produce) |
-| 6985 | DRIVER_RSA_EXTERIOR_KEYPAD1 | 228 | byte | ev1sim→ECU (produce) |
-| 6986 | DRIVER_RSA_EXTERIOR_KEYPAD2 | 229 | byte | ev1sim→ECU (produce) |
-| 6987 | DRIVER_RSA_EXTERIOR_KEYPAD3 | 230 | byte | ev1sim→ECU (produce) |
-| 6988 | DRIVER_RSA_EXTERIOR_KEYPAD4 | 231 | byte | ev1sim→ECU (produce) |
-| 6989 | DRIVER_RSA_EXTERIOR_KEYPAD5 | 232 | byte | ev1sim→ECU (produce) |
-| 6990 | DRIVER_DOOR_HANDLE_ATTEMPT_DRIVER | 233 | bit | ev1sim→ECU (produce) |
-| 6991 | DRIVER_DOOR_HANDLE_ATTEMPT_PASSENGER | 234 | bit | ev1sim→ECU (produce) |
+| 4130 | CHASSIS_IPC_SEATBELT_TELLTALE_DRIVER | 150 | bit | ECU->ev1sim (consume) |
+| 4131 | CHASSIS_IPC_SEATBELT_TELLTALE_PASSENGER | 151 | bit | ECU->ev1sim (consume) |
+| 4132 | CHASSIS_IPC_TRIP_DISTANCE_M | 152 | float32 | ECU->ev1sim (consume) |
+| 4134 | CHASSIS_IPC_BRAKE_TELLTALE | 153 | bit | ECU->ev1sim (consume) |
+| 4135 | CHASSIS_IPC_PARK_BRAKE_TELLTALE | 154 | bit | ECU->ev1sim (consume) |
+| 4136 | CHASSIS_IPC_ANTILOCK_TELLTALE | 155 | bit | ECU->ev1sim (consume) |
+| 4138 | CHASSIS_IPC_AIR_BAG_TELLTALE | 157 | bit | ECU->ev1sim (consume) |
+| 4140 | CHASSIS_IPC_SERVICE_NOW_TELLTALE | 158 | bit | ECU->ev1sim (consume) |
+| 4141 | CHASSIS_IPC_CHECK_MESSAGES_TELLTALE | 159 | bit | ECU->ev1sim (consume) |
+| 4142 | CHASSIS_IPC_TEMP_TELLTALE | 160 | bit | ECU->ev1sim (consume) |
+| 4143 | CHASSIS_IPC_BATTERY_LIFE_TELLTALE | 161 | bit | ECU->ev1sim (consume) |
+| 4144 | CHASSIS_IPC_REDUCED_PERF_TELLTALE | 162 | bit | ECU->ev1sim (consume) |
+| 4145 | CHASSIS_IPC_CHECK_TIRE_PRESS_TELLTALE | 163 | bit | ECU->ev1sim (consume) |
+| 4147 | CHASSIS_BTCM_ISO_CLOSE_FL | 171 | bit | ECU->ev1sim (consume) |
+| 4148 | CHASSIS_BTCM_ISO_CLOSE_FR | 172 | bit | ECU->ev1sim (consume) |
+| 4149 | CHASSIS_BTCM_DUMP_OPEN_FL | 173 | bit | ECU->ev1sim (consume) |
+| 4150 | CHASSIS_BTCM_DUMP_OPEN_FR | 174 | bit | ECU->ev1sim (consume) |
+| 4151 | CHASSIS_BTCM_EMB_MOTOR_CMD_LR | 175 | float32 | ECU->ev1sim (consume) |
+| 4152 | CHASSIS_BTCM_EMB_MOTOR_CMD_RR | 176 | float32 | ECU->ev1sim (consume) |
+| 4153 | CHASSIS_BTCM_CYL_PRESSURE_FL_K_PA | 177 | float32 | ECU->ev1sim (consume) |
+| 4154 | CHASSIS_BTCM_CYL_PRESSURE_FR_K_PA | 178 | float32 | ECU->ev1sim (consume) |
+| 4158 | CHASSIS_IPC_LEFT_TURN_TELLTALE | 164 | bit | ECU->ev1sim (consume) |
+| 4159 | CHASSIS_IPC_RIGHT_TURN_TELLTALE | 165 | bit | ECU->ev1sim (consume) |
+| 4160 | CHASSIS_IPC_HIGH_BEAM_TELLTALE | 166 | bit | ECU->ev1sim (consume) |
+| 4161 | CHASSIS_IPC_PARK_LAMP_TELLTALE | 167 | bit | ECU->ev1sim (consume) |
+| 4162 | CHASSIS_IPC_DOOR_AJAR_TELLTALE | 168 | bit | ECU->ev1sim (consume) |
+| 4163 | CHASSIS_IPC_DIM_DUTY_PCT | 169 | byte | ECU->ev1sim (consume) |
+
+#### Group K — Door-lock state / road grade / pitch (ev1sim->ECU) — 5 cells
+
+| sig | WireId `kWire…` | # | type | dir |
+|--|--|--|--|--|
+| 4165 | CHASSIS_DOOR_LOCK_STATE_DRIVER | 181 | bit | ev1sim->ECU (produce) |
+| 4166 | CHASSIS_DOOR_LOCK_STATE_PASSENGER | 182 | bit | ev1sim->ECU (produce) |
+| 4167 | CHASSIS_DOOR_LOCK_STATE_TRUNK | 183 | bit | ev1sim->ECU (produce) |
+| 4168 | CHASSIS_ROAD_GRADE_PCT | 184 | float32 | ev1sim->ECU (produce) |
+| 4169 | CHASSIS_PITCH_DEG | 185 | float32 | ev1sim->ECU (produce) |
+
+#### Group L — RHJB sub-modules + inter-ECU (ECU->ev1sim) — 10 cells
+
+| sig | WireId `kWire…` | # | type | dir |
+|--|--|--|--|--|
+| 4180 | CHASSIS_RHJB_PMM_RUN1_BUS | 190 | bit | ECU->ev1sim (consume) |
+| 4181 | CHASSIS_RHJB_PMM_RUN2_BUS | 191 | bit | ECU->ev1sim (consume) |
+| 4182 | CHASSIS_RHJB_DLM_LH_LOCK | 192 | bit | ECU->ev1sim (consume) |
+| 4183 | CHASSIS_RHJB_DLM_LH_UNLOCK | 193 | bit | ECU->ev1sim (consume) |
+| 4184 | CHASSIS_RHJB_DLM_RH_LOCK | 194 | bit | ECU->ev1sim (consume) |
+| 4185 | CHASSIS_RHJB_DLM_RH_UNLOCK | 195 | bit | ECU->ev1sim (consume) |
+| 4186 | CHASSIS_RHJB_DILM_LEVEL | 196 | byte | ECU->ev1sim (consume) |
+| 4192 | CHASSIS_AUX_BATTERY_TERMINAL_MV | 201 | uint32 | ECU->ev1sim (consume) |
+| 4193 | CHASSIS_AUX_BATTERY_PRESENT | 202 | bit | ECU->ev1sim (consume) |
+| 4194 | CHASSIS_AUX_BATTERY_SOC_PCT | 203 | byte | ECU->ev1sim (consume) |
+
+#### Group M — Driver inputs (main segment) (ev1sim->ECU) — 29 cells
+
+| sig | WireId `kWire…` | # | type | dir |
+|--|--|--|--|--|
+| 6900 | DRIVER_BRAKE_PEDAL_Q8 | 206 | byte | ev1sim->ECU (produce) |
+| 6901 | DRIVER_STEERING_DEG_Q8 | 207 | uint16 | ev1sim->ECU (produce) |
+| 6902 | DRIVER_GEAR_SELECTOR | 208 | byte | ev1sim->ECU (produce) |
+| 6903 | DRIVER_THROTTLE_Q8 | 209 | byte | ev1sim->ECU (produce) |
+| 6904 | DRIVER_BRAKE_SWITCH | 210 | bit | ev1sim->ECU (produce) |
+| 6910 | EXT_WHEEL_SPEED_FL | 213 | float32 | ev1sim->ECU (produce) |
+| 6911 | EXT_WHEEL_SPEED_FR | 214 | float32 | ev1sim->ECU (produce) |
+| 6912 | EXT_WHEEL_SPEED_RL | 215 | float32 | ev1sim->ECU (produce) |
+| 6913 | EXT_WHEEL_SPEED_RR | 216 | float32 | ev1sim->ECU (produce) |
+| 6952 | DRIVER_IPC_TRIP_RESET_BUTTON | 217 | bit | ev1sim->ECU (produce) |
+| 6964 | DRIVER_SEATBELT_BUCKLED | 211 | bit | ev1sim->ECU (produce) |
+| 6965 | DRIVER_SEATBELT_BUCKLED_PASSENGER | 212 | bit | ev1sim->ECU (produce) |
+| 6971 | DRIVER_RSA_MODE_BUTTON | 218 | byte | ev1sim->ECU (produce) |
+| 6975 | DRIVER_RSA_KEYPAD_BUTTON1 | 219 | bit | ev1sim->ECU (produce) |
+| 6976 | DRIVER_RSA_KEYPAD_BUTTON2 | 220 | bit | ev1sim->ECU (produce) |
+| 6977 | DRIVER_RSA_KEYPAD_BUTTON3 | 221 | bit | ev1sim->ECU (produce) |
+| 6978 | DRIVER_RSA_KEYPAD_BUTTON4 | 222 | bit | ev1sim->ECU (produce) |
+| 6979 | DRIVER_RSA_KEYPAD_BUTTON5 | 223 | bit | ev1sim->ECU (produce) |
+| 6980 | DRIVER_POWER_WINDOW_DRIVER_UP | 224 | bit | ev1sim->ECU (produce) |
+| 6981 | DRIVER_POWER_WINDOW_DRIVER_DOWN | 225 | bit | ev1sim->ECU (produce) |
+| 6982 | DRIVER_POWER_WINDOW_PASSENGER_UP | 226 | bit | ev1sim->ECU (produce) |
+| 6983 | DRIVER_POWER_WINDOW_PASSENGER_DOWN | 227 | bit | ev1sim->ECU (produce) |
+| 6985 | DRIVER_RSA_EXTERIOR_KEYPAD1 | 228 | byte | ev1sim->ECU (produce) |
+| 6986 | DRIVER_RSA_EXTERIOR_KEYPAD2 | 229 | byte | ev1sim->ECU (produce) |
+| 6987 | DRIVER_RSA_EXTERIOR_KEYPAD3 | 230 | byte | ev1sim->ECU (produce) |
+| 6988 | DRIVER_RSA_EXTERIOR_KEYPAD4 | 231 | byte | ev1sim->ECU (produce) |
+| 6989 | DRIVER_RSA_EXTERIOR_KEYPAD5 | 232 | byte | ev1sim->ECU (produce) |
+| 6990 | DRIVER_DOOR_HANDLE_ATTEMPT_DRIVER | 233 | bit | ev1sim->ECU (produce) |
+| 6991 | DRIVER_DOOR_HANDLE_ATTEMPT_PASSENGER | 234 | bit | ev1sim->ECU (produce) |
 
 ---
 
@@ -394,14 +399,22 @@ The **gating asymmetry** (electricsim `phase_c_chassis_migration_scope.md` §9):
 | F Motor/brake/sim-time | 5 | mixed | partial | ~1.5 h | 4072 consume (PIM); 4075 is uint64 sim-time |
 | A Bulb feeds | 17 | consume | C-b Batch A | ~1.5 h | dormant until LHJB→wire; 3 also feed IPC |
 | G ECU actuator outputs | 9 | consume | C-b (rhjb/htcm/rsa) | ~1.5 h | wiper/hvac/doorlock/window render |
-| J IPC telltales / LCD | 30 | consume | C-b Batch M | ~3 h | see §8 — likely superseded by LCD-as-device |
-| L RHJB sub-modules | 11 | consume | C-b Batch C | ~2 h | PMM/DLM/DILM render |
+| J IPC telltales / LCD | 27 | consume | C-b Batch M | ~3 h | see §8 — likely superseded by LCD-as-device |
+| L RHJB sub-modules | 10 | consume | C-b Batch C | ~2 h | PMM/DLM/DILM render |
 
-**Total remaining effort: ~20–22 h** of mechanical migration + per-group tests,
-spread across ~11 groups. (Lower than electricsim's ~50 h for its side: ev1sim
-dual-writes/overlays rather than re-architecting producer/consumer ownership.)
-Producer groups (C,D,H,I,K,M,F-partial ≈ 85 cells, ~11 h) carry no cross-repo
-dependency and should go first.
+**Update (2026-06-15): the producer side is mechanism-complete.** The
+table-driven `mirror_signal` dual-write (commit landing this session) already
+mirrors all **84** producer cells (groups C, D, H, I, K, M, and the F
+producers) — so those rows are done at the mechanism level; only per-cell
+spot-verification remains for them. The producer-effort column above is the
+historical estimate, retained for context.
+
+**Remaining effort: ~10–12 h**, almost all consumer-side (groups A, G, J, L +
+the F/I consumer cells), each gated on electricsim's matching C-b producer move
+(§6.1). The consumer mechanism is a near-mirror of the producer one (reuse the
+`DebugInject*(signal_id, …)` dispatch); once it lands, remaining work is
+registry rows + tests. (Still far below electricsim's ~50 h: ev1sim
+dual-writes/overlays rather than re-architecting ownership.)
 
 ---
 
@@ -416,7 +429,7 @@ dependency and should go first.
    electricsim Batch B (LHJB→wire) lands. This is expected, not a defect.
 3. **Multi-producer / bidirectional cells.** `kSigChargerCouplerPresent` (4060)
    is produced by BOTH ev1sim (operator UI) and electricsim's charger demo, so
-   it classifies as inter-ECU here and is *excluded* from the clean 154 — it
+   it classifies as inter-ECU here and is *excluded* from the clean 150 — it
    needs an explicit multi-writer policy (electricsim §6.2) before ev1sim writes
    it. The door-lock cmd (4084/85, ECU→ev1sim) vs door-lock *state* (4165/66,
    ev1sim→ECU) pair moves in lock-step across two IDs with an ordering
@@ -501,7 +514,7 @@ additionally requires electricsim Batch B (LHJB→wire); see §8.
    all: display items move to on-module signals (the **IPC LCD**), and ev1sim
    exposes the LCD as a rendered **"device"** — like the horns and bulbs — rather
    than subscribing to a dedicated chassis voltage signal. This likely supersedes
-   much of **Group J** (IPC telltales as discrete signals): instead of 30
+   much of **Group J** (IPC telltales as discrete signals): instead of 27
    telltale wire cells, ev1sim renders the IPC LCD summary (`kSigIpcLcdState`,
    already on the bus). Revisit Group J's plan once the LCD-as-device model is
    designed.
@@ -513,7 +526,7 @@ additionally requires electricsim Batch B (LHJB→wire); see §8.
 ## 9. Suggested sequencing
 
 1. **Producer groups first** (no cross-repo dep): C → H → K → D → I → M, then the
-   F producer cells. ~85 cells, ~11 h, each a dual-write + test. Immediately
+   F producer cells. ~84 cells, ~11 h, each a dual-write + test. Immediately
    useful: electricsim consumers can flip to the wire as they're ready.
 2. **sim-time (4075)** as its own step once `WireTruthChassis` grows uint64
    accessors (§6.4).
