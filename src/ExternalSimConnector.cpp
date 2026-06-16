@@ -2929,133 +2929,15 @@ void ExternalSimConnector::Tick(double sim_time_s) {
     constexpr double kBrakeHeartbeatPeriodS = 0.200;
     const bool brake_heartbeat_due = sim_time_s >= st.next_brake_heartbeat;
 
-    // 1. Open transport if we don't have one (reconnect logic).
-    //    SharedMemoryTransport's ctor silently no-ops on failure, so we
-    //    verify by round-tripping a heartbeat frame and fall back into
-    //    the reconnect timer if it can't be written.
-    if (!st.transport) {
-        if (sim_time_s < st.next_reconnect_time) return;
-        SharedMemoryTransportOptions opts{};
-        opts.name   = m_opts.bus_name;
-        opts.create = true;    // tolerate being first on the bus
-
-        auto candidate = std::make_unique<SharedMemoryTransport>(opts);
-        Frame hb{};
-        hb.header.type              = FrameType::Heartbeat;
-        hb.header.stream_id         = kStreamEv1Sim;
-        hb.header.sequence          = st.sequence;
-        hb.header.monotonic_time_ns = NowNs();
-        if (!candidate->publish_frame(hb)) {
-            st.status = Status::Connecting;
-            st.next_reconnect_time = sim_time_s + m_opts.reconnect_period_s;
-            std::cerr << "[ExternalSim] connect to '" << m_opts.bus_name
-                      << "' failed — retry in "
-                      << m_opts.reconnect_period_s << "s\n";
-            return;
-        }
-        st.sequence++;
-        st.transport = std::move(candidate);
-        st.status    = Status::Connected;
-        st.next_presence_time    = 0.0;
-        st.panel_ever_published  = false;  // re-publish all panels after reconnect
-        st.turn_haz_ever_published = false; // re-publish turn/hazard cavities after reconnect
-        st.wiper_ever_published    = false; // re-publish wiper cavities after reconnect
-        // Force re-publish of all chassis outputs after reconnect.
-        st.charge_coupler_present_pub = -1;
-        st.prnd_a_pub = -1;
-        st.prnd_b_pub = -1;
-        st.prnd_c_pub = -1;
-        st.prnd_d_pub = -1;
-        st.steering_pump_interlock_pub = -1;
-        st.hvac_temp_setpoint_pub   = -9999.0f;
-        st.hvac_fan_request_pub      = -1;
-        st.hvac_mode_request_pub     = -1;
-        st.hvac_ac_request_pub       = -1;
-        st.hvac_defrost_request_pub  = -1;
-        st.door_lock_state_driver_pub    = -1;
-        st.door_lock_state_passenger_pub = -1;
-        st.door_lock_state_trunk_pub     = -1;
-        std::cout << "[ExternalSim] connected to bus '"
-                  << m_opts.bus_name << "'\n";
-    }
-
-    // 2. Drain incoming frames.
-    for (;;) {
-        PollResult polled = st.transport->poll_frame(std::chrono::milliseconds(0));
-        if (polled.status == PollStatus::Timeout) break;
-        if (polled.status == PollStatus::Closed) {
-            std::cerr << "[ExternalSim] transport closed — reconnecting\n";
-            st.transport.reset();
-            st.status = Status::Connecting;
-            st.next_reconnect_time = sim_time_s + m_opts.reconnect_period_s;
-            return;
-        }
-        if (polled.status == PollStatus::Corrupt) continue;
-        if (polled.frame.header.stream_id == kStreamEv1Sim) continue;  // our echo
-        if (polled.frame.header.type != FrameType::DeltaBatch) continue;
-
-        for (const auto& d : polled.frame.deltas) {
-            const Endpoint* ep = FindEndpoint(d.signal_id);
-            if (!ep || !ep->input_to_sim) continue;
-            if (d.payload.empty()) continue;
-            // float32 LE chassis-bus signals — decode as 4-byte little-endian float.
-            if (d.signal_id == kSigIpcTripDistanceM            ||
-                d.signal_id == kSigSteeringCmd                 ||
-                d.signal_id == kSigChassisBtcmEmbMotorCmdLR    ||
-                d.signal_id == kSigChassisBtcmEmbMotorCmdRR    ||
-                d.signal_id == kSigChassisBtcmCylPressureFL_kPa ||
-                d.signal_id == kSigChassisBtcmCylPressureFR_kPa) {
-                if (d.payload.size() >= 4) {
-                    DebugInjectFloat(d.signal_id,
-                        [&]() -> float {
-                            std::uint32_t bits = 0;
-                            for (int b = 0; b < 4; ++b)
-                                bits |= static_cast<std::uint32_t>(d.payload[static_cast<std::size_t>(b)]) << (b * 8);
-                            float v; std::memcpy(&v, &bits, 4); return v;
-                        }());
-                }
-            // uint32 LE chassis-bus signals — decode as 4-byte little-endian unsigned.
-            } else if (d.signal_id == kSigBpmPackVoltageMv) {
-                if (d.payload.size() >= 4) {
-                    std::uint32_t mv = 0;
-                    for (int b = 0; b < 4; ++b)
-                        mv |= static_cast<std::uint32_t>(d.payload[static_cast<std::size_t>(b)]) << (b * 8);
-                    DebugInjectU32(d.signal_id, mv);
-                }
-            // uint8 chassis-bus signals — decode as raw byte.
-            } else if (d.signal_id == kSigThrottleCmdQ8 ||
-                d.signal_id == kSigWiperMotorCommand ||
-                d.signal_id == kSigWasherPumpCommand ||
-                d.signal_id == kSigDoorLockCmdDriver   ||
-                d.signal_id == kSigDoorLockCmdPassenger ||
-                d.signal_id == kSigPowerWindowMotorDriver ||
-                d.signal_id == kSigPowerWindowMotorPassenger ||
-                d.signal_id == kSigRsaShiftBlocked     ||
-                d.signal_id == kSigHvacBlowerLevel     ||
-                d.signal_id == kSigDefrostGridActive   ||
-                d.signal_id == kSigIpcSeatbeltTelltaleDriver ||
-                d.signal_id == kSigIpcSeatbeltTelltalePassenger ||
-                d.signal_id == kSigIpcBrakeTelltale    ||
-                d.signal_id == kSigIpcParkBrakeTelltale ||
-                d.signal_id == kSigIpcAntilockTelltale ||
-                d.signal_id == kSigIpcLowTracTelltale  ||
-                d.signal_id == kSigIpcAirBagTelltale   ||
-                d.signal_id == kSigIpcServiceNowTelltale    ||
-                d.signal_id == kSigIpcCheckMessagesTelltale ||
-                d.signal_id == kSigIpcTempTelltale          ||
-                d.signal_id == kSigIpcBatteryLifeTelltale   ||
-                d.signal_id == kSigIpcReducedPerfTelltale   ||
-                d.signal_id == kSigIpcCheckTirePressTelltale ||
-                d.signal_id == kSigPscmPumpSpeedCmdQ8) {
-                DebugInjectU8(d.signal_id, d.payload[0]);
-            } else {
-                // All other inbound signals are boolean (bool) — decode LSB.
-                // (door-lock motor legs 4092-4095 and sounder piezo 4096 land here.)
-                const bool v = (d.payload[0] & 1u) != 0u;
-                DebugInjectDelta(d.signal_id, v);
-            }
-        }
-    }
+    // 1-2. Chassis ring RETIRED (wire-truth Phase 3, 2026-06-16). ev1sim no
+    //      longer opens or drains electricsim_chassis_bus: every chassis cell
+    //      it consumes is read from the WireTable (the overlay below), and every
+    //      cell it produces is written to the wire (the mirror at each publish
+    //      site). The chassis SharedMemoryTransport (st.transport) is vestigial
+    //      now — never created; its remaining publish_frame calls are guarded so
+    //      they never fire — pending a dead-code sweep. The on-change _pub
+    //      sentinels are seeded by the State initializers, so the first tick
+    //      still primes the wire. main_transport (the ECU bus) is unaffected.
 
 #if EV1SIM_HAVE_WIRE_TRUTH
     // 2b. Wire-truth overlay (chassis migration; see docs/wire_truth_migration_scope.md).
@@ -3260,7 +3142,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
 #if EV1SIM_HAVE_WIRE_TRUTH
         if (st.wire) for (const auto& d : f.deltas) st.wire->mirror_signal(d.signal_id, d.payload.data(), d.payload.size());
 #endif
-        if (!st.transport->publish_frame(f)) {
+        if (st.transport && !st.transport->publish_frame(f)) {
             std::cerr << "[ExternalSim] publish_frame failed — reconnecting\n";
             st.transport.reset();
             st.status = Status::Connecting;
@@ -3308,7 +3190,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
 #if EV1SIM_HAVE_WIRE_TRUTH
         if (st.wire) for (const auto& d : df.deltas) st.wire->mirror_signal(d.signal_id, d.payload.data(), d.payload.size());
 #endif
-        if (!st.transport->publish_frame(df)) {
+        if (st.transport && !st.transport->publish_frame(df)) {
             std::cerr << "[ExternalSim] publish_frame (dynamics) failed — reconnecting\n";
             st.transport.reset();
             st.status = Status::Connecting;
@@ -3338,6 +3220,11 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         } else {
             st.main_sequence++;
             st.main_transport = std::move(candidate);
+            // Wire-truth Phase 3: the chassis ring is retired, so the main
+            // harness segment connecting is what marks ev1sim "Connected" now
+            // (BusesUp() = status Connected && main_transport up). Previously the
+            // chassis transport connect set this.
+            st.status = Status::Connected;
             // Reset published sentinels so we force-publish on first tick.
             st.driver_brake_pub            = 0xFF;
             st.driver_steering_pub         = 0x7FFF;
@@ -3760,7 +3647,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
 #if EV1SIM_HAVE_WIRE_TRUTH
             if (st.wire) for (const auto& d : mf.deltas) st.wire->mirror_signal(d.signal_id, d.payload.data(), d.payload.size());
 #endif
-            if (!st.transport->publish_frame(mf)) {
+            if (st.transport && !st.transport->publish_frame(mf)) {
                 std::cerr << "[ExternalSim] publish_frame (motor state) failed — reconnecting\n";
                 st.transport.reset();
                 st.status = Status::Connecting;
@@ -3796,7 +3683,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
 #if EV1SIM_HAVE_WIRE_TRUTH
             if (st.wire) for (const auto& d : ef.deltas) st.wire->mirror_signal(d.signal_id, d.payload.data(), d.payload.size());
 #endif
-            if (!st.transport->publish_frame(ef)) {
+            if (st.transport && !st.transport->publish_frame(ef)) {
                 std::cerr << "[ExternalSim] publish_frame (ambient env) failed — reconnecting\n";
                 st.transport.reset();
                 st.status = Status::Connecting;
@@ -3830,7 +3717,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
 #if EV1SIM_HAVE_WIRE_TRUTH
             if (st.wire) for (const auto& d : bf.deltas) st.wire->mirror_signal(d.signal_id, d.payload.data(), d.payload.size());
 #endif
-            if (!st.transport->publish_frame(bf)) {
+            if (st.transport && !st.transport->publish_frame(bf)) {
                 std::cerr << "[ExternalSim] publish_frame (brake pressure) "
                              "failed — reconnecting\n";
                 st.transport.reset();
@@ -3860,7 +3747,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         for (const auto& ep : EndpointTable()) {
             def.deltas.push_back(MakeDefineDelta(ep.signal_id, ep.qualified_name));
         }
-        st.transport->publish_frame(def);
+        if (st.transport) st.transport->publish_frame(def);
         st.next_presence_time = sim_time_s + m_opts.presence_period_s;
     }
 }

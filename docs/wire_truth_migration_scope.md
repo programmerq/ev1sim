@@ -30,9 +30,13 @@ each push; electricsim's parallel "disabled-fallback retirement sweep" deleted
 internal fallback code/tests only — no contract constant or topology cell, hash
 still `0x27469F03`). ev1sim continues to dual-write the ring during the soak.
 
-Remaining on ev1sim's side: only the deferred **visual** LCD render (3D/2D
-panel, ~weeks) and the eventual final **ring cutover** (delete ev1sim's legacy
-ring publish/poll once every cell is wire-authoritative on both ends and soaked).
+**Chassis ring-drop DONE (2026-06-16, §10):** ev1sim is now wire-only for the
+chassis — it no longer opens/drains/publishes `electricsim_chassis_bus` (the
+wire overlay is the consumer path; the `mirror_signal` writes are the producer
+path), unblocking electricsim's chassis-transport deletion. The MAIN harness
+segment stays (ev1sim still consumes ECU-bus telemetry from it). Remaining on
+ev1sim's side: only the deferred **visual** LCD render (3D/2D panel, ~weeks) and
+a follow-up dead-code sweep of the vestigial chassis-ring scaffolding.
 
 **What this is.** electricsim is moving the chassis bus off the legacy ring
 (`SharedMemoryTransport "electricsim_chassis_bus"`, `DeltaRecord` publish/poll
@@ -613,21 +617,42 @@ SLIP_RATIO_{FL,FR,RL,RR} (4120-23), DOOR_LOCK_STATE_{DRIVER,PASSENGER,TRUNK}
 (6901), DRIVER_GEAR_SELECTOR (6902). (DRIVER_SEATBELT_BUCKLED_PASSENGER 6965
 moved to `consumers: [ipc]` — IPC now wire-reads it — so it joins the 62.)
 
-**Prerequisites before ev1sim goes ring-free (in order):**
-1. **Coupler 4060 — DONE (2026-06-16).** Now mirrored to the wire
-   (`WireTruthChassis` producer registry; last-writer-wins, matching the ring's
-   existing multi-writer behavior — electricsim can flag if it wants different
-   arbitration). It was the one produced cell not yet on the wire; with it
-   covered, **every ev1sim-produced cell now reaches the wire**, so the ring-drop
-   won't lose anything. Round-trip tested (488/488).
-2. **Soak** — run the wire path in real multi-process scenarios; the dual-write
-   + `written()`-gated ring fallback is the safety net until then.
-3. **ev1sim ring-drop** (its own reviewed change) — remove the 15 publish sites,
-   the 2 poll drains + the consumer-overlay ring fallback (go wire-only), and
-   the 2 `SharedMemoryTransport` handles. Keep behind a flag (default off)
-   initially if a staged rollout is wanted.
-4. **electricsim Phase 5** — delete the chassis transport once ev1sim is ring-free.
+**Status — DONE (2026-06-16): ev1sim is off the chassis ring.**
+1. **Coupler 4060 — DONE.** Mirrored to the wire (last-writer-wins). Every
+   ev1sim-produced cell now reaches the wire, so the drop loses nothing.
+2. **Chassis ring-drop — DONE (this is "ev1sim Phase 3").** ev1sim no longer
+   opens, drains, or publishes to `electricsim_chassis_bus`: the connect block +
+   inbound drain were removed (the `written()`-gated wire overlay is the chassis
+   consumer path), and the 5 chassis `publish_frame` calls + the SignalDefine
+   republish are guarded off (`if (st.transport …)` with `st.transport` never
+   created). The per-batch delta-build + the `mirror_signal` wire writes are kept
+   — that is now the only chassis output. `status=Connected` moved to the
+   main-transport connect (`BusesUp()` unchanged in meaning). Build + 488 tests +
+   wire `[e2e]` green.
+   - **Scope is chassis-only.** The MAIN harness segment (`electricsim_ev1_bus`,
+     `main_transport`) STAYS — ev1sim consumes live ECU-bus telemetry from it
+     (RSA run-mode, PIM cruise, AD/HV contactor+precharge+state, the BTCM UART
+     frame for ABS liveness, BTCM solenoids), none of which is in this chassis
+     migration. The driver-input publish on the main segment also stays (harmless
+     redundancy; electricsim reads driver inputs from the wire).
+   - **Consequence:** post-drop, ev1sim's chassis I/O *requires* the wire
+     substrate — the no-substrate ring fallback is gone. Fine in practice (no
+     electricsim ⇒ no sim to talk to).
+3. **electricsim Phase 5 — now unblocked.** ev1sim no longer creates/uses the
+   chassis transport, so electricsim can delete the `electricsim_chassis_bus`
+   segment. The chassis `kSig*` constants + `ChassisBridge` stay (ev1sim still
+   references them by name — drift guard).
+
+**Verification basis + follow-ups.** Verified by build + the unit suite (488,
+which exercises the `DebugInject*` dispatch + wire round-trips) + code
+inspection. The connector's full `Tick`/transport runtime path is *not*
+unit-tested (pre-existing — tests drive `DebugInject` directly), so confirm the
+live wire-only chassis path with the ABS integration sweep
+(`scripts/abs_regression.sh`) against a running electricsim before relying on it.
+Vestigial dead code left for a follow-up sweep (matching electricsim's Phase 6):
+the `st.transport` member + `Stop()` reset, the guarded-and-never-taken chassis
+publish branches, `next_reconnect_time`, and `m_opts.bus_name`.
 
 The 22 pure-output cells keep no consumer either way — they remain ev1sim
-output on the wire (for snooper/observability + future in-tree consumers) after
-the ring is gone.
+output on the wire (for snooper/observability + future in-tree consumers) now
+that the ring is gone.
