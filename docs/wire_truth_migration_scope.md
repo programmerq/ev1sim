@@ -14,10 +14,20 @@ K (HVAC), L (RSA), N (BTCM brake), I (PIM motor), C (RHJB sub-modules), and M
 (IPC telltales + trip + dim). ev1sim builds against electricsim `df153a1` (hash
 `0x27469F03`), **487/487 green**, with `[e2e]` tests driving the connector's real
 overlay sinks out to the getters for a representative cell of each batch. Cross-
-repo protocol: electricsim `notes/wire_truth_cross_repo_handshake.md`. Remaining
-on ev1sim's side: only the deferred **visual** LCD render (3D/2D panel, ~weeks)
-and the eventual coordinated **ring cutover** (delete ev1sim's legacy ring
-publish/poll once every cell is wire-authoritative and soaked).
+repo protocol: electricsim `notes/wire_truth_cross_repo_handshake.md`.
+
+**Cutover has begun (the reverse direction goes live).** electricsim `caa5e57`
+makes PIM **wire-authoritative** for 12 ev1sim-*produced* cells (motor rpm/torque
+4070-71, speed 4100, cruise 4047-49, throttle 6903, brake-switch 6904, PRND
+4050-53) — i.e. PIM now reads ev1sim's output from the wire as the source of
+truth, not the ring. All 12 are in ev1sim's producer registry, so ev1sim's
+dual-write already feeds them (verified: 487/487 green against `caa5e57`, no
+ev1sim change needed). This validates the producer direction end-to-end and is
+the first step of the cutover.
+
+Remaining on ev1sim's side: only the deferred **visual** LCD render (3D/2D
+panel, ~weeks) and the eventual final **ring cutover** (delete ev1sim's legacy
+ring publish/poll once every cell is wire-authoritative on both ends and soaked).
 
 **What this is.** electricsim is moving the chassis bus off the legacy ring
 (`SharedMemoryTransport "electricsim_chassis_bus"`, `DeltaRecord` publish/poll
