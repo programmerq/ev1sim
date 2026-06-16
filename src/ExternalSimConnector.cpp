@@ -3085,7 +3085,19 @@ void ExternalSimConnector::Tick(double sim_time_s) {
     }
     if (st.wire) {
         ev1sim::WireTruthChassis::ConsumerSinks sinks;
-        sinks.on_bit    = [this](std::uint32_t id, bool v)          { DebugInjectDelta(id, v); };
+        // A wire `bit` cell may be served by EITHER the connector's bit dispatch
+        // (DebugInjectDelta: horn, bulbs, washer, solenoids, AD relays, …) OR its
+        // byte dispatch (DebugInjectU8: the byte-coerced-bool signals — HVAC
+        // defrost 4083, RSA shift-blocked 4088, the IPC telltales — which the
+        // legacy ring delivered as 1-byte deltas). The two if/else tables
+        // partition the consumer signal_ids (no id sets a different field in
+        // both, and neither has a default), so routing a bit value to BOTH lands
+        // it wherever it lives and is a no-op in the other. Without this, the
+        // byte-coerced-bool cells would silently drop on the wire overlay.
+        sinks.on_bit    = [this](std::uint32_t id, bool v) {
+            DebugInjectDelta(id, v);
+            DebugInjectU8(id, v ? 1u : 0u);
+        };
         sinks.on_byte   = [this](std::uint32_t id, std::uint8_t v)  { DebugInjectU8(id, v); };
         sinks.on_float  = [this](std::uint32_t id, float v)         { DebugInjectFloat(id, v); };
         sinks.on_uint32 = [this](std::uint32_t id, std::uint32_t v) { DebugInjectU32(id, v); };

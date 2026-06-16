@@ -425,3 +425,50 @@ TEST_CASE("Horn round-trip end-to-end: wire -> connector overlay -> getter",
     CHECK_FALSE(c.GetHornLowCmd());
     CHECK(c.GetHornHighCmd());
 }
+
+// ---------------------------------------------------------------------------
+// Batch A/J/K/L live-render verification: with electricsim producing these
+// cells on the wire (Batch A bulbs, J wiper/washer, K HVAC/defrost, L RSA),
+// ev1sim must render them through the connector's REAL overlay sinks out to the
+// getters. Exercises both render types and, critically, the byte-coerced-bool
+// cells (defrost 4083, shift 4088) that the connector serves from DebugInjectU8
+// even though their wire is `bit` — these drop unless on_bit double-dispatches.
+// @design 2026-06-16 — per-batch verification (A/J/K/L).
+// ---------------------------------------------------------------------------
+TEST_CASE("Batches A/J/K/L render through the connector overlay (wire -> getter)",
+          "[wire_truth][e2e]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("e2e_batches");
+    auto prod = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(prod != nullptr);
+
+    // electricsim producers write one representative cell per landed batch.
+    REQUIRE(prod->write_bit (topo::kWireBULB_FEED_LINE_LBL,           true)); // A bit
+    REQUIRE(prod->write_byte(topo::kWireCHASSIS_WIPER_MOTOR_COMMAND,  3u));   // J byte
+    REQUIRE(prod->write_bit (topo::kWireCHASSIS_WASHER_PUMP_COMMAND,  true)); // J bit
+    REQUIRE(prod->write_byte(topo::kWireCHASSIS_HVAC_BLOWER_LEVEL,    4u));   // K byte
+    REQUIRE(prod->write_bit (topo::kWireCHASSIS_DEFROST_GRID_ACTIVE,  true)); // K bit (U8-served)
+    REQUIRE(prod->write_byte(topo::kWireCHASSIS_DOOR_LOCK_CMD_DRIVER, 1u));   // L byte
+    REQUIRE(prod->write_bit (topo::kWireCHASSIS_RSA_SHIFT_BLOCKED,    true)); // L bit (U8-served)
+
+    ExternalSimConnector c;
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+
+    // The SAME ConsumerSinks the connector installs in Tick() (on_bit routes to
+    // both DebugInjectDelta and DebugInjectU8).
+    ev1sim::WireTruthChassis::ConsumerSinks sinks;
+    sinks.on_bit    = [&c](std::uint32_t id, bool v)          { c.DebugInjectDelta(id, v); c.DebugInjectU8(id, v ? 1u : 0u); };
+    sinks.on_byte   = [&c](std::uint32_t id, std::uint8_t v)  { c.DebugInjectU8(id, v); };
+    sinks.on_float  = [&c](std::uint32_t id, float v)         { c.DebugInjectFloat(id, v); };
+    sinks.on_uint32 = [&c](std::uint32_t id, std::uint32_t v) { c.DebugInjectU32(id, v); };
+    REQUIRE(wire->apply_consumer_overlay(sinks) >= 7);
+
+    CHECK(c.GetBulbCmd(LightID::LBL));        // Batch A
+    CHECK(c.GetWiperMotorCommand() == 3u);    // Batch J
+    CHECK(c.GetWasherPumpCommand());          // Batch J
+    CHECK(c.GetHvacBlowerLevel() == 4u);      // Batch K
+    CHECK(c.GetDefrostGridActive());          // Batch K  (regresses without the on_bit fix)
+    CHECK(c.GetDoorLockCmd(0) == 1u);         // Batch L
+    CHECK(c.GetRsaShiftBlocked());            // Batch L  (regresses without the on_bit fix)
+}

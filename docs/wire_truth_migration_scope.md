@@ -407,7 +407,7 @@ The **gating asymmetry** (electricsim `phase_c_chassis_migration_scope.md` §9):
 | F Motor/brake/sim-time | 5 | mixed | partial | ~1.5 h | 4072 consume (PIM); 4075 is uint64 sim-time |
 | A Bulb feeds | 17 | consume | C-b Batch A | ~1.5 h | dormant until LHJB→wire; 3 also feed IPC |
 | G ECU actuator outputs | 9 | consume | C-b (rhjb/htcm/rsa) | ~1.5 h | wiper/hvac/doorlock/window render |
-| J IPC telltales / LCD | 27 | consume | C-b Batch M | ~3 h | see §8 — likely superseded by LCD-as-device |
+| J IPC telltales / LCD | 27 | consume | C-b Batch M | auto | in scope; overlay already reads them. Only the LCD *visual* render is deferred ~weeks (§8) |
 | L RHJB sub-modules | 10 | consume | C-b Batch C | ~2 h | PMM/DLM/DILM render |
 
 **Update (2026-06-15): BOTH sides are mechanism-complete — the effort column
@@ -421,8 +421,10 @@ first live cell and is verified end-to-end (see §7).
 **Remaining ev1sim effort is now just per-batch verification (~0.5 h each)** as
 electricsim lands its producer batches, plus the eventual ring cutover (delete
 ev1sim's legacy ring publish/poll once every cell is wire-authoritative and
-soaked — a coordinated late step, not yet). Group J (IPC telltales) is likely
-*dropped* rather than migrated, pending the LCD-as-device decision (§8).
+soaked — a coordinated late step, not yet). Group J / Batch M (IPC telltales +
+LCD) IS in scope and migrates like any other batch — ev1sim's overlay already
+reads those cells; only the separate ev1sim *visual* work (rendering the LCD
+segments to a 3D/2D panel) is deferred ~weeks (§8).
 
 ---
 
@@ -466,6 +468,19 @@ soaked — a coordinated late step, not yet). Group J (IPC telltales) is likely
    ev1sim attaches it once, lazily, after the ring connects (so the producer is
    up); standalone ev1sim (env unset) returns instantly. If a 2 s one-time stall
    is unacceptable on the render thread, lower the timeout for ev1sim.
+8. **bit-vs-byte-coerced dispatch (found + fixed during Batch K/L verification).**
+   The overlay routes a cell by its WIRE type, but the connector's two ring-decode
+   tables cover different signal_ids: `DebugInjectDelta` handles the "true bit"
+   signals (horn, bulbs, washer, solenoids), while a set of *bit*-typed cells the
+   ring delivered as 1-byte deltas — HVAC defrost (4083), RSA shift-blocked
+   (4088), and the IPC telltales (4130-4145, Batch M) — are served only by
+   `DebugInjectU8`. So a `bit` wire routed to `DebugInjectDelta` alone silently
+   dropped. Fixed by having the connector's `on_bit` sink dispatch to BOTH
+   (`DebugInjectDelta` + `DebugInjectU8`); the two tables partition the ids (no
+   shared id sets a different field; neither has a default), so the non-owning
+   call is a safe no-op. This already covers the Batch M IPC telltales (in scope;
+   ~weeks out) so they route correctly when electricsim migrates them. Verified
+   by the `[e2e]` Batch A/J/K/L test.
 
 ---
 
@@ -519,13 +534,17 @@ additionally requires electricsim Batch B (LHJB→wire); see §8.
    rather than migrated to a wire cell)? Confirm the intent.
 3. **Battery-voltage display direction (future, do not design now).** Per
    maintainer guidance, ev1sim should *not* carry its own pack-voltage signal at
-   all: display items move to on-module signals (the **IPC LCD**), and ev1sim
-   exposes the LCD as a rendered **"device"** — like the horns and bulbs — rather
-   than subscribing to a dedicated chassis voltage signal. This likely supersedes
-   much of **Group J** (IPC telltales as discrete signals): instead of 27
-   telltale wire cells, ev1sim renders the IPC LCD summary (`kSigIpcLcdState`,
-   already on the bus). Revisit Group J's plan once the LCD-as-device model is
-   designed.
+   all: that display value moves to on-module signals (the **IPC LCD**). This
+   is about the *pack-voltage readout*, NOT the telltale cells.
+
+   **Clarification (2026-06-16): Group J / Batch M IS in scope for the wire
+   migration.** The IPC telltale + LCD segments exist and migrate onto the wire
+   like any other batch; ev1sim's consumer overlay already reads those cells
+   (they are in the 66-cell registry, and the `on_bit` byte-coerced-bool fix in
+   §6.8 routes them correctly). What is **deferred** (~weeks out) is purely the
+   ev1sim-side **visual** work — rendering the LCD segments to a 3D model / 2D
+   panel as a "device." That render-design effort is independent of the wire
+   plumbing, which is already done on ev1sim's side.
 4. **Driver-input main-segment attach (Group M).** Confirm whether the 6900-range
    cells need a second `WireBank`/segment attach on ev1sim's side (§6.6).
 
@@ -541,7 +560,9 @@ additionally requires electricsim Batch B (LHJB→wire); see §8.
 3. **Consumer groups** (A, G, L, B-already-done) as electricsim's C-b producer
    batches land — wire them written()-gated ahead of time so they light up
    automatically.
-4. **Defer Group J** pending the LCD-as-device decision (§8.3).
+4. **Group J / Batch M (IPC telltales + LCD)** migrates like any other batch
+   (in scope); ev1sim's overlay already consumes those cells. Only the ev1sim
+   *visual* LCD render (3D/2D panel) is deferred ~weeks (§8.3).
 5. **Multi-producer cells** (4060 coupler; door-lock cmd/state pair) last, with
    an explicit policy.
 6. Ring publishes stay live throughout (ev1sim is the consumer that keeps the

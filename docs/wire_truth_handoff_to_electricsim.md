@@ -76,15 +76,19 @@ batch names:
 | N — BTCM brake actuator | BTCM | 4147–4154 | overlay pending | ev1sim renders per-corner brake |
 | I — PIM motor current | PIM | 4072 | overlay pending | |
 | C — RHJB sub-modules | RHJB | 4180–4186 | overlay pending | some not yet rendered by ev1sim |
-| M — IPC telltales | IPC | 4130–4145, 4158–4163 | **see note** | likely superseded — read below |
+| M — IPC telltales / LCD | IPC | 4130–4145, 4158–4163 | overlay ready | IN SCOPE — migrate like any other batch; ev1sim already reads these. ~weeks out per maintainer |
 
-**IPC telltales (your Batch M) — please hold / discuss before doing 27 cells.**
-The ev1sim maintainer's stated direction is that ev1sim should *not* consume
-discrete telltale signals at all: display items move to **on-module signals (the
-IPC LCD)**, and ev1sim renders the **IPC LCD as a "device"** (like the horn and
-bulbs) from `kSigIpcLcdState` (5600, already on the bus). If that holds, most of
-Batch M's discrete telltale cells (4130–4145, 4158–4163) don't need wire
-migration on ev1sim's behalf. Worth confirming before investing in 27 cells.
+**IPC telltales (your Batch M) — IN SCOPE (corrected 2026-06-16).** An earlier
+version of this memo suggested holding Batch M pending an "LCD-as-device"
+decision. That was based on a misunderstanding; the maintainer has clarified:
+the IPC telltale + LCD segments **exist and are in scope** for this wire
+migration — migrate them like any other batch. ev1sim's consumer overlay already
+reads those cells (they are in the 66-cell registry, and ev1sim's `on_bit` sink
+routes the byte-coerced-bool telltales — 4130–4145 etc. — correctly). The only
+deferred piece is ev1sim-side *visual* work: rendering the LCD segments to a 3D
+model / 2D panel, a separate render-design effort (~weeks out) independent of the
+wire plumbing. So no special handling needed on your side — Batch M is a normal
+batch whenever you get to it.
 
 ---
 
