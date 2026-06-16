@@ -8,13 +8,16 @@ table-driven `apply_consumer_overlay` reads each ev1sim-consumed cell from the
 wire `written()`-gated and routes it through the same `DebugInject*` dispatch
 the ring uses). Because the consumer overlay already covers **all 66** cells,
 **each electricsim producer batch lights up on ev1sim automatically** — no
-further ev1sim code per batch. The **horn (electricsim Batch B, LHJB→wire)** is
-the first live cross-repo round-trip. ev1sim builds against electricsim
-`fe2d3d1` (hash `0x27469F03`), 484/484 green. Cross-repo protocol:
-electricsim `notes/wire_truth_cross_repo_handshake.md`. Remaining is
-electricsim-gated (its per-batch producer moves) + per-batch verification + the
-eventual ring cutover; this doc lets a later session execute any of it without
-re-deriving anything.
+further ev1sim code per batch. **All ev1sim-consumer batches are now landed by
+electricsim and verified live on ev1sim:** B (horn), A (bulbs), J (wiper/washer),
+K (HVAC), L (RSA), N (BTCM brake), I (PIM motor), C (RHJB sub-modules), and M
+(IPC telltales + trip + dim). ev1sim builds against electricsim `df153a1` (hash
+`0x27469F03`), **487/487 green**, with `[e2e]` tests driving the connector's real
+overlay sinks out to the getters for a representative cell of each batch. Cross-
+repo protocol: electricsim `notes/wire_truth_cross_repo_handshake.md`. Remaining
+on ev1sim's side: only the deferred **visual** LCD render (3D/2D panel, ~weeks)
+and the eventual coordinated **ring cutover** (delete ev1sim's legacy ring
+publish/poll once every cell is wire-authoritative and soaked).
 
 **What this is.** electricsim is moving the chassis bus off the legacy ring
 (`SharedMemoryTransport "electricsim_chassis_bus"`, `DeltaRecord` publish/poll

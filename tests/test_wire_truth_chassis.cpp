@@ -472,3 +472,41 @@ TEST_CASE("Batches A/J/K/L render through the connector overlay (wire -> getter)
     CHECK(c.GetDoorLockCmd(0) == 1u);         // Batch L
     CHECK(c.GetRsaShiftBlocked());            // Batch L  (regresses without the on_bit fix)
 }
+
+// ---------------------------------------------------------------------------
+// Batch M live-render verification: IPC telltales (bit, byte-coerced-bool in the
+// connector — served by DebugInjectU8) + trip distance (float32). These are the
+// exact cells the on_bit double-dispatch fix targets; the bit telltales below
+// would NOT render without it. Confirms Batch M renders end-to-end off the wire.
+// @design 2026-06-16 — per-batch verification (Batch M, IPC telltales).
+// ---------------------------------------------------------------------------
+TEST_CASE("Batch M: IPC telltales + trip render through the connector overlay",
+          "[wire_truth][e2e]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("e2e_ipc");
+    auto ipc = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(ipc != nullptr);
+
+    REQUIRE(ipc->write_bit    (topo::kWireCHASSIS_IPC_SEATBELT_TELLTALE_DRIVER, true));
+    REQUIRE(ipc->write_bit    (topo::kWireCHASSIS_IPC_BRAKE_TELLTALE,           true));
+    REQUIRE(ipc->write_bit    (topo::kWireCHASSIS_IPC_ANTILOCK_TELLTALE,        true));
+    REQUIRE(ipc->write_bit    (topo::kWireCHASSIS_IPC_SERVICE_NOW_TELLTALE,     true));
+    REQUIRE(ipc->write_float32(topo::kWireCHASSIS_IPC_TRIP_DISTANCE_M,          12.5f));
+
+    ExternalSimConnector c;
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+
+    ev1sim::WireTruthChassis::ConsumerSinks sinks;
+    sinks.on_bit    = [&c](std::uint32_t id, bool v)          { c.DebugInjectDelta(id, v); c.DebugInjectU8(id, v ? 1u : 0u); };
+    sinks.on_byte   = [&c](std::uint32_t id, std::uint8_t v)  { c.DebugInjectU8(id, v); };
+    sinks.on_float  = [&c](std::uint32_t id, float v)         { c.DebugInjectFloat(id, v); };
+    sinks.on_uint32 = [&c](std::uint32_t id, std::uint32_t v) { c.DebugInjectU32(id, v); };
+    REQUIRE(wire->apply_consumer_overlay(sinks) >= 5);
+
+    CHECK(c.GetIpcSeatbeltTelltaleDriver());  // bit telltale (U8-served; needs on_bit fix)
+    CHECK(c.GetIpcBrakeTelltale());
+    CHECK(c.GetIpcAntilockTelltale());
+    CHECK(c.GetIpcServiceNowTelltale());
+    CHECK(c.GetIpcTripDistanceM() == 12.5f);  // float32 (exact)
+}
