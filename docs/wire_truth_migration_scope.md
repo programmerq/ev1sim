@@ -16,14 +16,19 @@ K (HVAC), L (RSA), N (BTCM brake), I (PIM motor), C (RHJB sub-modules), and M
 overlay sinks out to the getters for a representative cell of each batch. Cross-
 repo protocol: electricsim `notes/wire_truth_cross_repo_handshake.md`.
 
-**Cutover has begun (the reverse direction goes live).** electricsim `caa5e57`
-makes PIM **wire-authoritative** for 12 ev1sim-*produced* cells (motor rpm/torque
-4070-71, speed 4100, cruise 4047-49, throttle 6903, brake-switch 6904, PRND
-4050-53) — i.e. PIM now reads ev1sim's output from the wire as the source of
-truth, not the ring. All 12 are in ev1sim's producer registry, so ev1sim's
-dual-write already feeds them (verified: 487/487 green against `caa5e57`, no
-ev1sim change needed). This validates the producer direction end-to-end and is
-the first step of the cutover.
+**Cutover Phase 1 COMPLETE — both directions now run on the wire.** electricsim
+flipped every in-repo consumer of an ev1sim-*produced* cell to **wire-
+authoritative** (reads the wire as the source of truth, not the ring): PIM
+(`caa5e57`, 12 cells), IPC+APM (`9b5552a`, 5), LHJB+RHJB (`9899cd8`, 17), and
+RSA+BTCM (`17fc22c`/`cba3f4d`, "Phase 1 COMPLETE", 31). Combined with ev1sim's
+consumer overlay (which already reads every electricsim-produced cell off the
+wire), the WireTable is now the authoritative path in **both** directions for
+all chassis/driver-input cells. Every one of those reads is fed by ev1sim's
+producer dual-write — all the cells are in ev1sim's producer registry, so **no
+ev1sim change was needed for any module's flip** (verified 487/487 green against
+each push; electricsim's parallel "disabled-fallback retirement sweep" deleted
+internal fallback code/tests only — no contract constant or topology cell, hash
+still `0x27469F03`). ev1sim continues to dual-write the ring during the soak.
 
 Remaining on ev1sim's side: only the deferred **visual** LCD render (3D/2D
 panel, ~weeks) and the eventual final **ring cutover** (delete ev1sim's legacy
