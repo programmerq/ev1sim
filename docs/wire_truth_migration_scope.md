@@ -603,20 +603,23 @@ ev1sim dropping its ring footprint.
 ev1sim-produced cells are still dual-written to the ring via **15 `publish_frame`
 sites**, plus **2 `poll_frame`** drains, across **2 transports** (`transport` =
 chassis `electricsim_chassis_bus`, `main_transport` = `electricsim_ev1_bus`).
-Of the 84: **61** have a now-wire-authoritative in-tree consumer (ring write is
-pure redundancy); **23** are pure ev1sim output with no in-tree reader
+Of the 84: **62** have a now-wire-authoritative in-tree consumer (ring write is
+pure redundancy); **22** are pure ev1sim output with no in-tree reader
 (`consumers: []`): PANEL_AJAR_HOOD/TRUNK (4030/31), AMBIENT_TEMP/HUMIDITY
 (4090/91), ACCEL_LAT (4102), APPLIED_THROTTLE/FRONT/REAR_BRAKE (4104-06),
 FRONT_BRAKE_PRESSURE/REAR_BRAKE_POSITION (4107/08), STEERING_TORQUE (4109),
 SLIP_RATIO_{FL,FR,RL,RR} (4120-23), DOOR_LOCK_STATE_{DRIVER,PASSENGER,TRUNK}
 (4165-67), ROAD_GRADE_PCT (4168), PITCH_DEG (4169), DRIVER_STEERING_DEG_Q8
-(6901), DRIVER_GEAR_SELECTOR (6902), DRIVER_SEATBELT_BUCKLED_PASSENGER (6965).
+(6901), DRIVER_GEAR_SELECTOR (6902). (DRIVER_SEATBELT_BUCKLED_PASSENGER 6965
+moved to `consumers: [ipc]` — IPC now wire-reads it — so it joins the 62.)
 
 **Prerequisites before ev1sim goes ring-free (in order):**
-1. **Coupler 4060** — resolve the multi-writer policy (open Q to electricsim;
-   last-writer-wins recommended), then add it to the producer registry so
-   ev1sim mirrors it to the wire. It is the ONE produced cell not yet on the
-   wire; dropping ev1sim's ring write without this would lose the coupler.
+1. **Coupler 4060 — DONE (2026-06-16).** Now mirrored to the wire
+   (`WireTruthChassis` producer registry; last-writer-wins, matching the ring's
+   existing multi-writer behavior — electricsim can flag if it wants different
+   arbitration). It was the one produced cell not yet on the wire; with it
+   covered, **every ev1sim-produced cell now reaches the wire**, so the ring-drop
+   won't lose anything. Round-trip tested (488/488).
 2. **Soak** — run the wire path in real multi-process scenarios; the dual-write
    + `written()`-gated ring fallback is the safety net until then.
 3. **ev1sim ring-drop** (its own reviewed change) — remove the 15 publish sites,
@@ -625,6 +628,6 @@ SLIP_RATIO_{FL,FR,RL,RR} (4120-23), DOOR_LOCK_STATE_{DRIVER,PASSENGER,TRUNK}
    initially if a staged rollout is wanted.
 4. **electricsim Phase 5** — delete the chassis transport once ev1sim is ring-free.
 
-The 23 pure-output cells keep no consumer either way — they remain ev1sim
+The 22 pure-output cells keep no consumer either way — they remain ev1sim
 output on the wire (for snooper/observability + future in-tree consumers) after
 the ring is gone.

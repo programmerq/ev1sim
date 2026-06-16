@@ -510,3 +510,30 @@ TEST_CASE("Batch M: IPC telltales + trip render through the connector overlay",
     CHECK(c.GetIpcServiceNowTelltale());
     CHECK(c.GetIpcTripDistanceM() == 12.5f);  // float32 (exact)
 }
+
+// ---------------------------------------------------------------------------
+// Coupler (4060) wire mirror — the one ev1sim-produced cell that was ring-only
+// until Phase 5 prep. Multi-producer (ev1sim UI + charger peer), last-writer-
+// wins. Confirms ev1sim now mirrors its coupler-present onto the wire so the
+// consumers can read it wire-authoritatively (and ev1sim can later drop the ring).
+// @design 2026-06-16 — Phase 5 prep.
+// ---------------------------------------------------------------------------
+TEST_CASE("Coupler 4060 mirrors to the wire (Phase 5 prep)", "[wire_truth][mirror_signal]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("ms_coupler");
+    auto creator = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(creator != nullptr);
+
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+
+    const std::uint8_t on[]  = {0x01u};
+    const std::uint8_t off[] = {0x00u};
+    REQUIRE(wire->mirror_signal(4060U, on, 1u));   // coupler mated
+    bool out = false;
+    REQUIRE(creator->read_bit(topo::kWireCHARGER_COUPLER_PRESENT, &out));
+    REQUIRE(out == true);
+    REQUIRE(wire->mirror_signal(4060U, off, 1u));  // unmated
+    REQUIRE(creator->read_bit(topo::kWireCHARGER_COUPLER_PRESENT, &out));
+    REQUIRE(out == false);
+}

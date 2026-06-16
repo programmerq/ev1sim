@@ -67,6 +67,17 @@ static const std::unordered_map<std::uint32_t, ProducerCell>& ProducerRegistry()
         {4055U, {kWireWIPER_SW_REQUEST_OUT,         WireType::kBit}},
         {4056U, {kWireWIPER_SW_HI_OUT,              WireType::kBit}},
         {4057U, {kWireWIPER_SW_WASHER_SWITCH_OUT,   WireType::kBit}},
+        // Charger coupler (bit) — MULTI-PRODUCER: both ev1sim (operator UI) and
+        // the in-repo charger demo peer write it. The wire mirror is plain
+        // last-writer-wins, identical to the ring's existing behavior for this
+        // cell (electricsim topology declares it multi-producer); ev1sim already
+        // publishes 4060 on the ring on-change, this extends the same write to
+        // the wire so the coupler consumers (bpm/pim/lhjb/ad) see the operator
+        // UI's toggle once they are wire-authoritative. Required before ev1sim
+        // can drop its ring writes (else the coupler would have no wire writer).
+        // @design 2026-06-16 — Phase 5 prep; electricsim, flag if you want
+        // arbitration beyond last-writer-wins.
+        {4060U, {kWireCHARGER_COUPLER_PRESENT,      WireType::kBit}},
         // Motor state (float32)
         {4070U, {kWireCHASSIS_MOTOR_RPM,            WireType::kFloat32}},
         {4071U, {kWireCHASSIS_MOTOR_TORQUE_NM,      WireType::kFloat32}},
