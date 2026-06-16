@@ -586,3 +586,45 @@ additionally requires electricsim Batch B (LHJB→wire); see §8.
 6. Ring publishes stay live throughout (ev1sim is the consumer that keeps the
    ring populated for any remaining ring-only peers); ring retirement is a later,
    coordinated step gated on ev1sim fully moving onto the substrate.
+
+---
+
+## 10. Phase 5 readiness — retiring ev1sim's ring footprint (next session)
+
+As of 2026-06-16 electricsim has completed **Phase 1** (every in-repo consumer
+reads ev1sim's output wire-authoritatively) and **Phase 2** (all 61
+electricsim-produced ev1sim-consumed cells have their ring publish gated on
+`wire.enabled()`). In production (wires ON) the chassis ring now carries **zero
+electricsim traffic**; the only thing still on it is **ev1sim's own writes**. So
+electricsim's Phase 5 (delete the chassis `SharedMemoryTransport`) is gated on
+ev1sim dropping its ring footprint.
+
+**ev1sim's remaining ring footprint** (audited 2026-06-16): all **84**
+ev1sim-produced cells are still dual-written to the ring via **15 `publish_frame`
+sites**, plus **2 `poll_frame`** drains, across **2 transports** (`transport` =
+chassis `electricsim_chassis_bus`, `main_transport` = `electricsim_ev1_bus`).
+Of the 84: **61** have a now-wire-authoritative in-tree consumer (ring write is
+pure redundancy); **23** are pure ev1sim output with no in-tree reader
+(`consumers: []`): PANEL_AJAR_HOOD/TRUNK (4030/31), AMBIENT_TEMP/HUMIDITY
+(4090/91), ACCEL_LAT (4102), APPLIED_THROTTLE/FRONT/REAR_BRAKE (4104-06),
+FRONT_BRAKE_PRESSURE/REAR_BRAKE_POSITION (4107/08), STEERING_TORQUE (4109),
+SLIP_RATIO_{FL,FR,RL,RR} (4120-23), DOOR_LOCK_STATE_{DRIVER,PASSENGER,TRUNK}
+(4165-67), ROAD_GRADE_PCT (4168), PITCH_DEG (4169), DRIVER_STEERING_DEG_Q8
+(6901), DRIVER_GEAR_SELECTOR (6902), DRIVER_SEATBELT_BUCKLED_PASSENGER (6965).
+
+**Prerequisites before ev1sim goes ring-free (in order):**
+1. **Coupler 4060** — resolve the multi-writer policy (open Q to electricsim;
+   last-writer-wins recommended), then add it to the producer registry so
+   ev1sim mirrors it to the wire. It is the ONE produced cell not yet on the
+   wire; dropping ev1sim's ring write without this would lose the coupler.
+2. **Soak** — run the wire path in real multi-process scenarios; the dual-write
+   + `written()`-gated ring fallback is the safety net until then.
+3. **ev1sim ring-drop** (its own reviewed change) — remove the 15 publish sites,
+   the 2 poll drains + the consumer-overlay ring fallback (go wire-only), and
+   the 2 `SharedMemoryTransport` handles. Keep behind a flag (default off)
+   initially if a staged rollout is wanted.
+4. **electricsim Phase 5** — delete the chassis transport once ev1sim is ring-free.
+
+The 23 pure-output cells keep no consumer either way — they remain ev1sim
+output on the wire (for snooper/observability + future in-tree consumers) after
+the ring is gone.
