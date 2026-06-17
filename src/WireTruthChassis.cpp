@@ -469,6 +469,71 @@ std::optional<bool> WireTruthChassis::horn_high_drive() const {
     return read_bit(electricsim::topology::kWireHORN_DRIVE_LINE_HIGH);
 }
 
+// ── ECU-bus semantic helpers (wire-truth Phase 4) ───────────────────────────
+std::optional<bool> WireTruthChassis::rsa_run_active() const {
+    // RSA_RUN1_OUT and RSA_RUN2_OUT are written identically by the RSA
+    // controller (both = run_active); read RUN1 as the representative.
+    return read_bit(electricsim::topology::kWireRSA_RUN1_OUT);
+}
+
+std::optional<bool> WireTruthChassis::ad_main_contactor_closed() const {
+    return read_bit(electricsim::topology::kWireAPM_HV_CONTACTOR_CLOSED);
+}
+
+std::optional<std::uint32_t> WireTruthChassis::ad_state_enum() const {
+    // Reconstruct the AD state enum from the discrete state lines + power
+    // supply, replicating electricsim ev1/ad/ad_state.c ad_state_decode().
+    // All four contributing cells must be written; otherwise a partial set
+    // would decode to a wrong state, so we return nullopt (caller keeps its
+    // "no data" path) until the AD has driven the full line set.
+    const auto a     = read_bit(electricsim::topology::kWireAD_STATE_A);
+    const auto b     = read_bit(electricsim::topology::kWireAD_STATE_B);
+    const auto c     = read_bit(electricsim::topology::kWireAD_STATE_C);
+    const auto power = read_bit(electricsim::topology::kWireAD_POWER_SUPPLY);
+    if (!a || !b || !c || !power) return std::nullopt;
+
+    // AD_STATE_POWER_LOST = 8 (ad_state.h). Power-lost dominates the lines.
+    if (!*power) return std::uint32_t{8u};
+
+    // idx = (A<<2)|(B<<1)|C → ad_state_t (see ad_state.c decode table). The
+    // enum integer values below match ev1/ad/ad_state.h exactly.
+    const unsigned idx = (*a ? 4u : 0u) | (*b ? 2u : 0u) | (*c ? 1u : 0u);
+    switch (idx) {
+        case 0x0: return std::uint32_t{0u};  // AD_STATE_OK
+        case 0x1: return std::uint32_t{7u};  // AD_STATE_CAPACITOR_PRECHARGE_FAIL
+        case 0x2: return std::uint32_t{5u};  // AD_STATE_BPM_COMMANDED_OPEN
+        case 0x3: return std::uint32_t{3u};  // AD_STATE_INTERLOCK
+        case 0x4: return std::uint32_t{6u};  // AD_STATE_CAPACITOR_PRECHARGE
+        case 0x5: return std::uint32_t{4u};  // AD_STATE_LOW_PACK_VOLTAGE
+        case 0x6: return std::uint32_t{2u};  // AD_STATE_GROUND_LOSS
+        case 0x7: return std::uint32_t{1u};  // AD_STATE_LOSS_OF_ISOLATION
+        default:  return std::uint32_t{0u};  // unreachable (idx is 3-bit)
+    }
+}
+
+std::optional<std::uint64_t> WireTruthChassis::btcm_tx_total_bits() const {
+    if (!attached()) return std::nullopt;
+    std::uint64_t total = 0;
+    if (!impl_->table->bit_stream_total(
+            electricsim::topology::kWireGM8192_BTCM_TX, &total)) {
+        return std::nullopt;  // undeclared / type mismatch
+    }
+    if (total == 0) return std::nullopt;  // nothing ever appended (BTCM silent)
+    return total;
+}
+
+std::optional<bool> WireTruthChassis::pim_cruise_active() const {
+    return read_bit(electricsim::topology::kWirePIM_CRUISE_ACTIVE);
+}
+
+std::optional<float> WireTruthChassis::pim_cruise_setpoint_mps() const {
+    return read_float32(electricsim::topology::kWirePIM_CRUISE_SETPOINT_MPS);
+}
+
+std::optional<bool> WireTruthChassis::ad_precharge_relay() const {
+    return read_bit(electricsim::topology::kWireAD_PRECHARGE_RELAY);
+}
+
 }  // namespace ev1sim
 
 #else  // !EV1SIM_HAVE_WIRE_TRUTH
@@ -521,6 +586,27 @@ std::optional<bool> WireTruthChassis::horn_low_drive() const {
     return std::nullopt;
 }
 std::optional<bool> WireTruthChassis::horn_high_drive() const {
+    return std::nullopt;
+}
+std::optional<bool> WireTruthChassis::rsa_run_active() const {
+    return std::nullopt;
+}
+std::optional<bool> WireTruthChassis::ad_main_contactor_closed() const {
+    return std::nullopt;
+}
+std::optional<std::uint32_t> WireTruthChassis::ad_state_enum() const {
+    return std::nullopt;
+}
+std::optional<std::uint64_t> WireTruthChassis::btcm_tx_total_bits() const {
+    return std::nullopt;
+}
+std::optional<bool> WireTruthChassis::pim_cruise_active() const {
+    return std::nullopt;
+}
+std::optional<float> WireTruthChassis::pim_cruise_setpoint_mps() const {
+    return std::nullopt;
+}
+std::optional<bool> WireTruthChassis::ad_precharge_relay() const {
     return std::nullopt;
 }
 

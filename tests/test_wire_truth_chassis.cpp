@@ -537,3 +537,148 @@ TEST_CASE("Coupler 4060 mirrors to the wire (Phase 5 prep)", "[wire_truth][mirro
     REQUIRE(creator->read_bit(topo::kWireCHARGER_COUPLER_PRESENT, &out));
     REQUIRE(out == false);
 }
+
+// ---------------------------------------------------------------------------
+// ECU-bus semantic helpers (wire-truth Phase 4). These cells used to arrive as
+// ring DeltaBatches on the electricsim_ev1_bus SharedMemoryTransport; the
+// connector now reads them off the shared WireTable through these helpers.
+// The creator plays the producing ECU's role (RSA / APM / AD / BTCM).
+// @design 2026-06-17 — Phase 4 ECU-bus migration.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("WireTruthChassis::rsa_run_active follows RSA_RUN1_OUT", "[wire_truth][ecu]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("ecu_rsa");
+    auto rsa = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(rsa != nullptr);
+
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+
+    // Unwritten -> nullopt (consumer keeps its "no run-mode" default).
+    REQUIRE(wire->rsa_run_active() == std::nullopt);
+
+    REQUIRE(rsa->write_bit(topo::kWireRSA_RUN1_OUT, true));
+    REQUIRE(wire->rsa_run_active() == std::optional<bool>(true));
+    REQUIRE(rsa->write_bit(topo::kWireRSA_RUN1_OUT, false));
+    REQUIRE(wire->rsa_run_active() == std::optional<bool>(false));
+}
+
+TEST_CASE("WireTruthChassis::ad_main_contactor_closed follows APM_HV_CONTACTOR_CLOSED",
+          "[wire_truth][ecu]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("ecu_apm");
+    auto apm = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(apm != nullptr);
+
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+
+    REQUIRE(wire->ad_main_contactor_closed() == std::nullopt);  // unwritten
+    REQUIRE(apm->write_bit(topo::kWireAPM_HV_CONTACTOR_CLOSED, true));
+    REQUIRE(wire->ad_main_contactor_closed() == std::optional<bool>(true));
+}
+
+TEST_CASE("WireTruthChassis::ad_state_enum reconstructs the AD line code",
+          "[wire_truth][ecu]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("ecu_ad");
+    auto ad = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(ad != nullptr);
+
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+
+    // All-or-nothing: with no lines written, decode is nullopt.
+    REQUIRE(wire->ad_state_enum() == std::nullopt);
+
+    // Helper to write the four contributing cells.
+    auto set_lines = [&](bool a, bool b, bool c, bool power) {
+        REQUIRE(ad->write_bit(topo::kWireAD_STATE_A, a));
+        REQUIRE(ad->write_bit(topo::kWireAD_STATE_B, b));
+        REQUIRE(ad->write_bit(topo::kWireAD_STATE_C, c));
+        REQUIRE(ad->write_bit(topo::kWireAD_POWER_SUPPLY, power));
+    };
+
+    // OK = (0,0,0) power -> 0 (AD_STATE_OK).
+    set_lines(false, false, false, true);
+    REQUIRE(wire->ad_state_enum() == std::optional<std::uint32_t>(0u));
+
+    // CAPACITOR_PRECHARGE = (1,0,0) -> 6 (matches the value the old
+    // kSigAdStateEnum carried, per ev1/ad/ad_state.h).
+    set_lines(true, false, false, true);
+    REQUIRE(wire->ad_state_enum() == std::optional<std::uint32_t>(6u));
+
+    // CAPACITOR_PRECHARGE_FAIL = (0,0,1) -> 7.
+    set_lines(false, false, true, true);
+    REQUIRE(wire->ad_state_enum() == std::optional<std::uint32_t>(7u));
+
+    // Power lost dominates the lines -> 8 (AD_STATE_POWER_LOST).
+    set_lines(true, true, true, false);
+    REQUIRE(wire->ad_state_enum() == std::optional<std::uint32_t>(8u));
+}
+
+TEST_CASE("WireTruthChassis::btcm_tx_total_bits tracks the GM8192 TX bit-stream",
+          "[wire_truth][ecu]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("ecu_btcm");
+    auto btcm = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(btcm != nullptr);
+
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+
+    // Nothing appended yet -> nullopt (BTCM silent; btcm_alive stays false).
+    REQUIRE(wire->btcm_tx_total_bits() == std::nullopt);
+
+    // BTCM transmits a byte's worth of frame bits; the total advances.
+    REQUIRE(btcm->append_bit(topo::kWireGM8192_BTCM_TX, true));
+    auto t1 = wire->btcm_tx_total_bits();
+    REQUIRE(t1.has_value());
+    REQUIRE(*t1 >= 1u);
+
+    const bool more[] = {false, true, true, false, true};
+    REQUIRE(btcm->append_bits(topo::kWireGM8192_BTCM_TX, more, 5u));
+    auto t2 = wire->btcm_tx_total_bits();
+    REQUIRE(t2.has_value());
+    REQUIRE(*t2 > *t1);  // advanced => "BTCM is transmitting" liveness proxy
+}
+
+TEST_CASE("WireTruthChassis::pim_cruise_active/setpoint follow the PIM cruise cells",
+          "[wire_truth][ecu]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("ecu_pim");
+    auto pim = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(pim != nullptr);
+
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+
+    // Unwritten -> nullopt (consumer keeps its "no cruise data" default).
+    REQUIRE(wire->pim_cruise_active() == std::nullopt);
+    REQUIRE(wire->pim_cruise_setpoint_mps() == std::nullopt);
+
+    REQUIRE(pim->write_bit(topo::kWirePIM_CRUISE_ACTIVE, true));
+    REQUIRE(wire->pim_cruise_active() == std::optional<bool>(true));
+
+    // 25.0 m/s is exactly representable, so the round-trip is bit-exact.
+    REQUIRE(pim->write_float32(topo::kWirePIM_CRUISE_SETPOINT_MPS, 25.0f));
+    REQUIRE(wire->pim_cruise_setpoint_mps() == std::optional<float>(25.0f));
+}
+
+TEST_CASE("WireTruthChassis::ad_precharge_relay follows AD_PRECHARGE_RELAY",
+          "[wire_truth][ecu]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("ecu_ad_pre");
+    auto ad = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(ad != nullptr);
+
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+
+    REQUIRE(wire->ad_precharge_relay() == std::nullopt);  // unwritten
+    REQUIRE(ad->write_bit(topo::kWireAD_PRECHARGE_RELAY, true));
+    REQUIRE(wire->ad_precharge_relay() == std::optional<bool>(true));
+    REQUIRE(ad->write_bit(topo::kWireAD_PRECHARGE_RELAY, false));
+    REQUIRE(wire->ad_precharge_relay() == std::optional<bool>(false));
+}

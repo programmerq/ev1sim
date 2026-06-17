@@ -124,6 +124,62 @@ public:
     std::optional<bool> horn_low_drive() const;   // HORN_DRIVE_LINE_LOW  (4020)
     std::optional<bool> horn_high_drive() const;  // HORN_DRIVE_LINE_HIGH (4021)
 
+    // ── ECU-bus semantic helpers (wire-truth Phase 4) ───────────────────────
+    // These resolve the ECU-side kWire* names inside WireTruthChassis.cpp, so
+    // the connector reads ECU telemetry off the WireTable without hardcoding
+    // numeric WireIds (mirrors the horn_low_drive() pattern). Each honours the
+    // written() contract: nullopt until the producing ECU has written the cell.
+    // @design 2026-06-17 — Phase 4 ECU-bus migration off SharedMemoryTransport.
+
+    // RSA power-mode "run active" (RSA_RUN1_OUT). The RSA controller asserts
+    // RUN1_OUT == RUN2_OUT == (run_mode is RUN or START); see electricsim
+    // ev1/rsa/controller.cpp. true => RUN/START, false => OFF/ACC. The old
+    // kSigRunModeBroadcast (5711) carried the full 4-value enum, but only the
+    // run-active bit survives on the wire (the ACC output has no cell yet —
+    // electricsim PR #171 gap), so OFF-vs-ACC and RUN-vs-START are not
+    // distinguishable here. Reads RSA_RUN1_OUT (RUN2 is identical).
+    std::optional<bool> rsa_run_active() const;    // RSA_RUN1_OUT (rsa_ecu)
+
+    // Auto-Disconnect main HV contactor closed (APM_HV_CONTACTOR_CLOSED). Maps
+    // to ev1sim's ad_main_contactor (was kSigAdMainContactor 5224).
+    std::optional<bool> ad_main_contactor_closed() const;  // APM_HV_CONTACTOR_CLOSED
+
+    // Auto-Disconnect state enum, reconstructed from the three discrete AD state
+    // lines (AD_STATE_A/B/C) + the AD power-supply discrete (AD_POWER_SUPPLY),
+    // using electricsim's ad_state_decode contract (ev1/ad/ad_state.{h,c}):
+    //   power lost            -> 8  (AD_STATE_POWER_LOST)
+    //   idx=(a<<2)|(b<<1)|c   -> {0=OK,1=PRECHARGE_FAIL,2=BPM_OPEN,3=INTERLOCK,
+    //                             4=PRECHARGE,5=LOW_PACK,6=GROUND_LOSS,
+    //                             7=LOSS_OF_ISOLATION}
+    // These integer codes match the enum the old kSigAdStateEnum (5230) carried,
+    // so ev1sim's downstream interpretation (0=OK, 6=precharge, 7=fail) is
+    // unchanged. Returns nullopt unless ALL FOUR contributing cells are written
+    // (an all-or-nothing reconstruct — a partial line set would decode to a
+    // wrong state). The decode table is replicated here with a pointer to the
+    // canonical source; revalidated at integration.
+    std::optional<std::uint32_t> ad_state_enum() const;
+
+    // BTCM GM-8192 TX liveness proxy: the total bit count ever appended to the
+    // BTCM transmit bit-stream cell (GM8192_BTCM_TX). The BTCM broadcasts its
+    // canonical status frame at 5 Hz, so a growing total => "BTCM transmitting"
+    // (alive). The connector stamps btcm_uart_frame_ns whenever this advances —
+    // a cheap stand-in for the old kSigBtcmUartFrame (5050) heartbeat that keeps
+    // the ABS/EMB freshness gate (btcm_alive) live WITHOUT reconstructing frame
+    // payloads off the bit FIFO (deferred — see WireTruthChassis.cpp /
+    // ExternalSimConnector.cpp TODOs). nullopt when not attached / undeclared /
+    // never appended.  @inferred 2026-06-17 — total-bits-advancing ≈ alive.
+    std::optional<std::uint64_t> btcm_tx_total_bits() const;
+
+    // PIM cruise-control state — electricsim declared these cells on PR #171
+    // (was kSigPimCruiseActive/SetpointMps 5360/5361). Read off PIM_CRUISE_ACTIVE
+    // / PIM_CRUISE_SETPOINT_MPS; nullopt until PIM writes them.
+    std::optional<bool>  pim_cruise_active() const;        // PIM_CRUISE_ACTIVE
+    std::optional<float> pim_cruise_setpoint_mps() const;  // PIM_CRUISE_SETPOINT_MPS
+
+    // Auto-Disconnect precharge relay closed — electricsim declared this cell on
+    // PR #171 (was kSigAdPrechargeRelay 5225). nullopt until AD writes it.
+    std::optional<bool>  ad_precharge_relay() const;       // AD_PRECHARGE_RELAY
+
 private:
     WireTruthChassis();
     struct Impl;
