@@ -139,27 +139,44 @@ if(EV1SIM_HAVE_WHEEL_IO)
     set(_ev1sim_wheel_io TRUE)
 endif()
 
-# ── electricsim connector (optional) ────────────────────────────────────────
+# ── electricsim wire-truth substrate / connector (optional) ─────────────────
 # If the electricsim repo is checked out next to this one (or pointed at via
-# -DELECTRICSIM_DIR=<path>), we build a small static library from its I/O
-# sources (no simavr / libelf / firmware needed) and link the main executable
-# against it.  Otherwise we fall back to a stub so --external-sim is a no-op.
+# -DELECTRICSIM_DIR=<path>), build a small static library from its wire-truth
+# substrate sources (no simavr / libelf / firmware needed) and link ev1sim's
+# ExternalSimConnector against it.  Otherwise fall back to a stub so
+# --external-sim is a no-op.
+#
+# Wire-truth Phase 4 (2026-06-17): electricsim deleted the host-side message
+# queue (signal_catalog / protocol / shm_transport / bridge_adapter) and unified
+# every wire onto one shared-memory WireTable.  ev1sim's connector is now a pure
+# WireTable client (via WireTruthChassis), so "external sim available" ==
+# "the wire-truth substrate is present", and there is no separate connector lib
+# to build.  The stale-check therefore probes the SUBSTRATE sources (which exist
+# on a wire-truth electricsim tree) rather than the now-deleted transport ones —
+# a transport-free tree is VALID, not stale.
 
-# Source files we need from the electricsim tree.  Used both as a stale-path
-# probe and as the actual library inputs below — keep these two lists in sync.
+# Source files we need from the electricsim tree (substrate).  Used both as a
+# stale-path probe and as the actual library inputs below — keep in sync.  These
+# are the files the connector depends on at link/compile time.
 set(_electricsim_sources
-    "src/io/signal_catalog.cpp"
-    "src/io/protocol.cpp"
-    "src/io/shm_transport.cpp"
-    "src/io/bridge_adapter.cpp")
+    "src/io/wire_table.cpp"
+    "src/io/topology/env_open.cpp")
 
-# Helper: returns TRUE in ${_out_var} if every required source exists under
-# ${_root}.  Probing every source (not just the header) catches partially-
-# deleted trees — e.g. a git worktree that was removed while CMake's cache
-# still pointed at it — that would otherwise pass a single-file check at
-# configure time only to fail later at compile time.
+# Headers the connector compiles against: the generated topology (kWire*,
+# kTopologyHash, declare_all) and ev1_chassis_signals.hpp (the canonical
+# chassis-ID drift-guard static_asserts in ExternalSimConnector.cpp).  Both
+# survive on a wire-truth tree; probe them so a partial checkout is "stale".
+set(_electricsim_headers
+    "src/io/topology/topology_generated.h"
+    "src/io/ev1_chassis_signals.hpp")
+
+# Helper: returns TRUE in ${_out_var} if every required source + header exists
+# under ${_root}.  Probing every file (not just one) catches partially-deleted
+# trees — e.g. a git worktree removed while CMake's cache still pointed at it —
+# that would otherwise pass a single-file check at configure time only to fail
+# later at compile time.
 function(_ev1sim_check_electricsim_tree _root _out_var)
-    foreach(_src IN LISTS _electricsim_sources)
+    foreach(_src IN LISTS _electricsim_sources _electricsim_headers)
         if(NOT EXISTS "${_root}/${_src}")
             set(${_out_var} FALSE PARENT_SCOPE)
             return()
@@ -176,8 +193,8 @@ if(ELECTRICSIM_DIR)
     if(NOT _ev1sim_dir_ok)
         message(WARNING
             "ELECTRICSIM_DIR='${ELECTRICSIM_DIR}' is stale "
-            "(required sources missing) — clearing and re-searching. "
-            "Pass -DELECTRICSIM_DIR=<path> to pin a specific tree.")
+            "(required wire-truth substrate sources/headers missing) — clearing "
+            "and re-searching. Pass -DELECTRICSIM_DIR=<path> to pin a tree.")
         unset(ELECTRICSIM_DIR CACHE)
         unset(ELECTRICSIM_DIR)
     endif()
@@ -201,19 +218,37 @@ if(NOT ELECTRICSIM_DIR)
     endforeach()
 endif()
 
+# Build the substrate lib when a usable tree was found.  This is the SAME
+# ELECTRICSIM_DIR tree the topology hash is generated from (no vendored copy to
+# drift).  EV1SIM_HAVE_WIRE_TRUTH and EV1SIM_HAVE_EXTERNAL_SIM are now the same
+# capability — the substrate being present — but both names are kept: the
+# connector's guarded code (publish/consume path) is under
+# EV1SIM_HAVE_EXTERNAL_SIM, and WireTruthChassis.cpp's real-vs-stub switch is
+# under EV1SIM_HAVE_WIRE_TRUTH.
 set(EV1SIM_HAVE_EXTERNAL_SIM FALSE)
-if(ELECTRICSIM_DIR AND EXISTS "${ELECTRICSIM_DIR}/src/io/shm_transport.hpp")
-    message(STATUS "electricsim connector: ${ELECTRICSIM_DIR}")
-    set(_electricsim_sources_abs "")
-    foreach(_src IN LISTS _electricsim_sources)
-        list(APPEND _electricsim_sources_abs "${ELECTRICSIM_DIR}/${_src}")
-    endforeach()
-    add_library(electricsim_connector STATIC ${_electricsim_sources_abs})
-    target_include_directories(electricsim_connector PUBLIC
-        "${ELECTRICSIM_DIR}/src/io")
-    set(EV1SIM_HAVE_EXTERNAL_SIM TRUE)
-else()
-    message(STATUS "electricsim connector: not found (set ELECTRICSIM_DIR to enable external sim)")
+set(EV1SIM_HAVE_WIRE_TRUTH FALSE)
+if(ELECTRICSIM_DIR)
+    _ev1sim_check_electricsim_tree("${ELECTRICSIM_DIR}" _ev1sim_dir_final_ok)
+    if(_ev1sim_dir_final_ok)
+        message(STATUS "electricsim wire-truth substrate: ${ELECTRICSIM_DIR}/src/io")
+        message(STATUS "electricsim connector: ${ELECTRICSIM_DIR} (wire-truth client)")
+        set(_electricsim_sources_abs "")
+        foreach(_src IN LISTS _electricsim_sources)
+            list(APPEND _electricsim_sources_abs "${ELECTRICSIM_DIR}/${_src}")
+        endforeach()
+        add_library(electricsim_wire_substrate STATIC ${_electricsim_sources_abs})
+        target_include_directories(electricsim_wire_substrate PUBLIC
+            "${ELECTRICSIM_DIR}/src/io")
+        find_package(Threads REQUIRED)
+        target_link_libraries(electricsim_wire_substrate PUBLIC Threads::Threads)
+        set(EV1SIM_HAVE_EXTERNAL_SIM TRUE)
+        set(EV1SIM_HAVE_WIRE_TRUTH TRUE)
+    endif()
+endif()
+if(NOT EV1SIM_HAVE_WIRE_TRUTH)
+    message(STATUS "electricsim wire-truth substrate: not found "
+                   "(set ELECTRICSIM_DIR to enable external sim; "
+                   "ExternalSimConnector + WireTruthChassis compile as a disabled no-op)")
 endif()
 
 # ── macOS Objective-C++ support ─────────────────────────────────────────────
@@ -246,6 +281,7 @@ add_executable(ev1sim
     src/PhysicalWorld.cpp
     src/FloatingUiPanel.cpp
     src/ExternalSimConnector.cpp
+    src/WireTruthChassis.cpp
     ${EV1SIM_WHEEL_IO_SRC}
     ${MACOS_PLATFORM_SRC}
 )
@@ -256,9 +292,17 @@ target_link_libraries(ev1sim PRIVATE
     ${IRRLICHT_LIBRARY}   # explicit Irrlicht .so — render helpers reference it directly (GNU ld)
     nlohmann_json::nlohmann_json
 )
-if(EV1SIM_HAVE_EXTERNAL_SIM)
-    target_link_libraries(ev1sim PRIVATE electricsim_connector)
-    target_compile_definitions(ev1sim PRIVATE EV1SIM_HAVE_EXTERNAL_SIM=1)
+# External-sim == wire-truth substrate present (Phase 4). One lib carries both:
+# the substrate's PUBLIC include dir (${ELECTRICSIM_DIR}/src/io) gives the
+# connector its topology_generated.h + ev1_chassis_signals.hpp, and linking it
+# pulls in the WireTable + env_open object code. Both compile defs are set so
+# the connector's guarded path (EV1SIM_HAVE_EXTERNAL_SIM) and WireTruthChassis's
+# real impl (EV1SIM_HAVE_WIRE_TRUTH) both light up.
+if(EV1SIM_HAVE_WIRE_TRUTH)
+    target_link_libraries(ev1sim PRIVATE electricsim_wire_substrate)
+    target_compile_definitions(ev1sim PRIVATE
+        EV1SIM_HAVE_EXTERNAL_SIM=1
+        EV1SIM_HAVE_WIRE_TRUTH=1)
 endif()
 if(_ev1sim_wheel_io)
     target_link_libraries(ev1sim PRIVATE SDL3::SDL3)
@@ -301,6 +345,14 @@ if(BUILD_TESTS)
     )
     FetchContent_MakeAvailable(Catch2)
 
+    # The wire-truth round-trip test creates the shared WireTable (creator role,
+    # declare_all + the real topology hash) and reads it back through
+    # WireTruthChassis, so it only compiles when the substrate is present.
+    set(EV1SIM_WIRE_TRUTH_TEST_SRC "")
+    if(EV1SIM_HAVE_WIRE_TRUTH)
+        set(EV1SIM_WIRE_TRUTH_TEST_SRC tests/test_wire_truth_chassis.cpp)
+    endif()
+
     add_executable(ev1sim_tests
         tests/test_config.cpp
         tests/test_driver_command.cpp
@@ -324,9 +376,11 @@ if(BUILD_TESTS)
         tests/test_input_actions.cpp
         tests/test_hood.cpp
         ${EV1SIM_WHEEL_IO_TEST_SRC}
+        ${EV1SIM_WIRE_TRUTH_TEST_SRC}
         src/Config.cpp
         src/KeyboardInputController.cpp
         src/ExternalSimConnector.cpp
+        src/WireTruthChassis.cpp
         src/Scenario.cpp
         src/ScriptedDriver.cpp
         src/VehicleLights.cpp
@@ -347,9 +401,12 @@ if(BUILD_TESTS)
         ${CHRONO_LIBRARIES}
         ${IRRLICHT_LIBRARY}   # empty when Chrono provides Irrlicht; set in the tests-only build
     )
-    if(EV1SIM_HAVE_EXTERNAL_SIM)
-        target_link_libraries(ev1sim_tests PRIVATE electricsim_connector)
-        target_compile_definitions(ev1sim_tests PRIVATE EV1SIM_HAVE_EXTERNAL_SIM=1)
+    # External-sim == wire-truth substrate present (Phase 4); see the app target.
+    if(EV1SIM_HAVE_WIRE_TRUTH)
+        target_link_libraries(ev1sim_tests PRIVATE electricsim_wire_substrate)
+        target_compile_definitions(ev1sim_tests PRIVATE
+            EV1SIM_HAVE_EXTERNAL_SIM=1
+            EV1SIM_HAVE_WIRE_TRUTH=1)
     endif()
     if(_ev1sim_wheel_io)
         target_link_libraries(ev1sim_tests PRIVATE SDL3::SDL3)

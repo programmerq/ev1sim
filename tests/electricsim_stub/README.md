@@ -1,33 +1,52 @@
 # electricsim CI stub
 
-A **minimal, self-contained** stand-in for electricsim's `src/io/` layer, used
-only by CI's `integrated-build` job. Pointing `-DELECTRICSIM_DIR=` at this tree
-makes ev1sim's CMake build the `electricsim_connector` shim and compile
-`ExternalSimConnector.cpp` with `EV1SIM_HAVE_EXTERNAL_SIM=1` — **without a real
+A **self-contained** stand-in for electricsim's `src/io/` wire-truth substrate,
+used only by CI's `integrated-build` job. Pointing `-DELECTRICSIM_DIR=` at this
+tree makes ev1sim's CMake build the `electricsim_wire_substrate` lib and compile
+`ExternalSimConnector.cpp` + `WireTruthChassis.cpp` with
+`EV1SIM_HAVE_EXTERNAL_SIM=1` / `EV1SIM_HAVE_WIRE_TRUTH=1` — **without a real
 electricsim checkout or any repo secret**.
 
 ## What it does / doesn't catch
 
 - ✅ **Catches** compile/link breakage of the `EV1SIM_HAVE_EXTERNAL_SIM`-guarded
-  transport/publish path — the class of bug the stub build `#if`-excludes (e.g.
-  the dangling `ext_horn_*` reference that broke the integrated build).
-- ⚠️ **Does not** verify ev1sim's chassis IDs are in sync with the *real*
-  electricsim: `ev1_chassis_signals.hpp` here is pinned to ev1sim's own values,
-  so the drift-guard `static_assert`s pass tautologically. Live drift detection
-  needs the App-token integrated build against the real repo.
+  WireTable publish/consume path + the real `WireTruthChassis` implementation —
+  the code the plain stub build `#if`-excludes.
+- ⚠️ **Does not** verify ev1sim's chassis IDs are in sync with the *live*
+  electricsim, nor that the topology hash matches a running fleet:
+  `ev1_chassis_signals.hpp` / `topology_generated.h` here are vendored copies, so
+  the drift-guard `static_assert`s pass against the vendored constants. Live
+  drift detection needs the App-token integrated build against the real repo.
 
 ## Surface
 
-Only what the connector uses: `protocol.hpp` (frames/deltas/enums),
-`shm_transport.hpp` (a header-only no-op transport), and
-`ev1_chassis_signals.hpp` (canonical IDs). The four `src/io/*.cpp` are
-intentionally near-empty — they exist only because ev1sim's CMake builds the
-connector lib from those four sources and checks each is present.
+The wire-truth substrate the connector now depends on (electricsim deleted the
+legacy SharedMemoryTransport message queue — `protocol` / `shm_transport` /
+`signal_catalog` / `bridge_adapter` — in the "rip out the message-queue layer"
+change; those stubs are gone here too):
+
+- `wire_table.{cpp,hpp}` — the shared-memory `WireTable` (the substrate).
+- `topology/env_open.{cpp,hpp}` — `try_open_from_env()` (the attach idiom).
+- `topology/topology_generated.h` — generated `kWire*` ids, `kTopologyHash`,
+  `declare_all()`.
+- `ev1_chassis_signals.hpp` — canonical chassis IDs for the connector's
+  drift-guard `static_assert`s.
+
+These are **vendored copies** of electricsim's files (self-contained — they pull
+in only standard headers and each other). ev1sim's CMake stale-check probes
+exactly this set, so the tree must stay complete.
 
 ## Maintenance
 
-If you add a chassis ID to the drift guard (a new `EV1SIM_CHASSIS_ID_MATCHES`
-line in `ExternalSimConnector.cpp`), regenerate `ev1_chassis_signals.hpp` so the
-new `kSigChassis*` constant exists here, or `integrated-build` will fail to
-compile. If electricsim's protocol/transport API changes, mirror the minimal
-change in `protocol.hpp` / `shm_transport.hpp`.
+These are copies of electricsim `src/io/` files; refresh them from the
+electricsim tree when:
+
+- you add a chassis ID to the drift guard (a new `EV1SIM_CHASSIS_ID_MATCHES`
+  line in `ExternalSimConnector.cpp`) — re-copy `ev1_chassis_signals.hpp` so the
+  new `kSigChassis*` constant exists here;
+- the connector starts reading/writing a new `kWire*` cell — re-copy
+  `topology_generated.h` so the constant resolves;
+- electricsim's `WireTable` / `env_open` API changes — re-copy the matching file.
+
+Copy verbatim from `${ELECTRICSIM_DIR}/src/io/` (do not hand-edit) so the stub
+stays a faithful, compileable subset.
