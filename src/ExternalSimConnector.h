@@ -41,14 +41,7 @@
 class ExternalSimConnector {
 public:
     struct Options {
-        bool        enabled          = false;
-        std::string bus_name         = "electricsim_chassis_bus";
-        std::string main_harness_bus_name = "electricsim_ev1_bus";
-        // How often to republish SignalDefine frames so other bus peers can
-        // introspect our endpoints.
-        double      presence_period_s = 2.0;
-        // Back-off between reconnect attempts when the transport fails to open.
-        double      reconnect_period_s = 1.0;
+        bool enabled = false;
     };
 
     enum class Status {

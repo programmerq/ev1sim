@@ -481,9 +481,6 @@ TEST_CASE("Disabled connector is inert", "[ExternalSim]") {
 TEST_CASE("Enabled connector reports a non-disabled status", "[ExternalSim]") {
     ExternalSimConnector::Options opts;
     opts.enabled = true;
-    // Use a nonce bus name so we don't collide with a real run on the machine.
-    opts.bus_name = "ev1sim_unit_test_bus_ignore_me";
-    opts.reconnect_period_s = 60.0;  // don't thrash in tests
     ExternalSimConnector c(opts);
 
     // Either "connecting" (real build) or "unavailable" (stub build) — both

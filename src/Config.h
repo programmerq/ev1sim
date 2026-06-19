@@ -100,9 +100,7 @@ struct Config {
     } body;
 
     struct ExternalSim {
-        bool        enabled            = false;
-        std::string bus_name           = "electricsim_chassis_bus";
-        double      reconnect_period_s = 1.0;
+        bool enabled = false;
     } external_sim;
 
     // Vehicle dynamics authority — selects whether Chrono's powertrain is

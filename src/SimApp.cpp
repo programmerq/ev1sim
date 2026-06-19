@@ -852,17 +852,14 @@ SimApp::SimApp(const Config& config) : m_config(config) {
     // 8b. Wiper renderer — phase-based sweep animation driven by RHJB motor command.
     m_wiper = std::make_unique<WiperRenderer>();
 
-    // 9. External electrical-simulator connector.  Non-blocking — if the
-    //    electric sim isn't running yet, the connector retries each Tick().
+    // 9. External electrical-simulator connector.  Non-blocking — attaches the
+    //    shared WireTable lazily inside Tick() once the substrate is up.
     ExternalSimConnector::Options ext_opts;
-    ext_opts.enabled            = m_config.external_sim.enabled;
-    ext_opts.bus_name           = m_config.external_sim.bus_name;
-    ext_opts.reconnect_period_s = m_config.external_sim.reconnect_period_s;
+    ext_opts.enabled = m_config.external_sim.enabled;
     m_external_sim = std::make_unique<ExternalSimConnector>(ext_opts);
     m_external_sim->Start();
     if (ext_opts.enabled) {
-        std::cout << "[SimApp] External sim: enabled, bus='"
-                  << ext_opts.bus_name << "' ("
+        std::cout << "[SimApp] External sim: enabled ("
                   << m_external_sim->StatusString() << ")\n";
     }
 
