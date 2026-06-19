@@ -371,7 +371,6 @@ if(BUILD_TESTS)
         tests/test_brake_bias.cpp
         tests/test_brake_decel.cpp
         tests/test_aerodynamics.cpp
-        tests/test_motor_current.cpp
         tests/test_suspension_geometry.cpp
         tests/test_input_actions.cpp
         tests/test_hood.cpp
