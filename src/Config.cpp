@@ -193,9 +193,7 @@ Config Config::LoadFromFile(const std::string& path) {
 
     if (j.contains("external_sim")) {
         auto& x = j["external_sim"];
-        read_if(x, "enabled",            cfg.external_sim.enabled);
-        read_if(x, "bus_name",           cfg.external_sim.bus_name);
-        read_if(x, "reconnect_period_s", cfg.external_sim.reconnect_period_s);
+        read_if(x, "enabled", cfg.external_sim.enabled);
     }
 
     if (j.contains("vehicle_dynamics")) {
@@ -315,9 +313,6 @@ void Config::ApplyCliOverrides(int argc, char* argv[]) {
         } else if (arg == "--external-sim") {
             auto v = next();
             external_sim.enabled = (v == "true" || v == "1" || v == "on");
-        } else if (arg == "--external-sim-bus") {
-            auto v = next();
-            if (!v.empty()) external_sim.bus_name = v;
         } else if (arg == "--driver-mode") {
             auto v = next();
             if (v == "local" || v == "electronics") {

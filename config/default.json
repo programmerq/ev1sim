@@ -30,8 +30,6 @@
     "demo_mode": "off"
   },
   "external_sim": {
-    "enabled": true,
-    "bus_name": "electricsim_chassis_bus",
-    "reconnect_period_s": 1.0
+    "enabled": true
   }
 }

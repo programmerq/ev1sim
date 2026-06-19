@@ -100,15 +100,12 @@ TEST_CASE("Config CLI overrides take precedence", "[Config]") {
 TEST_CASE("Config loads external_sim and lights sections", "[Config]") {
     auto path = WriteTempJson(R"({
         "lights":       { "demo_mode": "chase" },
-        "external_sim": { "enabled": true, "bus_name": "custom_bus",
-                          "reconnect_period_s": 2.5 }
+        "external_sim": { "enabled": true }
     })");
 
     Config cfg = Config::LoadFromFile(path);
     CHECK(cfg.lights.demo_mode == "chase");
     CHECK(cfg.external_sim.enabled == true);
-    CHECK(cfg.external_sim.bus_name == "custom_bus");
-    CHECK_THAT(cfg.external_sim.reconnect_period_s, WithinAbs(2.5, 1e-9));
 }
 
 // -----------------------------------------------------------------------
@@ -132,10 +129,9 @@ TEST_CASE("Config accepts legacy boolean demo_mode", "[Config]") {
 }
 
 // -----------------------------------------------------------------------
-TEST_CASE("Config external_sim defaults off with stock bus name", "[Config]") {
+TEST_CASE("Config external_sim defaults off", "[Config]") {
     Config cfg;
     CHECK(cfg.external_sim.enabled == false);
-    CHECK(cfg.external_sim.bus_name == "electricsim_chassis_bus");
     CHECK(cfg.lights.demo_mode == "off");
 }
 
@@ -145,14 +141,12 @@ TEST_CASE("Config --external-sim and --lights-demo CLI flags", "[Config]") {
     const char* args[] = {
         "ev1sim",
         "--external-sim", "true",
-        "--external-sim-bus", "alt_bus",
         "--lights-demo", "chase",
     };
     int argc = sizeof(args) / sizeof(args[0]);
     cfg.ApplyCliOverrides(argc, const_cast<char**>(args));
 
     CHECK(cfg.external_sim.enabled == true);
-    CHECK(cfg.external_sim.bus_name == "alt_bus");
     CHECK(cfg.lights.demo_mode == "chase");
 
     // "false"/"0" disables external sim; bool-style synonyms map to "blink"/"off".

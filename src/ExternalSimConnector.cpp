@@ -1595,8 +1595,6 @@ struct ExternalSimConnector::State {
     std::int8_t prnd_d_pub = -1;
 
     // Timers (sim_time_s based).
-    double next_presence_time  = 0.0;
-    double next_reconnect_time = 0.0;
     // Heartbeat re-publish for brake-state signals.  ev1sim publishes
     // these on change only — so a controller that connects to the bus
     // *after* the brake-pedal edge (e.g. BTCM startup hits the chassis
@@ -3633,7 +3631,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
     //    endpoints; the WireTable has a fixed, declared topology (no runtime
     //    signal-define), so there is nothing to announce. The EndpointTable() +
     //    Endpoints()/FindEndpoint() registry stays — tests and tooling still use
-    //    it — it just isn't broadcast. next_presence_time is now unused.
+    //    it — it just isn't broadcast.
 }
 
 bool ExternalSimConnector::BusesUp() const {
