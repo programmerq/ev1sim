@@ -12,8 +12,8 @@
 /// Connects the vehicle simulator to an external electric simulator over the
 /// electricsim shared-memory I/O fabric.
 ///
-/// The connection is non-blocking: Start() returns immediately, and the
-/// transport is (re)opened lazily inside Tick().  If the electricsim library
+/// The connection is non-blocking: Start() returns immediately, and the shared
+/// WireTable is attached lazily inside Tick().  If the electricsim library
 /// is not available at build time the connector compiles as a stub that
 /// reports "not available" and does nothing — callers can unconditionally
 /// drive it.
@@ -47,8 +47,8 @@ public:
     enum class Status {
         Disabled,        // --external-sim is off
         Unavailable,     // built without electricsim; always disconnected
-        Connecting,      // enabled, transport not yet open
-        Connected,       // transport open, poll/publish live
+        Connecting,      // enabled, WireTable not yet attached
+        Connected,       // WireTable attached; cells read/written each Tick
     };
 
     /// Endpoints exposed (see Endpoints()):
@@ -83,21 +83,21 @@ public:
     /// connector (does nothing).
     void Start();
 
-    /// Drain incoming frames, publish outgoing deltas, and handle any
-    /// reconnection retries.  Call once per render frame; sim_time_s is used
-    /// for the presence / reconnect timers.
+    /// Overlay incoming wire cells onto local state and mirror outgoing state
+    /// onto the WireTable.  Call once per render frame; sim_time_s drives the
+    /// brake-state heartbeat re-publish.
     void Tick(double sim_time_s);
 
-    /// Release the transport; further Tick() calls become no-ops until Start().
+    /// Release the WireTable handle; further Tick() calls become no-ops until Start().
     void Stop();
 
     Status      GetStatus()     const;
     bool        IsConnected()   const { return GetStatus() == Status::Connected; }
-    /// True once BOTH bus transports are open (the chassis segment that
-    /// GetStatus() tracks AND the main-harness segment, which opens lazily
-    /// inside Tick()).  This is the instant `requires_external_sim`
-    /// scenarios anchor their clock to — driver-input one-shots published
-    /// before this point would land on a bus nobody has created/joined yet.
+    /// True once the shared WireTable is attached (post-Phase-4 there is a
+    /// single bus, so this tracks the same handle GetStatus() does).  This is
+    /// the instant `requires_external_sim` scenarios anchor their clock to —
+    /// driver-input one-shots written before this point would land on a table
+    /// nobody has created/joined yet.
     bool        BusesUp()       const;
     const char* StatusString()  const;
     const Options& GetOptions() const { return m_opts; }
@@ -119,13 +119,13 @@ public:
     bool HasReceivedBulbData() const;
 
     /// Outgoing panel ajar state — SimApp writes this every frame; the
-    /// connector publishes a DeltaBatch only when a value changes.
+    /// connector mirrors the cell onto the WireTable only when a value changes.
     void SetPanelSensor(PanelID panel, bool ajar);
     bool GetPanelSensor(PanelID panel) const;
 
     /// Outgoing vehicle dynamics snapshot — SimApp writes this every frame
-    /// and Tick() publishes it as a float32 DeltaBatch so the electric sim
-    /// can model BTCM, regen braking, ABS, etc.
+    /// and Tick() mirrors each value onto its float32 WireTable cell so the
+    /// electric sim can model BTCM, regen braking, ABS, etc.
     void SetVehicleState(const VehicleState& state);
 
     /// Outgoing combination switch pin states — three meaningful output pins
@@ -684,8 +684,9 @@ public:
     bool  HasVehicleState() const;
 
     // ---------------------------------------------------------------------
-    // Test hooks — feed the connector synthetic delta records as though they
-    // arrived over the bus.  Used by unit tests; not part of the runtime path.
+    // Test hooks — feed the connector synthetic signal values as though a
+    // producer had written them to the WireTable.  Used by unit tests; not
+    // part of the runtime path.
     // ---------------------------------------------------------------------
     void DebugInjectDelta(std::uint32_t signal_id, bool value);
 

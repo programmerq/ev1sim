@@ -1,6 +1,6 @@
 // WireTruthChassis — ev1sim's attachment to electricsim's wire-truth substrate.
 //
-// electricsim is migrating the chassis bus off the legacy ring
+// electricsim moved the chassis bus off the legacy ring
 // (SharedMemoryTransport "electricsim_chassis_bus", DeltaRecord publish/poll)
 // onto a shared-memory WireTable: a directory of named, typed cells indexed by
 // WireId, with a topology_hash gate so peers built against different topologies
@@ -14,8 +14,8 @@
 // "electricsim_wires", topology hash electricsim::topology::kTopologyHash). It
 // exposes typed accessors that honour the substrate's written()/freshness
 // contract: a read returns std::nullopt when the cell has never been written
-// (the producer hasn't moved onto the wire yet), so the caller falls back to
-// its legacy ring value — the kHold-safe migration seam.
+// (the producer hasn't written it this run), so the caller keeps its own
+// last/default value — the kHold-safe seam.
 //
 // The header is deliberately electricsim-free (PIMPL). When the electricsim
 // tree is not checked out next to ev1sim (EV1SIM_HAVE_WIRE_TRUTH undefined —
@@ -46,7 +46,7 @@ public:
     // electricsim controller does (run_ev1_vehicle.sh sets these). Returns
     // nullptr when wire-truth is disabled (env unset), the segment never comes
     // up, the topology hash mismatches, or the substrate is compiled out. A
-    // nullptr return is the normal "stay on the legacy ring" path.
+    // nullptr return is the normal "external sim not present" path.
     static std::unique_ptr<WireTruthChassis> OpenFromEnv(
         const char* default_role = "attacher");
 
@@ -62,7 +62,7 @@ public:
     // Generic typed read of a bit cell, honouring the written() contract:
     //   - std::nullopt  -> not attached, undeclared/type-mismatched id, OR the
     //                      producer has never written it (gen == 0). Caller
-    //                      keeps its legacy/fallback value.
+    //                      keeps its own last/default value.
     //   - true/false    -> the live wire value.
     std::optional<bool>          read_bit(std::uint32_t wire_id) const;
 
@@ -89,7 +89,7 @@ public:
     // (signal_id, value). Returns the number of cells for which a sink was
     // invoked. Returns 0 (no-op) when not attached or substrate compiled out.
     // The written() gate makes this kHold-safe: a cell whose producer has not
-    // yet moved onto the wire is skipped so the ring-derived value persists.
+    // written it yet is skipped so the consumer's last value persists.
     // @design 2026-06-15 — consumer overlay batch.
     int apply_consumer_overlay(const ConsumerSinks& sinks) const;
 
