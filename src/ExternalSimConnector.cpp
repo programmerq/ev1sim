@@ -2874,7 +2874,7 @@ EV1SIM_CHASSIS_ID_MATCHES(kDynamicsBase,                 kSigChassisSpeedMps);
 // producer whenever this connector is updated to a newer contract.
 // See electricsim docs/chassis_contract_versioning.md.
 #define EV1_CHASSIS_CONTRACT_VERSION_IMPLEMENTED_MAJOR 1
-#define EV1_CHASSIS_CONTRACT_VERSION_IMPLEMENTED_MINOR 0
+#define EV1_CHASSIS_CONTRACT_VERSION_IMPLEMENTED_MINOR 9
 #define EV1_CHASSIS_CONTRACT_VERSION_IMPLEMENTED_PATCH 0
 
 // Baseline guard: if this is built against an electricsim that predates the
