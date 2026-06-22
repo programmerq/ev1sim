@@ -3,6 +3,27 @@
 Catch-all for physical-world / render / sim follow-ups deferred from focused
 work.  When you finish an item, delete it from here.
 
+## IPC + RSA display rework (planned)
+
+Rework ev1sim's HUD to surface the IPC instrument cluster + RSA center console
+as in-app displays (2D panels first, 3D later), fed by **decoding the GM-8192
+`*_TX` frame cells off the wire** (Palm-EV1-dashboard style) rather than
+per-value chassis cells. Display-only first; interactivity later. Full plan +
+ratified decisions: [`docs/ipc_rsa_display_plan.md`](ipc_rsa_display_plan.md).
+
+- [ ] **Phase 0 — retire the dead 4139 pack-voltage path** (ev1sim-only): the
+  `kSigBpmPackVoltageMv` endpoint + decode, `GetBpmPackVoltageMv()`,
+  `FormatBpmPackVoltageLabel`, and the `SimApp` wiring.  Permanently blank since
+  electricsim retired the cell (PIM moved to the HV-bus rail).
+- [ ] **Phase 1 — IPC cluster, 2D, snoop-fed (display-only)**: a `BusSnoop`
+  frame-decode layer → `DashSnapshot`; `InstrumentClusterPanel` + pure label
+  helpers; frame-decode + label + `[e2e]` tests.
+- [ ] **Phase 2 — RSA console, 2D, snoop-fed (display-only)**: `RsaConsolePanel`
+  mirroring electricsim `rsa_panel_catalog.yaml`.
+- [ ] **Phase 3 — 3D in-scene** cluster + console (same snapshot feed).
+- [ ] **Phase 4 — interactivity**: clickable RSA inputs; resolve multi-writer
+  arbitration with electricsim's RSA controller first.
+
 ## Physical-world components (next batches)
 
 The `PhysicalWorld` pattern landed with `CombinationSwitch` as the first
