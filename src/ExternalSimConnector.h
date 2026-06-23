@@ -639,13 +639,6 @@ public:
     float GetPimCruiseSetpointMps() const;
     bool  HasReceivedPimCruiseSetpointMps() const;
 
-    /// Incoming BPM pack voltage (ID 4139, chassis segment).
-    /// uint32 LE, millivolts (mV).  BPM publishes on change (epsilon ~50 mV)
-    /// while key-on.  Range: 0..~360 000 mV (0..360 V nominal).
-    /// Returns 0 if never received.
-    std::uint32_t GetBpmPackVoltageMv() const;
-    bool          HasReceivedBpmPackVoltage() const;
-
     /// Incoming Auto Disconnect main HV contactor state (ID 5224, main
     /// harness segment).  Published by the AD controller on change.
     /// bool: true = main contactor commanded closed (HV bus energized from

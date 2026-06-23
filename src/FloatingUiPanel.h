@@ -185,13 +185,6 @@ std::wstring FormatHoodStateLabel(int state);
 /// active: true while the switch is asserted (held) — appends " [ON]".
 std::wstring FormatPowerWindowButtonLabel(const wchar_t* text, bool active);
 
-// BPM pack voltage label helper (display-only, not a button).
-/// Format BPM pack voltage as "PackVolt: NNN.N V" or "PackVolt: ---" if not received.
-/// pack_voltage_mv: raw millivolt value from kSigChassisBpmPackVoltageMv (4139).
-/// ever_received: false before the first BPM publish (shows "PackVolt: ---").
-/// Converts mV → V with one decimal place.  Locale-independent formatting.
-std::wstring FormatBpmPackVoltageLabel(bool ever_received, std::uint32_t pack_voltage_mv);
-
 // ---------------------------------------------------------------------------
 class FloatingUiPanel : public irr::IEventReceiver {
 public:

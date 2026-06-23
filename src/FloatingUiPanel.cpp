@@ -250,19 +250,6 @@ std::wstring FormatVehicleSpeedLabel(bool ever_received, float speed_mps) {
     return buf;
 }
 
-std::wstring FormatBpmPackVoltageLabel(bool ever_received, std::uint32_t pack_voltage_mv) {
-    if (!ever_received) {
-        return L"PackVolt: ---";
-    }
-    // Convert mV → V with one decimal place.
-    const double volts = static_cast<double>(pack_voltage_mv) / 1000.0;
-    // "PackVolt: 312.0 V"
-    wchar_t buf[64];
-    std::swprintf(buf, sizeof(buf) / sizeof(buf[0]),
-                  L"PackVolt: %.1f V", volts);
-    return buf;
-}
-
 std::wstring FormatPedalPercentLabel(const char* name, double value_0_to_1) {
     // Build a wide-character version of the name.
     wchar_t wname[64] = {};

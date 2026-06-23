@@ -828,19 +828,6 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                     return FormatSteeringAngleLabel(deg);
                 },
                 []() {});   // no-op: display-only row
-
-            // --- BPM pack voltage (display-only; chassis bus 4139) ---
-            // Subscribes to kSigChassisBpmPackVoltageMv (4139) published by BPM on change
-            // (epsilon ~50 mV) while key-on.  Converts uint32 mV → V for display.
-            // Shows "PackVolt: 312.0 V" or "PackVolt: ---" before first BPM frame arrives.
-            m_floating_ui->AddButton(
-                [this]() -> std::wstring {
-                    if (!m_external_sim) return L"PackVolt: n/a";
-                    return FormatBpmPackVoltageLabel(
-                        m_external_sim->HasReceivedBpmPackVoltage(),
-                        m_external_sim->GetBpmPackVoltageMv());
-                },
-                []() {});   // no-op: display-only row
         }
     }
 
