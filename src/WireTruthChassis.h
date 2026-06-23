@@ -170,6 +170,17 @@ public:
     // never appended.  @inferred 2026-06-17 — total-bits-advancing ≈ alive.
     std::optional<std::uint64_t> btcm_tx_total_bits() const;
 
+    // GM-8192 frame snoop (IPC-cluster Phase 1) — decode module TX frames off
+    // the wire to feed the dashboard, rather than a dedicated chassis cell per
+    // display value (docs/ipc_rsa_display_plan.md). snoop_step() drains the
+    // per-module bit-stream TX cells through gm8192_rx_framer once per render
+    // tick; the bit-stream self-paces, so a coarse tick replays every missed bit.
+    void snoop_step(double now_s);
+    // Latest vehicle speed (km/h) decoded from the PIM $41 PCM Data Response
+    // (GM8192_PIM_TX, payload[4] = wire byte 6, 1 km/h/count; see electricsim
+    // ev1/pim/pim_uart_frame.h). nullopt until a $41 frame has been decoded.
+    std::optional<std::uint8_t> pim_vehicle_speed_kph() const;
+
     // PIM cruise-control state — electricsim declared these cells on PR #171
     // (was kSigPimCruiseActive/SetpointMps 5360/5361). Read off PIM_CRUISE_ACTIVE
     // / PIM_CRUISE_SETPOINT_MPS; nullopt until PIM writes them.

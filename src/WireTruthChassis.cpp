@@ -12,6 +12,7 @@
 #include "topology/env_open.hpp"          // electricsim::topology::try_open_from_env
 #include "topology/topology_generated.h"  // kTopologyHash, kWireHORN_DRIVE_LINE_*
 #include "wire_table.hpp"                 // electricsim::io::WireTable
+#include "gm8192/gm8192_rx_framer.hpp"    // electricsim::io::Gm8192RxFramer (frame snoop)
 
 #include <cstring>
 #include <unordered_map>
@@ -168,6 +169,10 @@ static const std::unordered_map<std::uint32_t, ProducerCell>& ProducerRegistry()
 
 struct WireTruthChassis::Impl {
     std::unique_ptr<electricsim::io::WireTable> table;
+    // GM-8192 frame snoop (Phase 1): lazily constructed on the first snoop_step()
+    // after `table` is attached. Drains GM8192_PIM_TX → $41 frames → vehicle speed.
+    std::unique_ptr<electricsim::io::Gm8192RxFramer> pim_framer;
+    std::optional<std::uint8_t>                      last_pim_speed_kph;
 };
 
 WireTruthChassis::WireTruthChassis() : impl_(std::make_unique<Impl>()) {}
@@ -522,6 +527,34 @@ std::optional<std::uint64_t> WireTruthChassis::btcm_tx_total_bits() const {
     return total;
 }
 
+void WireTruthChassis::snoop_step(double now_s) {
+    if (!attached()) return;
+    // GM-8192 physical layer: 8192 baud → 122.07 µs/bit. Mirrors electricsim
+    // ev1/lhjb/controller.cpp kGm8192BitPeriodNs. @source:manual.
+    constexpr std::uint64_t kGm8192BitPeriodNs = 122070;
+    if (!impl_->pim_framer) {
+        impl_->pim_framer = std::make_unique<electricsim::io::Gm8192RxFramer>(
+            impl_->table.get(), electricsim::topology::kWireGM8192_PIM_TX,
+            kGm8192BitPeriodNs);
+    }
+    // now_ns is advisory under the bit-stream transport (the appended bits
+    // self-pace), so a coarse render tick still replays every buffered bit.
+    // Drain every frame produced since the last tick. $41 = PIM PCM Data
+    // Response; payload[4] (wire byte 6) is vehicle speed, 1 km/h/count (0..162).
+    // See electricsim ev1/pim/pim_uart_frame.h (PIM_UART_FRAME_ID 0x41, N=7).
+    const auto now_ns = static_cast<std::uint64_t>(now_s * 1.0e9);
+    while (auto frame = impl_->pim_framer->step(now_ns)) {
+        if (frame->id == 0x41u && frame->n == 7u && frame->payload != nullptr) {
+            impl_->last_pim_speed_kph = frame->payload[4];
+        }
+    }
+}
+
+std::optional<std::uint8_t> WireTruthChassis::pim_vehicle_speed_kph() const {
+    if (!impl_) return std::nullopt;
+    return impl_->last_pim_speed_kph;
+}
+
 std::optional<bool> WireTruthChassis::pim_cruise_active() const {
     return read_bit(electricsim::topology::kWirePIM_CRUISE_ACTIVE);
 }
@@ -598,6 +631,10 @@ std::optional<std::uint32_t> WireTruthChassis::ad_state_enum() const {
     return std::nullopt;
 }
 std::optional<std::uint64_t> WireTruthChassis::btcm_tx_total_bits() const {
+    return std::nullopt;
+}
+void WireTruthChassis::snoop_step(double) {}
+std::optional<std::uint8_t> WireTruthChassis::pim_vehicle_speed_kph() const {
     return std::nullopt;
 }
 std::optional<bool> WireTruthChassis::pim_cruise_active() const {

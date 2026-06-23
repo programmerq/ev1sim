@@ -160,7 +160,16 @@ endif()
 # are the files the connector depends on at link/compile time.
 set(_electricsim_sources
     "src/io/wire_table.cpp"
-    "src/io/topology/env_open.cpp")
+    "src/io/topology/env_open.cpp"
+    # GM-8192 frame snoop (IPC-cluster Phase 1, docs/ipc_rsa_display_plan.md):
+    # decode module TX frames off the wire to feed the dashboard. gm8192_frame.c
+    # (C99 envelope) + the UART rx/tx state machines + the rx framer bridge.
+    # uart_tx.cpp is used by the wire-truth snoop test (serialises a frame onto a
+    # TX cell); it lives in the same lib for simplicity.
+    "src/io/gm8192/gm8192_frame.c"
+    "src/io/gm8192/gm8192_rx_framer.cpp"
+    "src/io/uart/uart_rx.cpp"
+    "src/io/uart/uart_tx.cpp")
 
 # Headers the connector compiles against: the generated topology (kWire*,
 # kTopologyHash, declare_all) and ev1_chassis_signals.hpp (the canonical

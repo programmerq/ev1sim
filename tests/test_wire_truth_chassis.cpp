@@ -30,6 +30,8 @@
 // electricsim substrate (creator side) — same headers env_open.cpp uses.
 #include "topology/topology_generated.h"
 #include "wire_table.hpp"
+#include "gm8192/gm8192_frame.h"  // gm8192_encode (build a $41 frame for the snoop test)
+#include "uart/uart_tx.hpp"       // electricsim::io::UartTx (serialise onto a TX cell)
 
 namespace {
 
@@ -642,6 +644,46 @@ TEST_CASE("WireTruthChassis::btcm_tx_total_bits tracks the GM8192 TX bit-stream"
     auto t2 = wire->btcm_tx_total_bits();
     REQUIRE(t2.has_value());
     REQUIRE(*t2 > *t1);  // advanced => "BTCM is transmitting" liveness proxy
+}
+
+TEST_CASE("WireTruthChassis::snoop decodes vehicle speed from the PIM $41 frame",
+          "[wire_truth][snoop]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("snoop_pim");
+    auto pim = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(pim != nullptr);
+
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+
+    // Nothing transmitted yet -> no decoded speed.
+    wire->snoop_step(0.0);
+    REQUIRE(wire->pim_vehicle_speed_kph() == std::nullopt);
+
+    // Serialise a real $41 PCM Data Response with vehicle speed = 50 km/h onto
+    // the PIM TX bit-stream cell, exactly as the PIM controller's UartTx would.
+    // payload[4] (wire byte 6) = vehicle speed (1 km/h/count); see electricsim
+    // ev1/pim/pim_uart_frame.h.
+    std::uint8_t payload[7] = {0u, 0u, 0u, 0u, 50u, 0u, 0u};
+    std::uint8_t frame[GM8192_MAX_FRAME_LEN] = {0u};
+    std::size_t  frame_len = 0;
+    REQUIRE(gm8192_encode(0x41u, payload, 7u, frame, sizeof(frame), &frame_len)
+            == GM8192_OK);
+
+    constexpr std::uint64_t kBitPeriodNs = 122070;
+    electricsim::io::UartTx tx(pim.get(), topo::kWireGM8192_PIM_TX, kBitPeriodNs);
+    tx.enqueue(frame, frame_len);
+
+    // Pump TX + snoop in lockstep, one bit period per step, until the frame
+    // (frame_len bytes × 10 UART bits) has serialised + decoded, plus slack.
+    std::uint64_t now = 1000u;
+    const int steps = static_cast<int>(frame_len) * 10 + 20;
+    for (int i = 0; i < steps; ++i) {
+        now += kBitPeriodNs;
+        tx.tick(now);
+        wire->snoop_step(static_cast<double>(now) / 1.0e9);
+    }
+    REQUIRE(wire->pim_vehicle_speed_kph() == std::optional<std::uint8_t>(50u));
 }
 
 TEST_CASE("WireTruthChassis::pim_cruise_active/setpoint follow the PIM cruise cells",
