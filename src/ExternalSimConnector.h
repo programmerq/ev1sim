@@ -639,6 +639,13 @@ public:
     float GetPimCruiseSetpointMps() const;
     bool  HasReceivedPimCruiseSetpointMps() const;
 
+    /// Instrument-cluster vehicle speed (km/h) decoded from the PIM $41 frame
+    /// snooped off the GM-8192 bus (GM8192_PIM_TX) — what the cluster reports,
+    /// distinct from ev1sim's own physics speed (GetVehicleSpeedMps). 0 / false
+    /// until a $41 frame is decoded.
+    std::uint8_t GetBusVehicleSpeedKph() const;
+    bool         HasBusVehicleSpeed() const;
+
     /// Incoming Auto Disconnect main HV contactor state (ID 5224, main
     /// harness segment).  Published by the AD controller on change.
     /// bool: true = main contactor commanded closed (HV bus energized from

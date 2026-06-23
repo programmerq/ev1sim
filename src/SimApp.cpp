@@ -828,6 +828,18 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                     return FormatSteeringAngleLabel(deg);
                 },
                 []() {});   // no-op: display-only row
+
+            // --- Instrument cluster: bus speed (Phase 1, display-only) ---
+            // Decoded from the PIM $41 frame snooped off GM8192_PIM_TX — what
+            // the cluster reads, distinct from ev1sim's own physics speed.
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    if (!m_external_sim) return L"Cluster: n/a";
+                    return FormatBusSpeedLabel(
+                        m_external_sim->HasBusVehicleSpeed(),
+                        m_external_sim->GetBusVehicleSpeedKph());
+                },
+                []() {});   // no-op: display-only row
         }
     }
 

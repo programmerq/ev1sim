@@ -165,6 +165,10 @@ std::wstring FormatTurnSignalStatusLabel(const wchar_t* side, bool active,
 /// Locale-independent formatting (period decimal, no thousand separators).
 std::wstring FormatVehicleSpeedLabel(bool ever_received, float speed_mps);
 
+/// Instrument-cluster vehicle speed from the PIM $41 frame snoop (GM8192_PIM_TX):
+/// "Cluster: NNN km/h" or "Cluster: ---" before the first frame is decoded.
+std::wstring FormatBusSpeedLabel(bool ever_received, std::uint8_t speed_kph);
+
 // Steering-angle indicator label helper (display-only, not a button).
 /// Format the front road-wheel steering angle (degrees) for the HUD.
 /// angle_deg: front-left road-wheel angle (positive = left, per Chrono's

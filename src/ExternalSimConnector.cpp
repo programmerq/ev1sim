@@ -1391,6 +1391,11 @@ struct ExternalSimConnector::State {
     bool          ipc_air_bag_telltale            = false;
     bool          has_ipc_air_bag_telltale        = false;
 
+    // Instrument-cluster vehicle speed (km/h) decoded from the PIM $41 frame
+    // snoop (GM8192_PIM_TX); 0 / false until a frame is decoded. Phase 1.
+    std::uint8_t  bus_speed_kph                    = 0u;
+    bool          has_bus_speed                    = false;
+
     // Auto Disconnect HV status (IDs 5224/5225 bool, 5230 uint32 enum; main
     // harness segment) — received from the AD controller, published on
     // change. Lets scenarios observe the HV power-up sequence (precharge →
@@ -1958,6 +1963,13 @@ float ExternalSimConnector::GetPimCruiseSetpointMps() const {
 }
 bool ExternalSimConnector::HasReceivedPimCruiseSetpointMps() const {
     return m_state->has_pim_cruise_setpoint_mps;
+}
+
+std::uint8_t ExternalSimConnector::GetBusVehicleSpeedKph() const {
+    return m_state->bus_speed_kph;
+}
+bool ExternalSimConnector::HasBusVehicleSpeed() const {
+    return m_state->has_bus_speed;
 }
 
 bool ExternalSimConnector::GetAdMainContactorClosed() const {
@@ -3007,6 +3019,15 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                 st.btcm_tx_bits_last  = *total;
                 st.btcm_uart_frame_ns = NowNs();
             }
+        }
+
+        // GM-8192 frame snoop (Phase 1 IPC cluster): drain the PIM $41 frame off
+        // GM8192_PIM_TX and surface the instrument-cluster vehicle speed. The
+        // snoop self-paces on the bit-stream, so one step per tick suffices.
+        st.wire->snoop_step(sim_time_s);
+        if (auto kph = st.wire->pim_vehicle_speed_kph()) {
+            st.bus_speed_kph = *kph;
+            st.has_bus_speed = true;
         }
 
         // PIM cruise state (was kSigPimCruiseActive/SetpointMps 5360/5361) ->

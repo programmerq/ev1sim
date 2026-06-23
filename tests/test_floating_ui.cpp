@@ -733,6 +733,23 @@ TEST_CASE("FormatVehicleSpeedLabel: 50 km/h = 13.89 m/s",
 }
 
 // ---------------------------------------------------------------------------
+// Instrument-cluster bus speed label (FormatBusSpeedLabel)
+// Source: PIM $41 frame snoop (GM8192_PIM_TX), uint8 km/h.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("FormatBusSpeedLabel: not-received shows placeholder",
+          "[FloatingUI][Cluster]") {
+    CHECK(FormatBusSpeedLabel(/*ever_received=*/false, 0u)  == L"Cluster: ---");
+    CHECK(FormatBusSpeedLabel(/*ever_received=*/false, 50u) == L"Cluster: ---");
+}
+
+TEST_CASE("FormatBusSpeedLabel: shows km/h when received",
+          "[FloatingUI][Cluster]") {
+    CHECK(FormatBusSpeedLabel(/*ever_received=*/true, 50u) == L"Cluster: 50 km/h");
+    CHECK(FormatBusSpeedLabel(/*ever_received=*/true, 0u)  == L"Cluster: 0 km/h");
+}
+
+// ---------------------------------------------------------------------------
 // HVAC driver-control labels (Round 2 — surfacing the HVAC control panel)
 // ---------------------------------------------------------------------------
 

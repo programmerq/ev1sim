@@ -250,6 +250,16 @@ std::wstring FormatVehicleSpeedLabel(bool ever_received, float speed_mps) {
     return buf;
 }
 
+std::wstring FormatBusSpeedLabel(bool ever_received, std::uint8_t speed_kph) {
+    if (!ever_received) {
+        return L"Cluster: ---";
+    }
+    wchar_t buf[48];
+    std::swprintf(buf, sizeof(buf) / sizeof(buf[0]),
+                  L"Cluster: %u km/h", static_cast<unsigned>(speed_kph));
+    return buf;
+}
+
 std::wstring FormatPedalPercentLabel(const char* name, double value_0_to_1) {
     // Build a wide-character version of the name.
     wchar_t wname[64] = {};
