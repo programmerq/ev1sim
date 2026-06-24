@@ -165,6 +165,10 @@ std::wstring FormatTurnSignalStatusLabel(const wchar_t* side, bool active,
 /// Locale-independent formatting (period decimal, no thousand separators).
 std::wstring FormatVehicleSpeedLabel(bool ever_received, float speed_mps);
 
+/// Instrument-cluster vehicle speed from the PIM $41 frame snoop (GM8192_PIM_TX):
+/// "Cluster: NNN km/h" or "Cluster: ---" before the first frame is decoded.
+std::wstring FormatBusSpeedLabel(bool ever_received, std::uint8_t speed_kph);
+
 // Steering-angle indicator label helper (display-only, not a button).
 /// Format the front road-wheel steering angle (degrees) for the HUD.
 /// angle_deg: front-left road-wheel angle (positive = left, per Chrono's
@@ -184,13 +188,6 @@ std::wstring FormatHoodStateLabel(int state);
 /// text:   static base label, e.g. L"Drv Window Up" (null treated as empty).
 /// active: true while the switch is asserted (held) — appends " [ON]".
 std::wstring FormatPowerWindowButtonLabel(const wchar_t* text, bool active);
-
-// BPM pack voltage label helper (display-only, not a button).
-/// Format BPM pack voltage as "PackVolt: NNN.N V" or "PackVolt: ---" if not received.
-/// pack_voltage_mv: raw millivolt value from kSigChassisBpmPackVoltageMv (4139).
-/// ever_received: false before the first BPM publish (shows "PackVolt: ---").
-/// Converts mV → V with one decimal place.  Locale-independent formatting.
-std::wstring FormatBpmPackVoltageLabel(bool ever_received, std::uint32_t pack_voltage_mv);
 
 // ---------------------------------------------------------------------------
 class FloatingUiPanel : public irr::IEventReceiver {

@@ -31,6 +31,11 @@ change; those stubs are gone here too):
   `declare_all()`.
 - `ev1_chassis_signals.hpp` — canonical chassis IDs for the connector's
   drift-guard `static_assert`s.
+- `gm8192/gm8192_frame.{c,h}`, `gm8192/gm8192_rx_framer.{cpp,hpp}`,
+  `uart/uart_rx.{cpp,hpp}`, `uart/uart_tx.{cpp,hpp}` — the GM-8192 frame snoop
+  `WireTruthChassis` uses to decode module TX frames off the bus (IPC-cluster
+  Phase 1, `docs/ipc_rsa_display_plan.md`). They depend only on
+  `wire_table.{cpp,hpp}` + each other.
 
 These are **vendored copies** of electricsim's files (self-contained — they pull
 in only standard headers and each other). ev1sim's CMake stale-check probes
@@ -46,7 +51,9 @@ electricsim tree when:
   new `kSigChassis*` constant exists here;
 - the connector starts reading/writing a new `kWire*` cell — re-copy
   `topology_generated.h` so the constant resolves;
-- electricsim's `WireTable` / `env_open` API changes — re-copy the matching file.
+- electricsim's `WireTable` / `env_open` API changes — re-copy the matching file;
+- `WireTruthChassis` snoops a new module's GM-8192 TX frame, or the GM-8192
+  frame / UART state machines change — re-copy `gm8192/` + `uart/`.
 
 Copy verbatim from `${ELECTRICSIM_DIR}/src/io/` (do not hand-edit) so the stub
 stays a faithful, compileable subset.

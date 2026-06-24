@@ -733,36 +733,20 @@ TEST_CASE("FormatVehicleSpeedLabel: 50 km/h = 13.89 m/s",
 }
 
 // ---------------------------------------------------------------------------
-// BPM pack voltage label helper (FormatBpmPackVoltageLabel)
-// Source: kSigChassisBpmPackVoltageMv (4139), uint32 LE mV from BPM.
-// ever_received=false shows "PackVolt: ---".
-// Format: "PackVolt: NNN.N V" — mV divided by 1000, one decimal place.
+// Instrument-cluster bus speed label (FormatBusSpeedLabel)
+// Source: PIM $41 frame snoop (GM8192_PIM_TX), uint8 km/h.
 // ---------------------------------------------------------------------------
 
-TEST_CASE("FormatBpmPackVoltageLabel: never-received shows placeholder",
-          "[FloatingUI][PackVolt]") {
-    CHECK(FormatBpmPackVoltageLabel(/*ever_received=*/false, 0u)
-          == L"PackVolt: ---");
-    CHECK(FormatBpmPackVoltageLabel(/*ever_received=*/false, 312000u)
-          == L"PackVolt: ---");
+TEST_CASE("FormatBusSpeedLabel: not-received shows placeholder",
+          "[FloatingUI][Cluster]") {
+    CHECK(FormatBusSpeedLabel(/*ever_received=*/false, 0u)  == L"Cluster: ---");
+    CHECK(FormatBusSpeedLabel(/*ever_received=*/false, 50u) == L"Cluster: ---");
 }
 
-TEST_CASE("FormatBpmPackVoltageLabel: nominal 312 V = 312000 mV",
-          "[FloatingUI][PackVolt]") {
-    CHECK(FormatBpmPackVoltageLabel(/*ever_received=*/true, 312000u)
-          == L"PackVolt: 312.0 V");
-}
-
-TEST_CASE("FormatBpmPackVoltageLabel: partial voltage 285.5 V = 285500 mV",
-          "[FloatingUI][PackVolt]") {
-    CHECK(FormatBpmPackVoltageLabel(/*ever_received=*/true, 285500u)
-          == L"PackVolt: 285.5 V");
-}
-
-TEST_CASE("FormatBpmPackVoltageLabel: zero voltage shows 0.0 V",
-          "[FloatingUI][PackVolt]") {
-    CHECK(FormatBpmPackVoltageLabel(/*ever_received=*/true, 0u)
-          == L"PackVolt: 0.0 V");
+TEST_CASE("FormatBusSpeedLabel: shows km/h when received",
+          "[FloatingUI][Cluster]") {
+    CHECK(FormatBusSpeedLabel(/*ever_received=*/true, 50u) == L"Cluster: 50 km/h");
+    CHECK(FormatBusSpeedLabel(/*ever_received=*/true, 0u)  == L"Cluster: 0 km/h");
 }
 
 // ---------------------------------------------------------------------------

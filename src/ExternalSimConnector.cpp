@@ -375,17 +375,6 @@ constexpr std::uint32_t kSigIpcReducedPerfTelltale    = 4144U;
 constexpr std::uint32_t kSigIpcCheckTirePressTelltale = 4145U;
 constexpr int           kNumIpcExtraTelltaleSignals   = 6;
 
-// BPM pack voltage (electricsim/BPM → ev1sim, chassis segment).
-//   4139  vehicle.bpm.pack_voltage_mv   uint32 LE, millivolts.
-// BPM publishes on change (epsilon ~50 mV) after each supervisor tick while
-// key-on.  Derived from pack_hi_v_q8 (primary pack-voltage sense lead, Q8 V).
-// ev1sim subscribes to surface the live pack voltage in the floating-UI panel.
-// 0 = sentinel "never received"; valid range 0..~360 000 mV (0..360 V).
-// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
-// kSigChassisBpmPackVoltageMv = 4139.
-constexpr std::uint32_t kSigBpmPackVoltageMv     = 4139U;
-constexpr int           kNumBpmPackVoltageSignals = 1;
-
 // Door lock commands (electricsim/RSA → ev1sim, chassis segment).
 //   4084  vehicle.body.door_lock_cmd.driver    uint8: 0=unlocked, 1=locked
 //   4085  vehicle.body.door_lock_cmd.passenger uint8: 0=unlocked, 1=locked
@@ -731,7 +720,6 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // +kNumIpcTripDistSignals for IPC trip distance (4132) — IPC → ev1sim.
 // +kNumIpcBtcmTelltaleSignals for IPC BTCM/airbag telltales (4134–4138) — IPC → ev1sim.
 // +kNumIpcExtraTelltaleSignals for IPC extra LCD telltales (4140–4145) — IPC → ev1sim.
-// +kNumBpmPackVoltageSignals for BPM pack voltage (4139) — BPM → ev1sim.
 // +kNumBtcmActuatorChassisSignals for the BTCM per-wheel actuator state
 //   on the chassis bus (4147-4154) — BTCM → ev1sim, parallel to the
 //   legacy main-harness 5010-5015 path.
@@ -759,7 +747,7 @@ constexpr int kNumEndpoints =
     kNumDoorLockMotorSignals + kNumSounderSignals + kNumSteeringPumpSignals +
     kNumHvacControlSignals + kNumDoorLockStateSignals +
     kNumIpcTelltaleSignals + kNumIpcTripDistSignals + kNumIpcBtcmTelltaleSignals +
-    kNumIpcExtraTelltaleSignals + kNumBpmPackVoltageSignals +
+    kNumIpcExtraTelltaleSignals +
     kNumBtcmActuatorChassisSignals + kNumExtContractSignals +
     kNumDynamics + kNumDriverInputs;
 
@@ -895,11 +883,6 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     out[i++] = {kSigIpcCheckTirePressTelltale,
                 "vehicle.ipc.check_tire_press_telltale",
                 "ipc_check_tire_press_telltale", true};
-    // BPM pack voltage (BPM → ev1sim, chassis segment, input_to_sim=true).
-    // Encoding: uint32 LE, millivolts.  Published on change (epsilon ~50 mV).
-    out[i++] = {kSigBpmPackVoltageMv,
-                "vehicle.bpm.pack_voltage_mv",
-                "bpm_pack_voltage_mv", true};
     // Door lock commands (RSA → ev1sim, chassis segment, input_to_sim=true).
     out[i++] = {kSigDoorLockCmdDriver,
                 "vehicle.body.door_lock_cmd.driver",
@@ -1408,10 +1391,10 @@ struct ExternalSimConnector::State {
     bool          ipc_air_bag_telltale            = false;
     bool          has_ipc_air_bag_telltale        = false;
 
-    // BPM pack voltage (ID 4139, chassis segment) — received from BPM.
-    // uint32 LE, millivolts.  0 = sentinel "never received"; valid range 0..~360 000 mV.
-    std::uint32_t bpm_pack_voltage_mv     = 0u;
-    bool          has_bpm_pack_voltage    = false;
+    // Instrument-cluster vehicle speed (km/h) decoded from the PIM $41 frame
+    // snoop (GM8192_PIM_TX); 0 / false until a frame is decoded. Phase 1.
+    std::uint8_t  bus_speed_kph                    = 0u;
+    bool          has_bus_speed                    = false;
 
     // Auto Disconnect HV status (IDs 5224/5225 bool, 5230 uint32 enum; main
     // harness segment) — received from the AD controller, published on
@@ -1982,11 +1965,11 @@ bool ExternalSimConnector::HasReceivedPimCruiseSetpointMps() const {
     return m_state->has_pim_cruise_setpoint_mps;
 }
 
-std::uint32_t ExternalSimConnector::GetBpmPackVoltageMv() const {
-    return m_state->bpm_pack_voltage_mv;
+std::uint8_t ExternalSimConnector::GetBusVehicleSpeedKph() const {
+    return m_state->bus_speed_kph;
 }
-bool ExternalSimConnector::HasReceivedBpmPackVoltage() const {
-    return m_state->has_bpm_pack_voltage;
+bool ExternalSimConnector::HasBusVehicleSpeed() const {
+    return m_state->has_bus_speed;
 }
 
 bool ExternalSimConnector::GetAdMainContactorClosed() const {
@@ -2658,10 +2641,7 @@ void ExternalSimConnector::DebugInjectU8(std::uint32_t signal_id,
 
 void ExternalSimConnector::DebugInjectU32(std::uint32_t signal_id,
                                            std::uint32_t value) {
-    if (signal_id == kSigBpmPackVoltageMv) {
-        m_state->bpm_pack_voltage_mv  = value;
-        m_state->has_bpm_pack_voltage = true;
-    } else if (signal_id == kSigAdStateEnum) {
+    if (signal_id == kSigAdStateEnum) {
         m_state->ad_state_enum     = value;
         m_state->has_ad_state_enum = true;
     }
@@ -2790,28 +2770,9 @@ EV1SIM_CHASSIS_ID_MATCHES(kSigIpcParkBrakeTelltale,      kSigChassisIpcParkBrake
 EV1SIM_CHASSIS_ID_MATCHES(kSigIpcAntilockTelltale,       kSigChassisIpcAntilockTelltale);
 EV1SIM_CHASSIS_ID_MATCHES(kSigIpcLowTracTelltale,        kSigChassisIpcLowTracTelltale);
 EV1SIM_CHASSIS_ID_MATCHES(kSigIpcAirBagTelltale,         kSigChassisIpcAirBagTelltale);
-// kSigChassisBpmPackVoltageMv (4139) is no longer declared by electricsim on
-// the wire-truth branch: it was dropped on 2026-06-15 (Phase C-b
-// "retire-not-migrate"; see electricsim src/io/ev1_chassis_signals.hpp ~L540
-// tombstone + notes/phase_c_chassis_migration_scope.md §9.1) on the grounds
-// that PIM, the only in-repo consumer, moved to the HV-bus rail (4155) and the
-// signal had "no ev1sim contract use". We DROP only the cross-repo drift-guard
-// here (the electricsim constant it referenced is gone); ev1sim's local
-// kSigBpmPackVoltageMv (4139) + its floating-UI pack-voltage plumbing are LEFT
-// INTACT but now inert (the delta never arrives), so the panel reads its
-// sentinel. This is non-fatal and reversible.
-//
-// Two open items, both future work (do NOT design now):
-//   1. electricsim may have *over-removed* 4139 (dropped rather than migrated).
-//      Worth verifying on the electricsim side whether a wire cell was the
-//      right call — tracked as a cross-repo follow-up in
-//      docs/wire_truth_migration_scope.md.
-//   2. ev1sim should not carry its own battery-voltage signal at all: the
-//      planned direction is to expose on-module displays (the IPC LCD) as a
-//      rendered "device" — like the horns and bulbs — rather than subscribe to
-//      a dedicated pack-voltage chassis signal. When that lands, this inert
-//      4139 plumbing is removed outright.
-// @design 2026-06-15 — wire-truth migration kickoff.
+// (4139 kSigChassisBpmPackVoltageMv: retired by electricsim 2026-06-15 and now
+// retired ev1sim-side too — see docs/ipc_rsa_display_plan.md Phase 0. The
+// pack-voltage readout returns via GM-8192 frame snoop in Phase 1.)
 EV1SIM_CHASSIS_ID_MATCHES(kSigIpcServiceNowTelltale,     kSigChassisIpcServiceNowTelltale);
 EV1SIM_CHASSIS_ID_MATCHES(kSigIpcCheckMessagesTelltale,  kSigChassisIpcCheckMessagesTelltale);
 EV1SIM_CHASSIS_ID_MATCHES(kSigIpcTempTelltale,           kSigChassisIpcTempTelltale);
@@ -3058,6 +3019,15 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                 st.btcm_tx_bits_last  = *total;
                 st.btcm_uart_frame_ns = NowNs();
             }
+        }
+
+        // GM-8192 frame snoop (Phase 1 IPC cluster): drain the PIM $41 frame off
+        // GM8192_PIM_TX and surface the instrument-cluster vehicle speed. The
+        // snoop self-paces on the bit-stream, so one step per tick suffices.
+        st.wire->snoop_step(sim_time_s);
+        if (auto kph = st.wire->pim_vehicle_speed_kph()) {
+            st.bus_speed_kph = *kph;
+            st.has_bus_speed = true;
         }
 
         // PIM cruise state (was kSigPimCruiseActive/SetpointMps 5360/5361) ->

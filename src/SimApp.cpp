@@ -829,16 +829,15 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                 },
                 []() {});   // no-op: display-only row
 
-            // --- BPM pack voltage (display-only; chassis bus 4139) ---
-            // Subscribes to kSigChassisBpmPackVoltageMv (4139) published by BPM on change
-            // (epsilon ~50 mV) while key-on.  Converts uint32 mV → V for display.
-            // Shows "PackVolt: 312.0 V" or "PackVolt: ---" before first BPM frame arrives.
+            // --- Instrument cluster: bus speed (Phase 1, display-only) ---
+            // Decoded from the PIM $41 frame snooped off GM8192_PIM_TX — what
+            // the cluster reads, distinct from ev1sim's own physics speed.
             m_floating_ui->AddButton(
                 [this]() -> std::wstring {
-                    if (!m_external_sim) return L"PackVolt: n/a";
-                    return FormatBpmPackVoltageLabel(
-                        m_external_sim->HasReceivedBpmPackVoltage(),
-                        m_external_sim->GetBpmPackVoltageMv());
+                    if (!m_external_sim) return L"Cluster: n/a";
+                    return FormatBusSpeedLabel(
+                        m_external_sim->HasBusVehicleSpeed(),
+                        m_external_sim->GetBusVehicleSpeedKph());
                 },
                 []() {});   // no-op: display-only row
         }

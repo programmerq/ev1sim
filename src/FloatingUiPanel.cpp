@@ -250,16 +250,13 @@ std::wstring FormatVehicleSpeedLabel(bool ever_received, float speed_mps) {
     return buf;
 }
 
-std::wstring FormatBpmPackVoltageLabel(bool ever_received, std::uint32_t pack_voltage_mv) {
+std::wstring FormatBusSpeedLabel(bool ever_received, std::uint8_t speed_kph) {
     if (!ever_received) {
-        return L"PackVolt: ---";
+        return L"Cluster: ---";
     }
-    // Convert mV → V with one decimal place.
-    const double volts = static_cast<double>(pack_voltage_mv) / 1000.0;
-    // "PackVolt: 312.0 V"
-    wchar_t buf[64];
+    wchar_t buf[48];
     std::swprintf(buf, sizeof(buf) / sizeof(buf[0]),
-                  L"PackVolt: %.1f V", volts);
+                  L"Cluster: %u km/h", static_cast<unsigned>(speed_kph));
     return buf;
 }
 
