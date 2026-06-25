@@ -144,11 +144,22 @@ static const std::unordered_map<std::uint32_t, ProducerCell>& ProducerRegistry()
         {6964U, {kWireDRIVER_SEATBELT_BUCKLED,           WireType::kBit}},
         {6965U, {kWireDRIVER_SEATBELT_BUCKLED_PASSENGER, WireType::kBit}},
         {6971U, {kWireDRIVER_RSA_MODE_BUTTON,            WireType::kByte}},
-        {6975U, {kWireDRIVER_RSA_KEYPAD_BUTTON1,         WireType::kBit}},
-        {6976U, {kWireDRIVER_RSA_KEYPAD_BUTTON2,         WireType::kBit}},
-        {6977U, {kWireDRIVER_RSA_KEYPAD_BUTTON3,         WireType::kBit}},
-        {6978U, {kWireDRIVER_RSA_KEYPAD_BUTTON4,         WireType::kBit}},
-        {6979U, {kWireDRIVER_RSA_KEYPAD_BUTTON5,         WireType::kBit}},
+        // Interior keypad buttons are BYTE, not bit: the cell carries the
+        // tap-vs-long-press digit encoding (0=idle, 1=tap/lower, 2=long/higher),
+        // matching electricsim's topology (config/topology.yaml
+        // DRIVER_RSA_KEYPAD_BUTTON{1..5}: type byte, since the 2026-06-19
+        // rsa-keypad-window-wire-type change) and the byte read in RSA's
+        // rsa_apply_driver_input_wires(). Declaring them kBit here silently sent
+        // every digit to a bit cell RSA never reads as a byte, so RSA never
+        // authenticated and the co-sim vehicle never left PARK. The mode button
+        // (6971) and exterior keypad (6985-6989) were already byte, which is why
+        // ACC was received but no interior code ever was.
+        // @design 2026-06-25 claude — cross-repo wire-type sync fix.
+        {6975U, {kWireDRIVER_RSA_KEYPAD_BUTTON1,         WireType::kByte}},
+        {6976U, {kWireDRIVER_RSA_KEYPAD_BUTTON2,         WireType::kByte}},
+        {6977U, {kWireDRIVER_RSA_KEYPAD_BUTTON3,         WireType::kByte}},
+        {6978U, {kWireDRIVER_RSA_KEYPAD_BUTTON4,         WireType::kByte}},
+        {6979U, {kWireDRIVER_RSA_KEYPAD_BUTTON5,         WireType::kByte}},
         // Power window switches (bit)
         {6980U, {kWireDRIVER_POWER_WINDOW_DRIVER_UP,      WireType::kBit}},
         {6981U, {kWireDRIVER_POWER_WINDOW_DRIVER_DOWN,    WireType::kBit}},
