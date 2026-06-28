@@ -118,6 +118,17 @@ public:
     bool mirror_signal(std::uint32_t signal_id, const std::uint8_t* payload,
                        std::size_t n);
 
+    // ── Co-sim tick barrier (primitive-4 B): leader-side ────────────────────
+    // ev1sim is the barrier LEADER. After publishing all cells for a tick, it
+    // opens the tick (BarrierPublishTick) and waits for all consumers to ack
+    // (BarrierAwaitAcks) before stepping the next physics tick — a deterministic
+    // per-tick lockstep. Inert (no-ops / returns true) when not attached, so a
+    // wire-disabled or unarmed run is byte-identical. See
+    // electricsim docs/proposals/primitive4_cosim_determinism_2026-06-25.md.
+    void BarrierArm();
+    void BarrierPublishTick();
+    bool BarrierAwaitAcks(std::uint32_t consumer_count, int timeout_ms);
+
     // Semantic helpers for the proof-of-life horn batch (chassis 4020/4021,
     // LHJB -> ev1sim). Resolve to the real generated WireIds in the .cpp, so
     // ev1sim never hardcodes the order-assigned numeric id.

@@ -1593,6 +1593,16 @@ struct ExternalSimConnector::State {
     std::unique_ptr<ev1sim::WireTruthChassis> wire;
     bool wire_attach_tried = false;
 
+    // Co-sim tick barrier (primitive-4 B), leader side. Read from env once on
+    // attach: ELECTRICSIM_BARRIER=1 arms it; EV1SIM_FLEET_N is the consumer
+    // count to wait for each tick. barrier_failed latches on the first ack
+    // timeout (a consumer crashed) — thereafter the leader free-runs so the run
+    // finishes (and fails) instead of stalling timeout-per-tick.
+    bool barrier_enabled = false;
+    bool barrier_failed = false;
+    std::uint32_t barrier_fleet_n = 0;
+    int barrier_timeout_ms = 30000;  // crash backstop; slow-but-live is waited for
+
     // Liveness proxy for the BTCM GM-8192 TX bit-stream (GM8192_BTCM_TX): the
     // last total-bit count we observed. When it advances, the BTCM is
     // transmitting, so we stamp btcm_uart_frame_ns (the old kSigBtcmUartFrame
@@ -2946,7 +2956,30 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             st.ext_park_brake_release_pub       = -1;
             st.ext_key_position_pub             = -1;
             std::cout << "[ExternalSim] wire-truth substrate attached "
-                         "(sole bus; chassis + ECU cells read from the WireTable)\n";
+                         "(sole bus; chassis + ECU cells read from the WireTable)\n"
+                      << std::flush;  // flush NOW: with the barrier armed this Tick
+                                      // BLOCKS at its end waiting for consumers that
+                                      // the vat orchestrator only spawns AFTER it
+                                      // scrapes this ready line from the log.
+            // Co-sim tick barrier (primitive-4 B), leader side: opt-in via env.
+            // The vat orchestrator sets ELECTRICSIM_BARRIER=1 + EV1SIM_FLEET_N
+            // for deterministic co-sim runs; nobody else does, so the barrier is
+            // inert (and the run byte-identical) otherwise.
+            if (const char* be = std::getenv("ELECTRICSIM_BARRIER");
+                be != nullptr && be[0] == '1') {
+                const char* fn = std::getenv("EV1SIM_FLEET_N");
+                const long n = (fn != nullptr) ? std::strtol(fn, nullptr, 10) : 0;
+                if (n > 0) {
+                    st.barrier_enabled = true;
+                    st.barrier_fleet_n = static_cast<std::uint32_t>(n);
+                    st.wire->BarrierArm();
+                    std::cout << "[ExternalSim] tick barrier ARMED (leader; "
+                                 "waiting for " << n << " consumers/tick)\n";
+                } else {
+                    std::cout << "[ExternalSim] ELECTRICSIM_BARRIER set but "
+                                 "EV1SIM_FLEET_N missing/invalid — barrier OFF\n";
+                }
+            }
         }
     }
     if (st.wire) {
@@ -3588,6 +3621,23 @@ void ExternalSimConnector::Tick(double sim_time_s) {
     //    signal-define), so there is nothing to announce. The EndpointTable() +
     //    Endpoints()/FindEndpoint() registry stays — tests and tooling still use
     //    it — it just isn't broadcast.
+
+    // 7. Co-sim tick barrier (primitive-4 B), leader side. ALL cells for this
+    //    tick are now published above, so open the tick (bump the publish
+    //    generation, ordering every cell write before it) and BLOCK until all
+    //    consumers ack — a deterministic per-tick lockstep. On the first ack
+    //    timeout a consumer has crashed: latch barrier_failed and free-run the
+    //    rest so the scenario finishes (and fails) instead of stalling 30 s/tick.
+    if (st.barrier_enabled && !st.barrier_failed && st.wire) {
+        st.wire->BarrierPublishTick();
+        if (!st.wire->BarrierAwaitAcks(st.barrier_fleet_n, st.barrier_timeout_ms)) {
+            st.barrier_failed = true;
+            std::cerr << "[ExternalSim] tick barrier ABORT — only some of "
+                      << st.barrier_fleet_n << " consumers acked within "
+                      << st.barrier_timeout_ms << " ms; a controller likely "
+                         "crashed. Free-running the remainder (run will fail).\n";
+        }
+    }
 }
 
 bool ExternalSimConnector::BusesUp() const {

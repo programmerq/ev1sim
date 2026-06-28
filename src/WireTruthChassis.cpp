@@ -252,6 +252,21 @@ bool WireTruthChassis::write_float32(std::uint32_t wire_id, float value) {
     return impl_->table->write_float32(wire_id, value);
 }
 
+// ── Co-sim tick barrier (primitive-4 B): leader-side forwarders ──────────────
+// ev1sim is the barrier LEADER. These thin-forward to the electricsim WireTable
+// barrier primitive. No-ops when not attached so a wire-disabled run is inert.
+void WireTruthChassis::BarrierArm() {
+    if (attached()) impl_->table->barrier_arm();
+}
+void WireTruthChassis::BarrierPublishTick() {
+    if (attached()) impl_->table->barrier_publish_tick();
+}
+bool WireTruthChassis::BarrierAwaitAcks(std::uint32_t consumer_count,
+                                        int timeout_ms) {
+    if (!attached()) return true;  // no barrier → nothing to wait for
+    return impl_->table->barrier_await_acks(consumer_count, timeout_ms);
+}
+
 bool WireTruthChassis::mirror_signal(std::uint32_t signal_id,
                                      const std::uint8_t* payload, std::size_t n) {
     if (!attached()) return false;
