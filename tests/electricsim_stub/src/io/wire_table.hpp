@@ -280,6 +280,19 @@ class WireTable {
   std::size_t cell_count() const noexcept;
   bool is_creator() const noexcept;
 
+  // ── Co-sim tick barrier (primitive-4 B) — leader side ───────────────
+  // The real electricsim wire_table implements these atop the segment
+  // header's reserved bytes (a futex-backed per-tick lockstep). ev1sim's
+  // WireTruthChassis drives only the LEADER side (arm / publish-tick /
+  // await-acks); the integrated-build compiles that path against this
+  // stub, so the methods must exist with matching signatures. No-ops
+  // here — the stub has no real fleet consumers to synchronize, and
+  // await-acks reports success so the connector's Tick proceeds.
+  void barrier_arm() {}
+  void barrier_publish_tick() {}
+  bool barrier_await_acks(std::uint32_t /*consumer_count*/,
+                          int /*timeout_ms*/) { return true; }
+
   // has_cell may insert into the process-local id_to_index cache on
   // a late-declare miss, so it can theoretically allocate and throw
   // std::bad_alloc. NOT noexcept. (Bugbot PR #86 fourth-round low

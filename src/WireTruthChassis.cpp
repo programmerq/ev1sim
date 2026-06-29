@@ -144,11 +144,22 @@ static const std::unordered_map<std::uint32_t, ProducerCell>& ProducerRegistry()
         {6964U, {kWireDRIVER_SEATBELT_BUCKLED,           WireType::kBit}},
         {6965U, {kWireDRIVER_SEATBELT_BUCKLED_PASSENGER, WireType::kBit}},
         {6971U, {kWireDRIVER_RSA_MODE_BUTTON,            WireType::kByte}},
-        {6975U, {kWireDRIVER_RSA_KEYPAD_BUTTON1,         WireType::kBit}},
-        {6976U, {kWireDRIVER_RSA_KEYPAD_BUTTON2,         WireType::kBit}},
-        {6977U, {kWireDRIVER_RSA_KEYPAD_BUTTON3,         WireType::kBit}},
-        {6978U, {kWireDRIVER_RSA_KEYPAD_BUTTON4,         WireType::kBit}},
-        {6979U, {kWireDRIVER_RSA_KEYPAD_BUTTON5,         WireType::kBit}},
+        // Interior keypad buttons are BYTE, not bit: the cell carries the
+        // tap-vs-long-press digit encoding (0=idle, 1=tap/lower, 2=long/higher),
+        // matching electricsim's topology (config/topology.yaml
+        // DRIVER_RSA_KEYPAD_BUTTON{1..5}: type byte, since the 2026-06-19
+        // rsa-keypad-window-wire-type change) and the byte read in RSA's
+        // rsa_apply_driver_input_wires(). Declaring them kBit here silently sent
+        // every digit to a bit cell RSA never reads as a byte, so RSA never
+        // authenticated and the co-sim vehicle never left PARK. The mode button
+        // (6971) and exterior keypad (6985-6989) were already byte, which is why
+        // ACC was received but no interior code ever was.
+        // @design 2026-06-25 claude — cross-repo wire-type sync fix.
+        {6975U, {kWireDRIVER_RSA_KEYPAD_BUTTON1,         WireType::kByte}},
+        {6976U, {kWireDRIVER_RSA_KEYPAD_BUTTON2,         WireType::kByte}},
+        {6977U, {kWireDRIVER_RSA_KEYPAD_BUTTON3,         WireType::kByte}},
+        {6978U, {kWireDRIVER_RSA_KEYPAD_BUTTON4,         WireType::kByte}},
+        {6979U, {kWireDRIVER_RSA_KEYPAD_BUTTON5,         WireType::kByte}},
         // Power window switches (bit)
         {6980U, {kWireDRIVER_POWER_WINDOW_DRIVER_UP,      WireType::kBit}},
         {6981U, {kWireDRIVER_POWER_WINDOW_DRIVER_DOWN,    WireType::kBit}},
@@ -239,6 +250,21 @@ bool WireTruthChassis::write_uint64(std::uint32_t wire_id, std::uint64_t value) 
 bool WireTruthChassis::write_float32(std::uint32_t wire_id, float value) {
     if (!attached()) return false;
     return impl_->table->write_float32(wire_id, value);
+}
+
+// ── Co-sim tick barrier (primitive-4 B): leader-side forwarders ──────────────
+// ev1sim is the barrier LEADER. These thin-forward to the electricsim WireTable
+// barrier primitive. No-ops when not attached so a wire-disabled run is inert.
+void WireTruthChassis::BarrierArm() {
+    if (attached()) impl_->table->barrier_arm();
+}
+void WireTruthChassis::BarrierPublishTick() {
+    if (attached()) impl_->table->barrier_publish_tick();
+}
+bool WireTruthChassis::BarrierAwaitAcks(std::uint32_t consumer_count,
+                                        int timeout_ms) {
+    if (!attached()) return true;  // no barrier → nothing to wait for
+    return impl_->table->barrier_await_acks(consumer_count, timeout_ms);
 }
 
 bool WireTruthChassis::mirror_signal(std::uint32_t signal_id,
