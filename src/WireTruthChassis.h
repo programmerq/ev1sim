@@ -151,9 +151,12 @@ public:
     // distinguishable here. Reads RSA_RUN1_OUT (RUN2 is identical).
     std::optional<bool> rsa_run_active() const;    // RSA_RUN1_OUT (rsa_ecu)
 
-    // Auto-Disconnect main HV contactor closed (APM_HV_CONTACTOR_CLOSED). Maps
-    // to ev1sim's ad_main_contactor (was kSigAdMainContactor 5224).
-    std::optional<bool> ad_main_contactor_closed() const;  // APM_HV_CONTACTOR_CLOSED
+    // Auto-Disconnect main HV contactor closed (AD_MAIN_CONTACTOR — the AD's
+    // own commanded output, the authoritative successor of kSigAdMainContactor
+    // 5224). Re-pointed 2026-07-04 off the APM_HV_CONTACTOR_CLOSED echo cell it
+    // was mis-mapped to in the #171 port: the echo is only written when an APM
+    // is in the fleet, so AD-only fleets read a permanent 0 (see .cpp comment).
+    std::optional<bool> ad_main_contactor_closed() const;  // AD_MAIN_CONTACTOR
 
     // Auto-Disconnect state enum, reconstructed from the three discrete AD state
     // lines (AD_STATE_A/B/C) + the AD power-supply discrete (AD_POWER_SUPPLY),
