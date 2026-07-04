@@ -575,18 +575,31 @@ TEST_CASE("WireTruthChassis::rsa_run_active follows RSA_RUN1_OUT", "[wire_truth]
     REQUIRE(wire->rsa_run_active() == std::optional<bool>(false));
 }
 
-TEST_CASE("WireTruthChassis::ad_main_contactor_closed follows APM_HV_CONTACTOR_CLOSED",
+TEST_CASE("WireTruthChassis::ad_main_contactor_closed follows the AD's own AD_MAIN_CONTACTOR",
           "[wire_truth][ecu]") {
+    // Re-pointed 2026-07-04: was wrongly wired to APM_HV_CONTACTOR_CLOSED (the
+    // APM's downstream echo, only written when an APM is in the fleet), which
+    // read a permanent nullopt/0 in an APM-less fleet (VAT
+    // safety_ad_precharge_timeout is [hv_bus, ad] — no APM) even though the AD
+    // itself had genuinely closed the contactor. The getter must follow the
+    // AD's OWN commanded output, matching its sibling getters
+    // (ad_precharge_relay, ad_state_enum) below.
     namespace topo = electricsim::topology;
-    const std::string seg = unique_segment("ecu_apm");
-    auto apm = create_fleet_table(seg, topo::kTopologyHash);
-    REQUIRE(apm != nullptr);
+    const std::string seg = unique_segment("ecu_ad_main");
+    auto ad = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(ad != nullptr);
 
     auto wire = ev1sim::WireTruthChassis::Attach(seg);
     REQUIRE(wire != nullptr);
 
     REQUIRE(wire->ad_main_contactor_closed() == std::nullopt);  // unwritten
-    REQUIRE(apm->write_bit(topo::kWireAPM_HV_CONTACTOR_CLOSED, true));
+    REQUIRE(ad->write_bit(topo::kWireAD_MAIN_CONTACTOR, true));
+    REQUIRE(wire->ad_main_contactor_closed() == std::optional<bool>(true));
+
+    // The APM echo cell must NOT be what the getter follows — even with the
+    // echo written to a DIFFERENT value, the getter must keep reporting the
+    // AD's own cell.
+    REQUIRE(ad->write_bit(topo::kWireAPM_HV_CONTACTOR_CLOSED, false));
     REQUIRE(wire->ad_main_contactor_closed() == std::optional<bool>(true));
 }
 
