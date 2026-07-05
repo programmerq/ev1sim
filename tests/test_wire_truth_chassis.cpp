@@ -324,6 +324,12 @@ TEST_CASE("WireTruthChassis::apply_consumer_overlay: written cells invoke matchi
         electricsim::topology::kWireCHASSIS_IPC_TRIP_DISTANCE_M, 123.5f));
     REQUIRE(creator->write_uint32(
         electricsim::topology::kWireCHASSIS_AUX_BATTERY_TERMINAL_MV, 12650u));
+    // PIM commanded throttle (4073) — the cell the #171 migration dropped from
+    // the consumer set (restored 2026-07-04); pin it here so it can't fall out
+    // again silently (the VAT safety failsafe assertions read this via stats).
+    REQUIRE(creator->write_byte(
+        electricsim::topology::kWireCHASSIS_THROTTLE_CMD_Q8,
+        static_cast<std::uint8_t>(128u)));
 
     auto wire = ev1sim::WireTruthChassis::Attach(seg);
     REQUIRE(wire != nullptr);
@@ -356,11 +362,14 @@ TEST_CASE("WireTruthChassis::apply_consumer_overlay: written cells invoke matchi
     REQUIRE(u32_map.count(4192U) == 1);
     REQUIRE(u32_map.at(4192U) == 12650u);
 
-    // Return count must be >= 4 (the four we wrote; other cells may also be
+    REQUIRE(byte_map.count(4073U) == 1);
+    REQUIRE(byte_map.at(4073U) == static_cast<std::uint8_t>(128u));
+
+    // Return count must be >= 5 (the five we wrote; other cells may also be
     // registered consumer cells but were not written so do not count).
-    REQUIRE(n >= 4);
-    // The count must not exceed the total number of consumer cells (66).
-    REQUIRE(n <= 66);
+    REQUIRE(n >= 5);
+    // The count must not exceed the total number of consumer cells (67).
+    REQUIRE(n <= 67);
 }
 
 TEST_CASE("WireTruthChassis::apply_consumer_overlay: no-write returns 0, no sink fires",
@@ -566,18 +575,31 @@ TEST_CASE("WireTruthChassis::rsa_run_active follows RSA_RUN1_OUT", "[wire_truth]
     REQUIRE(wire->rsa_run_active() == std::optional<bool>(false));
 }
 
-TEST_CASE("WireTruthChassis::ad_main_contactor_closed follows APM_HV_CONTACTOR_CLOSED",
+TEST_CASE("WireTruthChassis::ad_main_contactor_closed follows the AD's own AD_MAIN_CONTACTOR",
           "[wire_truth][ecu]") {
+    // Re-pointed 2026-07-04: was wrongly wired to APM_HV_CONTACTOR_CLOSED (the
+    // APM's downstream echo, only written when an APM is in the fleet), which
+    // read a permanent nullopt/0 in an APM-less fleet (VAT
+    // safety_ad_precharge_timeout is [hv_bus, ad] — no APM) even though the AD
+    // itself had genuinely closed the contactor. The getter must follow the
+    // AD's OWN commanded output, matching its sibling getters
+    // (ad_precharge_relay, ad_state_enum) below.
     namespace topo = electricsim::topology;
-    const std::string seg = unique_segment("ecu_apm");
-    auto apm = create_fleet_table(seg, topo::kTopologyHash);
-    REQUIRE(apm != nullptr);
+    const std::string seg = unique_segment("ecu_ad_main");
+    auto ad = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(ad != nullptr);
 
     auto wire = ev1sim::WireTruthChassis::Attach(seg);
     REQUIRE(wire != nullptr);
 
     REQUIRE(wire->ad_main_contactor_closed() == std::nullopt);  // unwritten
-    REQUIRE(apm->write_bit(topo::kWireAPM_HV_CONTACTOR_CLOSED, true));
+    REQUIRE(ad->write_bit(topo::kWireAD_MAIN_CONTACTOR, true));
+    REQUIRE(wire->ad_main_contactor_closed() == std::optional<bool>(true));
+
+    // The APM echo cell must NOT be what the getter follows — even with the
+    // echo written to a DIFFERENT value, the getter must keep reporting the
+    // AD's own cell.
+    REQUIRE(ad->write_bit(topo::kWireAPM_HV_CONTACTOR_CLOSED, false));
     REQUIRE(wire->ad_main_contactor_closed() == std::optional<bool>(true));
 }
 

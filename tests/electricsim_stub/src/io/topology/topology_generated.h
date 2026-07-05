@@ -261,6 +261,7 @@ inline constexpr ::electricsim::io::WireId kWireDRIVER_DOOR_HANDLE_ATTEMPT_PASSE
 inline constexpr ::electricsim::io::WireId kWirePIM_CRUISE_ACTIVE = 235U;
 inline constexpr ::electricsim::io::WireId kWirePIM_CRUISE_SETPOINT_MPS = 236U;
 inline constexpr ::electricsim::io::WireId kWireAD_PRECHARGE_RELAY = 237U;
+inline constexpr ::electricsim::io::WireId kWireAD_MAIN_CONTACTOR = 240U;
 
 // Per-net default + init_policy constants (round-4 step 4b).
 // Used by consumers that opt into the kDefault policy — see
@@ -741,6 +742,8 @@ inline constexpr auto kWirePIM_CRUISE_SETPOINT_MPS_Default = 0.0f;
 inline constexpr InitPolicy kWirePIM_CRUISE_SETPOINT_MPS_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireAD_PRECHARGE_RELAY_Default = false;
 inline constexpr InitPolicy kWireAD_PRECHARGE_RELAY_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireAD_MAIN_CONTACTOR_Default = false;
+inline constexpr InitPolicy kWireAD_MAIN_CONTACTOR_InitPolicy = InitPolicy::kHold;
 
 // Declare every wire in this topology on the given (creator)
 // table. Returns true iff all declarations succeed.
@@ -983,6 +986,7 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(kWirePIM_CRUISE_ACTIVE, ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(kWirePIM_CRUISE_SETPOINT_MPS, ::electricsim::io::WireType::kFloat32) && ok;
   ok = table.declare(kWireAD_PRECHARGE_RELAY, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireAD_MAIN_CONTACTOR, ::electricsim::io::WireType::kBit) && ok;
   return ok;
 }
 
@@ -1228,6 +1232,7 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case kWirePIM_CRUISE_ACTIVE: return "PIM_CRUISE_ACTIVE";
     case kWirePIM_CRUISE_SETPOINT_MPS: return "PIM_CRUISE_SETPOINT_MPS";
     case kWireAD_PRECHARGE_RELAY: return "AD_PRECHARGE_RELAY";
+    case kWireAD_MAIN_CONTACTOR: return "AD_MAIN_CONTACTOR";
     default: return ::std::string_view{};
   }
 }
@@ -1478,6 +1483,7 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case kWirePIM_CRUISE_ACTIVE: return "";
     case kWirePIM_CRUISE_SETPOINT_MPS: return "";
     case kWireAD_PRECHARGE_RELAY: return "";
+    case kWireAD_MAIN_CONTACTOR: return "";
     default: return ::std::string_view{};
   }
 }
@@ -1732,6 +1738,7 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(kWirePIM_CRUISE_ACTIVE, &gen) && gen == 0) { visitor(::std::string_view{"PIM_CRUISE_ACTIVE"}, kWirePIM_CRUISE_ACTIVE); ++count; }
   if (table.write_gen(kWirePIM_CRUISE_SETPOINT_MPS, &gen) && gen == 0) { visitor(::std::string_view{"PIM_CRUISE_SETPOINT_MPS"}, kWirePIM_CRUISE_SETPOINT_MPS); ++count; }
   if (table.write_gen(kWireAD_PRECHARGE_RELAY, &gen) && gen == 0) { visitor(::std::string_view{"AD_PRECHARGE_RELAY"}, kWireAD_PRECHARGE_RELAY); ++count; }
+  if (table.write_gen(kWireAD_MAIN_CONTACTOR, &gen) && gen == 0) { visitor(::std::string_view{"AD_MAIN_CONTACTOR"}, kWireAD_MAIN_CONTACTOR); ++count; }
   return count;
 }
 

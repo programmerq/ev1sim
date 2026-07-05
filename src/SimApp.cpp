@@ -1367,6 +1367,10 @@ int SimApp::RunWithVisualization() {
         // --- Bus-mediated throttle override (electronics drive mode) ---
         // No-op in "local" mode.  Must run before the propulsion gate so
         // a stale-fallback to the local pedal still respects KEY OFF.
+        // Raw-pedal capture: 6903 publishes the driver's pedal, not the
+        // post-override command — see the headless twin of this site for
+        // the feedback-collapse this prevents. @design 2026-07-04.
+        const double driver_pedal_raw = cmd.throttle;
         ApplyElectronicsThrottle(cmd);
         ApplyElectronicsSteering(cmd);
 
@@ -1615,7 +1619,9 @@ int SimApp::RunWithVisualization() {
                 return static_cast<std::int16_t>(deg_q8);
             };
             m_external_sim->SetDriverBrakePedalQ8(clamp01_q8(cmd.front_brake));
-            m_external_sim->SetDriverThrottleQ8(clamp01_q8(cmd.throttle));
+            // Raw pedal, not the electronics-override result — 6903 is the
+            // APA pedal sensor (PIM's input); see the capture site above.
+            m_external_sim->SetDriverThrottleQ8(clamp01_q8(driver_pedal_raw));
             m_external_sim->SetDriverSteeringDegQ8(steer_deg_q8(cmd.steering));
             // Gear selector: map PrndSelector::Position to enum (P=0, R=1, N=2, D=3).
             m_external_sim->SetDriverGearSelector(
@@ -2084,6 +2090,24 @@ int SimApp::RunHeadless() {
         // In headless mode there is no keyboard pedal, so the local
         // fallback is the scripted driver (or zero throttle).  When the
         // bus is fresh, PIM's commanded throttle replaces the local value.
+        //
+        // Capture the DRIVER's raw pedal BEFORE the override: 6903
+        // (DRIVER_THROTTLE_Q8) models the APA pedal sensor — a physical
+        // human input — and it is PIM's input for computing the very
+        // command the override applies. Publishing the post-override
+        // value fed PIM its own output back (pedal -> PIM cmd -> plant
+        // cmd -> "pedal"), which collapses to zero the moment the bus
+        // goes live: PIM boots commanding 0 (PARK), the override zeroes
+        // cmd.throttle, 6903 publishes 0, PIM reads foot-off, commands 0
+        // — forever. Latent until 2026-07-04 because ev1sim never
+        // actually ingested 4073 post-#171 (the consumer-registry gap);
+        // the moment that was fixed, cruise_hold's car stopped launching.
+        // The vehicle's actual actuation remains observable on its own
+        // cell (4104 CHASSIS_APPLIED_THROTTLE). The steering pair
+        // (6901 vs ApplyElectronicsSteering) has the same latent shape —
+        // dormant today because no fleet module produces steering_cmd.
+        // @design 2026-07-04.
+        const double driver_pedal_raw = cmd.throttle;
         ApplyElectronicsThrottle(cmd);
         ApplyElectronicsSteering(cmd);
 
@@ -2162,8 +2186,12 @@ int SimApp::RunHeadless() {
             m_external_sim->SetPrndSelector(prnd.pin_a(), prnd.pin_b(),
                                             prnd.pin_c(), prnd.pin_d());
         }
-        // Driver inputs — publish the override-adjusted values so the bus
-        // reflects what the vehicle is actually doing (IDs 6900-6903).
+        // Driver inputs (IDs 6900-6903). The throttle publishes the RAW
+        // driver pedal captured before the electronics-mode bus override —
+        // 6903 is the APA pedal sensor (PIM's input), not the vehicle's
+        // actuation (that is 4104); publishing the override-adjusted value
+        // fed PIM its own command back and collapsed the loop to zero (see
+        // the capture-site comment above ApplyElectronicsThrottle).
         {
             auto clamp01_q8 = [](double v) -> std::uint8_t {
                 if (v < 0.0) v = 0.0;
@@ -2171,7 +2199,7 @@ int SimApp::RunHeadless() {
                 return static_cast<std::uint8_t>(v * 255.0 + 0.5);
             };
             m_external_sim->SetDriverBrakePedalQ8(clamp01_q8(cmd.front_brake));
-            m_external_sim->SetDriverThrottleQ8(clamp01_q8(cmd.throttle));
+            m_external_sim->SetDriverThrottleQ8(clamp01_q8(driver_pedal_raw));
             m_external_sim->SetDriverSteeringDegQ8(0);  // no keyboard in headless
             // Gear selector: map PrndSelector::Position to enum (P=0, R=1, N=2, D=3).
             m_external_sim->SetDriverGearSelector(

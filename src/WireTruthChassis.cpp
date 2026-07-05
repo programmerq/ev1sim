@@ -381,6 +381,19 @@ static const std::unordered_map<std::uint32_t, ConsumerCell>& ConsumerRegistry()
         {4021U, {kWireHORN_DRIVE_LINE_HIGH,             WireType::kBit}},
         // Motor current (float32)
         {4072U, {kWireCHASSIS_MOTOR_CURRENT_A,          WireType::kFloat32}},
+        // PIM commanded throttle (byte, PIM -> ev1sim). MISSING from the
+        // original wire-truth consumer set: the ring used to deliver 4073 as a
+        // 1-byte delta into DebugInjectU8, and the #171 migration ported the
+        // sibling PIM output (motor current 4072, above) but not this one — so
+        // post-#171 ev1sim never saw PIM's command at all. GetThrottleCmd()
+        // stayed at its never-received default (q8=0xFF, fresh=false): the
+        // electronics driver-mode plant silently fell back to the local pedal,
+        // and the VAT stats columns (throttle_cmd_q8 / throttle_cmd_fresh)
+        // recorded the 255/0 placeholder — exactly what the nightly's
+        // safety_pps_triplet_fail / safety_brake_throttle_override /
+        // cruise_hold failures were asserting against. Found 2026-07-04
+        // triaging those. @design 2026-07-04 — restore the consumer mapping.
+        {4073U, {kWireCHASSIS_THROTTLE_CMD_Q8,          WireType::kByte}},
         // Wiper motor command + washer pump command (byte / bit)
         {4080U, {kWireCHASSIS_WIPER_MOTOR_COMMAND,      WireType::kByte}},
         {4081U, {kWireCHASSIS_WASHER_PUMP_COMMAND,      WireType::kBit}},
@@ -508,7 +521,18 @@ std::optional<bool> WireTruthChassis::rsa_run_active() const {
 }
 
 std::optional<bool> WireTruthChassis::ad_main_contactor_closed() const {
-    return read_bit(electricsim::topology::kWireAPM_HV_CONTACTOR_CLOSED);
+    // Read the AD's OWN commanded main-contactor output (AD_MAIN_CONTACTOR),
+    // not the APM's downstream echo (APM_HV_CONTACTOR_CLOSED) it was
+    // mis-mapped to during the #171 wire port. The ring signal this getter
+    // replaces (kSigAdMainContactor 5224) was published BY THE AD, and the
+    // echo cell is only written when an APM is in the fleet — the VAT
+    // safety_ad_precharge_timeout fleet is [hv_bus, ad], so the echo stayed
+    // unwritten and the healthy-run "main contactor closed" discriminator
+    // read a permanent 0 while the AD's own log showed main=1. Found
+    // 2026-07-04 triaging the nightly. @design 2026-07-04 — authoritative
+    // source, matching the sibling getters (ad_precharge_relay, ad_state_enum),
+    // which already read the AD's own cells.
+    return read_bit(electricsim::topology::kWireAD_MAIN_CONTACTOR);
 }
 
 std::optional<std::uint32_t> WireTruthChassis::ad_state_enum() const {
