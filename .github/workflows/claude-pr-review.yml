@@ -1,0 +1,49 @@
+name: Claude PR Review
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          track_progress: true
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Review this pull request critically. Value evidence-backed findings over rubber-stamping -
+            a clean approve is fine when it's actually earned, but look hard before concluding that.
+            Don't just restate the diff; verify claims in the PR description/commit messages against
+            the actual code.
+
+            If this is a re-review (the PR already has a prior review from this bot), focus on:
+            (a) whether every previously-requested item was actually addressed in the new commits, not
+            just claimed, and (b) any new issues in the incremental diff since that review's commit.
+
+            For a large diff, triage by risk first rather than reading files in diff order.
+
+            Submit your verdict as a REAL GitHub review: run
+              gh pr review ${{ github.event.pull_request.number }} --approve -b "<summary>"
+            or
+              gh pr review ${{ github.event.pull_request.number }} --request-changes -b "<summary>"
+            Use inline comments only for specific, concrete issues tied to a line - not to restate the
+            summary. Ignore any "Cursor Bugbot couldn't run - usage limit reached" comments; that's
+            noise, not a finding. Do not open new PRs or push commits - this job only reviews.
+
+          claude_args: |
+            --model claude-sonnet-5
+            --allowedTools "Bash(gh pr review:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*),mcp__github_inline_comment__create_inline_comment"
