@@ -21,7 +21,16 @@ struct Config {
     } terrain;
 
     struct Simulation {
-        double step_size_s = 0.002;
+        // 1 ms physics step. The old 2 ms under-resolved the TMeasy standstill
+        // contact force: a stopped/unbraked/undriven wheel limit-cycled at
+        // +/-4-5 rad/s (physically impossible) and the launch phase carried the
+        // same wobble. Halving collapses it ~31x (standstill wheel_omega rms
+        // 2.88 -> 0.09 rad/s) and finer only plateaus — the 2 ms explicit
+        // integration was unstable, not the model. steps_per_tick =
+        // round(tick_dt/step) auto-doubles, so the 1/render_fps co-sim exchange
+        // cadence is unchanged; only the physics integration is finer.
+        // @design 2026-07-08 — electricsim BL-0103; docs/ev1_chrono_audit.md 5.1.
+        double step_size_s = 0.001;
         int    render_fps  = 60;
         bool   realtime    = true;
 

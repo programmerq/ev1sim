@@ -117,6 +117,32 @@ Tires are the best-modeled part of the vehicle.  The wide margin on
 bearing capacity (4750 N vs ~3140 N actual peak load per tire) is
 conservative; not worth touching.
 
+### 5.1 Standstill wheel-spin limit cycle → integration step (2026-07-08)
+
+Surfaced by electricsim's VAT `wheel_speed_*.svg` plots: a stopped, unbraked,
+undriven wheel reported ±4–5 rad/s of `wheel_omega` (physically impossible),
+and the launch phase carried the same near-Nyquist wobble. Root cause is a
+**numerical instability of the explicit multibody integration at the 2 ms
+step**, not the tire model:
+
+- Below 1 m/s the TMeasy force switches to the Coulomb path (`frblend→0`) and
+  the near-zero slip gain `sx = −vsx/(R·|ω| + m_vnum)` (`m_vnum = 0.01`) is very
+  high; the low-inertia wheel-spin DOF it drives is stiff, and the 2 ms explicit
+  step over/undershoots each tick → a limit cycle.
+- Measured standalone (a free wheel at rest, `wheel_omega_rl` rms over t ≥ 1 s):
+  step 2 ms → 2.88; **1 ms → 0.094 (31×)**; 0.5 ms → 0.099; 0.25 ms → 0.10 — so
+  1 ms is already stable and finer only plateaus.
+- `dfx0` is irrelevant here (×0.5 / 0.25 / 0.1 all gave 2.88): the standstill
+  force is Coulomb, not the slip curve. Sub-stepping the *tire* is also a no-op —
+  this Chrono TMeasy is steady-state (algebraic `Advance()`).
+
+Fix: `simulation.step_size_s` 2 ms → **1 ms** (all configs + the `Config.h`
+default). `steps_per_tick = round(tick_dt / step)` auto-doubles, so the
+`1/render_fps` co-sim exchange cadence and the stats cadence are unchanged —
+only the physics integration is finer. Deterministic (bit-identical run-to-run
+preserved); VAT baselines recaptured because every physics value shifts
+slightly. Tracked as electricsim `BL-0103`.
+
 ## 6. Brakes
 
 | Parameter | Current | Real EV1 | Status |

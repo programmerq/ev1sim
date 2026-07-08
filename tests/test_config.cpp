@@ -38,7 +38,7 @@ TEST_CASE("Config built-in defaults are sane", "[Config]") {
     Config cfg;
     CHECK(cfg.vehicle_model == "ev1");
     CHECK(cfg.terrain.friction == 0.9);
-    CHECK(cfg.simulation.step_size_s == 0.002);
+    CHECK(cfg.simulation.step_size_s == 0.001);  // 1 ms: standstill-limit-cycle fix (docs/ev1_chrono_audit.md 5.1)
     CHECK(cfg.simulation.realtime == true);
     CHECK(cfg.camera.default_mode == "chase");
     CHECK(cfg.input.steer_rate == 1.8);

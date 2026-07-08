@@ -10,7 +10,7 @@
     "width_m":  200.0
   },
   "simulation": {
-    "step_size_s": 0.002,
+    "step_size_s": 0.001,
     "render_fps": 60,
     "realtime": true,
     "headless": true
