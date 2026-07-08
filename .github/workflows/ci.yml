@@ -18,7 +18,7 @@ jobs:
     if: github.event_name != 'schedule'   # cron only warms chrono-smoke's cache
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Validate JSON (config + level + vehicle data)
         run: |
@@ -68,7 +68,7 @@ jobs:
     if: github.event_name != 'schedule'   # cron only warms chrono-smoke's cache
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -101,7 +101,7 @@ jobs:
     if: github.event_name != 'schedule'   # cron only warms chrono-smoke's cache
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Irrlicht (Chrono-free test dep)
         run: |
@@ -129,7 +129,7 @@ jobs:
     if: github.event_name != 'schedule'   # cron only warms chrono-smoke's cache
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Irrlicht
         run: |
@@ -178,7 +178,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 75          # absolute ceiling; covers a cold Chrono build
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Chrono build deps (Vehicle + Irrlicht + GL/X11)
         run: |
@@ -189,14 +189,14 @@ jobs:
             libxxf86vm-dev libxext-dev libx11-dev freeglut3-dev
 
       - name: ccache
-        uses: hendrikmuhs/ccache-action@v1
+        uses: hendrikmuhs/ccache-action@v1.2.23
         with:
           key: ccache-chrono-smoke-${{ runner.os }}
           max-size: 2G
 
       - name: Restore prebuilt Chrono install
         id: chrono-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/chrono-install
           # The recipe (ref + flags) lives in scripts/build_chrono.sh, so
