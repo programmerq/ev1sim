@@ -141,7 +141,7 @@ default). `steps_per_tick = round(tick_dt / step)` auto-doubles, so the
 `1/render_fps` co-sim exchange cadence and the stats cadence are unchanged —
 only the physics integration is finer. Deterministic (bit-identical run-to-run
 preserved); VAT baselines recaptured because every physics value shifts
-slightly. Tracked as electricsim `BL-0103`.
+slightly. Tracked as electricsim `BL-0181`.
 
 ## 6. Brakes
 

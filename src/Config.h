@@ -29,7 +29,7 @@ struct Config {
         // integration was unstable, not the model. steps_per_tick =
         // round(tick_dt/step) auto-doubles, so the 1/render_fps co-sim exchange
         // cadence is unchanged; only the physics integration is finer.
-        // @design 2026-07-08 — electricsim BL-0103; docs/ev1_chrono_audit.md 5.1.
+        // @design 2026-07-08 — electricsim BL-0181; docs/ev1_chrono_audit.md 5.1.
         double step_size_s = 0.001;
         int    render_fps  = 60;
         bool   realtime    = true;
