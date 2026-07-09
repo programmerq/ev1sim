@@ -507,6 +507,46 @@ TEST_CASE("Scenario: AD / bulb / horn stats fields read the bus mirrors",
     std::filesystem::remove(tmp_csv);
 }
 
+TEST_CASE("Scenario: IPC air-bag telltale stats field reads the bus mirror",
+          "[Scenario]") {
+    using ev1sim::Scenario;
+    using ev1sim::ScenarioStats;
+
+    auto tmp_csv = std::filesystem::temp_directory_path() /
+                   "ev1sim_scenario_stats_airbag_test.csv";
+    Scenario s;
+    ScenarioStats st{tmp_csv.string(),
+                     {"sim_time_s", "ipc_air_bag_telltale"},
+                     0.10};
+    s.set_stats(st);
+    s.OpenStats();
+
+    ExternalSimConnector bus;
+    DriverCommand cmd{};
+    VehicleState state{};
+
+    // Row 1: nothing received — telltale defaults off (latched false).
+    s.MaybeSampleStats(0.0, state, bus, cmd);
+
+    // Row 2: SIR/SDM air-bag telltale lit (chassis 4138 = 1).
+    bus.DebugInjectU8(4138, 1u);  // 4138 = kSigChassisIpcAirBagTelltale
+    s.MaybeSampleStats(0.15, state, bus, cmd);
+
+    s.Close();
+
+    std::ifstream f(tmp_csv);
+    REQUIRE(f.is_open());
+    std::string header, row1, row2;
+    std::getline(f, header);
+    CHECK(header == "sim_time_s,ipc_air_bag_telltale");
+    std::getline(f, row1);
+    std::getline(f, row2);
+    CHECK(row1 == "0,0");        // default off
+    CHECK(row2 == "0.15,1");     // air-bag telltale mirrored
+    f.close();
+    std::filesystem::remove(tmp_csv);
+}
+
 TEST_CASE("Scenario: fail_throttle_input dispatches with fail/restore value",
           "[Scenario]") {
     using ev1sim::Scenario;

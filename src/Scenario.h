@@ -64,8 +64,9 @@ struct ScenarioEvent {
 //   throttle_cmd_q8, throttle_cmd_fresh,
 //   cruise_active (bus, when published), motor_rpm, motor_torque_nm,
 //   front_brake_pressure, rear_brake_position,
-//   ipc_brake_telltale, ipc_antilock_telltale, ipc_service_now_telltale,
-//   ipc_reduced_perf_telltale, ipc_check_messages_telltale
+//   ipc_brake_telltale, ipc_antilock_telltale, ipc_air_bag_telltale,
+//   ipc_service_now_telltale, ipc_reduced_perf_telltale,
+//   ipc_check_messages_telltale
 struct ScenarioStats {
     std::string              output_csv;
     std::vector<std::string> fields;
