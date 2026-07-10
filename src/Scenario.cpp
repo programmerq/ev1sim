@@ -275,7 +275,7 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
         else if (f == "emb_fresh_rr")         m_csv << (bus_rear.rr_fresh ? 1 : 0);
         // IPC telltale states mirrored from the chassis bus (IDs 4134
         // brake / 4136 antilock / 4138 air-bag / 4140 service-now /
-        // 4144 reduced-perf) —
+        // 4141 check-messages / 4144 reduced-perf) —
         // lets acceptance scenarios assert the driver-facing indication
         // timeline (e.g. brake telltale lighting after a BTCM death, the
         // reduced-perf latch after a pedal-feed loss). Latched IPC state:
