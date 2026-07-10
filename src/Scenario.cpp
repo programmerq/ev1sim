@@ -274,7 +274,8 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
         else if (f == "emb_fresh_lr")         m_csv << (bus_rear.lr_fresh ? 1 : 0);
         else if (f == "emb_fresh_rr")         m_csv << (bus_rear.rr_fresh ? 1 : 0);
         // IPC telltale states mirrored from the chassis bus (IDs 4134
-        // brake / 4136 antilock / 4140 service-now / 4144 reduced-perf) —
+        // brake / 4136 antilock / 4138 air-bag / 4140 service-now /
+        // 4141 check-messages / 4144 reduced-perf) —
         // lets acceptance scenarios assert the driver-facing indication
         // timeline (e.g. brake telltale lighting after a BTCM death, the
         // reduced-perf latch after a pedal-feed loss). Latched IPC state:
@@ -287,6 +288,11 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
             m_csv << (bus.GetIpcServiceNowTelltale() ? 1 : 0);
         else if (f == "ipc_reduced_perf_telltale")
             m_csv << (bus.GetIpcReducedPerfTelltale() ? 1 : 0);
+        // AIR BAG (4138) is the IPC's SIR/SDM occupant-restraint telltale —
+        // lit on airbag-system faults (IPC DTC 40) — the driver-facing
+        // indication the SIR acceptance scenarios assert on.
+        else if (f == "ipc_air_bag_telltale")
+            m_csv << (bus.GetIpcAirBagTelltale() ? 1 : 0);
         // CHECK MESSAGES (4141) is the IPC's aggregate comm-loss telltale —
         // the one that lights when a peer's UART stream dies (e.g. IPC
         // DTC 15 on BTCM eavesdrop loss), so it's the loss-of-module
