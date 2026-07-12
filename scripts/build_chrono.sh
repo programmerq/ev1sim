@@ -41,10 +41,16 @@ cmake -S "${CHRONO_SRC}" -B "${CHRONO_SRC}/build" \
     -DCMAKE_BUILD_TYPE=Release \
     -DENABLE_MODULE_VEHICLE=ON \
     -DENABLE_MODULE_IRRLICHT=ON \
+    -DBUILD_DEMOS=OFF \
+    -DBUILD_TESTING=OFF \
+    -DBUILD_BENCHMARKING=OFF \
     -DCMAKE_INSTALL_PREFIX="${PREFIX}" \
     "${extra_flags[@]}"
 
-cmake --build "${CHRONO_SRC}/build" -j"$(nproc)"
+# Cap build parallelism (default -j4): the cold Chrono build fans out to host
+# core count under -j"$(nproc)" and OOMs on constrained-RAM runners even at
+# 7Gi. Tune via CHRONO_BUILD_JOBS.
+cmake --build "${CHRONO_SRC}/build" -j"${CHRONO_BUILD_JOBS:-4}"
 cmake --install "${CHRONO_SRC}/build"
 
 # Drop the multi-GB build tree; only the (small) install prefix is kept/cached.
