@@ -1,5 +1,6 @@
 #include "VehicleWorld.h"
 #include "Aerodynamics.h"
+#include "SlipRatio.h"
 
 #include "chrono/core/ChGlobal.h"
 #include "chrono/core/ChRotation.h"
@@ -550,15 +551,17 @@ VehicleState VehicleWorld::GetState() const {
     }
 
     // Per-wheel longitudinal slip ratio (braking convention: 0=free, +1=locked).
-    // Undefined below 0.1 m/s — left as zero to avoid divide-by-noise at standstill.
+    // Zero at/below SlipRatio::kSpeedFloorMps — the quotient is numerical-
+    // validity-guarded, and the floor sits safely above the no-stiction
+    // standstill creep band (~0.12 m/s measured) so a near-zero/near-zero
+    // division can't rail the clamp on a stationary car.  Formula, floor
+    // rationale, and the deliberate non-alignment with sensor cutoffs live in
+    // SlipRatio.h (unit-tested there without booting Chrono).
     {
         constexpr double kTireRadius = 0.2915;  // EV1 TMeasy unloaded radius [m]
-        double v = std::abs(s.speed_mps);
-        if (v > 0.1) {
-            for (int i = 0; i < 4; ++i) {
-                double vw = std::abs(s.wheel_omega[i]) * kTireRadius;
-                s.slip_ratio[i] = std::clamp((v - vw) / v, -1.0, 1.0);
-            }
+        for (int i = 0; i < 4; ++i) {
+            s.slip_ratio[i] = ev1sim::SlipRatio::longitudinal(
+                s.speed_mps, s.wheel_omega[i], kTireRadius);
         }
     }
 

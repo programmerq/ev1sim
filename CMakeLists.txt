@@ -381,6 +381,7 @@ if(BUILD_TESTS)
         tests/test_brake_decel.cpp
         tests/test_aerodynamics.cpp
         tests/test_suspension_geometry.cpp
+        tests/test_slip_ratio.cpp
         tests/test_input_actions.cpp
         tests/test_hood.cpp
         ${EV1SIM_WHEEL_IO_TEST_SRC}
