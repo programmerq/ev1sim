@@ -43,6 +43,8 @@ public:
     void CruiseCancel()      override;
     void CruiseSpeedUp()     override;
     void CruiseSpeedDown()   override;
+    void DoorLockAll()       override;
+    void DoorUnlockAll()     override;
     void FailThrottleInput(bool fail) override;
 
     // Dispatch a named input action (from a wheel button / Arduino contact) by

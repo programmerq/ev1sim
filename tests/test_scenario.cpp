@@ -29,6 +29,7 @@ struct CountingHooks : public ev1sim::ScenarioHooks {
     int ipc_trip_reset = 0;
     int cruise_set = 0, cruise_resume = 0, cruise_cancel = 0;
     int cruise_speed_up = 0, cruise_speed_down = 0;
+    int door_lock_all = 0, door_unlock_all = 0;
     int fail_throttle = 0, restore_throttle = 0;
 
     void KeyOnCycle()        override { ++key_on_cycle; }
@@ -44,6 +45,8 @@ struct CountingHooks : public ev1sim::ScenarioHooks {
     void CruiseCancel()      override { ++cruise_cancel; }
     void CruiseSpeedUp()     override { ++cruise_speed_up; }
     void CruiseSpeedDown()   override { ++cruise_speed_down; }
+    void DoorLockAll()       override { ++door_lock_all; }
+    void DoorUnlockAll()     override { ++door_unlock_all; }
     void FailThrottleInput(bool fail) override {
         if (fail) ++fail_throttle; else ++restore_throttle;
     }
@@ -545,6 +548,170 @@ TEST_CASE("Scenario: IPC air-bag telltale stats field reads the bus mirror",
     CHECK(row2 == "0.15,1");     // air-bag telltale mirrored
     f.close();
     std::filesystem::remove(tmp_csv);
+}
+
+TEST_CASE("Scenario: HVAC blower level stats field reads the bus mirror as int",
+          "[Scenario]") {
+    using ev1sim::Scenario;
+    using ev1sim::ScenarioStats;
+
+    auto tmp_csv = std::filesystem::temp_directory_path() /
+                   "ev1sim_scenario_stats_blower_test.csv";
+    Scenario s;
+    ScenarioStats st{tmp_csv.string(),
+                     {"sim_time_s", "hvac_blower_level"},
+                     0.10};
+    s.set_stats(st);
+    s.OpenStats();
+
+    ExternalSimConnector bus;
+    DriverCommand cmd{};
+    VehicleState state{};
+
+    // Row 1: nothing received — blower level default sentinel (0xFF -> 255).
+    s.MaybeSampleStats(0.0, state, bus, cmd);
+
+    // Row 2: blower commanded HIGH (chassis 4082 = 3). Must print as an int.
+    bus.DebugInjectU8(4082, 3u);  // 4082 = HVAC blower level enum
+    s.MaybeSampleStats(0.15, state, bus, cmd);
+
+    s.Close();
+
+    std::ifstream f(tmp_csv);
+    REQUIRE(f.is_open());
+    std::string header, row1, row2;
+    std::getline(f, header);
+    CHECK(header == "sim_time_s,hvac_blower_level");
+    std::getline(f, row1);
+    std::getline(f, row2);
+    CHECK(row1 == "0,255");      // default sentinel, cast to int (not a char)
+    CHECK(row2 == "0.15,3");     // blower level mirrored as an int
+    f.close();
+    std::filesystem::remove(tmp_csv);
+}
+
+TEST_CASE("Scenario: door-lock motor leg drives read the bus mirror",
+          "[Scenario]") {
+    using ev1sim::Scenario;
+    using ev1sim::ScenarioStats;
+
+    auto tmp_csv = std::filesystem::temp_directory_path() /
+                   "ev1sim_scenario_stats_doorlock_test.csv";
+    Scenario s;
+    ScenarioStats st{tmp_csv.string(),
+                     {"sim_time_s",
+                      "door_lock_motor_lh_lock_drive",
+                      "door_lock_motor_lh_unlock_drive",
+                      "door_lock_motor_rh_lock_drive",
+                      "door_lock_motor_rh_unlock_drive"},
+                     0.10};
+    s.set_stats(st);
+    s.OpenStats();
+
+    ExternalSimConnector bus;
+    DriverCommand cmd{};
+    VehicleState state{};
+
+    // Row 1: nothing received — all four legs default off.
+    s.MaybeSampleStats(0.0, state, bus, cmd);
+
+    // Row 2: energise the two LOCK legs (4092 LH lock, 4094 RH lock).
+    bus.DebugInjectDelta(4092, true);   // LH lock drive
+    bus.DebugInjectDelta(4094, true);   // RH lock drive
+    s.MaybeSampleStats(0.15, state, bus, cmd);
+
+    s.Close();
+
+    std::ifstream f(tmp_csv);
+    REQUIRE(f.is_open());
+    std::string header, row1, row2;
+    std::getline(f, header);
+    CHECK(header == "sim_time_s,door_lock_motor_lh_lock_drive,"
+                    "door_lock_motor_lh_unlock_drive,"
+                    "door_lock_motor_rh_lock_drive,"
+                    "door_lock_motor_rh_unlock_drive");
+    std::getline(f, row1);
+    std::getline(f, row2);
+    CHECK(row1 == "0,0,0,0,0");        // all legs default off
+    CHECK(row2 == "0.15,1,0,1,0");     // both LOCK legs energised
+    f.close();
+    std::filesystem::remove(tmp_csv);
+}
+
+TEST_CASE("Scenario: ad_precharge_participated latches once the relay closes",
+          "[Scenario]") {
+    using ev1sim::Scenario;
+    using ev1sim::ScenarioStats;
+
+    auto tmp_csv = std::filesystem::temp_directory_path() /
+                   "ev1sim_scenario_stats_precharge_latch_test.csv";
+    Scenario s;
+    ScenarioStats st{tmp_csv.string(),
+                     {"sim_time_s", "ad_precharge_participated"},
+                     0.10};
+    s.set_stats(st);
+    s.OpenStats();
+
+    ExternalSimConnector bus;
+    DriverCommand cmd{};
+    VehicleState state{};
+
+    // Row 1: nothing received — participation latch defaults off.
+    s.MaybeSampleStats(0.0, state, bus, cmd);
+
+    // Row 2: precharge relay closes (chassis 5225 = 1) — latch sets.
+    bus.DebugInjectDelta(5225, true);
+    s.MaybeSampleStats(0.15, state, bus, cmd);
+
+    // Row 3: relay re-opens (5225 = 0) BEFORE the next sample — the
+    // instantaneous state is now false, but the latch must remain 1.
+    bus.DebugInjectDelta(5225, false);
+    s.MaybeSampleStats(0.30, state, bus, cmd);
+
+    s.Close();
+
+    std::ifstream f(tmp_csv);
+    REQUIRE(f.is_open());
+    std::string header, row1, row2, row3;
+    std::getline(f, header);
+    CHECK(header == "sim_time_s,ad_precharge_participated");
+    std::getline(f, row1);
+    std::getline(f, row2);
+    std::getline(f, row3);
+    CHECK(row1 == "0,0");        // default off
+    CHECK(row2 == "0.15,1");     // latched on relay close
+    CHECK(row3 == "0.3,1");      // stays latched after relay re-opens
+    f.close();
+    std::filesystem::remove(tmp_csv);
+}
+
+TEST_CASE("Scenario: door_lock_all / door_unlock_all dispatch to the hooks",
+          "[Scenario]") {
+    using ev1sim::Scenario;
+
+    Scenario s;
+    s.set_events({
+        {0.10, "door_lock_all",   0.0},
+        {0.30, "door_unlock_all", 0.0},
+    });
+
+    CountingHooks hooks;
+    DriverCommand cmd{};
+
+    // Before t=0.10 nothing has fired.
+    s.Tick(0.05, VehicleState{}, hooks, cmd);
+    CHECK(hooks.door_lock_all == 0);
+    CHECK(hooks.door_unlock_all == 0);
+
+    // Lock-all fires.
+    s.Tick(0.20, VehicleState{}, hooks, cmd);
+    CHECK(hooks.door_lock_all == 1);
+    CHECK(hooks.door_unlock_all == 0);
+
+    // Unlock-all fires.
+    s.Tick(0.40, VehicleState{}, hooks, cmd);
+    CHECK(hooks.door_lock_all == 1);
+    CHECK(hooks.door_unlock_all == 1);
 }
 
 TEST_CASE("Scenario: fail_throttle_input dispatches with fail/restore value",

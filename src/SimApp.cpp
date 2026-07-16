@@ -2594,6 +2594,14 @@ void SimApp::CruiseSpeedDown() {
     if (m_physical) m_physical->cruise_stalk().press_speed_down();
 }
 
+void SimApp::DoorLockAll() {
+    if (m_physical) m_physical->door_locks().lock_all();
+}
+
+void SimApp::DoorUnlockAll() {
+    if (m_physical) m_physical->door_locks().unlock_all();
+}
+
 void SimApp::FailThrottleInput(bool fail) {
     if (m_external_sim) m_external_sim->SetSuppressThrottlePublish(fail);
     std::cout << "[Scenario] fail_throttle_input -> "
