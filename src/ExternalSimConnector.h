@@ -660,6 +660,13 @@ public:
     bool GetAdPrechargeRelayClosed() const;
     bool HasReceivedAdPrechargeRelay() const;
 
+    /// Latched precharge participation flag (derived from ID 5225, main
+    /// harness segment).  Returns true once the precharge relay has ever
+    /// been observed closed, and stays true thereafter — a sticky witness
+    /// that alias-proofs a brief relay-closed transient the periodic stats
+    /// sampler could otherwise step over.  Returns false if never received.
+    bool GetAdPrechargeParticipated() const;
+
     /// Incoming Auto Disconnect state-machine state (ID 5230, main harness
     /// segment).  uint32 enum published by the AD controller on change:
     /// 0 = OK (main closed), 6 = capacitor precharge in progress,

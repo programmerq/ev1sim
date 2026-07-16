@@ -91,6 +91,12 @@ public:
     virtual void CruiseCancel()       = 0;
     virtual void CruiseSpeedUp()      = 0;
     virtual void CruiseSpeedDown()    = 0;
+    // Door locks: headless equivalents of the Lock All / Unlock All UI
+    // buttons — drive every door-lock to LOCKED / unlocked at once, so
+    // acceptance scenarios can exercise the lock/unlock actuation timeline
+    // without the interactive UI.
+    virtual void DoorLockAll()        = 0;
+    virtual void DoorUnlockAll()      = 0;
     // Fault injection (used by external acceptance scenarios): fail=true
     // suppresses the driver THROTTLE publish (6903) on the main harness —
     // models the accelerator-pedal acquisition feed going dead at the

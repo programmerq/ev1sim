@@ -161,6 +161,8 @@ void Scenario::Tick(double sim_time, const VehicleState& state,
         } else if (e.action == "cruise_cancel")       { hooks.CruiseCancel();
         } else if (e.action == "cruise_speed_up")     { hooks.CruiseSpeedUp();
         } else if (e.action == "cruise_speed_down")   { hooks.CruiseSpeedDown();
+        } else if (e.action == "door_lock_all")       { hooks.DoorLockAll();
+        } else if (e.action == "door_unlock_all")     { hooks.DoorUnlockAll();
         } else if (e.action == "fail_throttle_input") {
             // value != 0 → fail, 0 → restore.
             hooks.FailThrottleInput(e.value != 0.0);
@@ -310,6 +312,30 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
             m_csv << (bus.GetAdPrechargeRelayClosed() ? 1 : 0);
         else if (f == "ad_state_enum")
             m_csv << bus.GetAdStateEnum();
+        // Latched precharge participation (derived from 5225) — sticky-true
+        // once the precharge relay has ever been observed closed. Alias-proofs
+        // a brief relay-closed transient the periodic sampler could step over,
+        // so the HV power-up assertion is witnessed regardless of the CSV
+        // sample-grid alignment. 0 until the relay is first seen closed.
+        else if (f == "ad_precharge_participated")
+            m_csv << (bus.GetAdPrechargeParticipated() ? 1 : 0);
+        // HVAC blower level mirrored from the chassis bus (4082) — the
+        // commanded fan speed enum (0=OFF, 1=LOW, 2=MED, 3=HIGH). Cast to int
+        // so it prints as a number, not the char of a small uint8_t.
+        else if (f == "hvac_blower_level")
+            m_csv << static_cast<int>(bus.GetHvacBlowerLevel());
+        // Door-lock motor leg drives mirrored from the chassis bus
+        // (4092 LH lock / 4093 LH unlock / 4094 RH lock / 4095 RH unlock) —
+        // 1 = the junction box is energising that motor leg, 0 otherwise.
+        // Lets body/HMI scenarios assert the lock/unlock actuation timeline.
+        else if (f == "door_lock_motor_lh_lock_drive")
+            m_csv << (bus.GetDoorLockMotorDrive(0) ? 1 : 0);
+        else if (f == "door_lock_motor_lh_unlock_drive")
+            m_csv << (bus.GetDoorLockMotorDrive(1) ? 1 : 0);
+        else if (f == "door_lock_motor_rh_lock_drive")
+            m_csv << (bus.GetDoorLockMotorDrive(2) ? 1 : 0);
+        else if (f == "door_lock_motor_rh_unlock_drive")
+            m_csv << (bus.GetDoorLockMotorDrive(3) ? 1 : 0);
         // Two-tone horn commands (1 = commanded sounding, 0 otherwise).
         else if (f == "horn_low_cmd")
             m_csv << (bus.GetHornLowCmd() ? 1 : 0);

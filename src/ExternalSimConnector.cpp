@@ -1404,6 +1404,12 @@ struct ExternalSimConnector::State {
     bool          has_ad_main_contactor   = false;
     bool          ad_precharge_relay      = false;
     bool          has_ad_precharge_relay  = false;
+    // Latched participation flag: sticky-true once the precharge relay has
+    // ever been observed closed, independent of the CSV sample grid. The
+    // instantaneous relay-closed state (ad_precharge_relay) can toggle back
+    // open in a brief transient that the periodic stats sampler may step over;
+    // this OR-accumulator witnesses that the relay participated at all.
+    bool          ad_precharge_ever       = false;
     std::uint32_t ad_state_enum           = 0u;
     bool          has_ad_state_enum       = false;
 
@@ -1994,6 +2000,9 @@ bool ExternalSimConnector::GetAdPrechargeRelayClosed() const {
 bool ExternalSimConnector::HasReceivedAdPrechargeRelay() const {
     return m_state->has_ad_precharge_relay;
 }
+bool ExternalSimConnector::GetAdPrechargeParticipated() const {
+    return m_state->ad_precharge_ever;
+}
 std::uint32_t ExternalSimConnector::GetAdStateEnum() const {
     return m_state->ad_state_enum;
 }
@@ -2525,6 +2534,8 @@ void ExternalSimConnector::DebugInjectDelta(std::uint32_t signal_id, bool value)
     } else if (signal_id == kSigAdPrechargeRelay) {
         m_state->ad_precharge_relay     = value;
         m_state->has_ad_precharge_relay = true;
+        // Latch participation on every closed reading (finer than the CSV grid).
+        m_state->ad_precharge_ever      = m_state->ad_precharge_ever || value;
     }
     // Panel-sensor signals are outputs — ignore inbound.
 }
@@ -3080,6 +3091,10 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         if (auto pre = st.wire->ad_precharge_relay()) {
             st.ad_precharge_relay     = *pre;
             st.has_ad_precharge_relay = true;
+            // OR-accumulate on EVERY connector tick the relay reads closed —
+            // finer than the CSV sample grid, so a brief relay-closed transient
+            // is witnessed regardless of sample-grid alignment.
+            st.ad_precharge_ever      = st.ad_precharge_ever || *pre;
         }
     }
 #endif  // EV1SIM_HAVE_WIRE_TRUTH
