@@ -15,6 +15,7 @@
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <thread>
 
 #include "Scenario.h"
 #include "ExternalSimConnector.h"
@@ -681,6 +682,70 @@ TEST_CASE("Scenario: ad_precharge_participated latches once the relay closes",
     CHECK(row1 == "0,0");        // default off
     CHECK(row2 == "0.15,1");     // latched on relay close
     CHECK(row3 == "0.3,1");      // stays latched after relay re-opens
+    f.close();
+    std::filesystem::remove(tmp_csv);
+}
+
+TEST_CASE("Scenario: abs-phase / rear-EMB stats columns stay live across a "
+          "sub-3s heartbeat gap",
+          "[Scenario][ABS]") {
+    // Regression: the stats-CSV observer used to read the BTCM-sourced ABS
+    // phase (and rear-EMB command) with a 200 ms freshness window while the
+    // control path used 3000 ms.  Liveness is gated on the BTCM's ~5 Hz
+    // canonical-frame heartbeat, which is paced in sim time; under wall-clock
+    // pacing on long, low-friction stops the inter-heartbeat gap can stretch
+    // past 200 ms.  With the old 200 ms window the observer then declared the
+    // BTCM dead and wrote the -1 no-data sentinel for a phase that was still
+    // live.  The observer now uses the same 3000 ms window as the control path,
+    // so a gap between 200 ms and 3000 ms must still read the live phase.
+    using ev1sim::Scenario;
+    using ev1sim::ScenarioStats;
+
+    auto tmp_csv = std::filesystem::temp_directory_path() /
+                   "ev1sim_scenario_stats_abs_freshness_test.csv";
+    Scenario s;
+    ScenarioStats st{tmp_csv.string(),
+                     {"sim_time_s", "abs_phase_fl", "abs_fresh_fl",
+                      "emb_cmd_lr", "emb_fresh_lr"},
+                     0.10};
+    s.set_stats(st);
+    s.OpenStats();
+
+    ExternalSimConnector bus;
+    DriverCommand cmd{};
+    VehicleState state{};
+
+    // Inject a BTCM heartbeat, an FL HOLD phase (iso=1, dump=0 -> phase 1),
+    // and a rear-EMB LR command.  All timestamps are stamped "now".
+    bus.DebugInjectDelta(5050, true);   // BTCM canonical-frame heartbeat
+    bus.DebugInjectDelta(5010, true);   // FL_ISO = 1
+    bus.DebugInjectDelta(5011, false);  // FL_DMP = 0  -> HOLD
+    bus.DebugInjectFloat(5014, 1.0f);   // rear motor LR command = full apply
+
+    // Advance the heartbeat gap to ~260 ms: past the old 200 ms window, well
+    // within the corrected 3000 ms window.  sleep_for guarantees at least the
+    // requested duration, so the gap is reliably > 200 ms and << 3000 ms.
+    std::this_thread::sleep_for(std::chrono::milliseconds(260));
+
+    // Document the seam directly on the production symbol: at this gap the old
+    // 200 ms window reads stale, the corrected 3000 ms window reads live.
+    CHECK_FALSE(bus.GetAbsPhaseFront(std::chrono::milliseconds(200)).fl_fresh);
+    CHECK(bus.GetAbsPhaseFront(std::chrono::milliseconds(3000)).fl_fresh);
+
+    s.MaybeSampleStats(0.0, state, bus, cmd);
+    s.Close();
+
+    std::ifstream f(tmp_csv);
+    REQUIRE(f.is_open());
+    std::string header, row1;
+    std::getline(f, header);
+    CHECK(header == "sim_time_s,abs_phase_fl,abs_fresh_fl,"
+                    "emb_cmd_lr,emb_fresh_lr");
+    std::getline(f, row1);
+    // With the corrected window the phase is live: abs_phase_fl = 1 (HOLD),
+    // NOT the -1 no-data sentinel; abs_fresh_fl = 1; the rear-EMB command
+    // mirrors through fresh too.
+    CHECK(row1 == "0,1,1,1,1");
     f.close();
     std::filesystem::remove(tmp_csv);
 }
