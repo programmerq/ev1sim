@@ -92,6 +92,21 @@ else()
     include_directories(${IRRLICHT_INCLUDE_DIR})
 endif()
 
+# ── Portable ISA baseline (mirror of scripts/build_chrono.sh) ───────────────
+# Pin every ev1sim object to a portable x86-64-v2 floor (SSE4.2/POPCNT — the
+# common denominator of GitHub's heterogeneous ubuntu-latest pool).  ev1sim
+# objects are ccache'd across that pool keyed on runner.os only, so without this
+# a wide-ISA build host would emit AVX/AVX2 that SIGILLs (illegal instruction)
+# when the cached objects/binary are restored onto a narrower runner.  Chrono is
+# built the same way (USE_SIMD=OFF + this same -march) so CHRONO_CXX_FLAGS no
+# longer carries `-march=native`; this call comes AFTER add_compile_options(
+# ${CHRONO_CXX_FLAGS}) above so — last `-march` wins in GCC — the baseline holds
+# even if a future Chrono config were to re-introduce a wider host flag.
+# Portability over host-native SIMD perf is the deliberate trade-off for CI.
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|amd64")
+    add_compile_options(-march=x86-64-v2)
+endif()
+
 # ── nlohmann/json (header-only, fetched at configure time) ──────────────────
 include(FetchContent)
 FetchContent_Declare(json
