@@ -198,9 +198,9 @@ private:
     // their own freshness check.  The 3-second window matches the
     // tightest peer-side BTCM-loss tolerance documented in the EV1
     // manual corpus (IPC DTC 015 "Loss of BTCM Eavesdrop", page 27
-    // of the EV1 electrical service manual).  See
-    // electricsim docs/btcm_deferred_todos.md §8 for the full
-    // investigation that motivated this.
+    // of the EV1 electrical service manual): a shorter window would
+    // trip abs-phase-stale before that peer tolerance elapses, a
+    // longer one would keep reporting a lost BTCM as live.
     static constexpr std::chrono::milliseconds kAbsFreshnessWindow{3000};
 
     // Rear EMB drum brake state (BTCM rear-motor integration).

@@ -210,8 +210,20 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
 
     const auto bus_throttle =
         bus.GetThrottleCmd(std::chrono::milliseconds(200));
-    const auto bus_abs    = bus.GetAbsPhaseFront(std::chrono::milliseconds(200));
-    const auto bus_rear   = bus.GetRearEmbCmd(std::chrono::milliseconds(200));
+
+    // Freshness window for the BTCM-sourced ABS-phase and rear-EMB reads.
+    // This MUST match the control path's window (SimApp::kAbsFreshnessWindow
+    // = 3000 ms, the authoritative source of truth).  The two diverged once:
+    // this stats-CSV observer read the same signals with a 200 ms window while
+    // the control path used 3000 ms.  Liveness comes from the BTCM's ~5 Hz
+    // canonical-frame heartbeat, which is paced in sim time; under wall-clock
+    // pacing on long, low-friction stops the inter-heartbeat gap can stretch
+    // past 200 ms, so the observer wrongly declared the BTCM dead and emitted
+    // the -1 no-data sentinel for a phase that was actually live (and that the
+    // control path, on 3000 ms, still saw). Keep these two windows in lockstep.
+    constexpr auto kAbsPhaseFreshness = std::chrono::milliseconds(3000);
+    const auto bus_abs    = bus.GetAbsPhaseFront(kAbsPhaseFreshness);
+    const auto bus_rear   = bus.GetRearEmbCmd(kAbsPhaseFreshness);
 
     // Encode ABS phase as int for CSV-friendly plotting.
     auto phase_to_int = [](ExternalSimConnector::AbsPhaseFront::Phase p) -> int {
@@ -262,9 +274,11 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
         //   abs_phase_fl/fr:  0=APPLY (full pressure), 1=HOLD (frozen),
         //                     2=DUMP (release).  Only meaningful when the
         //                     bus value is fresh; -1 when BTCM is silent.
-        //   abs_fresh_fl/fr:  1 when BTCM data arrived within the last 200 ms.
+        //   abs_fresh_fl/fr:  1 when the BTCM is alive per the freshness
+        //                     window (3000 ms, matching the control path).
         //   emb_cmd_lr/rr:    rear motor command in [-1, +1].  +1=full apply.
-        //   emb_fresh_lr/rr:  1 when BTCM data arrived within the last 200 ms.
+        //   emb_fresh_lr/rr:  1 when the BTCM is alive per the freshness
+        //                     window (3000 ms, matching the control path).
         else if (f == "abs_phase_fl")
             m_csv << (bus_abs.fl_fresh ? phase_to_int(bus_abs.fl) : -1);
         else if (f == "abs_phase_fr")

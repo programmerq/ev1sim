@@ -1505,9 +1505,11 @@ struct ExternalSimConnector::State {
     // BTCM publishes on-change only, so a sustained HOLD or DUMP phase
     // keeps the last-known iso/dump values authoritative even when no
     // new delta has arrived in a while.  Liveness is tracked separately
-    // via btcm_uart_frame_ns (the 5 Hz canonical-frame heartbeat).  See
-    // electricsim docs/btcm_deferred_todos.md §8 for the mu_jump
-    // regression that motivated this split.
+    // via btcm_uart_frame_ns (the 5 Hz canonical-frame heartbeat).
+    // The split (cached commanded-state vs. heartbeat-based liveness)
+    // exists so a sudden road-friction (mu) jump — which can hold one
+    // iso/dump phase across many ticks — is not misread as a stale
+    // signal by a per-pin freshness check.
     bool          sol_fl_iso              = false;
     bool          sol_fl_dmp             = false;
     bool          sol_fr_iso              = false;
@@ -2278,14 +2280,13 @@ ExternalSimConnector::AbsPhaseFront ExternalSimConnector::GetAbsPhaseFront(
     // guard) so freshness works correctly in both real and stub builds.
     const std::uint64_t now_ns = NowNs();
 
-    // Freshness model — see electricsim docs/btcm_deferred_todos.md §8
-    // for the full investigation.
+    // Freshness model — the full rationale is inline below.
     //
     // Liveness comes from the BTCM's 5 Hz canonical-frame heartbeat
     // (kSigBtcmUartFrame, signal 5050).  The BTCM supervisor
     // broadcasts this frame every 200 ms regardless of ABS modulation
-    // state — see ev1/btcm/controller.cpp publish_supervisor_uart_frame.
-    // That makes it the authoritative "BTCM is alive" signal,
+    // state (its periodic canonical-frame publish, independent of the
+    // ABS algorithm).  That makes it the authoritative "BTCM is alive" signal,
     // independent of whether the algorithm has changed phase recently.
     //
     // Iso/dump pin states are *commanded state* (on-change publish),
@@ -2385,8 +2386,8 @@ ExternalSimConnector::RearEmbCmd ExternalSimConnector::GetRearEmbCmd(
     // value for hundreds of ms, so the per-signal timestamp doesn't
     // refresh.  The 5 Hz kSigBtcmUartFrame heartbeat is the
     // authoritative "BTCM alive" signal; cached motor-cmd values
-    // stay valid as long as the producer is alive.  See
-    // electricsim docs/btcm_deferred_todos.md §8.
+    // stay valid as long as the producer is alive.  Same freshness
+    // model as GetAbsPhaseFront above.
     //
     // Source preference (per wheel): chassis-bus value (4151/4152) wins
     // when ever-seen; otherwise main-harness value (5014/5015).  Same
@@ -2854,7 +2855,7 @@ EV1SIM_CHASSIS_ID_MATCHES(kDynamicsBase,                 kSigChassisSpeedMps);
 // scripts/audit_chassis_contract.py reads both and enforces compatibility in CI
 // (same MAJOR, producer MINOR >= consumer MINOR). Bump these to match the
 // producer whenever this connector is updated to a newer contract.
-// See electricsim docs/chassis_contract_versioning.md.
+// The compatibility rule and bump procedure are described inline above.
 #define EV1_CHASSIS_CONTRACT_VERSION_IMPLEMENTED_MAJOR 1
 #define EV1_CHASSIS_CONTRACT_VERSION_IMPLEMENTED_MINOR 9
 #define EV1_CHASSIS_CONTRACT_VERSION_IMPLEMENTED_PATCH 0
