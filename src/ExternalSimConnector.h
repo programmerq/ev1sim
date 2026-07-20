@@ -10,10 +10,10 @@
 #include <string>
 
 /// Connects the vehicle simulator to an external electric simulator over the
-/// electricsim shared-memory I/O fabric.
+/// external sim shared-memory I/O fabric.
 ///
 /// The connection is non-blocking: Start() returns immediately, and the shared
-/// WireTable is attached lazily inside Tick().  If the electricsim library
+/// WireTable is attached lazily inside Tick().  If the external sim library
 /// is not available at build time the connector compiles as a stub that
 /// reports "not available" and does nothing — callers can unconditionally
 /// drive it.
@@ -33,11 +33,11 @@
 /// --------------------
 /// This connector exposes ev1sim as a flat list of buttons, lights, switches,
 /// and sensors on a dedicated chassis bus.  It is deliberately ignorant of
-/// electricsim's module structure — there is no concept of BTCM, BPM, AD,
+/// the external sim's module structure — there is no concept of BTCM, BPM, AD,
 /// charger, or any other ECU here.  When adding new endpoints, name them in
 /// vehicle terms (`vehicle.panel.*`, `vehicle.dynamics.*`, `avr0.lights.*`),
 /// never in ECU/module terms.  Anything that needs to know "which ECU
-/// consumes this signal" lives on the electricsim side of the boundary.
+/// consumes this signal" lives on the external sim side of the boundary.
 class ExternalSimConnector {
 public:
     struct Options {
@@ -46,7 +46,7 @@ public:
 
     enum class Status {
         Disabled,        // --external-sim is off
-        Unavailable,     // built without electricsim; always disconnected
+        Unavailable,     // built without external sim; always disconnected
         Connecting,      // enabled, WireTable not yet attached
         Connected,       // WireTable attached; cells read/written each Tick
     };
@@ -141,7 +141,7 @@ public:
     void SetWiperWasherSwOutputs(bool delay, bool request, bool hi, bool washer);
 
     /// Outgoing driver inputs — published to the main harness segment
-    /// (electricsim_ev1_bus, IDs 6900-6903).
+    /// (the main harness segment, IDs 6900-6903).
     /// q8 values: brake/throttle 0..255 (normalized × 256), steering signed
     /// degrees × 256, gear enum 0=P 1=R 2=N 3=D.
     void SetDriverBrakePedalQ8(std::uint8_t q8);
@@ -177,14 +177,14 @@ public:
     /// Outgoing turn-signal stalk position (IDs 6948, 6949).
     /// Encoded as 1-byte uint8 boolean each (0=inactive, 1=active).
     /// Published on the main harness segment in lockstep with
-    /// electricsim/src/io/ev1_driver_inputs.hpp kSigDriverTurnSignalLeft/Right.
+    /// the external sim's driver-input header kSigDriverTurnSignalLeft/Right.
     void SetDriverTurnSignalLeft(bool active);
     void SetDriverTurnSignalRight(bool active);
 
     /// Outgoing hazard switch request (ID 6944).
     /// Encoded as 1-byte uint8 boolean (0=off, 1=on).
     /// Published on the main harness segment in lockstep with
-    /// electricsim/src/io/ev1_driver_inputs.hpp kSigDriverHazardRequest.
+    /// the external sim's driver-input header kSigDriverHazardRequest.
     void SetDriverHazardRequest(bool on);
 
     /// Outgoing charge coupler presence — publishes delta on change on the
@@ -252,7 +252,7 @@ public:
     void SetDriverWiperWashRequest(bool pressed);
 
     /// 3D-sim integration contract — driver buttons and discrete sensors
-    /// (main harness segment).  See electricsim docs/3d_sim_contract.md
+    /// (main harness segment).  See the external sim's 3D-sim signal contract
     /// §1.3 (buttons) and §1.4 (discrete sensors).  All publish on change
     /// with -1 sentinel for first-publish.
     ///
@@ -451,7 +451,7 @@ public:
     /// (positive = left, matching DriverCommand.steering).  Symmetric with the
     /// throttle path: used by SimApp::ApplyElectronicsSteering() to override the
     /// local steering in "electronics" drive mode when fresh.  Allocated
-    /// ev1sim-side first (no electricsim producer yet — a closed-loop / rig
+    /// ev1sim-side first (no external sim producer yet — a closed-loop / rig
     /// steering input, distinct from the PSCM power-steering pump peripheral).
     struct SteeringCmd {
         float value         = 0.0f;
@@ -533,7 +533,7 @@ public:
     void SetHvacDefrostRequest(bool on);
 
     /// Outgoing door-lock STATE feedback (IDs 4155-4157, chassis segment) →
-    /// electricsim.  The resulting latched state of ev1sim::DoorLocks
+    /// external sim.  The resulting latched state of ev1sim::DoorLocks
     /// (driver/passenger/trunk; true = LOCKED), published on change each tick so
     /// an RSA/IPC central-locking consumer can confirm the actuated state.
     void SetDoorLockState(bool driver_locked, bool passenger_locked, bool trunk_locked);

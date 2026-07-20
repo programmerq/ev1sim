@@ -23,10 +23,10 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     constexpr int kNumWiperSwCavity = 4;   // wiper/washer switch cavities (4054-4057)
     constexpr int kNumTurnHazSwCavity = 4; // turn/hazard switch cavities + horn (4043-4046)
     constexpr int kNumCruiseSwCavity = 3;  // cruise switch cavities (4047-4049)
-    constexpr int kNumMotor         = 2;   // motor_rpm (4070), motor_torque_nm (4071) — DC current (4072) is electricsim/PIM's
-    constexpr int kNumSimTime       = 1;   // sim_time_ns (4075) — ev1sim → electricsim
+    constexpr int kNumMotor         = 2;   // motor_rpm (4070), motor_torque_nm (4071) — DC current (4072) is the external PIM's
+    constexpr int kNumSimTime       = 1;   // sim_time_ns (4075) — ev1sim → external sim
     constexpr int kNumThrottleCmd   = 1;   // throttle_cmd_q8 (4073) — PIM → ev1sim
-    constexpr int kNumSteeringCmd   = 1;   // steering_cmd (4076) — electricsim → ev1sim
+    constexpr int kNumSteeringCmd   = 1;   // steering_cmd (4076) — external sim → ev1sim
     constexpr int kNumBrake         = 1;   // master_cylinder_pressure_kpa (4074) — ev1sim → BTCM
     constexpr int kNumWiper         = 2;   // wiper_motor_command (4080), washer_pump_command (4081)
     constexpr int kNumHvac          = 2;   // hvac_blower_level (4082), defrost_grid_active (4083)
@@ -38,7 +38,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     constexpr int kNumSounder       = 1;   // sounder piezo_drive (4096) — LHJB flasher → ev1sim
     constexpr int kNumSteeringPump  = 2;   // pump speed_cmd_q8 (4097, in) + interlock_closed (4098, out)
     constexpr int kNumHvacControls  = 5;   // hvac setpoint/fan/mode/ac/defrost requests (4124-4128) — ev1sim → HTCM
-    constexpr int kNumDoorLockState = 3;   // door lock state feedback driver/passenger/trunk (4155-4157) — ev1sim → electricsim
+    constexpr int kNumDoorLockState = 3;   // door lock state feedback driver/passenger/trunk (4155-4157) — ev1sim → external sim
     constexpr int kNumIpcTelltale   = 2;   // ipc_seatbelt_telltale_driver (4130),
                                            // ipc_seatbelt_telltale_passenger (4131)
     constexpr int kNumIpcTripDist   = 1;   // ipc_trip_distance_m (4132)
@@ -61,7 +61,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
                                                //  6962 hood open, 6963 trunk open,
                                                //  6966 key position
                                                //  (horn 6940/6941 removed — now chassis cavity 4046)
-    // Driver inputs on the main harness segment (electricsim_ev1_bus), output
+    // Driver inputs on the main harness segment (the main harness segment), output
     // from ev1sim: brake_pedal_q8 (6900), steering_deg_q8 (6901),
     // gear_selector (6902), throttle_q8 (6903), brake_switch (6904),
     // (hazard/turn moved to chassis cavities kSigTurnHazSw_* 4043-4045),
@@ -159,10 +159,10 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
             CHECK_FALSE(e.input_to_sim);    // charge coupler present is an output
             ++charge_coupler_count;
         } else if (e.signal_id >= 4070 && e.signal_id <= 4071) {
-            CHECK_FALSE(e.input_to_sim);    // motor RPM + torque are outputs (DC current 4072 is electricsim/PIM's)
+            CHECK_FALSE(e.input_to_sim);    // motor RPM + torque are outputs (DC current 4072 is the external PIM's)
             ++dynamics_count;
         } else if (e.signal_id == 4075) {
-            CHECK_FALSE(e.input_to_sim);    // sim-time clock is an output (ev1sim → electricsim)
+            CHECK_FALSE(e.input_to_sim);    // sim-time clock is an output (ev1sim → external sim)
             ++dynamics_count;
         } else if (e.signal_id == 4073) {
             CHECK(e.input_to_sim);          // PIM throttle command flows into ev1sim
@@ -201,7 +201,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
             CHECK_FALSE(e.input_to_sim);    // HVAC driver-control requests flow out to HTCM
             ++hvac_controls_count;
         } else if (e.signal_id >= 4165 && e.signal_id <= 4167) {
-            CHECK_FALSE(e.input_to_sim);    // door-lock state feedback flows out to electricsim
+            CHECK_FALSE(e.input_to_sim);    // door-lock state feedback flows out to external sim
             ++door_lock_state_count;
         } else if (e.signal_id == 4130 || e.signal_id == 4131) {
             CHECK(e.input_to_sim);          // IPC seatbelt telltales flow into ev1sim
@@ -225,7 +225,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
                    (e.signal_id >= 6946 && e.signal_id <= 6947) ||
                    (e.signal_id >= 6960 && e.signal_id <= 6963) ||
                     e.signal_id == 6966) {
-            // 3D-sim contract publishes — main harness, ev1sim → electricsim.
+            // 3D-sim contract publishes — main harness, ev1sim → external sim.
             // 6920 body_velocity_mps, 6921/6922 long/lat accel,
             // 6930-6932 pose X/Y/yaw,
             // 6942 headlight switch, 6943 headlight dim,
@@ -301,7 +301,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     CHECK(steering_pump_count     == kNumSteeringPump);
     // hvac_controls_count: setpoint/fan/mode/ac/defrost requests (4124-4128) — ev1sim → HTCM.
     CHECK(hvac_controls_count     == kNumHvacControls);
-    // door_lock_state_count: driver/passenger/trunk lock state (4155-4157) — ev1sim → electricsim.
+    // door_lock_state_count: driver/passenger/trunk lock state (4155-4157) — ev1sim → external sim.
     CHECK(door_lock_state_count   == kNumDoorLockState);
     // ipc_telltale_count: driver seatbelt telltale (4130) + passenger (4131) — from IPC.
     CHECK(ipc_telltale_count      == kNumIpcTelltale);
@@ -876,7 +876,7 @@ TEST_CASE("HVAC control setters store without crashing", "[ExternalSim]") {
 }
 
 // ---------------------------------------------------------------------------
-// Door lock STATE feedback (4165-4167) — ev1sim → electricsim. Moved off
+// Door lock STATE feedback (4165-4167) — ev1sim → external sim. Moved off
 // 4155-4157, which the canonical chassis contract allocates to the HV bus
 // rail (drift guards now pin the new IDs).
 // ---------------------------------------------------------------------------
@@ -900,7 +900,7 @@ TEST_CASE("Door-lock state endpoints have correct IDs and direction", "[External
         const auto* ep = ExternalSimConnector::FindEndpoint(r.sid);
         REQUIRE(ep != nullptr);
         CHECK(std::string(ep->qualified_name) == r.qualified);
-        CHECK_FALSE(ep->input_to_sim);   // state feedback flows out to electricsim
+        CHECK_FALSE(ep->input_to_sim);   // state feedback flows out to external sim
     }
 }
 
@@ -915,14 +915,14 @@ TEST_CASE("SetDoorLockState stores without crashing", "[ExternalSim]") {
 }
 
 // ---------------------------------------------------------------------------
-// Steering command (4076) — electricsim → ev1sim (symmetric with throttle).
+// Steering command (4076) — external sim → ev1sim (symmetric with throttle).
 // ---------------------------------------------------------------------------
 
 TEST_CASE("Steering command endpoint + GetSteeringCmd decode/freshness", "[ExternalSim]") {
     const auto* ep = ExternalSimConnector::FindEndpoint(4076);
     REQUIRE(ep != nullptr);
     CHECK(std::string(ep->qualified_name) == "vehicle.dynamics.steering_cmd");
-    CHECK(ep->input_to_sim);   // electricsim → ev1sim
+    CHECK(ep->input_to_sim);   // external sim → ev1sim
 
     ExternalSimConnector c;
     auto none = c.GetSteeringCmd(std::chrono::milliseconds(200));
@@ -1352,7 +1352,7 @@ TEST_CASE("Power window motor subscription: DebugInjectU8 delivers passenger mot
 
 TEST_CASE("FindEndpoint returns door lock and power window motor cmd rows",
           "[ExternalSim][DoorLock][PowerWindow]") {
-    // Door lock cmds are inputs to ev1sim (electricsim/RSA → ev1sim).
+    // Door lock cmds are inputs to ev1sim (the external RSA → ev1sim).
     const auto* dl_drv = ExternalSimConnector::FindEndpoint(4084);
     REQUIRE(dl_drv != nullptr);
     CHECK(std::string(dl_drv->qualified_name) == "vehicle.body.door_lock_cmd.driver");

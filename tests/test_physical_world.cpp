@@ -784,7 +784,7 @@ TEST_CASE("test_power_windows_independent_per_window", "[PhysicalWorld][PowerWin
 // ---------------------------------------------------------------------------
 //
 // Regression coverage for the boot-keying redesign
-// (electricsim notes/manual_supplements.yaml#2026-06-11-ev1sim-boot-keying-race):
+// (the external sim's boot-keying-race supplement note):
 // the faithful detent order is OFF → ACC → RUN → OFF and a cycle must NEVER
 // downgrade RUN→ACC.  The old OFF→RUN→ACC→OFF order silently failed the
 // "key_on_cycle x2" boot recipe (two cycles landed in ACC).  These tests run
@@ -847,7 +847,7 @@ TEST_CASE("test_rsa_keypad_RUN_press_follows_the_code_not_races_it",
           "[PhysicalWorld][RsaKeypadDriver][C2]") {
     // The co-sim recipe cycles ~300 ms apart, faster than the 600 ms code
     // emission.  RUN must still be pressed AFTER all six digits — otherwise the
-    // electricsim RSA rejects it (RUN is gated on the auth window being open).
+    // external sim RSA rejects it (RUN is gated on the auth window being open).
     RsaKeypadDriver kp;
     KeypadTrace tr;
 

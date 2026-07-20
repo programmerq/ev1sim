@@ -9,7 +9,7 @@
 
 #if EV1SIM_HAVE_EXTERNAL_SIM
 // Wire-truth Phase 4 (2026-06-17): the host-side SharedMemoryTransport message
-// queue (protocol.hpp / shm_transport.hpp) was deleted upstream when electricsim
+// queue (protocol.hpp / shm_transport.hpp) was deleted upstream when external sim
 // unified every wire onto one shared-memory WireTable. ev1sim is now a pure
 // WireTable client via WireTruthChassis (no transport include). We still pull in
 // ev1_chassis_signals.hpp for the canonical chassis-ID drift-guard static_asserts
@@ -79,7 +79,7 @@ constexpr std::uint32_t kHornLowCmd     = 4020;
 constexpr std::uint32_t kHornHighCmd    = 4021;
 constexpr std::uint32_t kPanelBase      = 4030;
 
-// Combination switch outputs (ev1sim → electricsim, chassis segment).
+// Combination switch outputs (ev1sim → external sim, chassis segment).
 // 6-way blue connector 12084699; 3 output pins meaningfully published.
 //   4040  combination_switch.low_beam_out         (pin C, YEL 525B)
 //   4041  combination_switch.flash_to_pass_out    (pin B, PPL 524B)
@@ -89,9 +89,9 @@ constexpr std::uint32_t kCombSwFlashToPassOutId  = 4041;
 constexpr std::uint32_t kCombSwParkHeadlampOutId = 4042;
 constexpr int           kNumCombSw               = 3;
 
-// Turn/hazard combination switch outputs (ev1sim → electricsim, chassis segment).
+// Turn/hazard combination switch outputs (ev1sim → external sim, chassis segment).
 // Steering-column combination switch, connector 12092237 (DARK GRAY).
-// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// Locked in lockstep with the external sim's chassis-signal header
 // kSigTurnHazSw_* = 4043-4046.  Horn is a single command (circuit 28); there is
 // no hi/lo driver choice — LHJB drives both sounders (4020/4021) together.
 //   4043  vehicle.body.turn_haz_switch.right_turn_out   (pin B, DK BLU/WHT 1415)
@@ -106,12 +106,12 @@ constexpr std::uint32_t kTurnHazSwHornOutId      = 4046;
 //  driver-input section as vehicle.driver.*_contact; these IDs are still used
 //  by the chassis-bus publish block + the drift guard below.)
 
-// Charge coupler presence (ev1sim → electricsim, chassis segment).
+// Charge coupler presence (ev1sim → external sim, chassis segment).
 //   4060  vehicle.body.charge_coupler.present
 //         True when the J1772/Avcon paddle is mated.  Stubbed false for now.
 constexpr std::uint32_t kChargeCouplerPresentId = 4060;
 
-// PRND selector lines (ev1sim → electricsim, chassis segment).
+// PRND selector lines (ev1sim → external sim, chassis segment).
 // Four PIM prnd_a/b/c/d cavities — physical wires from floor lever to PIM.
 // Encoding (Gray-coded with parity, propulsion manual p. 343):
 //   PARK    A=0 B=1 C=1 D=0
@@ -128,9 +128,9 @@ constexpr std::uint32_t kPrndSelectorCId = 4052;
 constexpr std::uint32_t kPrndSelectorDId = 4053;
 constexpr int           kNumPrndSelector = 4;
 
-// Wiper/washer switch outputs (ev1sim → electricsim, chassis segment).
+// Wiper/washer switch outputs (ev1sim → external sim, chassis segment).
 // Steering-column wiper/washer switch, connector 12092254 (BLACK).
-// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// Locked in lockstep with the external sim's chassis-signal header
 // kSigWiperSw_* = 4054-4057.  HI layers on the LOW "request" wire.
 //   4054  vehicle.body.wiper_washer_switch.delay_out         (pin B, GRA 112)
 //   4055  vehicle.body.wiper_washer_switch.request_out       (pin C, DK GRN 113)
@@ -145,13 +145,13 @@ constexpr std::uint32_t kWiperSwWasherSwitchOutId = 4057;
 
 constexpr std::uint32_t kDynamicsBase   = 4100;
 
-// Driver input signal IDs on the main harness segment (electricsim_ev1_bus).
-// Encoding per electricsim/src/io/ev1_driver_inputs.hpp.
+// Driver input signal IDs on the main harness segment (the main harness segment).
+// Encoding per the external sim's driver-input header.
 constexpr std::uint32_t kSigDriverBrakePedalQ8    = 6900U;
 constexpr std::uint32_t kSigDriverSteeringDegQ8   = 6901U;
 constexpr std::uint32_t kSigDriverGearSelector    = 6902U;
 constexpr std::uint32_t kSigDriverThrottleQ8      = 6903U;
-// Brake switch (discrete bool, 0/1) — locked in lockstep with electricsim
+// Brake switch (discrete bool, 0/1) — locked in lockstep with external sim
 // ev1_driver_inputs.hpp kSigDriverBrakeSwitch = 6904.
 constexpr std::uint32_t kSigDriverBrakeSwitch     = 6904U;
 // Driver seatbelt buckle — locked in lockstep with kSigDriverSeatbeltBuckled = 6964.
@@ -161,7 +161,7 @@ constexpr std::uint32_t kSigDriverSeatbeltBuckled = 6964U;
 // TODO(consumer): IPC seatbelt-light telltale — deferred.
 constexpr std::uint32_t kSigDriverSeatbeltBuckledPassenger = 6965U;
 // Turn/hazard combination-switch CHASSIS cavities (chassis segment), locked in
-// lockstep with electricsim kSigTurnHazSw_* = 4043-4046 (connector 12092237).
+// lockstep with external sim kSigTurnHazSw_* = 4043-4046 (connector 12092237).
 // LHJB consumes these directly (turn left/right + hazard + the single horn
 // command on circuit 28).
 constexpr std::uint32_t kSigTurnHazSw_RightTurnOut = 4043U;
@@ -169,7 +169,7 @@ constexpr std::uint32_t kSigTurnHazSw_LeftTurnOut  = 4044U;
 constexpr std::uint32_t kSigTurnHazSw_HazardOut    = 4045U;
 constexpr std::uint32_t kSigTurnHazSw_HornOut      = 4046U;  // single horn cmd (ckt 28)
 // RSA per-digit keypad button signals (momentary 1-tick bool, 0=idle, 1=pressed).
-// Locked in lockstep with electricsim kSigDriverRsaKeypadButton[1..5] = 6975-6979.
+// Locked in lockstep with external sim kSigDriverRsaKeypadButton[1..5] = 6975-6979.
 // (Slot 6970 was kSigDriverRsaKeypadCodeOk — now reserved, not published here.)
 constexpr std::uint32_t kSigDriverRsaKeypadButton1 = 6975U;  // "1/2" button (tap=1)
 constexpr std::uint32_t kSigDriverRsaKeypadButton2 = 6976U;  // "3/4" button (tap=3)
@@ -178,14 +178,14 @@ constexpr std::uint32_t kSigDriverRsaKeypadButton4 = 6978U;  // "7/8" button (ta
 constexpr std::uint32_t kSigDriverRsaKeypadButton5 = 6979U;  // "9/0" button (tap=9)
 // RSA mode button press — momentary 1-tick uint8 enum.
 // 0=NONE, 1=OFF, 2=ACC, 3=RUN, 4=START.
-// Locked in lockstep with electricsim kSigDriverRsaModeButton = 6971.
+// Locked in lockstep with external sim kSigDriverRsaModeButton = 6971.
 constexpr std::uint32_t kSigDriverRsaModeButton    = 6971U;
-// IPC trip-reset (ID 6952), locked in lockstep with electricsim
+// IPC trip-reset (ID 6952), locked in lockstep with external sim
 // kSigDriverIpcTripResetButton = 6952.  (The cruise stalk formerly published
 // pre-decoded pulses 6953-6957 here; it now publishes the raw chassis cavities
 // kSigCruiseSw_* (4047-4049) below — the same edge model as wiper/turn-hazard.)
 constexpr std::uint32_t kSigDriverIpcTripResetButton = 6952U;
-// Wiper/washer switch CHASSIS cavities, locked in lockstep with electricsim
+// Wiper/washer switch CHASSIS cavities, locked in lockstep with external sim
 // kSigWiperSw_* = 4054-4057. ev1sim computes these raw contacts from the
 // detent enum (driver_wiper_switch) and publishes them on the chassis segment;
 // RHJB's WSW decoder turns them back into OFF/INT/LOW/HIGH (ESM p.511).
@@ -193,7 +193,7 @@ constexpr std::uint32_t kSigWiperSw_DelayOut          = 4054U;  // INT detent
 constexpr std::uint32_t kSigWiperSw_RequestOut        = 4055U;  // any on-state
 constexpr std::uint32_t kSigWiperSw_HiOut             = 4056U;  // HIGH detent
 constexpr std::uint32_t kSigWiperSw_WasherSwitchOut   = 4057U;  // wash button
-// Cruise-control switch CHASSIS cavities, locked in lockstep with electricsim
+// Cruise-control switch CHASSIS cavities, locked in lockstep with external sim
 // kSigCruiseSw_{SetCoast,ResumeAccel,OnOff}Out = 4047/4048/4049 (circuits
 // 84/87/397 -> PIM J1).  ev1sim opens/closes these raw contacts from the
 // keyboard/UI cruise stalk; PIM's tap/hold decoder (pim_cruise_input) turns a
@@ -206,7 +206,7 @@ constexpr std::uint32_t kSigCruiseSw_ResumeAccelOut = 4048U;  // ckt 87,  PIM J1
 constexpr std::uint32_t kSigCruiseSw_OnOffOut       = 4049U;  // ckt 397, PIM J1 pin 10
 constexpr int           kNumNewDriverInputs         = 1;  // ipc trip-reset (6952) only
 // Power window switch signals (momentary bool, held while pressed).
-// Locked in lockstep with electricsim kSigDriverPowerWindow* = 6980-6983.
+// Locked in lockstep with external sim kSigDriverPowerWindow* = 6980-6983.
 // consumer = RSA (window-motor logic), future round.
 constexpr std::uint32_t kSigDriverPowerWindowDriverUp      = 6980U;
 constexpr std::uint32_t kSigDriverPowerWindowDriverDown    = 6981U;
@@ -215,7 +215,7 @@ constexpr std::uint32_t kSigDriverPowerWindowPassengerDown = 6983U;
 constexpr int           kNumPowerWindowInputs              = 4;
 
 // RSA exterior pillar keypad signals (momentary uint8, 0=idle/1=tap/2=long).
-// Locked in lockstep with electricsim kSigDriverRsaExteriorKeypad[1..5] = 6985-6989.
+// Locked in lockstep with external sim kSigDriverRsaExteriorKeypad[1..5] = 6985-6989.
 // Same Option A encoding as interior keypad (6975-6979).
 // consumer = RSA exterior keypad logic, future round.
 constexpr std::uint32_t kSigDriverRsaExteriorKeypad1 = 6985U;
@@ -224,7 +224,7 @@ constexpr std::uint32_t kSigDriverRsaExteriorKeypad3 = 6987U;
 constexpr std::uint32_t kSigDriverRsaExteriorKeypad4 = 6988U;
 constexpr std::uint32_t kSigDriverRsaExteriorKeypad5 = 6989U;
 // Door handle pull attempt signals (momentary bool 0=idle, 1=pulled this tick).
-// Locked in lockstep with electricsim kSigDriverDoorHandleAttempt{Driver,Passenger}
+// Locked in lockstep with external sim kSigDriverDoorHandleAttempt{Driver,Passenger}
 // = 6990-6991.  consumer = RSA (decides if door unlocks).
 constexpr std::uint32_t kSigDriverDoorHandleAttemptDriver    = 6990U;
 constexpr std::uint32_t kSigDriverDoorHandleAttemptPassenger = 6991U;
@@ -241,12 +241,12 @@ constexpr int           kNumExteriorKeypadInputs             = 7;  // 5 buttons 
 constexpr int kNumPassengerSeatbelt = 1;  // passenger seatbelt (6965)
 constexpr int kNumDriverInputs = 12 + kNumNewDriverInputs + kNumPowerWindowInputs + kNumExteriorKeypadInputs + kNumPassengerSeatbelt;  // 12 base: turn/hazard (6944/6948/6949) + cruise (6953-6957) moved to chassis cavities
 
-// Motor state signals on the chassis segment (ev1sim → electricsim, float32 LE).
+// Motor state signals on the chassis segment (ev1sim → external sim, float32 LE).
 //   4070  vehicle.dynamics.motor_rpm          motor shaft RPM
 //   4071  vehicle.dynamics.motor_torque_nm    motor shaft torque (Nm, signed)
 // ev1sim publishes only the *mechanical* operating point (rpm + torque). The
 // DC pack current (4072 kSigChassisMotorCurrentA) is derived and published by
-// electricsim's PIM, which subscribes to 4070/4071 and applies the pack-voltage
+// the external sim's PIM, which subscribes to 4070/4071 and applies the pack-voltage
 // / inverter-efficiency conversion it owns. ev1sim is a chassis/physics layer
 // and intentionally does not model the battery, so it neither computes nor
 // publishes pack current.
@@ -254,17 +254,17 @@ constexpr std::uint32_t kSigMotorRpm       = 4070U;
 constexpr std::uint32_t kSigMotorTorqueNm  = 4071U;
 constexpr int           kNumMotorSignals   = 2;
 
-// Sim-time master clock (ev1sim → electricsim, chassis segment, uint64 LE ns).
+// Sim-time master clock (ev1sim → external sim, chassis segment, uint64 LE ns).
 //   4075  vehicle.dynamics.sim_time_ns   monotonic Chrono sim-time, nanoseconds
-// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// Locked in lockstep with the external sim's chassis-signal header
 // kSigChassisSimTimeNs = 4075.  (NOT 4070 — that is motor RPM.)  Published
-// every physics step so electricsim's SimClock can switch from wall-clock to
+// every physics step so the external sim's SimClock can switch from wall-clock to
 // sim-time-master mode (BTCM/PIM/IPC subscribe).  Must increase monotonically;
-// electricsim ignores non-increasing samples.
+// external sim ignores non-increasing samples.
 constexpr std::uint32_t kSigSimTimeNs      = 4075U;
 constexpr int           kNumSimTimeSignals = 1;
 
-// Ambient environment sensors (ev1sim → electricsim, chassis segment, float32 LE).
+// Ambient environment sensors (ev1sim → external sim, chassis segment, float32 LE).
 //   4090  vehicle.environment.ambient_temp_c          ambient air temperature (°C)
 //   4091  vehicle.environment.ambient_humidity_pct    ambient relative humidity (%)
 // Publisher: ev1sim AmbientTempSensor (naive diurnal sinusoid; no live weather API).
@@ -273,60 +273,60 @@ constexpr std::uint32_t kSigAmbientTempC       = 4090U;
 constexpr std::uint32_t kSigAmbientHumidityPct = 4091U;
 constexpr int           kNumAmbientSignals      = 2;
 
-// Brake master cylinder pressure (ev1sim → electricsim, chassis segment).
+// Brake master cylinder pressure (ev1sim → external sim, chassis segment).
 //   4074  vehicle.brake.master_cylinder_pressure_kpa   float32 LE, kPa
-// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// Locked in lockstep with the external sim's chassis-signal header
 // kSigChassisBrakeMasterPressureKpa = 4074.  Computed by BrakePedal's
 // two-stage curve from normalized pedal travel each tick.
 constexpr std::uint32_t kSigBrakeMasterPressureKpa = 4074U;
 constexpr int           kNumBrakeSignals           = 1;
 
-// Throttle command (electricsim/PIM → ev1sim, chassis segment).
+// Throttle command (the external PIM → ev1sim, chassis segment).
 //   4073  vehicle.dynamics.throttle_cmd_q8   uint8 q8: 0=zero, 255=full
-// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// Locked in lockstep with the external sim's chassis-signal header
 // kSigChassisThrottleCmdQ8 = 4073.  Subscribed when running in
 // "electronics" drive mode; ignored in "local" mode.
 constexpr std::uint32_t kSigThrottleCmdQ8     = 4073U;
 constexpr int           kNumThrottleCmdSignals = 1;
 
-// Steering command (electricsim → ev1sim, chassis segment).
+// Steering command (external sim → ev1sim, chassis segment).
 //   4076  vehicle.dynamics.steering_cmd   float32 LE, normalized -1..+1
 //         (positive = left, matching Chrono / DriverCommand.steering).
 // The symmetric counterpart of the throttle bus path: when running in
 // "electronics" drive mode ev1sim subscribes and overrides the local steering
 // when the value is fresh, falling back to the local input otherwise.  Allocated
-// ev1sim-side first — there is no electricsim steering producer today; this is a
+// ev1sim-side first — there is no external sim steering producer today; this is a
 // closed-loop / physical-rig steering input, NOT the PSCM power-steering pump
 // (that is the separate power_steering_pump_motor peripheral).  See the
-// "pending electricsim adoption" note in the drift guard below.
+// "pending external sim adoption" note in the drift guard below.
 constexpr std::uint32_t kSigSteeringCmd        = 4076U;
 constexpr int           kNumSteeringCmdSignals = 1;
 
-// Wiper motor command (electricsim/RHJB → ev1sim, chassis segment).
+// Wiper motor command (the external RHJB → ev1sim, chassis segment).
 //   4080  vehicle.body.wiper_motor.command  uint8 enum: 0=OFF, 1=INT, 2=LOW, 3=HIGH
 //   4081  vehicle.body.washer_pump.command  uint8 bool: 0=idle, 1=pump active
-// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// Locked in lockstep with the external sim's chassis-signal header
 // kSigChassisWiperMotorCommand = 4080, kSigChassisWasherPumpCommand = 4081.
 constexpr std::uint32_t kSigWiperMotorCommand  = 4080U;
 constexpr std::uint32_t kSigWasherPumpCommand  = 4081U;
 constexpr int           kNumWiperSignals       = 2;
 
-// HVAC blower level + defrost grid (electricsim/HTCM → ev1sim, chassis segment).
+// HVAC blower level + defrost grid (the external HTCM → ev1sim, chassis segment).
 //   4082  vehicle.hvac.blower_level   uint8 enum: 0=OFF, 1=LOW, 2=MED, 3=HIGH
 //   4083  vehicle.hvac.defrost_grid   uint8 bool: 0=inactive, 1=active
-// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// Locked in lockstep with the external sim's chassis-signal header
 // kSigChassisHvacBlowerLevel = 4082, kSigChassisDefrostGridActive = 4083.
-// Encoding confirmed from electricsim/ev1/htcm/htcm_supervisor.h:
+// Encoding confirmed from the external sim's HTCM supervisor header:
 //   hvac_blower_level: 0=OFF, 1=LOW, 2=MED, 3=HIGH (clamped 0-3)
 //   defrost_grid_active: bool
 constexpr std::uint32_t kSigHvacBlowerLevel  = 4082U;
 constexpr std::uint32_t kSigDefrostGridActive = 4083U;
 constexpr int           kNumHvacSignals       = 2;
 
-// IPC LCD seatbelt telltale outputs (electricsim/IPC → ev1sim, chassis segment).
+// IPC LCD seatbelt telltale outputs (the external IPC → ev1sim, chassis segment).
 //   4130  vehicle.ipc.seatbelt_telltale_driver    uint8 bool: 0=lamp off, 1=lamp on
 //   4131  vehicle.ipc.seatbelt_telltale_passenger uint8 bool: 0=lamp off, 1=lamp on
-// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// Locked in lockstep with the external sim's chassis-signal header
 // kSigChassisIpcSeatbeltTelltaleDriver = 4130,
 // kSigChassisIpcSeatbeltTelltalePassenger = 4131.
 // Lit when the corresponding seat is unbuckled AND vehicle speed > ~8 km/h.
@@ -334,22 +334,22 @@ constexpr std::uint32_t kSigIpcSeatbeltTelltaleDriver    = 4130U;
 constexpr std::uint32_t kSigIpcSeatbeltTelltalePassenger = 4131U;
 constexpr int           kNumIpcTelltaleSignals           = 2;
 
-// IPC trip distance (electricsim/IPC → ev1sim, chassis segment).
+// IPC trip distance (the external IPC → ev1sim, chassis segment).
 //   4132  vehicle.ipc.trip_distance_m   float32 LE, metres
-// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// Locked in lockstep with the external sim's chassis-signal header
 // kSigChassisIpcTripDistanceM = 4132.
 // Published by IPC controller on change (epsilon ~0.5 m); resets to 0.0 on
 // trip-reset button press.
 constexpr std::uint32_t kSigIpcTripDistanceM    = 4132U;
 constexpr int           kNumIpcTripDistSignals  = 1;
 
-// IPC BTCM / airbag telltale outputs (electricsim/IPC → ev1sim, chassis segment).
+// IPC BTCM / airbag telltale outputs (the external IPC → ev1sim, chassis segment).
 //   4134  vehicle.ipc.brake_telltale         uint8 bool: 0=off, 1=on (DTC 42, BTCM brake_ind)
 //   4135  vehicle.ipc.park_brake_telltale    uint8 bool: 0=off, 1=on (DTC 44, BTCM park_brake_ind)
 //   4136  vehicle.ipc.antilock_telltale      uint8 bool: 0=off, 1=on (DTC 41, BTCM antilock_ind)
 //   4137  vehicle.ipc.low_trac_telltale      uint8 bool: 0=off, 1=on (DTC 43, BTCM low_trac_ind)
 //   4138  vehicle.ipc.air_bag_telltale       uint8 bool: 0=off, 1=on (DTC 40, set_airbag_input)
-// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// Locked in lockstep with the external sim's chassis-signal header
 // kSigChassisIpcBrakeTelltale=4134 .. kSigChassisIpcAirBagTelltale=4138.
 constexpr std::uint32_t kSigIpcBrakeTelltale     = 4134U;
 constexpr std::uint32_t kSigIpcParkBrakeTelltale = 4135U;
@@ -358,14 +358,14 @@ constexpr std::uint32_t kSigIpcLowTracTelltale   = 4137U;
 constexpr std::uint32_t kSigIpcAirBagTelltale    = 4138U;
 constexpr int           kNumIpcBtcmTelltaleSignals = 5;
 
-// IPC extra LCD telltale outputs (electricsim/IPC → ev1sim, chassis segment).
+// IPC extra LCD telltale outputs (the external IPC → ev1sim, chassis segment).
 //   4140  vehicle.ipc.service_now_telltale      uint8 bool: 0=off, 1=on (DTCs 31/33/35 via HTCM/PCM/BPM)
 //   4141  vehicle.ipc.check_messages_telltale   uint8 bool: 0=off, 1=on (aggregate: any comm-loss/req/BTCM)
 //   4142  vehicle.ipc.temp_telltale             uint8 bool: 0=off, 1=on (DTCs 32/34/36 via HTCM/PCM/BPM)
 //   4143  vehicle.ipc.battery_life_telltale     uint8 bool: 0=off, 1=on (DTC 38 via IPC_REQ_BATTERY_LIFE_FROM_BPM)
 //   4144  vehicle.ipc.reduced_perf_telltale     uint8 bool: 0=off, 1=on (DTC 37 via IPC_REQ_REDUCED_PERF_FROM_PCM)
 //   4145  vehicle.ipc.check_tire_press_telltale uint8 bool: 0=off, 1=on (DTC 39 via IPC_REQ_CHECK_TIRE_PRESS_FROM_RSA)
-// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// Locked in lockstep with the external sim's chassis-signal header
 // kSigChassisIpcServiceNowTelltale=4140 .. kSigChassisIpcCheckTirePressTelltale=4145.
 constexpr std::uint32_t kSigIpcServiceNowTelltale     = 4140U;
 constexpr std::uint32_t kSigIpcCheckMessagesTelltale  = 4141U;
@@ -375,24 +375,24 @@ constexpr std::uint32_t kSigIpcReducedPerfTelltale    = 4144U;
 constexpr std::uint32_t kSigIpcCheckTirePressTelltale = 4145U;
 constexpr int           kNumIpcExtraTelltaleSignals   = 6;
 
-// Door lock commands (electricsim/RSA → ev1sim, chassis segment).
+// Door lock commands (the external RSA → ev1sim, chassis segment).
 //   4084  vehicle.body.door_lock_cmd.driver    uint8: 0=unlocked, 1=locked
 //   4085  vehicle.body.door_lock_cmd.passenger uint8: 0=unlocked, 1=locked
-// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// Locked in lockstep with the external sim's chassis-signal header
 // kSigChassisDoorLockCmdDriver = 4084, kSigChassisDoorLockCmdPassenger = 4085.
 constexpr std::uint32_t kSigDoorLockCmdDriver    = 4084U;
 constexpr std::uint32_t kSigDoorLockCmdPassenger = 4085U;
 
-// Power window motor commands (electricsim/RSA → ev1sim, chassis segment).
+// Power window motor commands (the external RSA → ev1sim, chassis segment).
 //   4086  vehicle.body.power_window_motor.driver    uint8: 0=stop, 1=up, 2=down
 //   4087  vehicle.body.power_window_motor.passenger uint8: 0=stop, 1=up, 2=down
-// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// Locked in lockstep with the external sim's chassis-signal header
 // kSigChassisPowerWindowMotorDriver = 4086, kSigChassisPowerWindowMotorPassenger = 4087.
 constexpr std::uint32_t kSigPowerWindowMotorDriver    = 4086U;
 constexpr std::uint32_t kSigPowerWindowMotorPassenger = 4087U;
 constexpr int           kNumDoorLockPwSignals         = 4;  // 4084+4085+4086+4087
 
-// Door lock STATE feedback (ev1sim → electricsim, chassis segment).
+// Door lock STATE feedback (ev1sim → external sim, chassis segment).
 // The resulting per-door latched state of ev1sim::DoorLocks, after the
 // door_lock_motor (4092-4095) reaches end-of-travel or the RSA cmd (4084/4085)
 // mirror is applied.  Closes the central-locking loop so RSA/IPC can confirm
@@ -410,36 +410,36 @@ constexpr std::uint32_t kSigDoorLockStatePassenger = 4166U;
 constexpr std::uint32_t kSigDoorLockStateTrunk     = 4167U;
 constexpr int           kNumDoorLockStateSignals   = 3;
 
-// RSA shift-blocked cue (electricsim/RSA → ev1sim, chassis segment).
+// RSA shift-blocked cue (the external RSA → ev1sim, chassis segment).
 //   4088  vehicle.body.rsa.shift_blocked    uint8 bool: 0=no block, 1=blocked this tick
-// Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp
+// Locked in lockstep with the external sim's chassis-signal header
 // kSigChassisRsaShiftBlocked = 4088.
 // Published as 1 when a P→non-P shift is refused (brake switch not pressed).
 // Level signal: 1 while the PRND selector holds a non-PARK request without brake; 0 otherwise.
 constexpr std::uint32_t kSigRsaShiftBlocked = 4088U;
 constexpr int           kNumRsaShiftBlockedSignals = 1;
 
-// Door-lock motor leg drives (electricsim/RHJB → ev1sim, chassis segment).
+// Door-lock motor leg drives (the external RHJB → ev1sim, chassis segment).
 // RHJB's rhjb_door_lock behavioral model is a 4-output dual-H-bridge driving
 // BOTH door-lock motors (LH driver + RH passenger) in lockstep.  Each motor has
 // a LOCK leg and an UNLOCK leg; the leg whose drive is high decides the motor's
 // direction, both-high/both-low → motor off.  ev1sim's door_lock_motor
 // peripheral (ev1sim::DoorLockMotor ×2) consumes these and models the
 // mechanical lock stroke.  Wire-level mapping (cavity → chassis-bus signal),
-// authoritative for the electricsim router — see docs/peripherals.md:
+// authoritative for the external sim router — see docs/peripherals.md:
 //   4092  vehicle.body.door_lock_motor.lh_lock_drive    ckt 294A, RHJB J9.C5 → LH motor LOCK
 //   4093  vehicle.body.door_lock_motor.lh_unlock_drive  ckt 295A, RHJB J9.C6 → LH motor UNLOCK
 //   4094  vehicle.body.door_lock_motor.rh_lock_drive    ckt 294C, RHJB J3.A6 → RH motor LOCK
 //   4095  vehicle.body.door_lock_motor.rh_unlock_drive  ckt 295C, RHJB J3.A7 → RH motor UNLOCK
 // uint8/bool wire level: 1 = leg energised.  Allocated ev1sim-side first; see
-// the "pending electricsim adoption" note in the drift-guard block below.
+// the "pending external sim adoption" note in the drift-guard block below.
 constexpr std::uint32_t kSigDoorLockMotorLhLockDrive   = 4092U;
 constexpr std::uint32_t kSigDoorLockMotorLhUnlockDrive = 4093U;
 constexpr std::uint32_t kSigDoorLockMotorRhLockDrive   = 4094U;
 constexpr std::uint32_t kSigDoorLockMotorRhUnlockDrive = 4095U;
 constexpr int           kNumDoorLockMotorSignals       = 4;
 
-// Sounder / piezo drive (electricsim/LHJB → ev1sim, chassis segment).
+// Sounder / piezo drive (the external LHJB → ev1sim, chassis segment).
 //   4096  vehicle.body.sounder.piezo_drive   uint8 bool: 1 = piezo energised
 // The LHJB turn/hazard flasher produces a piezo square-wave (the TURN/HAZ
 // "click" in a real GM vehicle).  ev1sim's sounder peripheral
@@ -463,11 +463,11 @@ constexpr std::uint32_t kSigPscmPumpSpeedCmdQ8      = 4097U;
 constexpr std::uint32_t kSigPscmPumpInterlockClosed = 4098U;
 constexpr int           kNumSteeringPumpSignals     = 2;  // 4097 (in) + 4098 (out)
 
-// HVAC driver controls (ev1sim → electricsim/HTCM, chassis segment).
+// HVAC driver controls (ev1sim → the external HTCM, chassis segment).
 // The driver's climate-panel requests, modelled by ev1sim::HvacControls.
 // HTCM owns the plant and feeds back the actual blower level (4082) + rear
 // defrost grid (4083); these five are the upstream driver inputs.  Allocated
-// ev1sim-side first (see the "pending electricsim adoption" note below).
+// ev1sim-side first (see the "pending external sim adoption" note below).
 //   4124  vehicle.hvac.temp_setpoint_c   float32 LE, °C (clamped 16..30)
 //   4125  vehicle.hvac.fan_request       uint8: 0=OFF, 1=LOW, 2=MED, 3=HIGH
 //   4126  vehicle.hvac.mode_request      uint8: 0=FACE, 1=BILEVEL, 2=FEET, 3=DEFROST
@@ -491,7 +491,7 @@ constexpr std::uint8_t kHvacModeMax          = 3u;      // FACE/BILEVEL/FEET/DEF
 // RSA run-mode broadcast — published by RSA on the main harness segment.
 // ev1sim subscribes to this (input_to_sim = true for subscription, but we
 // don't register it as an endpoint we publish — only receive).
-// Locked in lockstep with electricsim/ev1/rsa/rsa_signals.hpp kSigRunModeBroadcast = 5711.
+// Locked in lockstep with the external sim's RSA signal header kSigRunModeBroadcast = 5711.
 constexpr std::uint32_t kSigRunModeBroadcast = 5711U;
 
 // PIM cruise-control state — published by PIM on the main harness segment.
@@ -521,7 +521,7 @@ constexpr std::uint32_t kSigAdStateEnum      = 5230U;
 
 // BTCM front ABS solenoid signals — published by BTCM on the main harness segment.
 // ev1sim subscribes (input_to_sim direction); not registered as published endpoints.
-// Locked in lockstep with electricsim/ev1/btcm/btcm_signals.hpp:
+// Locked in lockstep with the external sim's BTCM signal header:
 //   kSigSolFL_ISO = 5010, kSigSolFL_DMP = 5011
 //   kSigSolFR_ISO = 5012, kSigSolFR_DMP = 5013
 constexpr std::uint32_t kSigSolFL_ISO = 5010U;
@@ -533,7 +533,7 @@ constexpr std::uint32_t kSigSolFR_DMP = 5013U;
 // status frame at 5 Hz regardless of ABS modulation state.  Used
 // as the "BTCM alive" liveness signal, separate from the iso/dump-pin
 // state (which encodes commanded valve position, not liveness).
-// Locked in lockstep with electricsim/ev1/btcm/btcm_signals.hpp:
+// Locked in lockstep with the external sim's BTCM signal header:
 //   kSigBtcmUartFrame = 5050
 constexpr std::uint32_t kSigBtcmUartFrame = 5050U;
 
@@ -546,9 +546,9 @@ constexpr std::uint32_t kSigRearMotorLR = 5014U;
 constexpr std::uint32_t kSigRearMotorRR = 5015U;
 
 // 3D-sim integration contract — physics telemetry + cabin sensors published
-// on the main harness segment.  Locked to electricsim's docs/3d_sim_contract.md
+// on the main harness segment.  Locked to the external sim's 3D-sim signal contract
 // reservations 6920-6939 (physics telemetry), 6940-6959 (buttons), and
-// 6960-6979 (discrete sensors).  electricsim does not yet subscribe to most
+// 6960-6979 (discrete sensors).  external sim does not yet subscribe to most
 // of these — publishing them locks the wire format on the public side so
 // the eventual subscriber doesn't have to guess.  Cross-references the
 // existing chassis-bus equivalents:
@@ -561,16 +561,16 @@ constexpr std::uint32_t kSigExtAccelLateralMps2       = 6922U;
 constexpr std::uint32_t kSigExtVehiclePoseX           = 6930U;
 constexpr std::uint32_t kSigExtVehiclePoseY           = 6931U;
 constexpr std::uint32_t kSigExtVehiclePoseYawRad      = 6932U;
-// Buttons / discrete driver inputs — see docs/3d_sim_contract.md §1.3.
+// Buttons / discrete driver inputs — see the external sim's 3D-sim signal contract §1.3.
 // 6940/6941 (horn high/low request) REMOVED — the driver horn is a single
 // physical contact (circuit 28), now published as chassis horn cavity 4046.
-// IDs left reserved (do not reuse) per docs/3d_sim_contract.md §1.3.
+// IDs left reserved (do not reuse) per the external sim's 3D-sim signal contract §1.3.
 constexpr std::uint32_t kSigDriverHeadlightSwitch     = 6942U;
 constexpr std::uint32_t kSigDriverHeadlightDimRequest = 6943U;
 constexpr std::uint32_t kSigDriverTelltaleTestRequest = 6945U;
 constexpr std::uint32_t kSigDriverParkBrakeSetRequest = 6946U;
 constexpr std::uint32_t kSigDriverParkBrakeReleaseRequest = 6947U;
-// Discrete sensors — see docs/3d_sim_contract.md §1.4.
+// Discrete sensors — see the external sim's 3D-sim signal contract §1.4.
 constexpr std::uint32_t kSigSensorDoorOpenDriver      = 6960U;
 constexpr std::uint32_t kSigSensorDoorOpenPassenger   = 6961U;
 constexpr std::uint32_t kSigSensorHoodOpen            = 6962U;
@@ -697,7 +697,7 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // Build the endpoint table once.
 // ---------------------------------------------------------------------------
 // kNumDriverInputs covers all driver inputs on the main harness segment
-// (electricsim_ev1_bus), all output from ev1sim:
+// (the main harness segment), all output from ev1sim:
 //   6900 brake_pedal_q8, 6901 steering_deg_q8, 6902 gear_selector,
 //   6903 throttle_q8, 6904 brake_switch, 6944 hazard_request,
 //   6948 turn_signal_left, 6949 turn_signal_right, 6964 seatbelt_buckled,
@@ -710,7 +710,7 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // +1 for the charge coupler presence (ID 4060, chassis segment).
 // +kNumPrndSelector for the 4 PRND selector lines (IDs 4050-4053, chassis segment).
 // +kNumMotorSignals for motor RPM + torque (IDs 4070-4071, chassis segment). DC pack
-//   current (4072) is electricsim/PIM's to publish, not ev1sim's.
+//   current (4072) is the external PIM's to publish, not ev1sim's.
 // +kNumWiperSignals for wiper motor command (4080) + washer pump command (4081).
 // +kNumHvacSignals for hvac_blower_level (4082) + defrost_grid_active (4083).
 // +kNumAmbientSignals for ambient temp (4090) + ambient humidity (4091).
@@ -725,7 +725,7 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 //   legacy main-harness 5010-5015 path.
 // +kNumExtContractSignals for the 3D-sim integration contract publish
 //   (6920-6932 physics telemetry + 6960-6963 cabin sensors) on the main
-//   harness — ev1sim → electricsim, locking the wire format for the
+//   harness — ev1sim → external sim, locking the wire format for the
 //   eventual subscribers.
 // Wiper/washer switch cavities (4054-4057): ev1sim publishes the raw contacts
 // computed from the detent enum; RHJB's WSW decoder consumes them.
@@ -798,15 +798,15 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     // chassis bus via the wiper publish block in Tick.)  A second
     // vehicle.body.wiper_washer_switch.* registration here was a leftover from
     // the pre-cavity wiring and is intentionally gone.
-    // Motor state signals (chassis segment, ev1sim → electricsim).
+    // Motor state signals (chassis segment, ev1sim → external sim).
     out[i++] = {kSigMotorRpm,
                 "vehicle.dynamics.motor_rpm", "motor_rpm", false};
     out[i++] = {kSigMotorTorqueNm,
                 "vehicle.dynamics.motor_torque_nm", "motor_torque_nm", false};
-    // Sim-time master clock (chassis segment, ev1sim → electricsim, uint64 LE ns).
+    // Sim-time master clock (chassis segment, ev1sim → external sim, uint64 LE ns).
     out[i++] = {kSigSimTimeNs,
                 "vehicle.dynamics.sim_time_ns", "sim_time_ns", false};
-    // Ambient environment sensors (chassis segment, ev1sim → electricsim).
+    // Ambient environment sensors (chassis segment, ev1sim → external sim).
     out[i++] = {kSigAmbientTempC,
                 "vehicle.environment.ambient_temp_c", "ambient_temp_c", false};
     out[i++] = {kSigAmbientHumidityPct,
@@ -814,10 +814,10 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     // Throttle command (PIM → ev1sim, chassis segment).
     out[i++] = {kSigThrottleCmdQ8,
                 "vehicle.dynamics.throttle_cmd_q8", "throttle_cmd_q8", true};
-    // Steering command (electricsim → ev1sim, chassis segment, input_to_sim=true).
+    // Steering command (external sim → ev1sim, chassis segment, input_to_sim=true).
     out[i++] = {kSigSteeringCmd,
                 "vehicle.dynamics.steering_cmd", "steering_cmd", true};
-    // Brake master cylinder pressure (ev1sim → electricsim, chassis segment).
+    // Brake master cylinder pressure (ev1sim → external sim, chassis segment).
     out[i++] = {kSigBrakeMasterPressureKpa,
                 "vehicle.brake.master_cylinder_pressure_kpa",
                 "brake_master_pressure_kpa", false};
@@ -940,7 +940,7 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.hvac.ac_request", "hvac_ac_request", false};
     out[i++] = {kSigHvacDefrostRequest,
                 "vehicle.hvac.defrost_request", "hvac_defrost_request", false};
-    // Door lock STATE feedback (ev1sim → electricsim, chassis segment, input_to_sim=false).
+    // Door lock STATE feedback (ev1sim → external sim, chassis segment, input_to_sim=false).
     out[i++] = {kSigDoorLockStateDriver,
                 "vehicle.body.door_lock_state.driver", "door_lock_state_driver", false};
     out[i++] = {kSigDoorLockStatePassenger,
@@ -980,7 +980,7 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                   kDynamicsNames[d].qualified, kDynamicsNames[d].shortname,
                   /*input_to_sim=*/false};
     }
-    // Driver inputs on the main harness segment (electricsim_ev1_bus).
+    // Driver inputs on the main harness segment (the main harness segment).
     // All are outputs from ev1sim (input_to_sim=false).
     out[i++] = {kSigDriverBrakePedalQ8,
                 "vehicle.driver.brake_pedal_q8", "driver_brake_pedal_q8", false};
@@ -1073,8 +1073,8 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.driver.door_handle_attempt_passenger",
                 "door_handle_attempt_passenger", false};
     // 3D-sim integration contract publishes — main harness segment,
-    // ev1sim → electricsim, all output (input_to_sim=false).
-    // PROPOSED in docs/3d_sim_contract.md; consumers TBD.
+    // ev1sim → external sim, all output (input_to_sim=false).
+    // PROPOSED in the external sim's 3D-sim signal contract; consumers TBD.
     out[i++] = {kSigExtBodyVelocityMps,
                 "vehicle.dynamics.body_velocity_mps",
                 "ext_body_velocity_mps", false};
@@ -1228,7 +1228,7 @@ struct ExternalSimConnector::State {
     bool         has_vstate = false;
 
     // Driver input snapshot — latched by SetDriver*() methods,
-    // published to the main harness segment (electricsim_ev1_bus) in Tick().
+    // published to the main harness segment (the main harness segment) in Tick().
     std::uint8_t  driver_brake_q8    = 0;
     std::int16_t  driver_steering_q8 = 0;
     std::uint8_t  driver_gear        = 3;  // default D
@@ -1340,7 +1340,7 @@ struct ExternalSimConnector::State {
     bool          has_throttle_cmd        = false;
     std::uint64_t throttle_cmd_ns         = 0;
 
-    // Steering command (ID 4076, chassis segment) — received from electricsim.
+    // Steering command (ID 4076, chassis segment) — received from external sim.
     // float32 normalized -1..+1 (positive = left).  Freshness tracked like
     // throttle for the stale-fallback in SimApp::ApplyElectronicsSteering.
     float         steering_cmd            = 0.0f;
@@ -1478,7 +1478,7 @@ struct ExternalSimConnector::State {
     std::int8_t   hvac_ac_request_pub      = -1;
     std::int8_t   hvac_defrost_request_pub = -1;
 
-    // Door lock STATE feedback (IDs 4155-4157, chassis segment) — published to electricsim.
+    // Door lock STATE feedback (IDs 4155-4157, chassis segment) — published to external sim.
     // 0=unlocked, 1=locked.  Mirror of ev1sim::DoorLocks; publish-on-change.
     bool          door_lock_state_driver       = false;   // default UNLOCKED (DoorLocks default)
     bool          door_lock_state_passenger     = false;
@@ -1596,7 +1596,7 @@ struct ExternalSimConnector::State {
     // shared WireTable is up; nullptr means wire-truth is disabled (env unset /
     // segment down / hash mismatch / substrate compiled out). Phase 4 made this
     // the SOLE bus handle — the legacy SharedMemoryTransport members (chassis
-    // `transport` + ECU `main_transport`) were removed when electricsim deleted
+    // `transport` + ECU `main_transport`) were removed when external sim deleted
     // the host-side message queue and unified every wire onto this table.
     std::unique_ptr<ev1sim::WireTruthChassis> wire;
     bool wire_attach_tried = false;
@@ -1632,7 +1632,7 @@ ExternalSimConnector::ExternalSimConnector(const Options& options)
 #else
         m_state->status = Status::Unavailable;
         std::cerr << "[ExternalSimConnector] --external-sim is on, but this "
-                     "build has no electricsim support; commands will be "
+                     "build has no external sim support; commands will be "
                      "ignored.\n";
 #endif
     }
@@ -2729,7 +2729,7 @@ WireDelta MakeI16Delta(std::uint32_t signal_id, std::int16_t value) {
 }
 
 // uint64_t eight-byte unsigned little-endian payload (sim-time nanoseconds).
-// Matches electricsim's WireTable uint64 decode: v |= payload[i] << (8*i).
+// Matches the external sim's WireTable uint64 decode: v |= payload[i] << (8*i).
 WireDelta MakeU64Delta(std::uint32_t signal_id, std::uint64_t value) {
     WireDelta d{};
     d.signal_id = signal_id;
@@ -2750,13 +2750,13 @@ inline void MirrorBatch(ev1sim::WireTruthChassis* wire,
 }
 
 // ── Cross-repo signal-ID drift guard ────────────────────────────────────────
-// ev1sim re-declares the chassis-bus signal IDs it shares with electricsim
-// (every "Locked in lockstep with electricsim/src/io/ev1_chassis_signals.hpp"
-// constant above).  These static_asserts pin each one to electricsim's
+// ev1sim re-declares the chassis-bus signal IDs it shares with external sim
+// (every "Locked in lockstep with the external sim's chassis-signal header"
+// constant above).  These static_asserts pin each one to the external sim's
 // canonical value, so any divergence is a compile error here rather than a
 // silent runtime mis-route.  The contract doc + ev1_chassis_signals.hpp stay
 // the single source of truth; this only enforces it.  Add a line whenever you
-// mirror a new chassis ID.  Only compiled when building against electricsim
+// mirror a new chassis ID.  Only compiled when building against external sim
 // (EV1SIM_HAVE_EXTERNAL_SIM), so the stub build is unaffected.
 #define EV1SIM_CHASSIS_ID_MATCHES(local_id, canonical)                       \
     static_assert((local_id) == electricsim::io::canonical,                  \
@@ -2792,7 +2792,7 @@ EV1SIM_CHASSIS_ID_MATCHES(kSigIpcParkBrakeTelltale,      kSigChassisIpcParkBrake
 EV1SIM_CHASSIS_ID_MATCHES(kSigIpcAntilockTelltale,       kSigChassisIpcAntilockTelltale);
 EV1SIM_CHASSIS_ID_MATCHES(kSigIpcLowTracTelltale,        kSigChassisIpcLowTracTelltale);
 EV1SIM_CHASSIS_ID_MATCHES(kSigIpcAirBagTelltale,         kSigChassisIpcAirBagTelltale);
-// (4139 kSigChassisBpmPackVoltageMv: retired by electricsim 2026-06-15 and now
+// (4139 kSigChassisBpmPackVoltageMv: retired by external sim 2026-06-15 and now
 // retired ev1sim-side too — see docs/ipc_rsa_display_plan.md Phase 0. The
 // pack-voltage readout returns via GM-8192 frame snoop in Phase 1.)
 EV1SIM_CHASSIS_ID_MATCHES(kSigIpcServiceNowTelltale,     kSigChassisIpcServiceNowTelltale);
@@ -2820,13 +2820,13 @@ EV1SIM_CHASSIS_ID_MATCHES(kWiperSwWasherSwitchOutId, kSigWiperSw_WasherSwitchOut
 // The 4100-range dynamics block publishes by literal offset from this base.
 EV1SIM_CHASSIS_ID_MATCHES(kDynamicsBase,                 kSigChassisSpeedMps);
 
-// ── Pending electricsim adoption (allocated ev1sim-side first) ──────────────
-// These chassis IDs were allocated here so electricsim's RHJB / LHJB / PSCM
+// ── Pending external sim adoption (allocated ev1sim-side first) ──────────────
+// These chassis IDs were allocated here so the external sim's RHJB / LHJB / PSCM
 // controllers can start publishing against a fixed wire contract.  They have
 // no electricsim::io::kSigChassis* counterpart yet, so they intentionally do
 // NOT get an EV1SIM_CHASSIS_ID_MATCHES line — adding one now would break the
-// integrated (EV1SIM_HAVE_EXTERNAL_SIM) build until electricsim catches up.
-// When electricsim adds the canonical constants (suggested names below), move
+// integrated (EV1SIM_HAVE_EXTERNAL_SIM) build until external sim catches up.
+// When external sim adds the canonical constants (suggested names below), move
 // each into the guard above so drift is caught from then on:
 //   kSigDoorLockMotorLhLockDrive   (4092) → kSigChassisDoorLockMotorLhLockDrive
 //   kSigDoorLockMotorLhUnlockDrive (4093) → kSigChassisDoorLockMotorLhUnlockDrive
@@ -2848,8 +2848,8 @@ EV1SIM_CHASSIS_ID_MATCHES(kDynamicsBase,                 kSigChassisSpeedMps);
 #undef EV1SIM_CHASSIS_ID_MATCHES
 
 // ── Chassis-signal contract version handshake (Phase 1) ──────────────────────
-// The version of the electricsim chassis-signal contract this connector
-// implements. electricsim is the PRODUCER and owns the contract semver
+// The version of the external sim chassis-signal contract this connector
+// implements. external sim is the PRODUCER and owns the contract semver
 // (electricsim::io's EV1_CHASSIS_CONTRACT_VERSION_* in ev1_chassis_signals.hpp);
 // ev1sim is the CONSUMER and declares here the version it was written against.
 // scripts/audit_chassis_contract.py reads both and enforces compatibility in CI
@@ -2860,15 +2860,15 @@ EV1SIM_CHASSIS_ID_MATCHES(kDynamicsBase,                 kSigChassisSpeedMps);
 #define EV1_CHASSIS_CONTRACT_VERSION_IMPLEMENTED_MINOR 9
 #define EV1_CHASSIS_CONTRACT_VERSION_IMPLEMENTED_PATCH 0
 
-// Baseline guard: if this is built against an electricsim that predates the
+// Baseline guard: if this is built against an external sim that predates the
 // contract version handshake, the producer macros are absent. Fail with a clear
 // message about the required baseline rather than a murky undefined-identifier
 // error in the static_asserts below.
 #if !defined(EV1_CHASSIS_CONTRACT_VERSION_MAJOR) \
     || !defined(EV1_CHASSIS_CONTRACT_VERSION_MINOR)
-#  error "electricsim's ev1_chassis_signals.hpp does not define \
+#  error "the external sim's ev1_chassis_signals.hpp does not define \
 EV1_CHASSIS_CONTRACT_VERSION_{MAJOR,MINOR} — it predates the chassis-contract \
-version handshake (electricsim Phase 0). Update the electricsim checkout."
+version handshake (external sim Phase 0). Update the external sim checkout."
 #endif
 
 // Compile-time compatibility guard: the contract is backward-compatible across
@@ -2877,14 +2877,14 @@ version handshake (electricsim Phase 0). Update the electricsim checkout."
 // locally; the audit catches it cross-repo in CI. Same MAJOR required:
 static_assert(EV1_CHASSIS_CONTRACT_VERSION_IMPLEMENTED_MAJOR
                   == EV1_CHASSIS_CONTRACT_VERSION_MAJOR,
-              "ev1sim chassis-contract MAJOR differs from electricsim's — the "
+              "ev1sim chassis-contract MAJOR differs from the external sim's — the "
               "shared signal contract changed incompatibly; update this "
               "connector to the new contract.");
 // Consumer must not be ahead of the producer on MINOR (it would implement
 // signals the producer hasn't defined):
 static_assert(EV1_CHASSIS_CONTRACT_VERSION_IMPLEMENTED_MINOR
                   <= EV1_CHASSIS_CONTRACT_VERSION_MINOR,
-              "ev1sim chassis-contract MINOR is ahead of electricsim's — this "
+              "ev1sim chassis-contract MINOR is ahead of the external sim's — this "
               "connector implements signals newer than the producer defines.");
 
 } // namespace
@@ -2909,7 +2909,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
 
     // 1-2. Legacy buses RETIRED (wire-truth Phase 3 + Phase 4). ev1sim no longer
     //      opens or drains the chassis ring OR the ECU SharedMemoryTransport
-    //      (electricsim_ev1_bus): electricsim deleted the host-side message queue
+    //      (the main harness segment): external sim deleted the host-side message queue
     //      and unified every wire onto one shared WireTable. ev1sim is now a pure
     //      WireTable peer — it READS every consumed cell from the table (the
     //      chassis overlay + the ECU reads below) and WRITES every produced cell
@@ -2918,7 +2918,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
 
 #if EV1SIM_HAVE_WIRE_TRUTH
     // 2b. Attach the shared WireTable once — the SAME env contract every
-    //     electricsim controller uses (ELECTRICSIM_WIRES_NAME / _ROLE, via
+    //     external-sim controller uses (ELECTRICSIM_WIRES_NAME / _ROLE, via
     //     topology::try_open_from_env behind OpenFromEnv). For a migrated
     //     CONSUMER cell we PREFER the wire value, but only when its producer has
     //     actually written it: read_*() returns nullopt until then and the
@@ -3015,7 +3015,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         st.wire->apply_consumer_overlay(sinks);
 
         // 2c. ECU-bus reads (Phase 4). These cells used to arrive as ring
-        //     DeltaBatches on main_transport (electricsim_ev1_bus); they now live
+        //     DeltaBatches on main_transport (the main harness segment); they now live
         //     on the shared WireTable. Each is written()-gated inside the
         //     WireTruthChassis helper, so a cell whose producing ECU has not run
         //     leaves the corresponding has_* flag false and the getter at its
@@ -3023,7 +3023,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
 
         // RSA power mode (was kSigRunModeBroadcast 5711). RSA_RUN1_OUT only
         // encodes run_active (RUN/START); the OFF/ACC distinction is lost (the
-        // ACC output has no wire cell yet — electricsim PR #171 gap). Map
+        // ACC output has no wire cell yet — external-sim gap). Map
         // run_active -> RUN(2), else OFF(0). ev1sim's only consumer is the KEY
         // HUD readout (PhysicalWorld), which renders 0/1/2; START(3) collapses to
         // RUN(2) which is the better display than the "?" the raw 3 produced.
@@ -3076,8 +3076,8 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         }
 
         // PIM cruise state (was kSigPimCruiseActive/SetpointMps 5360/5361) ->
-        // PIM_CRUISE_ACTIVE + PIM_CRUISE_SETPOINT_MPS. electricsim declared these
-        // cells on PR #171 (gap now closed); nullopt until PIM writes them.
+        // PIM_CRUISE_ACTIVE + PIM_CRUISE_SETPOINT_MPS. The external sim declared these
+        // cells (gap now closed); nullopt until PIM writes them.
         if (auto active = st.wire->pim_cruise_active()) {
             st.pim_cruise_active     = *active;
             st.has_pim_cruise_active = true;
@@ -3088,7 +3088,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         }
 
         // AD precharge relay (was kSigAdPrechargeRelay 5225) -> AD_PRECHARGE_RELAY.
-        // electricsim declared this cell on PR #171; nullopt until AD writes it.
+        // the external sim declared this cell; nullopt until AD writes it.
         if (auto pre = st.wire->ad_precharge_relay()) {
             st.ad_precharge_relay     = *pre;
             st.has_ad_precharge_relay = true;
@@ -3257,7 +3257,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         std::vector<WireDelta> dyn;
         dyn.reserve(static_cast<std::size_t>(kNumDynamics + kNumSimTimeSignals));
         // Sim-time master clock (chassis 4075, uint64 LE ns) — every tick,
-        // monotonic.  Lets electricsim's SimClock drive ECUs off sim-time
+        // monotonic.  Lets the external sim's SimClock drive ECUs off sim-time
         // instead of wall-clock; see kSigSimTimeNs.
         dyn.push_back(MakeU64Delta(
             kSigSimTimeNs,
@@ -3286,7 +3286,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
 #endif
     }
 
-    // 5. Driver-input + ECU-telemetry path (was the electricsim_ev1_bus
+    // 5. Driver-input + ECU-telemetry path (was the the main harness segment
     //    SharedMemoryTransport).
     //
     //    CONSUME: the inbound ECU cells this segment used to carry are now read
@@ -3301,7 +3301,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
     //    preference logic still consults them) but are simply never written now;
     //    the chassis path is authoritative.
     //
-    //    MIGRATED (electricsim PR #171 declared the cells; gaps now closed):
+    //    MIGRATED (the external sim declared the cells; gaps now closed):
     //      - PIM cruise active/setpoint (was 5360/5361 -> st.pim_cruise_*):
     //        read off PIM_CRUISE_ACTIVE / PIM_CRUISE_SETPOINT_MPS in §2c above;
     //        has_pim_cruise_* gate on written() so the HUD shows no cruise
@@ -3671,6 +3671,6 @@ bool ExternalSimConnector::BusesUp() const {
 bool ExternalSimConnector::BusesUp() const { return false; }
 
 void ExternalSimConnector::Tick(double /*sim_time_s*/) {
-    // Built without electricsim — nothing to do.
+    // Built without external sim — nothing to do.
 }
 #endif  // EV1SIM_HAVE_EXTERNAL_SIM

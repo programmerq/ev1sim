@@ -1,16 +1,16 @@
-// Proof-of-life for the wire-truth migration: ev1sim attaches electricsim's
+// Proof-of-life for the wire-truth migration: ev1sim attaches the external sim's
 // shared WireTable and round-trips the horn drive-line cells (chassis
 // 4020/4021 -> HORN_DRIVE_LINE_LOW/HIGH) through WireTruthChassis.
 //
 // The test plays BOTH cross-repo roles in-process: it CREATES the shared table
-// the way an electricsim driver does (env_open's creator path: declare_all +
+// the way an external sim driver does (env_open's creator path: declare_all +
 // the canonical topology hash), then ATTACHES through ev1sim's WireTruthChassis
 // and asserts the values match. This proves, against the REAL generated
 // topology (not a stand-in): the topology-hash attach gate, the WireId
 // resolution (kWireHORN_DRIVE_LINE_*), the bit type, the written()/freshness
 // fallback contract, and both read (consumer) and write (producer) directions.
 //
-// Only compiled when EV1SIM_HAVE_WIRE_TRUTH (the electricsim substrate is
+// Only compiled when EV1SIM_HAVE_WIRE_TRUTH (the external sim substrate is
 // checked out); see CMakeLists.txt.
 //
 // @design 2026-06-15 — wire-truth migration kickoff.
@@ -27,7 +27,7 @@
 #include "WireTruthChassis.h"
 #include "ExternalSimConnector.h"  // end-to-end: wire -> overlay -> getter
 
-// electricsim substrate (creator side) — same headers env_open.cpp uses.
+// external sim substrate (creator side) — same headers env_open.cpp uses.
 #include "topology/topology_generated.h"
 #include "wire_table.hpp"
 #include "gm8192/gm8192_frame.h"  // gm8192_encode (build a $41 frame for the snoop test)
@@ -39,14 +39,14 @@ using electricsim::io::WireTable;
 using electricsim::io::WireTableOptions;
 
 // A unique-per-run segment name so a killed test never collides with a leaked
-// segment (mirrors electricsim's $ELECTRICSIM_BUS_NAME convention). The creator
+// segment (mirrors the external sim's $ELECTRICSIM_BUS_NAME convention). The creator
 // WireTable unlinks the segment on destruction.
 std::string unique_segment(const char* tag) {
     return std::string("ev1sim_wt_") + tag + "_" +
            std::to_string(static_cast<long>(::getpid()));
 }
 
-// Create the shared table as an electricsim driver would: declare the full
+// Create the shared table as an external sim driver would: declare the full
 // topology under the canonical hash before publishing init_complete.
 std::unique_ptr<WireTable> create_fleet_table(const std::string& name,
                                               std::uint32_t hash) {
@@ -60,13 +60,13 @@ std::unique_ptr<WireTable> create_fleet_table(const std::string& name,
 
 }  // namespace
 
-TEST_CASE("WireTruthChassis: horn drive lines round-trip electricsim -> ev1sim",
+TEST_CASE("WireTruthChassis: horn drive lines round-trip external sim -> ev1sim",
           "[wire_truth]") {
     const std::string seg = unique_segment("horn");
     auto producer = create_fleet_table(seg, electricsim::topology::kTopologyHash);
     REQUIRE(producer != nullptr);  // creator path must succeed
 
-    // electricsim (LHJB) writes the low-tone horn drive line on the wire.
+    // external sim (LHJB) writes the low-tone horn drive line on the wire.
     REQUIRE(producer->write_bit(
         electricsim::topology::kWireHORN_DRIVE_LINE_LOW, true));
 
@@ -100,7 +100,7 @@ TEST_CASE("WireTruthChassis: never-written cell reads as nullopt (fallback)",
 
     // Nothing written yet: every read is nullopt so the consumer stays on its
     // legacy value. This is the seam that lets ev1sim migrate a consumer cell
-    // BEFORE electricsim's producer has moved onto the wire.
+    // BEFORE the external sim's producer has moved onto the wire.
     REQUIRE(wire->horn_low_drive() == std::nullopt);
     REQUIRE(wire->horn_high_drive() == std::nullopt);
     REQUIRE(wire->read_bit(electricsim::topology::kWireHORN_DRIVE_LINE_LOW) ==
@@ -210,7 +210,7 @@ TEST_CASE("WireTruthChassis::mirror_signal: kUint16 round-trip (6901 DRIVER_STEE
     REQUIRE(out == 0x1234u);
 }
 
-TEST_CASE("WireTruthChassis: uint32 accessor round-trips; electricsim-owned cells are not mirrored",
+TEST_CASE("WireTruthChassis: uint32 accessor round-trips; externally-owned cells are not mirrored",
           "[wire_truth][mirror_signal]") {
     const std::string seg = unique_segment("ms_u32");
     auto creator = create_fleet_table(seg, electricsim::topology::kTopologyHash);
@@ -220,9 +220,9 @@ TEST_CASE("WireTruthChassis: uint32 accessor round-trips; electricsim-owned cell
     REQUIRE(wire != nullptr);
 
     // There is no ev1sim-PRODUCED uint32 chassis cell: the only uint32 cells
-    // (HV bus 4155/4157) are electricsim-produced (topology `driver:`), so they
+    // (HV bus 4155/4157) are externally-produced (topology `driver:`), so they
     // are deliberately EXCLUDED from the producer registry. mirror_signal must
-    // therefore REFUSE 4155 — ev1sim never writes a cell electricsim drives.
+    // therefore REFUSE 4155 — ev1sim never writes a cell external sim drives.
     const std::uint8_t payload[] = {0xEFu, 0xBEu, 0xADu, 0xDEu};  // 0xDEADBEEF LE
     REQUIRE_FALSE(wire->mirror_signal(4155U, payload, 4u));
 
@@ -298,7 +298,7 @@ TEST_CASE("WireTruthChassis::mirror_signal: unregistered signal_id returns false
 // @design 2026-06-15 — consumer overlay batch.
 //
 // Four representative consumed cells, one per wire type that the consumer set
-// uses (bit/byte/float32/uint32).  The creator plays electricsim's role —
+// uses (bit/byte/float32/uint32).  The creator plays the external sim's role —
 // writes the cells onto the wire — then ev1sim's apply_consumer_overlay reads
 // them and invokes the matching sinks.
 //
@@ -314,7 +314,7 @@ TEST_CASE("WireTruthChassis::apply_consumer_overlay: written cells invoke matchi
     auto creator = create_fleet_table(seg, electricsim::topology::kTopologyHash);
     REQUIRE(creator != nullptr);
 
-    // electricsim (LHJB / IPC / BTCM / BPM) writes one cell of each consumed type.
+    // external sim (LHJB / IPC / BTCM / BPM) writes one cell of each consumed type.
     REQUIRE(creator->write_bit(
         electricsim::topology::kWireBULB_FEED_LINE_LBL, true));
     REQUIRE(creator->write_byte(
@@ -324,7 +324,7 @@ TEST_CASE("WireTruthChassis::apply_consumer_overlay: written cells invoke matchi
         electricsim::topology::kWireCHASSIS_IPC_TRIP_DISTANCE_M, 123.5f));
     REQUIRE(creator->write_uint32(
         electricsim::topology::kWireCHASSIS_AUX_BATTERY_TERMINAL_MV, 12650u));
-    // PIM commanded throttle (4073) — the cell the #171 migration dropped from
+    // PIM commanded throttle (4073) — the cell the wire-truth migration dropped from
     // the consumer set (restored 2026-07-04); pin it here so it can't fall out
     // again silently (the VAT safety failsafe assertions read this via stats).
     REQUIRE(creator->write_byte(
@@ -397,7 +397,7 @@ TEST_CASE("WireTruthChassis::apply_consumer_overlay: no-write returns 0, no sink
 }
 
 // ---------------------------------------------------------------------------
-// End-to-end horn round-trip: a value written on the wire the way electricsim's
+// End-to-end horn round-trip: a value written on the wire the way the external sim's
 // LHJB writes it (Batch B, write_bit on kWireHORN_DRIVE_LINE_*) flows through
 // ev1sim's REAL connector consumer path — the same ConsumerSinks the connector
 // installs in Tick() (on_bit -> DebugInjectDelta) — out to GetHornLowCmd/High.
@@ -407,7 +407,7 @@ TEST_CASE("WireTruthChassis::apply_consumer_overlay: no-write returns 0, no sink
 // ---------------------------------------------------------------------------
 TEST_CASE("Horn round-trip end-to-end: wire -> connector overlay -> getter",
           "[wire_truth][e2e]") {
-    // electricsim side (LHJB): create the segment + write both horn lines.
+    // external sim side (LHJB): create the segment + write both horn lines.
     const std::string seg = unique_segment("e2e_horn");
     auto lhjb = create_fleet_table(seg, electricsim::topology::kTopologyHash);
     REQUIRE(lhjb != nullptr);
@@ -438,7 +438,7 @@ TEST_CASE("Horn round-trip end-to-end: wire -> connector overlay -> getter",
 }
 
 // ---------------------------------------------------------------------------
-// Batch A/J/K/L live-render verification: with electricsim producing these
+// Batch A/J/K/L live-render verification: with external sim producing these
 // cells on the wire (Batch A bulbs, J wiper/washer, K HVAC/defrost, L RSA),
 // ev1sim must render them through the connector's REAL overlay sinks out to the
 // getters. Exercises both render types and, critically, the byte-coerced-bool
@@ -453,7 +453,7 @@ TEST_CASE("Batches A/J/K/L render through the connector overlay (wire -> getter)
     auto prod = create_fleet_table(seg, topo::kTopologyHash);
     REQUIRE(prod != nullptr);
 
-    // electricsim producers write one representative cell per landed batch.
+    // external sim producers write one representative cell per landed batch.
     REQUIRE(prod->write_bit (topo::kWireBULB_FEED_LINE_LBL,           true)); // A bit
     REQUIRE(prod->write_byte(topo::kWireCHASSIS_WIPER_MOTOR_COMMAND,  3u));   // J byte
     REQUIRE(prod->write_bit (topo::kWireCHASSIS_WASHER_PUMP_COMMAND,  true)); // J bit
@@ -551,7 +551,7 @@ TEST_CASE("Coupler 4060 mirrors to the wire (Phase 5 prep)", "[wire_truth][mirro
 
 // ---------------------------------------------------------------------------
 // ECU-bus semantic helpers (wire-truth Phase 4). These cells used to arrive as
-// ring DeltaBatches on the electricsim_ev1_bus SharedMemoryTransport; the
+// ring DeltaBatches on the the main harness segment SharedMemoryTransport; the
 // connector now reads them off the shared WireTable through these helpers.
 // The creator plays the producing ECU's role (RSA / APM / AD / BTCM).
 // @design 2026-06-17 — Phase 4 ECU-bus migration.
@@ -629,7 +629,7 @@ TEST_CASE("WireTruthChassis::ad_state_enum reconstructs the AD line code",
     REQUIRE(wire->ad_state_enum() == std::optional<std::uint32_t>(0u));
 
     // CAPACITOR_PRECHARGE = (1,0,0) -> 6 (matches the value the old
-    // kSigAdStateEnum carried, per ev1/ad/ad_state.h).
+    // kSigAdStateEnum carried, per the external sim's AD-state header).
     set_lines(true, false, false, true);
     REQUIRE(wire->ad_state_enum() == std::optional<std::uint32_t>(6u));
 
@@ -684,8 +684,7 @@ TEST_CASE("WireTruthChassis::snoop decodes vehicle speed from the PIM $41 frame"
 
     // Serialise a real $41 PCM Data Response with vehicle speed = 50 km/h onto
     // the PIM TX bit-stream cell, exactly as the PIM controller's UartTx would.
-    // payload[4] (wire byte 6) = vehicle speed (1 km/h/count); see electricsim
-    // ev1/pim/pim_uart_frame.h.
+    // payload[4] (wire byte 6) = vehicle speed (1 km/h/count); see the external sim's PIM UART-frame definition.
     std::uint8_t payload[7] = {0u, 0u, 0u, 0u, 50u, 0u, 0u};
     std::uint8_t frame[GM8192_MAX_FRAME_LEN] = {0u};
     std::size_t  frame_len = 0;

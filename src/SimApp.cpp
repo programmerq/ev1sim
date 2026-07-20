@@ -70,7 +70,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                   << " ms)\n";
     }
     // Bypass the RSA propulsion gate when explicitly opted in (scenario
-    // smoke tests / standalone runs without electricsim).  Default behavior
+    // smoke tests / standalone runs without external sim).  Default behavior
     // requires RSA to broadcast RUN before propulsion engages.
     if (m_config.vehicle_dynamics.start_propulsion_enabled) {
         m_propulsion_enabled = true;
@@ -755,7 +755,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
 
             // --- Headlamp status (display-only; bulb feed line cache) ---
             // Reads GetBulbCmd for low-beam bulbs (LLBH, RLBH) and high-beam
-            // bulbs (LHBH, RHBH) from the electricsim bulb-feed-line cache.
+            // bulbs (LHBH, RHBH) from the external sim bulb-feed-line cache.
             // No new bus subscription — bulb states are already received as part
             // of the 4000-block signals.  Priority: HIGH > LOW > OFF.
             // Shows "Headlamps: OFF / LOW / HIGH / ---" (--- before first bulb frame).
@@ -773,7 +773,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
 
             // --- Left turn-signal status (display-only; bulb feed line cache) ---
             // Reads GetBulbCmd for LFTS (left front turn signal) and LRTS (left
-            // rear turn signal) from the electricsim bulb-feed-line cache.
+            // rear turn signal) from the external sim bulb-feed-line cache.
             // No new bus subscription.  Turn signal flashes ~1 Hz so the label
             // alternates ON/OFF rapidly — the user can see the flash visually.
             // Shows "L Turn: ON / OFF / ---" (--- before first bulb frame).
@@ -789,7 +789,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
 
             // --- Right turn-signal status (display-only; bulb feed line cache) ---
             // Reads GetBulbCmd for RFTS (right front turn signal) and RRTS (right
-            // rear turn signal) from the electricsim bulb-feed-line cache.
+            // rear turn signal) from the external sim bulb-feed-line cache.
             // No new bus subscription.  Same flash-visible pattern as left.
             // Shows "R Turn: ON / OFF / ---" (--- before first bulb frame).
             m_floating_ui->AddButton(
@@ -912,7 +912,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
     std::cout << "[SimApp] Vehicle: KEY OFF — press K to cycle RSA state (OFF→ACC→RUN→OFF)\n";
 
     // Warn loudly when an external-sim scenario runs without realtime
-    // pacing.  ev1sim and the electricsim controllers (BTCM, PIM, RSA)
+    // pacing.  ev1sim and the external ECU controllers (BTCM, PIM, RSA)
     // each run on their own simulated clocks: ev1sim ticks chrono
     // physics, BTCM advances the simavr-emulated AVR.  When ev1sim is
     // unpaced (`realtime: false`) it can run many times faster than the
@@ -929,7 +929,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                      "external_sim is enabled, but simulation.realtime is "
                      "false.\n";
         std::cerr << "[SimApp]          ev1sim will run as fast as the host "
-                     "allows while electricsim controllers (BTCM/PIM/RSA)\n";
+                     "allows while external ECU controllers (BTCM/PIM/RSA)\n";
         std::cerr << "[SimApp]          run on their own simavr clocks — "
                      "the two sides will see different event durations\n";
         std::cerr << "[SimApp]          and ABS results will be unreliable.  "
@@ -1060,14 +1060,14 @@ void SimApp::ApplyAbsFrontBrake(double time, double dt_s,
     // round number close to the analytic target.
     //
     // **Validated 2026-05-21 — keep 30 ms.**  Full 6-scenario BTCM-on/off
-    // sweep (electricsim controllers rebuilt at 77e2a1f9) vs the dc63934
+    // sweep (external ECU controllers rebuilt) vs the prior
     // baseline: mu_jump FL/FR time-locked dropped ~50% → 36%/32% (the goal);
     // diagonal_mu also improved (5% locked); high_mu 149.4 m, split_mu
     // 73.4 m, brake_and_steer 60.8 m all within ~1% of baseline with heading
     // preserved; no scenario regressed.  The earlier "0 phase transitions"
     // scare was a stale-controller artifact, not the plant.  Regression gate
     // for this knob now lives in scripts/abs_regression.sh + abs_baseline.txt
-    // (`make test-integration`); see electricsim/docs/btcm_deferred_todos.md §8.
+    // (`make test-integration`); see the external sim's BTCM deferred-behaviour notes (§8).
     const double tau_apply = 0.005;  // s, caliper-fill time constant
     const double tau_dump  = 0.030;  // s, dump-valve release time constant
                                      // (was 0.060; validated 2026-05-21)
@@ -1203,7 +1203,7 @@ void SimApp::ApplyElectronicsSteering(DriverCommand& cmd) {
 }
 
 // ---------------------------------------------------------------------------
-// Consume the electricsim-driven body actuator peripherals (specs added in the
+// Consume the externally-driven body actuator peripherals (specs added in the
 // door-lock-motor / sounder / power-steering-pump round).  Advances the
 // PhysicalWorld plant models from the connector's latched chassis-bus inputs.
 // Called once per tick from both the windowed and headless loops, after the
@@ -1233,7 +1233,7 @@ void SimApp::ConsumeBodyActuatorPeripherals(double dt) {
     // --- Door-lock motors LH/RH (chassis 4092-4095 in) ---
     // Prefer the RHJB dual-H-bridge motor-leg drives when present: advance each
     // motor and mirror its end-of-travel stroke into DoorLocks.  When the legs
-    // are not published yet (electricsim hasn't adopted 4092-4095) the motors
+    // are not published yet (external sim hasn't adopted 4092-4095) the motors
     // never move and the high-level 4084/4085 mirror remains authoritative.
     {
         using S = ev1sim::DoorLocks::State;
@@ -1272,13 +1272,13 @@ void SimApp::ConsumeBodyActuatorPeripherals(double dt) {
 // ---------------------------------------------------------------------------
 int SimApp::Run() {
     // Some scenarios drive or assert on signals that only the external
-    // electronics sim (electricsim: BTCM ABS, PIM cruise, ...) produces.  Run
+    // electronics sim (external sim: BTCM ABS, PIM cruise, ...) produces.  Run
     // them only when that sim can actually be present.  Note ev1sim *creates*
-    // the shared-memory bus and the electricsim controllers attach to it, so a
+    // the shared-memory bus and the external ECU controllers attach to it, so a
     // "connected" transport just means our own bus is open — it does not prove
     // a controller is there, and controllers attach during the loop, after
     // this point.  What we *can* tell at startup is when the external sim can
-    // never appear: a build without electricsim (Status::Unavailable) or
+    // never appear: a build without external sim (Status::Unavailable) or
     // --external-sim off (Status::Disabled).  In those cases skip cleanly
     // (exit 0) rather than failing assertions or burning a realtime run.
     if (m_scenario && m_scenario->requires_external_sim()) {
@@ -1288,7 +1288,7 @@ int SimApp::Run() {
             std::cout << "[SimApp] SKIPPED scenario '" << m_scenario->name()
                       << "': requires the external electronics sim, which is "
                          "not available (status: " << m_external_sim->StatusString()
-                      << ").  Build with electricsim (ELECTRICSIM_DIR) and run "
+                      << ").  Build with external sim (ELECTRICSIM_DIR) and run "
                          "with --external-sim on.\n";
             return kExitSuccess;
         }
@@ -1757,7 +1757,7 @@ int SimApp::RunWithVisualization() {
                 static_cast<float>(m_physical->ambient_temp_sensor().humidity_pct()));
         }
         // Motor RPM + torque (chassis bus 4070-4071). DC pack current (4072) is
-        // electricsim/PIM's to derive from these — ev1sim publishes only the
+        // the external PIM's to derive from these — ev1sim publishes only the
         // mechanical operating point.
         {
             auto* engine = m_world->GetVehicle().GetEngine().get();
@@ -2100,7 +2100,7 @@ int SimApp::RunHeadless() {
         // goes live: PIM boots commanding 0 (PARK), the override zeroes
         // cmd.throttle, 6903 publishes 0, PIM reads foot-off, commands 0
         // — forever. Latent until 2026-07-04 because ev1sim never
-        // actually ingested 4073 post-#171 (the consumer-registry gap);
+        // actually ingested 4073 after the wire-truth migration (the consumer-registry gap);
         // the moment that was fixed, cruise_hold's car stopped launching.
         // The vehicle's actual actuation remains observable on its own
         // cell (4104 CHASSIS_APPLIED_THROTTLE). The steering pair
@@ -2334,7 +2334,7 @@ int SimApp::RunHeadless() {
                 static_cast<float>(m_physical->ambient_temp_sensor().humidity_pct()));
         }
         // Motor RPM + torque (chassis bus 4070-4071). DC pack current (4072) is
-        // electricsim/PIM's to derive from these — ev1sim publishes only the
+        // the external PIM's to derive from these — ev1sim publishes only the
         // mechanical operating point.
         {
             auto* engine = m_world->GetVehicle().GetEngine().get();
