@@ -145,7 +145,7 @@ constexpr std::uint32_t kWiperSwWasherSwitchOutId = 4057;
 
 constexpr std::uint32_t kDynamicsBase   = 4100;
 
-// Driver input signal IDs on the main harness segment (the main harness segment).
+// Driver input signal IDs on the main harness segment.
 // Encoding per the external sim's driver-input header.
 constexpr std::uint32_t kSigDriverBrakePedalQ8    = 6900U;
 constexpr std::uint32_t kSigDriverSteeringDegQ8   = 6901U;
@@ -696,8 +696,8 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // ---------------------------------------------------------------------------
 // Build the endpoint table once.
 // ---------------------------------------------------------------------------
-// kNumDriverInputs covers all driver inputs on the main harness segment
-// (the main harness segment), all output from ev1sim:
+// kNumDriverInputs covers all driver inputs on the main harness segment,
+// all output from ev1sim:
 //   6900 brake_pedal_q8, 6901 steering_deg_q8, 6902 gear_selector,
 //   6903 throttle_q8, 6904 brake_switch, 6944 hazard_request,
 //   6948 turn_signal_left, 6949 turn_signal_right, 6964 seatbelt_buckled,
@@ -980,7 +980,7 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                   kDynamicsNames[d].qualified, kDynamicsNames[d].shortname,
                   /*input_to_sim=*/false};
     }
-    // Driver inputs on the main harness segment (the main harness segment).
+    // Driver inputs on the main harness segment.
     // All are outputs from ev1sim (input_to_sim=false).
     out[i++] = {kSigDriverBrakePedalQ8,
                 "vehicle.driver.brake_pedal_q8", "driver_brake_pedal_q8", false};
@@ -1228,7 +1228,7 @@ struct ExternalSimConnector::State {
     bool         has_vstate = false;
 
     // Driver input snapshot — latched by SetDriver*() methods,
-    // published to the main harness segment (the main harness segment) in Tick().
+    // published to the main harness segment in Tick().
     std::uint8_t  driver_brake_q8    = 0;
     std::int16_t  driver_steering_q8 = 0;
     std::uint8_t  driver_gear        = 3;  // default D
@@ -3286,7 +3286,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
 #endif
     }
 
-    // 5. Driver-input + ECU-telemetry path (was the the main harness segment
+    // 5. Driver-input + ECU-telemetry path (was the main harness segment
     //    SharedMemoryTransport).
     //
     //    CONSUME: the inbound ECU cells this segment used to carry are now read

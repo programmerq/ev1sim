@@ -200,7 +200,7 @@ public:
     std::optional<bool>  pim_cruise_active() const;        // PIM_CRUISE_ACTIVE
     std::optional<float> pim_cruise_setpoint_mps() const;  // PIM_CRUISE_SETPOINT_MPS
 
-    // Auto-Disconnect precharge relay closed — external sim declared this cell on
+    // Auto-Disconnect precharge relay closed — external sim declared this cell
     // (was kSigAdPrechargeRelay 5225). nullopt until AD writes it.
     std::optional<bool>  ad_precharge_relay() const;       // AD_PRECHARGE_RELAY
 

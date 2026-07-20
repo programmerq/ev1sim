@@ -7,7 +7,7 @@
 #if defined(EV1SIM_HAVE_WIRE_TRUTH)
 
 // Real implementation: attach the external sim's shared WireTable. These headers
-// come from the external sim's source tree (compiled into the the wire-substrate library
+// come from the external sim's source tree (compiled into the wire-substrate library
 // static lib); the include root is ${ELECTRICSIM_DIR}/src/io.
 #include "topology/env_open.hpp"          // electricsim::topology::try_open_from_env
 #include "topology/topology_generated.h"  // kTopologyHash, kWireHORN_DRIVE_LINE_*

@@ -141,7 +141,7 @@ public:
     void SetWiperWasherSwOutputs(bool delay, bool request, bool hi, bool washer);
 
     /// Outgoing driver inputs — published to the main harness segment
-    /// (the main harness segment, IDs 6900-6903).
+    /// (IDs 6900-6903).
     /// q8 values: brake/throttle 0..255 (normalized × 256), steering signed
     /// degrees × 256, gear enum 0=P 1=R 2=N 3=D.
     void SetDriverBrakePedalQ8(std::uint8_t q8);

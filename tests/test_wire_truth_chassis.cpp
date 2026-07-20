@@ -551,7 +551,7 @@ TEST_CASE("Coupler 4060 mirrors to the wire (Phase 5 prep)", "[wire_truth][mirro
 
 // ---------------------------------------------------------------------------
 // ECU-bus semantic helpers (wire-truth Phase 4). These cells used to arrive as
-// ring DeltaBatches on the the main harness segment SharedMemoryTransport; the
+// ring DeltaBatches on the main harness segment SharedMemoryTransport; the
 // connector now reads them off the shared WireTable through these helpers.
 // The creator plays the producing ECU's role (RSA / APM / AD / BTCM).
 // @design 2026-06-17 — Phase 4 ECU-bus migration.

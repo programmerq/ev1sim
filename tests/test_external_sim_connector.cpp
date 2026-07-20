@@ -61,7 +61,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
                                                //  6962 hood open, 6963 trunk open,
                                                //  6966 key position
                                                //  (horn 6940/6941 removed — now chassis cavity 4046)
-    // Driver inputs on the main harness segment (the main harness segment), output
+    // Driver inputs on the main harness segment, output
     // from ev1sim: brake_pedal_q8 (6900), steering_deg_q8 (6901),
     // gear_selector (6902), throttle_q8 (6903), brake_switch (6904),
     // (hazard/turn moved to chassis cavities kSigTurnHazSw_* 4043-4045),

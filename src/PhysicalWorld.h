@@ -329,8 +329,8 @@ private:
 ///   RUN → OFF : an OFF mode-button pulse (always allowed; turns the car off).
 ///   OFF → ACC : wraps back to start (re-entering the code).
 ///
-/// Faithfulness note (@design 2026-06-13 claude): on the external sim RSA
-/// supervisor (the external sim's RSA supervisor (eval_mode_button_)) ACC is allowed
+/// Faithfulness note (@design 2026-06-13 claude): on the external sim's RSA
+/// supervisor (`eval_mode_button_`) ACC is allowed
 /// unconditionally while RUN/START are gated on the keypad auth window — so
 /// the code must be entered before the RUN press, and entering it at the ACC
 /// detent (rather than re-entering at RUN) matches "authenticate, then select
