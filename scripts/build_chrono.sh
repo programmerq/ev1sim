@@ -37,6 +37,28 @@ rm -rf "${CHRONO_SRC}"
 git clone --depth 1 --branch "${CHRONO_REF}" \
     https://github.com/projectchrono/chrono.git "${CHRONO_SRC}"
 
+# Portable-by-construction ISA baseline.
+#
+# Chrono's cmake/FindSIMD.cmake (invoked from src/CMakeLists.txt via the USE_SIMD
+# option) probes the BUILD host and, on GCC/x86, unconditionally bakes
+# `-march=native` into SIMD_CXX_FLAGS.  Those flags flow into CH_CXX_FLAGS and are
+# re-exported as CHRONO_CXX_FLAGS (see cmake/chrono-config.cmake.in).  Downstream
+# consumers (ev1sim's CMakeLists.txt applies CHRONO_CXX_FLAGS globally) then inherit
+# the build host's widest ISA (AVX/AVX2/...).  When this install is cached and
+# restored onto a narrower CI runner, the first wide SIMD op traps with SIGILL.
+#
+# Fix, two parts that must go together:
+#   * -DUSE_SIMD=OFF disables the host-SIMD probe entirely, so `-march=native`
+#     never enters CH_CXX_FLAGS / CHRONO_CXX_FLAGS.  A baseline `-march` alone is
+#     NOT enough: with USE_SIMD=ON, FindSIMD appends `-march=native` AFTER our
+#     flags and GCC's last-`-march`-wins rule re-widens the binary.
+#   * -march=x86-64-v2 pins a portable floor (SSE4.2/POPCNT) that every
+#     ubuntu-latest runner supports, so the actual code Chrono compiles runs
+#     anywhere in the heterogeneous runner pool.
+# CMAKE_CXX_FLAGS is applied to Chrono's own build but is NOT re-exported, so
+# ev1sim mirrors the same `-march=x86-64-v2` on its side (CMakeLists.txt).
+BASELINE_ISA="-march=x86-64-v2"
+
 cmake -S "${CHRONO_SRC}" -B "${CHRONO_SRC}/build" \
     -DCMAKE_BUILD_TYPE=Release \
     -DENABLE_MODULE_VEHICLE=ON \
@@ -44,6 +66,9 @@ cmake -S "${CHRONO_SRC}" -B "${CHRONO_SRC}/build" \
     -DBUILD_DEMOS=OFF \
     -DBUILD_TESTING=OFF \
     -DBUILD_BENCHMARKING=OFF \
+    -DUSE_SIMD=OFF \
+    -DCMAKE_C_FLAGS="${BASELINE_ISA}" \
+    -DCMAKE_CXX_FLAGS="${BASELINE_ISA}" \
     -DCMAKE_INSTALL_PREFIX="${PREFIX}" \
     "${extra_flags[@]}"
 
