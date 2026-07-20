@@ -11,10 +11,13 @@ as in-app displays (2D panels first, 3D later), fed by **decoding the GM-8192
 per-value chassis cells. Display-only first; interactivity later. Full plan +
 ratified decisions: [`docs/ipc_rsa_display_plan.md`](ipc_rsa_display_plan.md).
 
-- [ ] **Phase 0 — retire the dead 4139 pack-voltage path** (ev1sim-only): the
+- [x] **Phase 0 — retire the dead 4139 pack-voltage path** (ev1sim-only): the
   `kSigBpmPackVoltageMv` endpoint + decode, `GetBpmPackVoltageMv()`,
   `FormatBpmPackVoltageLabel`, and the `SimApp` wiring.  Permanently blank since
-  electricsim retired the cell (PIM moved to the HV-bus rail).
+  electricsim retired the cell (PIM moved to the HV-bus rail).  *(Done — retired
+  in commit `0f2490b`; the three symbols now have zero live-code hits, only the
+  retirement note at `src/ExternalSimConnector.cpp` ~L2795.  Pack-voltage returns
+  via GM-8192 frame snoop in Phase 1.)*
 - [ ] **Phase 1 — IPC cluster, 2D, snoop-fed (display-only)**: a `BusSnoop`
   frame-decode layer → `DashSnapshot`; `InstrumentClusterPanel` + pure label
   helpers; frame-decode + label + `[e2e]` tests.
@@ -105,15 +108,6 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   RSA cmd encoding (4084/4085).  Closes the `door_lock_motor` loop so RSA/IPC
   central-locking can confirm the actuated state.  IDs allocated ev1sim-side
   first; electricsim consumer wiring is a TODO on that side.
-- [x] **Motor current calculation** — `src/MotorCurrent.h` derives DC pack
-  current from shaft torque × speed (P_mech → P_pack via drive/regen efficiency
-  + a 12 V accessory load, ÷ 312 V nominal Gen 2 NiMH pack — 26 modules × 12 V
-  nominal; the earlier 343.2 V was a charged/float per-module figure misread as
-  nominal, since corrected).  SimApp publishes it on
-  `vehicle.dynamics.motor_current_a` (chassis ID **4072**, float32, signed:
-  + discharge / − regen charge) each tick, publish-on-change.  Allocated
-  ev1sim-side first (no electricsim counterpart yet, so intentionally absent
-  from the compile-time drift guard).  Pinned by `tests/test_motor_current.cpp`.
 - [x] **EV1 powertrain model fidelity audit (initial pass).**  Done in
   [docs/ev1_chrono_audit.md](ev1_chrono_audit.md).  Fixed final drive
   10.0 → 10.946:1, brake torque 1800 → 800 N·m/wheel, chassis mass
@@ -342,8 +336,9 @@ Only the render/audio surfacing remains (tracked in the "defer all" section abov
   4072) is a display-only ammeter readout that never feeds wheel torque,
   so the **regen-cutout fail-safe is untestable in-sim** (no regen torque
   to cut, no blend to hand off to friction).  Documented fully in
-  [docs/ev1_chrono_audit.md](ev1_chrono_audit.md) §15 + the limitation
-  block in [src/MotorCurrent.h](../src/MotorCurrent.h).  Blocked on
+  [docs/ev1_chrono_audit.md](ev1_chrono_audit.md) §15.  (The earlier
+  `src/MotorCurrent.h` limitation block was removed when PIM took over
+  pack-current derivation — commit `4d49a55`.)  Blocked on
   EV1 regen-torque-vs-speed + blend-handover data the manuals don't
   publish — modelling it would mean inventing constants.  When traceable
   structure (or a justified structure-only `@design` model) lands: add a
