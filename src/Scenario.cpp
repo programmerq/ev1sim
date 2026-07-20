@@ -340,7 +340,7 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
             m_csv << static_cast<int>(bus.GetHvacBlowerLevel());
         // Door-lock motor leg drives mirrored from the chassis bus
         // (4092 LH lock / 4093 LH unlock / 4094 RH lock / 4095 RH unlock) —
-        // 1 = the junction box is energising that motor leg, 0 otherwise.
+        // 1 = the junction block is energising that motor leg, 0 otherwise.
         // Lets body/HMI scenarios assert the lock/unlock actuation timeline.
         else if (f == "door_lock_motor_lh_lock_drive")
             m_csv << (bus.GetDoorLockMotorDrive(0) ? 1 : 0);
@@ -357,7 +357,7 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
             m_csv << (bus.GetHornHighCmd() ? 1 : 0);
         // Bulb feed lines by EV1-manual short name — "<abbrev>_bulb_feed_line"
         // (e.g. lhbh_bulb_feed_line, lrsl_bulb_feed_line): 1 = the junction
-        // box is commanding the bulb lit. Covers all NUM_LIGHTS elements so
+        // block is commanding the bulb lit. Covers all NUM_LIGHTS elements so
         // lighting/HMI scenarios can assert indication timelines (turn
         // signal flash cadence, stop lamps on brake) without bespoke
         // per-bulb plumbing. 0 until a bulb command is first received.
