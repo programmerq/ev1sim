@@ -111,10 +111,6 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   button hover state which is hover-color only (no geometric scale-up). A
   geometric magnify would require custom IGUIElement drawing or a separate
   overlay node; deferred.
-- [ ] **Door handle test scenarios** — config flag `auto_unlock_at_start: true`
-  is already de facto since DoorLocks defaults to UNLOCKED.  Expose an
-  explicit config or scenario JSON option to set initial lock state so
-  user-interactive tests that need to iterate don't have to unlock first.
 
 ## Floating UI panel
 - [ ] **Remaining UI candidates** — next floating-panel rounds:
@@ -141,11 +137,6 @@ future-UI input on one side, chassis-segment signal publishing on the other.
     `,` / `.` keys); display row was already present
 
 ## Bus-mediated physics
-- [ ] **Rear-EMB clamp-position model needed for full rear-wheel modulation.**
-  BTCM publishes EMB motor commands (`kSigRearMotorLR/RR`, signed floats)
-  but nothing directly mappable to torque without a clamp-position model.
-  Until that model is added, rear brake = local `rear_brake` (no per-wheel
-  modulation).
 - [ ] **Regen ↔ friction blending (S15 — documented gap, do NOT fabricate).**
   Friction braking is regen-agnostic and regen (PIM's motor-current readout,
   chassis 4072 `kSigChassisMotorCurrentA`, derived/published by electricsim's
