@@ -147,8 +147,10 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   Until that model is added, rear brake = local `rear_brake` (no per-wheel
   modulation).
 - [ ] **Regen ↔ friction blending (S15 — documented gap, do NOT fabricate).**
-  Friction braking is regen-agnostic and regen (`MotorCurrent`, chassis
-  4072) is a display-only ammeter readout that never feeds wheel torque,
+  Friction braking is regen-agnostic and regen (PIM's motor-current readout,
+  chassis 4072 `kSigChassisMotorCurrentA`, derived/published by electricsim's
+  PIM — see `src/ExternalSimConnector.cpp:244-252`) is a display-only ammeter
+  readout that never feeds wheel torque,
   so the **regen-cutout fail-safe is untestable in-sim** (no regen torque
   to cut, no blend to hand off to friction).  Documented fully in
   [docs/ev1_chrono_audit.md](ev1_chrono_audit.md) §15.  (The earlier
