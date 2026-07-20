@@ -1,23 +1,24 @@
-// WireTruthChassis — ev1sim's attachment to electricsim's wire-truth substrate.
+// WireTruthChassis — ev1sim's attachment to the external sim's wire-truth substrate.
 //
-// electricsim moved the chassis bus off the legacy ring
-// (SharedMemoryTransport "electricsim_chassis_bus", DeltaRecord publish/poll)
+// external sim moved the chassis bus off the legacy ring
+// (SharedMemoryTransport "the chassis-bus segment", DeltaRecord publish/poll)
 // onto a shared-memory WireTable: a directory of named, typed cells indexed by
 // WireId, with a topology_hash gate so peers built against different topologies
-// refuse to attach. See electricsim docs/3d_sim_contract.md and
-// notes/phase_c_chassis_migration_scope.md, and ev1sim
+// refuse to attach. See the external sim's 3D-sim signal contract and
+// the external sim's Phase-C chassis-migration scope note, and ev1sim
 // docs/wire_truth_migration_scope.md for the migration plan.
 //
 // This class is ev1sim's side of that substrate. It attaches the shared
-// WireTable as a fleet peer — the SAME create/attach idiom every electricsim
-// controller uses via electricsim::topology::try_open_from_env() (segment
-// "electricsim_wires", topology hash electricsim::topology::kTopologyHash). It
+// WireTable as a fleet peer — the SAME create/attach idiom every external sim
+// controller uses via electricsim::topology::try_open_from_env() (segment name
+// from the ELECTRICSIM_WIRES_NAME env var, topology hash
+// electricsim::topology::kTopologyHash). It
 // exposes typed accessors that honour the substrate's written()/freshness
 // contract: a read returns std::nullopt when the cell has never been written
 // (the producer hasn't written it this run), so the caller keeps its own
 // last/default value — the kHold-safe seam.
 //
-// The header is deliberately electricsim-free (PIMPL). When the electricsim
+// The header is deliberately external-sim-free (PIMPL). When the external sim
 // tree is not checked out next to ev1sim (EV1SIM_HAVE_WIRE_TRUTH undefined —
 // e.g. the CI stub build), the factories return nullptr and the class is a
 // compiled-out no-op; the connector's `if (wire)` guards keep working.
@@ -43,7 +44,7 @@ public:
 
     // Attach as a fleet peer using electricsim::topology::try_open_from_env():
     // honours ELECTRICSIM_WIRES_NAME / ELECTRICSIM_WIRES_ROLE exactly as every
-    // electricsim controller does (run_ev1_vehicle.sh sets these). Returns
+    // external-sim controller does (run_ev1_vehicle.sh sets these). Returns
     // nullptr when wire-truth is disabled (env unset), the segment never comes
     // up, the topology hash mismatches, or the substrate is compiled out. A
     // nullptr return is the normal "external sim not present" path.
@@ -100,7 +101,7 @@ public:
     bool write_bit(std::uint32_t wire_id, bool value);
 
     // Typed write accessors for ev1sim-produced cells (producer side).
-    // Mirrors the electricsim WireTable::write_* surface; returns false when
+    // Mirrors the external WireTable::write_* surface; returns false when
     // not attached, the substrate is compiled out, or the id is undeclared /
     // type-mismatched. @design 2026-06-15 — producer dual-write batch.
     bool write_byte(std::uint32_t wire_id, std::uint8_t value);
@@ -124,7 +125,7 @@ public:
     // (BarrierAwaitAcks) before stepping the next physics tick — a deterministic
     // per-tick lockstep. Inert (no-ops / returns true) when not attached, so a
     // wire-disabled or unarmed run is byte-identical. See
-    // electricsim docs/proposals/primitive4_cosim_determinism_2026-06-25.md.
+    // the external sim's co-sim determinism design note.
     void BarrierArm();
     void BarrierPublishTick();
     bool BarrierAwaitAcks(std::uint32_t consumer_count, int timeout_ms);
@@ -143,24 +144,23 @@ public:
     // @design 2026-06-17 — Phase 4 ECU-bus migration off SharedMemoryTransport.
 
     // RSA power-mode "run active" (RSA_RUN1_OUT). The RSA controller asserts
-    // RUN1_OUT == RUN2_OUT == (run_mode is RUN or START); see electricsim
-    // ev1/rsa/controller.cpp. true => RUN/START, false => OFF/ACC. The old
+    // RUN1_OUT == RUN2_OUT == (run_mode is RUN or START); see the external sim's RSA controller. true => RUN/START, false => OFF/ACC. The old
     // kSigRunModeBroadcast (5711) carried the full 4-value enum, but only the
     // run-active bit survives on the wire (the ACC output has no cell yet —
-    // electricsim PR #171 gap), so OFF-vs-ACC and RUN-vs-START are not
+    // external-sim gap), so OFF-vs-ACC and RUN-vs-START are not
     // distinguishable here. Reads RSA_RUN1_OUT (RUN2 is identical).
     std::optional<bool> rsa_run_active() const;    // RSA_RUN1_OUT (rsa_ecu)
 
     // Auto-Disconnect main HV contactor closed (AD_MAIN_CONTACTOR — the AD's
     // own commanded output, the authoritative successor of kSigAdMainContactor
     // 5224). Re-pointed 2026-07-04 off the APM_HV_CONTACTOR_CLOSED echo cell it
-    // was mis-mapped to in the #171 port: the echo is only written when an APM
+    // was mis-mapped to in the wire-truth port: the echo is only written when an APM
     // is in the fleet, so AD-only fleets read a permanent 0 (see .cpp comment).
     std::optional<bool> ad_main_contactor_closed() const;  // AD_MAIN_CONTACTOR
 
     // Auto-Disconnect state enum, reconstructed from the three discrete AD state
     // lines (AD_STATE_A/B/C) + the AD power-supply discrete (AD_POWER_SUPPLY),
-    // using electricsim's ad_state_decode contract (ev1/ad/ad_state.{h,c}):
+    // using the external sim's ad_state_decode contract (its AD-state header):
     //   power lost            -> 8  (AD_STATE_POWER_LOST)
     //   idx=(a<<2)|(b<<1)|c   -> {0=OK,1=PRECHARGE_FAIL,2=BPM_OPEN,3=INTERLOCK,
     //                             4=PRECHARGE,5=LOW_PACK,6=GROUND_LOSS,
@@ -191,18 +191,17 @@ public:
     // tick; the bit-stream self-paces, so a coarse tick replays every missed bit.
     void snoop_step(double now_s);
     // Latest vehicle speed (km/h) decoded from the PIM $41 PCM Data Response
-    // (GM8192_PIM_TX, payload[4] = wire byte 6, 1 km/h/count; see electricsim
-    // ev1/pim/pim_uart_frame.h). nullopt until a $41 frame has been decoded.
+    // (GM8192_PIM_TX, payload[4] = wire byte 6, 1 km/h/count; see the external sim's PIM UART-frame definition). nullopt until a $41 frame has been decoded.
     std::optional<std::uint8_t> pim_vehicle_speed_kph() const;
 
-    // PIM cruise-control state — electricsim declared these cells on PR #171
+    // PIM cruise-control state — the external sim declared these cells
     // (was kSigPimCruiseActive/SetpointMps 5360/5361). Read off PIM_CRUISE_ACTIVE
     // / PIM_CRUISE_SETPOINT_MPS; nullopt until PIM writes them.
     std::optional<bool>  pim_cruise_active() const;        // PIM_CRUISE_ACTIVE
     std::optional<float> pim_cruise_setpoint_mps() const;  // PIM_CRUISE_SETPOINT_MPS
 
-    // Auto-Disconnect precharge relay closed — electricsim declared this cell on
-    // PR #171 (was kSigAdPrechargeRelay 5225). nullopt until AD writes it.
+    // Auto-Disconnect precharge relay closed — external sim declared this cell
+    // (was kSigAdPrechargeRelay 5225). nullopt until AD writes it.
     std::optional<bool>  ad_precharge_relay() const;       // AD_PRECHARGE_RELAY
 
 private:

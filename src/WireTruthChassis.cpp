@@ -6,8 +6,8 @@
 
 #if defined(EV1SIM_HAVE_WIRE_TRUTH)
 
-// Real implementation: attach electricsim's shared WireTable. These headers
-// come from the electricsim tree (compiled into the electricsim_wire_substrate
+// Real implementation: attach the external sim's shared WireTable. These headers
+// come from the external sim's source tree (compiled into the wire-substrate library
 // static lib); the include root is ${ELECTRICSIM_DIR}/src/io.
 #include "topology/env_open.hpp"          // electricsim::topology::try_open_from_env
 #include "topology/topology_generated.h"  // kTopologyHash, kWireHORN_DRIVE_LINE_*
@@ -27,7 +27,7 @@ namespace ev1sim {
 
 // ---------------------------------------------------------------------------
 // Producer registry — maps every ev1sim-produced ring signal_id to the
-// corresponding electricsim WireId + WireType.  Generated from
+// corresponding external WireId + WireType.  Generated from
 // /tmp/producer_cells.tsv (88 entries).  Using the real kWire* constants from
 // topology_generated.h is the drift guard: a renamed/removed constant fails
 // to compile, forcing this table to be updated in lockstep with the topology.
@@ -71,12 +71,12 @@ static const std::unordered_map<std::uint32_t, ProducerCell>& ProducerRegistry()
         // Charger coupler (bit) — MULTI-PRODUCER: both ev1sim (operator UI) and
         // the in-repo charger demo peer write it. The wire mirror is plain
         // last-writer-wins, identical to the ring's existing behavior for this
-        // cell (electricsim topology declares it multi-producer); ev1sim already
+        // cell (the external sim's topology declares it multi-producer); ev1sim already
         // publishes 4060 on the ring on-change, this extends the same write to
         // the wire so the coupler consumers (bpm/pim/lhjb/ad) see the operator
         // UI's toggle once they are wire-authoritative. Required before ev1sim
         // can drop its ring writes (else the coupler would have no wire writer).
-        // @design 2026-06-16 — Phase 5 prep; electricsim, flag if you want
+        // @design 2026-06-16 — Phase 5 prep; external sim, flag if you want
         // arbitration beyond last-writer-wins.
         {4060U, {kWireCHARGER_COUPLER_PRESENT,      WireType::kBit}},
         // Motor state (float32)
@@ -109,11 +109,11 @@ static const std::unordered_map<std::uint32_t, ProducerCell>& ProducerRegistry()
         {4122U, {kWireCHASSIS_SLIP_RATIO_RL,        WireType::kFloat32}},
         {4123U, {kWireCHASSIS_SLIP_RATIO_RR,        WireType::kFloat32}},
         // NOTE: HV bus 4155-4157 and charge-wake 4187 are intentionally ABSENT.
-        // They are electricsim-PRODUCED cells — topology.yaml gives them a
+        // They are externally-produced cells — topology.yaml gives them a
         // `driver:` (hv_bus_host / lhjb_ecu), not the omitted-producer form
-        // ev1sim's own outputs use — and were migrated in an earlier electricsim
+        // ev1sim's own outputs use — and were migrated in an earlier external sim
         // step. ev1sim neither produces nor publishes them, so mirroring them
-        // here would be a wrong-owner write onto a cell electricsim drives.
+        // here would be a wrong-owner write onto a cell external sim drives.
         // (docs/wire_truth_migration_scope.md §1: ev1sim produces 84 cells.)
         // Door lock state + road grade / pitch (bit / float32)
         {4165U, {kWireCHASSIS_DOOR_LOCK_STATE_DRIVER,    WireType::kBit}},
@@ -146,7 +146,7 @@ static const std::unordered_map<std::uint32_t, ProducerCell>& ProducerRegistry()
         {6971U, {kWireDRIVER_RSA_MODE_BUTTON,            WireType::kByte}},
         // Interior keypad buttons are BYTE, not bit: the cell carries the
         // tap-vs-long-press digit encoding (0=idle, 1=tap/lower, 2=long/higher),
-        // matching electricsim's topology (config/topology.yaml
+        // matching the external sim's topology (the external sim's topology declaration
         // DRIVER_RSA_KEYPAD_BUTTON{1..5}: type byte, since the 2026-06-19
         // rsa-keypad-window-wire-type change) and the byte read in RSA's
         // rsa_apply_driver_input_wires(). Declaring them kBit here silently sent
@@ -253,7 +253,7 @@ bool WireTruthChassis::write_float32(std::uint32_t wire_id, float value) {
 }
 
 // ── Co-sim tick barrier (primitive-4 B): leader-side forwarders ──────────────
-// ev1sim is the barrier LEADER. These thin-forward to the electricsim WireTable
+// ev1sim is the barrier LEADER. These thin-forward to the external WireTable
 // barrier primitive. No-ops when not attached so a wire-disabled run is inert.
 void WireTruthChassis::BarrierArm() {
     if (attached()) impl_->table->barrier_arm();
@@ -343,7 +343,7 @@ std::optional<std::uint32_t> WireTruthChassis::read_uint32(std::uint32_t wire_id
 
 // ---------------------------------------------------------------------------
 // Consumer registry — maps every ev1sim-CONSUMED ring signal_id to the
-// corresponding electricsim WireId + WireType.  Generated from
+// corresponding external WireId + WireType.  Generated from
 // /tmp/consumer_cells_v2.tsv (66 entries).  Using the real kWire* constants
 // from topology_generated.h is the drift guard: a renamed/removed constant
 // fails to compile, forcing this table to be updated in lockstep with the
@@ -383,9 +383,9 @@ static const std::unordered_map<std::uint32_t, ConsumerCell>& ConsumerRegistry()
         {4072U, {kWireCHASSIS_MOTOR_CURRENT_A,          WireType::kFloat32}},
         // PIM commanded throttle (byte, PIM -> ev1sim). MISSING from the
         // original wire-truth consumer set: the ring used to deliver 4073 as a
-        // 1-byte delta into DebugInjectU8, and the #171 migration ported the
+        // 1-byte delta into DebugInjectU8, and the wire-truth migration ported the
         // sibling PIM output (motor current 4072, above) but not this one — so
-        // post-#171 ev1sim never saw PIM's command at all. GetThrottleCmd()
+        // after the wire-truth migration ev1sim never saw PIM's command at all. GetThrottleCmd()
         // stayed at its never-received default (q8=0xFF, fresh=false): the
         // electronics driver-mode plant silently fell back to the local pedal,
         // and the VAT stats columns (throttle_cmd_q8 / throttle_cmd_fresh)
@@ -454,7 +454,7 @@ static const std::unordered_map<std::uint32_t, ConsumerCell>& ConsumerRegistry()
         {4193U, {kWireCHASSIS_AUX_BATTERY_PRESENT,      WireType::kBit}},
         {4194U, {kWireCHASSIS_AUX_BATTERY_SOC_PCT,      WireType::kByte}},
         // NOTE: HV bus 4155-4157 and charge-wake 4187 are intentionally ABSENT.
-        // They are electricsim-PRODUCED cells (topology `driver:`), not ev1sim
+        // They are externally-produced cells (topology `driver:`), not ev1sim
         // consumer cells. ev1sim does not read them from this class.
         // (See the same NOTE in ProducerRegistry above.)
     };
@@ -523,7 +523,7 @@ std::optional<bool> WireTruthChassis::rsa_run_active() const {
 std::optional<bool> WireTruthChassis::ad_main_contactor_closed() const {
     // Read the AD's OWN commanded main-contactor output (AD_MAIN_CONTACTOR),
     // not the APM's downstream echo (APM_HV_CONTACTOR_CLOSED) it was
-    // mis-mapped to during the #171 wire port. The ring signal this getter
+    // mis-mapped to during the wire-truth port. The ring signal this getter
     // replaces (kSigAdMainContactor 5224) was published BY THE AD, and the
     // echo cell is only written when an APM is in the fleet — the VAT
     // safety_ad_precharge_timeout fleet is [hv_bus, ad], so the echo stayed
@@ -537,7 +537,7 @@ std::optional<bool> WireTruthChassis::ad_main_contactor_closed() const {
 
 std::optional<std::uint32_t> WireTruthChassis::ad_state_enum() const {
     // Reconstruct the AD state enum from the discrete state lines + power
-    // supply, replicating electricsim ev1/ad/ad_state.c ad_state_decode().
+    // supply, replicating the external sim's AD-state decode (ad_state_decode).
     // All four contributing cells must be written; otherwise a partial set
     // would decode to a wrong state, so we return nullopt (caller keeps its
     // "no data" path) until the AD has driven the full line set.
@@ -551,7 +551,7 @@ std::optional<std::uint32_t> WireTruthChassis::ad_state_enum() const {
     if (!*power) return std::uint32_t{8u};
 
     // idx = (A<<2)|(B<<1)|C → ad_state_t (see ad_state.c decode table). The
-    // enum integer values below match ev1/ad/ad_state.h exactly.
+    // enum integer values below match the external sim's AD-state header exactly.
     const unsigned idx = (*a ? 4u : 0u) | (*b ? 2u : 0u) | (*c ? 1u : 0u);
     switch (idx) {
         case 0x0: return std::uint32_t{0u};  // AD_STATE_OK
@@ -579,8 +579,7 @@ std::optional<std::uint64_t> WireTruthChassis::btcm_tx_total_bits() const {
 
 void WireTruthChassis::snoop_step(double now_s) {
     if (!attached()) return;
-    // GM-8192 physical layer: 8192 baud → 122.07 µs/bit. Mirrors electricsim
-    // ev1/lhjb/controller.cpp kGm8192BitPeriodNs. @source:manual.
+    // GM-8192 physical layer: 8192 baud → 122.07 µs/bit. Mirrors the external sim's LHJB controller (kGm8192BitPeriodNs). @source:manual.
     constexpr std::uint64_t kGm8192BitPeriodNs = 122070;
     if (!impl_->pim_framer) {
         impl_->pim_framer = std::make_unique<electricsim::io::Gm8192RxFramer>(
@@ -591,7 +590,7 @@ void WireTruthChassis::snoop_step(double now_s) {
     // self-pace), so a coarse render tick still replays every buffered bit.
     // Drain every frame produced since the last tick. $41 = PIM PCM Data
     // Response; payload[4] (wire byte 6) is vehicle speed, 1 km/h/count (0..162).
-    // See electricsim ev1/pim/pim_uart_frame.h (PIM_UART_FRAME_ID 0x41, N=7).
+    // See the external sim's PIM UART-frame definition (PIM_UART_FRAME_ID 0x41, N=7).
     const auto now_ns = static_cast<std::uint64_t>(now_s * 1.0e9);
     while (auto frame = impl_->pim_framer->step(now_ns)) {
         if (frame->id == 0x41u && frame->n == 7u && frame->payload != nullptr) {
@@ -621,7 +620,7 @@ std::optional<bool> WireTruthChassis::ad_precharge_relay() const {
 
 #else  // !EV1SIM_HAVE_WIRE_TRUTH
 
-// Disabled stub: the electricsim wire-truth substrate is not available at build
+// Disabled stub: the external sim wire-truth substrate is not available at build
 // time (e.g. the CI integrated-build against tests/electricsim_stub, which has
 // no wire_table.cpp / topology_generated.h). Factories return nullptr so every
 // caller's `if (wire)` guard takes the legacy-ring path; the accessors exist

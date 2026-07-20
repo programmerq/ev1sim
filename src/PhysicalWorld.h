@@ -190,7 +190,7 @@ private:
 ///
 /// TODO: when the charge-door animation is added, hook into this component
 /// and publish kSigChargerCouplerPresent (chassis ID 4060) to signal the
-/// electricsim side that the paddle is mated.
+/// external sim side that the paddle is mated.
 class ChargeCoupler {
 public:
     bool present() const { return m_present; }
@@ -311,7 +311,7 @@ private:
 /// mode.  To start the vehicle the user must:
 ///   1. Enter the correct 6-digit interior code on the RSA keypad by
 ///      pressing the per-digit button signals (6975-6979).  This opens the
-///      RSA's authentication window (~5 s on the electricsim side).
+///      RSA's authentication window (~5 s on the external sim side).
 ///   2. Press the ACC or RUN mode button on the RSA HMI (6971).
 ///
 /// The K key in ev1sim cycles a local "expected key state" through the
@@ -320,7 +320,7 @@ private:
 /// cycle NEVER steps RUN→ACC: that spurious downgrade (the old OFF→RUN→ACC→OFF
 /// order) silently failed every co-sim "key_on_cycle x2" boot recipe, since
 /// two cycles landed in ACC instead of RUN.  See
-/// electricsim notes/manual_supplements.yaml#2026-06-11-ev1sim-boot-keying-race.
+/// the external sim's boot-keying-race supplement note.
 ///
 ///   OFF → ACC : schedule the configured code digits (spaced 100 ms apart) to
 ///               open the auth window, then an ACC mode-button pulse.
@@ -329,8 +329,8 @@ private:
 ///   RUN → OFF : an OFF mode-button pulse (always allowed; turns the car off).
 ///   OFF → ACC : wraps back to start (re-entering the code).
 ///
-/// Faithfulness note (@design 2026-06-13 claude): on the electricsim RSA
-/// supervisor (ev1/rsa/rsa_supervisor.c eval_mode_button_) ACC is allowed
+/// Faithfulness note (@design 2026-06-13 claude): on the external sim's RSA
+/// supervisor (`eval_mode_button_`) ACC is allowed
 /// unconditionally while RUN/START are gated on the keypad auth window — so
 /// the code must be entered before the RUN press, and entering it at the ACC
 /// detent (rather than re-entering at RUN) matches "authenticate, then select
@@ -632,8 +632,8 @@ private:
 /// No keyboard binding for now — lock toggles will land via the floating-UI
 /// panel (see docs/TODO.md "Floating UI panel" item).
 ///
-/// No bus signal pinning for now — wait until an electricsim consumer wants it.
-/// TODO: when an RSA central locking consumer exists in electricsim, add a
+/// No bus signal pinning for now — wait until an external sim consumer wants it.
+/// TODO: when an RSA central locking consumer exists in external sim, add a
 ///       chassis bus signal (e.g. a per-door lock state signal) and publish it
 ///       from SimApp alongside the other PhysicalWorld signals.
 class DoorLocks {
@@ -738,7 +738,7 @@ private:
 ///   kSigDriverSeatbeltBuckledPassenger (6965) — passenger
 ///
 /// TODO(consumer): IPC seatbelt-light telltale should wire passenger signal
-/// (6965) — deferred to a future electricsim round.
+/// (6965) — deferred to a future external sim round.
 class Seatbelts {
 public:
     bool driver_buckled()    const { return m_driver;    }
@@ -860,7 +860,7 @@ private:
 /// command) or both low → motor off (no motion).
 ///
 /// Wire-level mapping (cavity → chassis-bus signal), authoritative for the
-/// electricsim router — see docs/peripherals.md:
+/// external sim router — see docs/peripherals.md:
 ///   LH (driver):    lock=294A RHJB J9.C5 → 4092,  unlock=295A RHJB J9.C6 → 4093
 ///   RH (passenger): lock=294C RHJB J3.A6 → 4094,  unlock=295C RHJB J3.A7 → 4095
 ///

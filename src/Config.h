@@ -29,7 +29,7 @@ struct Config {
         // integration was unstable, not the model. steps_per_tick =
         // round(tick_dt/step) auto-doubles, so the 1/render_fps co-sim exchange
         // cadence is unchanged; only the physics integration is finer.
-        // @design 2026-07-08 — electricsim BL-0181; docs/ev1_chrono_audit.md 5.1.
+        // @design 2026-07-08 — external sim BL-0181; docs/ev1_chrono_audit.md 5.1.
         double step_size_s = 0.001;
         int    render_fps  = 60;
         bool   realtime    = true;
@@ -132,7 +132,7 @@ struct Config {
         // gate and start with propulsion enabled.  When false (default),
         // ev1sim waits for kSigRunModeBroadcast == RUN before unclamping
         // brakes / allowing throttle — required when running paired with
-        // electricsim.  When true, the brakes/throttle clamp is lifted at
+        // external sim.  When true, the brakes/throttle clamp is lifted at
         // startup so a scenario can drive the car without the controller
         // suite running.  Recommended only with external_sim.enabled=false.
         bool        start_propulsion_enabled = false;

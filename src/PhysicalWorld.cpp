@@ -582,7 +582,7 @@ void RsaKeypadDriver::enqueue_mode_(std::uint8_t mode_button) {
 
 void RsaKeypadDriver::cycle_k() {
     // Faithful detent order: OFF → ACC → RUN → OFF.  See the class comment and
-    // electricsim notes/manual_supplements.yaml#2026-06-11-ev1sim-boot-keying-race.
+    // the external sim's boot-keying-race supplement note.
     switch (m_expected) {
         case ExpectedState::OFF:
             // OFF → ACC: schedule the code digits (open the RSA auth window),

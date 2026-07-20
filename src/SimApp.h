@@ -103,10 +103,10 @@ private:
     // Symmetric to ApplyElectronicsThrottle: override cmd.steering from the
     // chassis steering command (4076) when m_driver_mode == "electronics" and
     // the bus value is fresh; fall back to the local input otherwise.  No
-    // electricsim producer today — for closed-loop / physical-rig steering.
+    // external sim producer today — for closed-loop / physical-rig steering.
     void ApplyElectronicsSteering(DriverCommand& cmd);
 
-    // Consume the electricsim-driven body actuator peripherals each tick:
+    // Consume the externally-driven body actuator peripherals each tick:
     //   - power-steering pump motor (chassis 4097 in / 4098 out)
     //   - sounder / piezo "click"     (chassis 4096 in)
     //   - door-lock motors LH/RH      (chassis 4092-4095 in)
