@@ -47,7 +47,13 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   treats the BTCM cmd (-1 / 0 / +1) as a proportional force command.
   More faithful: integrate cmd × motor_speed × dt to track shoe
   position, then derive force from spring-like compliance.  Defer
-  until measured EV1 EMB response data lands.
+  until measured EV1 EMB response data lands.  (Per-wheel rear
+  modulation already ships: `ApplyRearEmbBrake`, `src/SimApp.cpp:1100-1157`,
+  consumes `kSigRearMotorLR/RR` and drives each wheel via
+  `BrakeDrum::torque_magnitude_nm`; the command→force step at
+  `SimApp.cpp:1126` is still a crude linear map — this refinement replaces
+  it with a faithful clamp/shoe-position model.  This item is the surviving
+  tracker for that residual clamp/shoe-position work.)
 - [x] **SHM transport "intermittent float corruption" — root-caused.**
   Was NOT a transport bug.  Controllers' bus-drain loops did not
   filter `FrameType::SignalDefine` frames, which carry an ASCII
