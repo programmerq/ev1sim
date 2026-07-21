@@ -1,0 +1,57 @@
+# AGENTS.md — guidance for AI agents contributing to ev1sim
+
+Entry point for any AI agent (Claude Code, etc.) picking up work in the ev1sim
+repo. This file captures the *operating conventions*; the build/run/architecture
+detail is **not** duplicated here — it lives in [`README.md`](README.md)
+(prerequisites, CMake presets, running, tests) and
+[`ARCHITECTURE.md`](ARCHITECTURE.md) (the boundaries and process layout). Read
+those for how the code works; read this for how we work on it.
+
+## The project in one paragraph
+
+ev1sim is the host-side **physics + visualization plant** for a future EV1
+electronics toolchain: a standalone C++ vehicle simulator built on Project
+Chrono that renders a drivable vehicle, accepts driver commands, and exposes
+clean command/telemetry boundaries so an external electrical simulator
+(`electricsim`) can drive the loads and read the sensors. See `ARCHITECTURE.md`
+for the seams and `README.md` for the build.
+
+## Git / PR workflow
+
+Develop on a feature branch (`claude/<id>`); never push to `main`.
+
+- **Open a PR for your own work as a draft — don't wait to be asked.**
+- **Flip it to ready-for-review yourself** once (a) an adversarial self-review
+  passes and CI is green, and (b) there are zero open owner-questions. Marking
+  ready *is* requesting the owner's review; while any owner-question is open,
+  keep it a draft.
+- **Merge stays the owner's call** — do not merge to `main`.
+- **Conflict resolution:** rebase onto fresh `origin/main` *or* merge
+  `origin/main` into the branch — either is fine. Sync before new work; after a
+  rebase that rewrites already-pushed history, push with `--force-with-lease`
+  (never plain `--force`).
+
+### Don't strand a PR in draft
+
+An owner comment plus a flip of the PR back to draft means **"rework wanted,"
+NOT "park it forever."** The session addresses the feedback and then flips the
+PR back to ready-for-review **itself** the moment the rework is done and CI is
+green — ready-for-review is the signal that the PR wants the owner's eyes again;
+never wait for the owner to ask you to flip it. A PR may stay draft **only**
+while rework is actively in progress, or while a blocking question is **both**
+posted on the PR **and** genuinely unanswered. If you stated defaults for your
+open questions, apply those defaults and flip ready rather than stranding the PR
+in draft.
+
+Mechanism: flip via the update-pull-request API with `draft=false`
+(`mcp__github__update_pull_request`, `draft: false`) — the dedicated
+mark-ready path can be permission-blocked.
+
+## Commits
+
+Small, focused, well-described — explain *why* the change matters, not just
+*what* changed. Don't batch unrelated changes. Every code change either adds a
+test in the same commit or the message says why a test isn't appropriate; the
+CI suite (see [`README.md`](README.md) "Running Tests" and
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml)) should be green on the
+branch you're committing to.
