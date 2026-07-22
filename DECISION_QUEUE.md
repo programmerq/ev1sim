@@ -34,4 +34,9 @@ they fork into a question the owner must rule on.
 
 ## Recently resolved (anti-re-ask ledger)
 
-*(empty — seeded 2026-07-22)*
+- **2026-07-22 — sibling-project naming in load-bearing identifiers: accepted
+  as a known tradeoff.** The long-standing references to a sibling project in
+  this repo's namespaces and stub directories stay as-is (a rename would break
+  the build for no content-security gain). This repo is treated as public
+  under the program's sharing hygiene **regardless of its hosting visibility**,
+  now and in the future. Owner ruling 2026-07-22; do not re-raise a rename.
