@@ -49,6 +49,19 @@ Mechanism: flip via the update-pull-request API with `draft=false`
 (`mcp__github__update_pull_request`, `draft: false`) — the dedicated
 mark-ready path can be permission-blocked.
 
+### Owner decision asks are self-contained
+
+Never ask the owner a bare option-letter question ("A, B, or C?") — an ask
+whose context lives somewhere else invites an answer to the wrong question
+(owner directive 2026-07-22). Any decision question aimed at the owner — chat,
+PR comment, or queue — must be answerable from that one message on one screen:
+what's being decided in plain language and why now; a link to the source that
+raised it; the options with one-line implications each, a recommendation, and a
+default-if-silent. Check first whether the fork was already asked or answered
+(the PR thread, the coordinator's decision queue) and cite the prior ask plus
+what changed instead of re-asking cold; when the owner answers, restate the
+ruling in-thread immediately so it stays findable and is never re-asked.
+
 ## Commits
 
 Small, focused, well-described — explain *why* the change matters, not just
