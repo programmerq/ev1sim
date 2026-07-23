@@ -11,6 +11,9 @@ source that raised it, options with one-line implications, a recommendation,
 and a default-if-silent. When the owner answers, record the ruling here and in
 the thread where it was asked, immediately, and move the entry to *Recently
 resolved*. Never re-ask a fork cold — cite the prior ask and what changed.
+Entry IDs are date-slugs `DQ-YYYY-MM-DD-<kebab-slug>` (date raised), never
+incrementing numbers (owner directive 2026-07-22 — parallel sessions minting
+numbers collide).
 
 This repo is public: queue entries follow the same sharing hygiene as the rest
 of the tree (no private-infrastructure identifiers).
