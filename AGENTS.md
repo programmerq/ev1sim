@@ -27,6 +27,20 @@ Develop on a feature branch (`claude/<id>`); never push to `main`.
   draft. **Don't gate ready on CI status** — CI is an independent signal the
   owner watches himself, never a reason to hold the PR in draft.
 - **Merge stays the owner's call** — do not merge to `main`.
+- **Images in PR bodies: `<img>` tags with an explicit width** (owner directive
+  2026-07-22). Bare markdown `![…]` gives no size control, and GitHub stretches
+  images to the full body column — small images upscale blurrily. Use a
+  percentage (`width="40%"`) for small images, a pixel width no larger than
+  natural size otherwise, and pin `src` to a commit SHA. If the saved body
+  shows `&lt;img&gt;` (a proxied environment entity-escaped it), redo the edit
+  from an unproxied session via
+  `gh api -X PATCH repos/<owner>/<repo>/pulls/<n> -F body=@file`.
+- **Batch small changes into an adjacent open PR** (owner directive
+  2026-07-23). Docs, queue, and other small housekeeping edits ride an
+  in-flight branch — even an imperfect topical fit — never a
+  single-small-file PR of their own. Prefer larger-than-comfortable PRs:
+  every extra PR spends Actions minutes and spins up review-bot + CI
+  machinery for no review value.
 - **Conflict resolution:** rebase onto fresh `origin/main` *or* merge
   `origin/main` into the branch — either is fine. Sync before new work; after a
   rebase that rewrites already-pushed history, push with `--force-with-lease`
