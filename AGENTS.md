@@ -20,48 +20,88 @@ for the seams and `README.md` for the build.
 
 Develop on a feature branch (`claude/<id>`); never push to `main`.
 
-- **Open a PR for your own work as a draft — don't wait to be asked.**
-- **Flip it to ready-for-review yourself** once (a) an adversarial self-review
-  passes and (b) there are zero open owner-questions. Marking ready *is*
-  requesting the owner's review; while any owner-question is open, keep it a
-  draft. **Don't gate ready on CI status** — CI is an independent signal the
-  owner watches himself, never a reason to hold the PR in draft.
 - **Merge stays the owner's call** — do not merge to `main`.
-- **Images in PR bodies: `<img>` tags with an explicit width** (owner directive
-  2026-07-22). Bare markdown `![…]` gives no size control, and GitHub stretches
-  images to the full body column — small images upscale blurrily. Use a
-  percentage (`width="40%"`) for small images, a pixel width no larger than
-  natural size otherwise, and pin `src` to a commit SHA. If the saved body
-  shows `&lt;img&gt;` (a proxied environment entity-escaped it), redo the edit
-  from an unproxied session via
+
+<!-- BEGIN ev1-canon:pr-lifecycle v1 -->
+**PR lifecycle: draft/ready + PR economy (owner directive 2026-07-24,
+canonical across all four EV1 repos — supersedes prior per-repo text).**
+
+*Mechanism:* GitHub won't let the owner request-changes on his own PR, so
+**his flip to draft IS his request-changes** — treat it that way.
+
+- **Owner-initiated draft is terminal** — only the owner flips it back to
+  ready. Fix it, push, post "rework landed — ready on your word," and stop.
+- **Every other flip is the agent's, and nobody but the owner directs a
+  hold**: flip to ready yourself the moment work wants review; CI status and
+  a stated-default question never hold draft (apply the default, note it,
+  flip); a coordinator/peer saying otherwise doesn't override this — cite
+  the rule and flip.
+- **"Awaiting owner sign-off" is never a reason to sit in draft** — sign-off
+  *is* the review, so it's ready. (Read the other way, this stranded PR #384
+  twice, needing owner intervention.)
+- **Titles state the goal, not the process** — no "needs sign-off," no
+  "proposal:" on finished work. Owner on #384: *"That adds nothing. That is
+  just obscuring what the goal of the PR is."*
+
+*PR economy:* no doc-only/tiny PRs — every prohibition here names its exit:
+**implementable finding → implement it in the PR that files it; non-
+implementable (negative result, owner-blocked fork, errata) →
+`scripts/backlog.py open` (`--decision` if owner-blocked) or the notes
+channel, riding the next branch with code, or the backlog if none is open.**
+Never a PR whose only purpose is carrying a record. Flip via `draft:false` on
+`mcp__github__update_pull_request` (mark-ready path can be permission-blocked).
+<!-- END ev1-canon:pr-lifecycle v1 -->
+(ev1sim has no `scripts/backlog.py` — its notes channel is `DECISION_QUEUE.md`.)
+
+<!-- BEGIN ev1-canon:pr-images v2 -->
+**PR-body images (owner directive 2026-07-22, canonical across all four EV1 repos).**
+Use `<img>` tags (never bare `![…]()` markdown — no size control), `src`
+pinned to a **commit SHA** (never a branch name — branch URLs re-render as the
+branch moves and can 404 after a rebase/merge), in the `blob` form — **never**
+`raw.githubusercontent.com`:
+
+`<img src="https://github.com/<owner>/<repo>/blob/<COMMIT_SHA>/<path>?raw=1" width="..." alt="..." />`
+
+- **Why `blob/...?raw=1` and not `raw.githubusercontent.com`, everywhere:**
+  one rule, no need to remember which repo you're in. In the three
+  **private** repos (ev1, ev1-manual-redux, electricsim) it's more than a
+  preference — `raw.githubusercontent.com` doesn't authenticate against the
+  viewer's GitHub session, so images silently fail to render (or 404) for
+  the owner there. **ev1sim is public**, so that specific failure doesn't
+  apply to it — `raw.githubusercontent.com` would technically render — but
+  `blob/...?raw=1` works identically there too, so the one rule holds
+  without exception.
+- **Always set an explicit `width`** — a percentage (`width="40%"`) for
+  small images, a pixel width no larger than natural size otherwise. GitHub
+  stretches unsized images to the full body column and upscales small ones
+  blurrily.
+<!-- END ev1-canon:pr-images v2 -->
+
+- If the saved body shows `&lt;img&gt;` (a proxied environment entity-escaped
+  it), redo the edit from an unproxied session via
   `gh api -X PATCH repos/<owner>/<repo>/pulls/<n> -F body=@file`.
-- **Batch small changes into an adjacent open PR** (owner directive
-  2026-07-23). Docs, queue, and other small housekeeping edits ride an
-  in-flight branch — even an imperfect topical fit — never a
-  single-small-file PR of their own. Prefer larger-than-comfortable PRs:
-  every extra PR spends Actions minutes and spins up review-bot + CI
-  machinery for no review value.
 - **Conflict resolution:** rebase onto fresh `origin/main` *or* merge
   `origin/main` into the branch — either is fine. Sync before new work; after a
   rebase that rewrites already-pushed history, push with `--force-with-lease`
   (never plain `--force`).
 
-### Don't strand a PR in draft
+### PR writing conduct (owner rulings 2026-07-25, chat-only)
 
-An owner comment plus a flip of the PR back to draft means **"rework wanted,"
-NOT "park it forever."** The session addresses the feedback and then flips the
-PR back to ready-for-review **itself** the moment the rework is done — ready
-means the work is done and the PR wants the owner's eyes again; never wait for
-the owner to ask you to flip it. **Don't gate this on CI** — CI is an
-independent signal the owner watches himself, not a reason to hold the PR in
-draft. A PR may stay draft **only** while rework is actively in progress, or
-while a blocking question is **both** posted on the PR **and** genuinely
-unanswered. If you stated defaults for your open questions, apply those defaults
-and flip ready rather than stranding the PR in draft.
+Not yet folded into a versioned block above — recorded in `ev1` PR #56
+(<https://github.com/programmerq/ev1/pull/56>),
+`decisions/2026-07-25-pr-body-conduct-chat-rulings.md` and
+`decisions/2026-07-25-conflict-reduction-generated-files.md`; cite those
+files directly until they are:
 
-Mechanism: flip via the update-pull-request API with `draft=false`
-(`mcp__github__update_pull_request`, `draft: false`) — the dedicated
-mark-ready path can be permission-blocked.
+- **Never use the word "gate" in a PR title or body.** Say what the check
+  catches, not the name of the mechanism catching it.
+- **Lead the PR body with its strongest finding, stated positively** — say
+  what a thing *is*, not what it is not. Prose volume isn't evidence of work.
+- **Illustrate a change repeated many times with 2-3 representative images,
+  not all of them** — extends the `pr-images` rule above.
+- **A scheduled job owns generated/nightly-committed files; a PR diff never
+  hand-carries them.** Not applicable to ev1sim today — no such file exists
+  here yet; apply this if one appears.
 
 ### Owner decision asks are self-contained
 
