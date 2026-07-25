@@ -27,13 +27,29 @@ Develop on a feature branch (`claude/<id>`); never push to `main`.
   draft. **Don't gate ready on CI status** — CI is an independent signal the
   owner watches himself, never a reason to hold the PR in draft.
 - **Merge stays the owner's call** — do not merge to `main`.
-- **Images in PR bodies: `<img>` tags with an explicit width** (owner directive
-  2026-07-22). Bare markdown `![…]` gives no size control, and GitHub stretches
-  images to the full body column — small images upscale blurrily. Use a
-  percentage (`width="40%"`) for small images, a pixel width no larger than
-  natural size otherwise, and pin `src` to a commit SHA. If the saved body
-  shows `&lt;img&gt;` (a proxied environment entity-escaped it), redo the edit
-  from an unproxied session via
+
+<!-- BEGIN ev1-canon:pr-images v1 -->
+**PR-body images (owner directive 2026-07-22, canonical across all four EV1 repos).**
+Use `<img>` tags (never bare `![…]()` markdown — no size control), `src`
+pinned to a **commit SHA** (never a branch name — branch URLs re-render as the
+branch moves and can 404 after a rebase/merge), in the `blob` form — **never**
+`raw.githubusercontent.com`:
+
+`<img src="https://github.com/<owner>/<repo>/blob/<COMMIT_SHA>/<path>?raw=1" width="..." alt="..." />`
+
+- **Why `blob/...?raw=1` and not `raw.githubusercontent.com`:** these repos
+  are private. `raw.githubusercontent.com` URLs don't authenticate against
+  the viewer's GitHub session, so images silently fail to render (or 404)
+  for the owner. The `github.com/.../blob/...?raw=1` form resolves through
+  the normal authenticated session and renders.
+- **Always set an explicit `width`** — a percentage (`width="40%"`) for
+  small images, a pixel width no larger than natural size otherwise. GitHub
+  stretches unsized images to the full body column and upscales small ones
+  blurrily.
+<!-- END ev1-canon:pr-images v1 -->
+
+- If the saved body shows `&lt;img&gt;` (a proxied environment entity-escaped
+  it), redo the edit from an unproxied session via
   `gh api -X PATCH repos/<owner>/<repo>/pulls/<n> -F body=@file`.
 - **Batch small changes into an adjacent open PR** (owner directive
   2026-07-23). Docs, queue, and other small housekeeping edits ride an
