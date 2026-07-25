@@ -85,6 +85,24 @@ branch moves and can 404 after a rebase/merge), in the `blob` form — **never**
   rebase that rewrites already-pushed history, push with `--force-with-lease`
   (never plain `--force`).
 
+### PR writing conduct (owner rulings 2026-07-25, chat-only)
+
+Not yet folded into a versioned block above — recorded in `ev1` PR #56
+(<https://github.com/programmerq/ev1/pull/56>),
+`decisions/2026-07-25-pr-body-conduct-chat-rulings.md` and
+`decisions/2026-07-25-conflict-reduction-generated-files.md`; cite those
+files directly until they are:
+
+- **Never use the word "gate" in a PR title or body.** Say what the check
+  catches, not the name of the mechanism catching it.
+- **Lead the PR body with its strongest finding, stated positively** — say
+  what a thing *is*, not what it is not. Prose volume isn't evidence of work.
+- **Illustrate a change repeated many times with 2-3 representative images,
+  not all of them** — extends the `pr-images` rule above.
+- **A scheduled job owns generated/nightly-committed files; a PR diff never
+  hand-carries them.** Not applicable to ev1sim today — no such file exists
+  here yet; apply this if one appears.
+
 ### Owner decision asks are self-contained
 
 Never ask the owner a bare option-letter question ("A, B, or C?") — an ask
