@@ -3,6 +3,17 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+# Cancel a superseded review run: a push that lands while a prior review for
+# the same PR is still in flight makes that in-flight review moot (it's
+# reviewing a head sha the PR no longer points at), but nothing was stopping
+# it from running to completion anyway - burning a full review job (and its
+# bot-review allocation) for nothing. Keyed on workflow+ref (stable per PR
+# across pushes) so only genuinely overlapping runs on the SAME PR cancel;
+# a real new push still starts its own fresh run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   pull-requests: write
