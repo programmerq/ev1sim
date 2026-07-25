@@ -53,7 +53,7 @@ Never a PR whose only purpose is carrying a record. Flip via `draft:false` on
 <!-- END ev1-canon:pr-lifecycle v1 -->
 (ev1sim has no `scripts/backlog.py` — its notes channel is `DECISION_QUEUE.md`.)
 
-<!-- BEGIN ev1-canon:pr-images v1 -->
+<!-- BEGIN ev1-canon:pr-images v2 -->
 **PR-body images (owner directive 2026-07-22, canonical across all four EV1 repos).**
 Use `<img>` tags (never bare `![…]()` markdown — no size control), `src`
 pinned to a **commit SHA** (never a branch name — branch URLs re-render as the
@@ -62,16 +62,20 @@ branch moves and can 404 after a rebase/merge), in the `blob` form — **never**
 
 `<img src="https://github.com/<owner>/<repo>/blob/<COMMIT_SHA>/<path>?raw=1" width="..." alt="..." />`
 
-- **Why `blob/...?raw=1` and not `raw.githubusercontent.com`:** these repos
-  are private. `raw.githubusercontent.com` URLs don't authenticate against
-  the viewer's GitHub session, so images silently fail to render (or 404)
-  for the owner. The `github.com/.../blob/...?raw=1` form resolves through
-  the normal authenticated session and renders.
+- **Why `blob/...?raw=1` and not `raw.githubusercontent.com`, everywhere:**
+  one rule, no need to remember which repo you're in. In the three
+  **private** repos (ev1, ev1-manual-redux, electricsim) it's more than a
+  preference — `raw.githubusercontent.com` doesn't authenticate against the
+  viewer's GitHub session, so images silently fail to render (or 404) for
+  the owner there. **ev1sim is public**, so that specific failure doesn't
+  apply to it — `raw.githubusercontent.com` would technically render — but
+  `blob/...?raw=1` works identically there too, so the one rule holds
+  without exception.
 - **Always set an explicit `width`** — a percentage (`width="40%"`) for
   small images, a pixel width no larger than natural size otherwise. GitHub
   stretches unsized images to the full body column and upscales small ones
   blurrily.
-<!-- END ev1-canon:pr-images v1 -->
+<!-- END ev1-canon:pr-images v2 -->
 
 - If the saved body shows `&lt;img&gt;` (a proxied environment entity-escaped
   it), redo the edit from an unproxied session via
