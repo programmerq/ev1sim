@@ -17,7 +17,11 @@ This is the **physics + visualization plant** for a future EV1 electronics simul
 # 1. Install Irrlicht (macOS)
 brew install irrlicht
 
-# On Ubuntu/Debian: sudo apt install libirrlicht-dev
+# On Ubuntu/Debian, install Irrlicht, Eigen and the X/GL development packages.
+# libirrlicht-dev pulls in none of the X libraries Chrono links against, so
+# installing it alone gets you as far as `ld: cannot find -lXxf86vm` partway
+# through the Chrono build:
+sudo apt install $(scripts/build_chrono.sh --print-deps)
 
 # 2. Clone Chrono
 git clone https://github.com/projectchrono/chrono.git
@@ -159,6 +163,7 @@ The stale-cache self-heal is the safety net — but for repeatable builds, prefe
 |---|---|
 | `Could not find a package configuration file provided by "Chrono"` | Chrono isn't installed, or CMake can't see it. Build it from source ([above](#installing-project-chrono-from-source) / `scripts/build_chrono.sh ~/chrono-install`) and point at it: `export Chrono_DIR=$HOME/chrono-install/lib/cmake/Chrono` (or pin it in `CMakeUserPresets.json`). The stock presets deliberately don't hardcode this path. |
 | Configure succeeds on one machine but not another, both with Chrono "installed" | You have a Chrono *build tree* but never ran `cmake --install`. `Chrono_DIR` must point at the **installed** `lib/cmake/Chrono`, which contains `ChronoConfig.cmake`. |
+| Building Chrono stops around 45% with `/usr/bin/ld: cannot find -lXxf86vm` (also `-lglut`, `-lX11`, `-lGL`) | Chrono hardcodes these four into its Irrlicht link line, and `libirrlicht-dev` depends on `libirrlicht1.8` alone, so it brings none of them. Install the full set: `sudo apt install $(scripts/build_chrono.sh --print-deps)`. Only the `-dev` symlink is missing — the runtime `libXxf86vm.so.1` is usually already there, and `-l` doesn't look at versioned sonames. `scripts/build_chrono.sh` now checks this before it starts building. |
 | Link error `DSO missing from command line` mentioning Irrlicht (Linux) | Install `libirrlicht-dev`. ev1sim links Irrlicht explicitly because GNU ld won't inherit it transitively from Chrono; the CMake already handles the link line once the library is present. |
 | `try/catch` doesn't catch — program aborts via `libc++abi` even with a matching handler (Apple Silicon) | Chrono's config injects `-Wl,-no_compact_unwind`, which strips the unwind info the runtime needs. ev1sim's `CMakeLists.txt` already removes this flag; if you copied a custom link setup, drop that flag. |
 | Compiling `electricsim_connector` fails with `use of undeclared identifier 'pthread_mutex_consistent'` / `'PTHREAD_MUTEX_ROBUST'` (macOS) | The connector compiles electricsim's `src/io/shm_transport.cpp`, which uses POSIX **robust mutexes** that macOS doesn't implement. Update your electricsim checkout — current `main` carries a `__APPLE__` fallback shim. If you're pinned to an older electricsim, bump it. |
