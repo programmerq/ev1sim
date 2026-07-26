@@ -209,6 +209,15 @@ jobs:
         if: steps.chrono-cache.outputs.cache-hit != 'true'
         run: scripts/build_chrono.sh "$HOME/chrono-install"
 
+      # ev1sim reads the Chrono install and writes nothing into it.  Dropping
+      # every write bit here makes that a build failure the moment it stops
+      # being true, rather than a machine-specific surprise: configure used to
+      # copy data/vehicle/ev1 into the install, so one build as another user
+      # left files nobody else could overwrite and every later build died.
+      # Read-only is also what the cache upload needs — it only reads the tree.
+      - name: Drop write permission on the Chrono install
+        run: chmod -R a-w "$HOME/chrono-install"
+
       - name: Configure ev1sim against Chrono
         run: |
           cmake -B build -S . \

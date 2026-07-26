@@ -359,9 +359,11 @@ endif()
 #
 # Symlinking (rather than copying) keeps configure cheap — Chrono's vehicle data
 # is ~570 MB — and lets an edit under data/vehicle/ev1/ take effect on the next
-# run with no reconfigure.  file(CREATE_LINK ... COPY_ON_ERROR) degrades to a
-# real copy where symlinks need privileges (Windows without developer mode);
-# there an edit needs a reconfigure, as it did before.
+# run with no reconfigure.  Linux and macOS, the two platforms this repo builds
+# on, always take that path.  file(CREATE_LINK ... COPY_ON_ERROR) keeps the
+# result correct where symlinks need privileges (Windows without developer
+# mode) by copying instead — at the cost of that 570 MB and a reconfigure after
+# each data edit, which is what the old code cost anyway.
 if(NOT CHRONO_VEHICLE_DATA_DIR)
     set(CHRONO_VEHICLE_DATA_DIR "${CHRONO_DATA_DIR}vehicle/")   # exported with a trailing slash
 endif()
