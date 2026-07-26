@@ -233,6 +233,21 @@ jobs:
         # -DELECTRICSIM_DIR ⇒ the external-sim connector stays off, so the smoke
         # run takes the no-bus headless path.
 
+      # Reconfiguring a build directory against a different Chrono_DIR must not
+      # leave the previous install's model names in the vehicle data root — the
+      # sim would keep loading e.g. hmmwv/ out of a prefix this build no longer
+      # uses.  Planting a name the configured Chrono does not provide tests that
+      # in seconds, with no second Chrono install to build: the next configure
+      # has to take it away again.
+      - name: Vehicle data root carries only what the configured Chrono has
+        run: |
+          ln -s /nonexistent build/chrono-vehicle-data/model_from_another_prefix
+          cmake -B build -S . -DChrono_DIR="$HOME/chrono-install/lib/cmake/Chrono"
+          if [ -L build/chrono-vehicle-data/model_from_another_prefix ]; then
+            echo "::error::stale model name survived reconfigure"; exit 1
+          fi
+          [ -L build/chrono-vehicle-data/ev1 ] || { echo "::error::ev1 link missing"; exit 1; }
+
       - name: Build the ev1sim executable
         run: cmake --build build --target ev1sim -j"$(nproc)"
 

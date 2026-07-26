@@ -380,6 +380,27 @@ file(MAKE_DIRECTORY "${EV1SIM_VEHICLE_DATA_DIR}")
 file(GLOB _chrono_vehicle_entries
      LIST_DIRECTORIES TRUE
      RELATIVE "${CHRONO_VEHICLE_DATA_DIR}" "${CHRONO_VEHICLE_DATA_DIR}*")
+
+# Reconfiguring an existing build directory against a different Chrono_DIR
+# leaves behind the model names the previous install had — Chrono would then
+# still load, say, hmmwv/ out of a prefix this build no longer uses.  Drop every
+# name the currently configured Chrono does not provide, so the root mirrors one
+# install.  Removing a symlink unlinks the link and never its target; the
+# recursive branch is for the real directories the COPY_ON_ERROR fallback makes.
+set(_ev1sim_wanted_entries ${_chrono_vehicle_entries} ev1)
+file(GLOB _ev1sim_staged_entries
+     LIST_DIRECTORIES TRUE
+     RELATIVE "${EV1SIM_VEHICLE_DATA_DIR}" "${EV1SIM_VEHICLE_DATA_DIR}*")
+foreach(_entry IN LISTS _ev1sim_staged_entries)
+    if(NOT _entry IN_LIST _ev1sim_wanted_entries)
+        if(IS_SYMLINK "${EV1SIM_VEHICLE_DATA_DIR}${_entry}")
+            file(REMOVE "${EV1SIM_VEHICLE_DATA_DIR}${_entry}")
+        else()
+            file(REMOVE_RECURSE "${EV1SIM_VEHICLE_DATA_DIR}${_entry}")
+        endif()
+    endif()
+endforeach()
+
 foreach(_entry IN LISTS _chrono_vehicle_entries)
     if(NOT _entry STREQUAL "ev1")
         file(CREATE_LINK "${CHRONO_VEHICLE_DATA_DIR}${_entry}"
