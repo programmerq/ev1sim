@@ -58,8 +58,12 @@ VehicleWorld::VehicleWorld(const Config& config_in) {
     m_spawn_rot = QuatFromAngleZ(yaw_rad);
 
     // Set Chrono data paths so vehicle JSON definitions and meshes are found.
+    // Core assets (shaders, fonts) come from the Chrono install; vehicle assets
+    // come from the build-tree root CMake assembles, which carries the EV1 tree
+    // alongside symlinks to Chrono's stock vehicle models.  Both are read-only
+    // to us — nothing writes into the Chrono install.
     SetChronoDataPath(CHRONO_DATA_DIR);
-    vehicle::SetDataPath(std::string(CHRONO_DATA_DIR) + "vehicle/");
+    vehicle::SetDataPath(EV1SIM_VEHICLE_DATA_DIR);
 
     // Build vehicle.
     if (config.vehicle_model == "ev1")

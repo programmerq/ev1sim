@@ -342,19 +342,82 @@ if(APPLE)
     )
 endif()
 
-# Pass Chrono's data directory so vehicle JSON definitions are found at runtime.
+# ── Vehicle data root: assembled in the build tree ─────────────────────────
+# Chrono resolves every vehicle asset as <vehicle data path> + <relative name>,
+# and there is exactly one such path for the whole process.  The EV1 JSONs name
+# their siblings through it ("ev1/chassis/EV1_Chassis.json", the chassis mesh
+# "ev1/ev1_chassis_vis.obj"); chrono_models does the same for the HMMWV and the
+# Sedan ("hmmwv/...", "sedan/..."); and VehicleWorld::CreateTerrain reads
+# "terrain/textures/tile4.jpg" from it.  So the directory handed to
+# vehicle::SetDataPath() must hold the EV1 tree *and* Chrono's stock trees.
+#
+# Assemble it here, in the build tree: one symlink per top-level name under
+# Chrono's own vehicle data, plus ev1/ pointing back at this source tree.  The
+# Chrono install is read from and never written to, so it may be read-only,
+# root-owned, or shared between users.  ev1/ resolves to this checkout even when
+# the Chrono install carries a stale ev1/ copy left by an older build.
+#
+# Symlinking (rather than copying) keeps configure cheap — Chrono's vehicle data
+# is ~570 MB — and lets an edit under data/vehicle/ev1/ take effect on the next
+# run with no reconfigure.  Linux and macOS, the two platforms this repo builds
+# on, always take that path.  file(CREATE_LINK ... COPY_ON_ERROR) keeps the
+# result correct where symlinks need privileges (Windows without developer
+# mode) by copying instead — at the cost of that 570 MB and a reconfigure after
+# each data edit, which is what the old code cost anyway.
+if(NOT CHRONO_VEHICLE_DATA_DIR)
+    set(CHRONO_VEHICLE_DATA_DIR "${CHRONO_DATA_DIR}vehicle/")   # exported with a trailing slash
+endif()
+if(NOT IS_DIRECTORY "${CHRONO_VEHICLE_DATA_DIR}")
+    message(FATAL_ERROR
+        "Chrono's vehicle data is missing at '${CHRONO_VEHICLE_DATA_DIR}'.\n"
+        "  The Chrono install at ${Chrono_DIR} was built without the Vehicle "
+        "module's data, or the install prefix moved after installation.  "
+        "Rebuild it with scripts/build_chrono.sh <prefix>.")
+endif()
+
+set(EV1SIM_VEHICLE_DATA_DIR "${CMAKE_BINARY_DIR}/chrono-vehicle-data/")
+file(MAKE_DIRECTORY "${EV1SIM_VEHICLE_DATA_DIR}")
+file(GLOB _chrono_vehicle_entries
+     LIST_DIRECTORIES TRUE
+     RELATIVE "${CHRONO_VEHICLE_DATA_DIR}" "${CHRONO_VEHICLE_DATA_DIR}*")
+
+# Reconfiguring an existing build directory against a different Chrono_DIR
+# leaves behind the model names the previous install had — Chrono would then
+# still load, say, hmmwv/ out of a prefix this build no longer uses.  Drop every
+# name the currently configured Chrono does not provide, so the root mirrors one
+# install.  Removing a symlink unlinks the link and never its target; the
+# recursive branch is for the real directories the COPY_ON_ERROR fallback makes.
+set(_ev1sim_wanted_entries ${_chrono_vehicle_entries} ev1)
+file(GLOB _ev1sim_staged_entries
+     LIST_DIRECTORIES TRUE
+     RELATIVE "${EV1SIM_VEHICLE_DATA_DIR}" "${EV1SIM_VEHICLE_DATA_DIR}*")
+foreach(_entry IN LISTS _ev1sim_staged_entries)
+    if(NOT _entry IN_LIST _ev1sim_wanted_entries)
+        if(IS_SYMLINK "${EV1SIM_VEHICLE_DATA_DIR}${_entry}")
+            file(REMOVE "${EV1SIM_VEHICLE_DATA_DIR}${_entry}")
+        else()
+            file(REMOVE_RECURSE "${EV1SIM_VEHICLE_DATA_DIR}${_entry}")
+        endif()
+    endif()
+endforeach()
+
+foreach(_entry IN LISTS _chrono_vehicle_entries)
+    if(NOT _entry STREQUAL "ev1")
+        file(CREATE_LINK "${CHRONO_VEHICLE_DATA_DIR}${_entry}"
+                         "${EV1SIM_VEHICLE_DATA_DIR}${_entry}"
+             SYMBOLIC COPY_ON_ERROR)
+    endif()
+endforeach()
+file(CREATE_LINK "${CMAKE_SOURCE_DIR}/data/vehicle/ev1"
+                 "${EV1SIM_VEHICLE_DATA_DIR}ev1"
+     SYMBOLIC COPY_ON_ERROR)
+
+# CHRONO_DATA_DIR still carries Chrono's core assets (shaders, fonts, logos)
+# read through chrono::GetChronoDataFile; only the vehicle root is ours.
 target_compile_definitions(ev1sim PRIVATE
     CHRONO_DATA_DIR="${CHRONO_DATA_DIR}"
+    EV1SIM_VEHICLE_DATA_DIR="${EV1SIM_VEHICLE_DATA_DIR}"
 )
-
-# ── Copy EV1 vehicle data into the Chrono data directory ───────────────────
-# This makes the EV1 JSON definitions and meshes discoverable via
-# vehicle::GetDataFile("ev1/...").
-file(GLOB_RECURSE EV1_DATA_FILES "${CMAKE_SOURCE_DIR}/data/vehicle/ev1/*")
-foreach(_f ${EV1_DATA_FILES})
-    file(RELATIVE_PATH _rel "${CMAKE_SOURCE_DIR}/data/vehicle/ev1" "${_f}")
-    configure_file("${_f}" "${CHRONO_DATA_DIR}/vehicle/ev1/${_rel}" COPYONLY)
-endforeach()
 endif()  # Chrono_FOUND (main executable)
 
 # ── Unit tests (optional) ──────────────────────────────────────────────────

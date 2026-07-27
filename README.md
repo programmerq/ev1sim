@@ -86,6 +86,14 @@ If you need to pin a different electricsim tree or Chrono install, drop a **`CMa
 
 On first configure, CMake fetches **nlohmann/json** and **Catch2** (for tests) automatically via FetchContent.
 
+The Chrono install is only read from. Configure assembles the vehicle data root
+the simulator uses — `<build dir>/chrono-vehicle-data/` — from a symlink to
+`data/vehicle/ev1/` in this checkout plus one symlink per stock Chrono vehicle
+model, and `VehicleWorld` points `chrono::vehicle::SetDataPath()` there. So a
+Chrono prefix that is root-owned, mounted read-only, or shared between users
+builds and runs unchanged. An `ev1/` directory left inside a Chrono install by
+an ev1sim build older than this is ignored and can be deleted.
+
 ### Bare-cmake invocation (no presets)
 
 ```bash

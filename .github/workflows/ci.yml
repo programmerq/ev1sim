@@ -209,6 +209,15 @@ jobs:
         if: steps.chrono-cache.outputs.cache-hit != 'true'
         run: scripts/build_chrono.sh "$HOME/chrono-install"
 
+      # ev1sim reads the Chrono install and writes nothing into it.  Dropping
+      # every write bit here makes that a build failure the moment it stops
+      # being true, rather than a machine-specific surprise: configure used to
+      # copy data/vehicle/ev1 into the install, so one build as another user
+      # left files nobody else could overwrite and every later build died.
+      # Read-only is also what the cache upload needs — it only reads the tree.
+      - name: Drop write permission on the Chrono install
+        run: chmod -R a-w "$HOME/chrono-install"
+
       - name: Configure ev1sim against Chrono
         run: |
           cmake -B build -S . \
@@ -223,6 +232,21 @@ jobs:
         # --target ev1sim below errors if the app target were skipped.  No
         # -DELECTRICSIM_DIR ⇒ the external-sim connector stays off, so the smoke
         # run takes the no-bus headless path.
+
+      # Reconfiguring a build directory against a different Chrono_DIR must not
+      # leave the previous install's model names in the vehicle data root — the
+      # sim would keep loading e.g. hmmwv/ out of a prefix this build no longer
+      # uses.  Planting a name the configured Chrono does not provide tests that
+      # in seconds, with no second Chrono install to build: the next configure
+      # has to take it away again.
+      - name: Vehicle data root carries only what the configured Chrono has
+        run: |
+          ln -s /nonexistent build/chrono-vehicle-data/model_from_another_prefix
+          cmake -B build -S . -DChrono_DIR="$HOME/chrono-install/lib/cmake/Chrono"
+          if [ -L build/chrono-vehicle-data/model_from_another_prefix ]; then
+            echo "::error::stale model name survived reconfigure"; exit 1
+          fi
+          [ -L build/chrono-vehicle-data/ev1 ] || { echo "::error::ev1 link missing"; exit 1; }
 
       - name: Build the ev1sim executable
         run: cmake --build build --target ev1sim -j"$(nproc)"
