@@ -31,6 +31,8 @@ struct CountingHooks : public ev1sim::ScenarioHooks {
     int cruise_set = 0, cruise_resume = 0, cruise_cancel = 0;
     int cruise_speed_up = 0, cruise_speed_down = 0;
     int door_lock_all = 0, door_unlock_all = 0;
+    int exterior_keypad_code = 0, door_handle_driver = 0;
+    int flash_to_pass_on = 0, flash_to_pass_off = 0;
     int fail_throttle = 0, restore_throttle = 0;
 
     void KeyOnCycle()        override { ++key_on_cycle; }
@@ -48,6 +50,11 @@ struct CountingHooks : public ev1sim::ScenarioHooks {
     void CruiseSpeedDown()   override { ++cruise_speed_down; }
     void DoorLockAll()       override { ++door_lock_all; }
     void DoorUnlockAll()     override { ++door_unlock_all; }
+    void ExteriorKeypadCode() override { ++exterior_keypad_code; }
+    void DoorHandleDriver()  override { ++door_handle_driver; }
+    void FlashToPass(bool held) override {
+        if (held) ++flash_to_pass_on; else ++flash_to_pass_off;
+    }
     void FailThrottleInput(bool fail) override {
         if (fail) ++fail_throttle; else ++restore_throttle;
     }
@@ -136,6 +143,39 @@ TEST_CASE("Scenario: set_brake overrides front + rear together",
     s.Tick(0.20, VehicleState{}, hooks, cmd);
     CHECK(cmd.front_brake == 0.3);
     CHECK(cmd.rear_brake  == 0.3);
+}
+
+TEST_CASE("Scenario: drive-cycle body actions reach their hooks",
+          "[Scenario]") {
+    using ev1sim::Scenario;
+    Scenario s;
+    s.set_events({
+        {0.10, "exterior_keypad_code", 0.0},
+        {0.20, "door_handle_driver",   0.0},
+        {0.30, "flash_to_pass",        1.0},
+        {0.40, "flash_to_pass",        0.0},
+        {0.50, "set_horn",             1.0},
+    });
+    CountingHooks hooks;
+    DriverCommand cmd{};
+
+    s.Tick(0.25, VehicleState{}, hooks, cmd);
+    CHECK(hooks.exterior_keypad_code == 1);
+    CHECK(hooks.door_handle_driver == 1);
+    // flash_to_pass value is a level, not a count: on then off.
+    s.Tick(0.45, VehicleState{}, hooks, cmd);
+    CHECK(hooks.flash_to_pass_on == 1);
+    CHECK(hooks.flash_to_pass_off == 1);
+    // The horn is held on the DriverCommand, like the pedals — one physical
+    // contact, so both tones go true together.
+    CHECK(cmd.horn_low == false);
+    s.Tick(0.55, VehicleState{}, hooks, cmd);
+    CHECK(cmd.horn_low == true);
+    CHECK(cmd.horn_high == true);
+    // …and stays held on later ticks with no further event.
+    DriverCommand cmd2{};
+    s.Tick(0.90, VehicleState{}, hooks, cmd2);
+    CHECK(cmd2.horn_low == true);
 }
 
 TEST_CASE("Scenario: unknown action logs warning, doesn't crash",

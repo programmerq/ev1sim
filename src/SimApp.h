@@ -45,6 +45,9 @@ public:
     void CruiseSpeedDown()   override;
     void DoorLockAll()       override;
     void DoorUnlockAll()     override;
+    void ExteriorKeypadCode() override;
+    void DoorHandleDriver()  override;
+    void FlashToPass(bool held) override;
     void FailThrottleInput(bool fail) override;
 
     // Dispatch a named input action (from a wheel button / Arduino contact) by

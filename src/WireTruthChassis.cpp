@@ -325,6 +325,14 @@ std::optional<std::uint8_t> WireTruthChassis::read_byte(std::uint32_t wire_id) c
     return sample.value;
 }
 
+std::optional<std::uint16_t> WireTruthChassis::read_uint16(std::uint32_t wire_id) const {
+    if (!attached()) return std::nullopt;
+    electricsim::io::WireTable::Sample<std::uint16_t> sample;
+    if (!impl_->table->read_uint16_sample(wire_id, &sample)) return std::nullopt;
+    if (!sample.written()) return std::nullopt;
+    return sample.value;
+}
+
 std::optional<float> WireTruthChassis::read_float32(std::uint32_t wire_id) const {
     if (!attached()) return std::nullopt;
     electricsim::io::WireTable::Sample<float> sample;
@@ -449,6 +457,23 @@ static const std::unordered_map<std::uint32_t, ConsumerCell>& ConsumerRegistry()
         {4184U, {kWireCHASSIS_RHJB_DLM_RH_LOCK,         WireType::kBit}},
         {4185U, {kWireCHASSIS_RHJB_DLM_RH_UNLOCK,       WireType::kBit}},
         {4186U, {kWireCHASSIS_RHJB_DILM_LEVEL,          WireType::kByte}},
+        // BTCM retard-request PWM duty (uint16, Q8 percent 0..25600). This is
+        // the wire the BTCM asks the propulsion side for regen torque on
+        // (@source:manual brakes-313 "the drive unit motor is electrically
+        // converted into a generator"; PIM J1-18 RETARD REQUEST IN). Consumed
+        // here so an acceptance scenario can witness "regen was COMMANDED"
+        // rather than inferring it from the deceleration trace, which friction
+        // braking produces identically.
+        {4191U, {kWireCHASSIS_BTCM_RETARD_REQUEST_DUTY_Q8, WireType::kUint16}},
+        // TJB rear-lamp branches (bit). The LHJB's BULB_FEED_LINE_LRSL/_RRSL
+        // (4014/4016, already consumed above) are the feeds INTO the trunk
+        // junction block; these two are what the TJB actually hands the rear
+        // stop lamps, downstream of its RUN1 gate. Asserting on the LHJB feed
+        // alone cannot tell a live TJB from an absent one.
+        {4203U, {kWireCHASSIS_TJB_LR_STOP_LAMP,         WireType::kBit}},
+        {4204U, {kWireCHASSIS_TJB_RR_STOP_LAMP,         WireType::kBit}},
+        {4198U, {kWireCHASSIS_TJB_LR_TAIL_LAMP,         WireType::kBit}},
+        {4199U, {kWireCHASSIS_TJB_RR_TAIL_LAMP,         WireType::kBit}},
         // Aux battery (uint32 / bit / byte)
         {4192U, {kWireCHASSIS_AUX_BATTERY_TERMINAL_MV,  WireType::kUint32}},
         {4193U, {kWireCHASSIS_AUX_BATTERY_PRESENT,      WireType::kBit}},
@@ -494,6 +519,14 @@ int WireTruthChassis::apply_consumer_overlay(const ConsumerSinks& sinks) const {
                 if (!sinks.on_uint32) break;
                 if (auto v = read_uint32(cell.wire_id)) {
                     sinks.on_uint32(signal_id, *v);
+                    ++count;
+                }
+                break;
+            }
+            case WireType::kUint16: {
+                if (!sinks.on_uint16) break;
+                if (auto v = read_uint16(cell.wire_id)) {
+                    sinks.on_uint16(signal_id, *v);
                     ++count;
                 }
                 break;
@@ -644,6 +677,9 @@ std::optional<bool> WireTruthChassis::read_bit(std::uint32_t) const {
     return std::nullopt;
 }
 std::optional<std::uint8_t> WireTruthChassis::read_byte(std::uint32_t) const {
+    return std::nullopt;
+}
+std::optional<std::uint16_t> WireTruthChassis::read_uint16(std::uint32_t) const {
     return std::nullopt;
 }
 std::optional<float> WireTruthChassis::read_float32(std::uint32_t) const {

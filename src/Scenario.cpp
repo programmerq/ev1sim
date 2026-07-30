@@ -163,6 +163,10 @@ void Scenario::Tick(double sim_time, const VehicleState& state,
         } else if (e.action == "cruise_speed_down")   { hooks.CruiseSpeedDown();
         } else if (e.action == "door_lock_all")       { hooks.DoorLockAll();
         } else if (e.action == "door_unlock_all")     { hooks.DoorUnlockAll();
+        } else if (e.action == "exterior_keypad_code"){ hooks.ExteriorKeypadCode();
+        } else if (e.action == "door_handle_driver")  { hooks.DoorHandleDriver();
+        } else if (e.action == "set_horn")            { m_held_horn = (e.value != 0.0);
+        } else if (e.action == "flash_to_pass")       { hooks.FlashToPass(e.value != 0.0);
         } else if (e.action == "fail_throttle_input") {
             // value != 0 → fail, 0 → restore.
             hooks.FailThrottleInput(e.value != 0.0);
@@ -175,6 +179,9 @@ void Scenario::Tick(double sim_time, const VehicleState& state,
     if (m_held_throttle) cmd.throttle    = *m_held_throttle;
     if (m_held_brake)    cmd.front_brake = cmd.rear_brake = *m_held_brake;
     if (m_held_steering) cmd.steering    = *m_held_steering;
+    // One physical horn contact (circuit 28); SimApp ORs low||high into
+    // HornButton::set_held, so driving both mirrors a closed contact.
+    if (m_held_horn)     cmd.horn_low    = cmd.horn_high = *m_held_horn;
 }
 
 void Scenario::OpenStats() {
@@ -355,6 +362,42 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
             m_csv << (bus.GetHornLowCmd() ? 1 : 0);
         else if (f == "horn_high_cmd")
             m_csv << (bus.GetHornHighCmd() ? 1 : 0);
+        // RSA power mode as ev1sim resolves it from RSA_RUN1_OUT: 0 = OFF,
+        // 2 = RUN.  ev1sim cannot see the ACC detent (the RSA's ACC output has
+        // no wire cell), so this column is a two-state "is the RSA commanding
+        // run mode" readout, NOT the full OFF/ACC/RUN/START enum.
+        else if (f == "rsa_run_mode")
+            m_csv << static_cast<int>(bus.GetRsaRunMode());
+        // RSA shift-blocked cue (4088): 1 while a P→non-P selector request is
+        // refused because the brake switch is open — the BTSI (brake/
+        // transmission shift interlock) saying no.
+        else if (f == "rsa_shift_blocked")
+            m_csv << (bus.GetRsaShiftBlocked() ? 1 : 0);
+        // PARKING BRAKE telltale (4135, IPC ← BTCM park_brake_ind).
+        // @source:manual brakes-314: "The PARKING BRAKE light will illuminate
+        // when the park brake is applied."  This is the driver-facing witness
+        // that the rear electric park brake latched.
+        else if (f == "ipc_park_brake_telltale")
+            m_csv << (bus.GetIpcParkBrakeTelltale() ? 1 : 0);
+        // RSA door-lock commands (4084/4085): 0 = unlocked, 1 = locked,
+        // 0xFF = never received.  Cast so a uint8 prints as a number.
+        else if (f == "door_lock_cmd_driver")
+            m_csv << static_cast<int>(bus.GetDoorLockCmd(0));
+        else if (f == "door_lock_cmd_passenger")
+            m_csv << static_cast<int>(bus.GetDoorLockCmd(1));
+        // BTCM retard-request PWM duty (4191), Q8 percent 0..25600 — regen
+        // torque the BTCM is asking the propulsion side to produce.
+        else if (f == "btcm_retard_request_duty_q8")
+            m_csv << static_cast<int>(bus.GetBtcmRetardRequestDutyQ8());
+        // TJB rear-lamp branches, downstream of the trunk junction block's
+        // RUN1 gate (4198/4199 tail, 4203/4204 stop).
+        else if (f == "tjb_lr_tail_lamp")  m_csv << (bus.GetTjbLampBranch(0) ? 1 : 0);
+        else if (f == "tjb_rr_tail_lamp")  m_csv << (bus.GetTjbLampBranch(1) ? 1 : 0);
+        else if (f == "tjb_lr_stop_lamp")  m_csv << (bus.GetTjbLampBranch(2) ? 1 : 0);
+        else if (f == "tjb_rr_stop_lamp")  m_csv << (bus.GetTjbLampBranch(3) ? 1 : 0);
+        // Sounder / piezo drive (LHJB flasher module).
+        else if (f == "sounder_piezo_drive")
+            m_csv << (bus.GetSounderPiezoDrive() ? 1 : 0);
         // Bulb feed lines by EV1-manual short name — "<abbrev>_bulb_feed_line"
         // (e.g. lhbh_bulb_feed_line, lrsl_bulb_feed_line): 1 = the junction
         // block is commanding the bulb lit. Covers all NUM_LIGHTS elements so

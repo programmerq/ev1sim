@@ -495,6 +495,18 @@ public:
     bool GetRsaShiftBlocked() const;
     bool HasReceivedRsaShiftBlocked() const;
 
+    /// BTCM retard-request PWM duty (chassis 4191), Q8 percent 0..25600 —
+    /// the BTCM asking the propulsion side for generator regen torque
+    /// (@source:manual brakes-313). 0 until first received.
+    std::uint16_t GetBtcmRetardRequestDutyQ8() const;
+    bool          HasReceivedBtcmRetardRequestDuty() const;
+
+    /// TJB rear-lamp branches, downstream of the trunk junction block's RUN1
+    /// gate (chassis 4198/4199 tail L/R, 4203/4204 stop L/R).
+    /// branch: 0=LR tail, 1=RR tail, 2=LR stop, 3=RR stop.
+    bool GetTjbLampBranch(int branch) const;
+    bool HasReceivedTjbLampBranch() const;
+
     /// Incoming door-lock motor leg drives from RHJB (IDs 4092-4095, chassis segment).
     /// RHJB's dual-H-bridge drives both door-lock motors in lockstep; each motor
     /// has a LOCK leg and an UNLOCK leg.  leg index: 0=LH lock, 1=LH unlock,
@@ -709,6 +721,10 @@ public:
     /// Inject a uint32 signal value (BPM pack voltage, etc.).
     /// Used by unit tests; not part of the runtime path.
     void DebugInjectU32(std::uint32_t signal_id, std::uint32_t value);
+
+    /// Inject a uint16 signal value (BTCM retard-request duty, etc.).
+    /// Used by unit tests; not part of the runtime path.
+    void DebugInjectU16(std::uint32_t signal_id, std::uint16_t value);
 
 private:
     Options m_opts;

@@ -2602,6 +2602,22 @@ void SimApp::DoorUnlockAll() {
     if (m_physical) m_physical->door_locks().unlock_all();
 }
 
+void SimApp::ExteriorKeypadCode() {
+    // Same factory code the interactive `K` binding enters. The sequence
+    // emitter fires one digit per ~100 ms; the headless publish block ticks
+    // update()/consume_sequence_fire() every frame, so the RSA sees five
+    // separate button pulses rather than one merged press.
+    if (m_physical) m_physical->rsa_exterior_keypad().enter_code_sequence("111111");
+}
+
+void SimApp::DoorHandleDriver() {
+    if (m_physical) m_physical->door_handles().attempt_driver();
+}
+
+void SimApp::FlashToPass(bool held) {
+    if (m_physical) m_physical->combination_switch().set_flash_to_pass(held);
+}
+
 void SimApp::FailThrottleInput(bool fail) {
     if (m_external_sim) m_external_sim->SetSuppressThrottlePublish(fail);
     std::cout << "[Scenario] fail_throttle_input -> "
