@@ -1,18 +1,50 @@
 {
-  "Name":                       "EV1 Front SLA (Double Wishbone)",
+  "Name":                       "EV1 Front SLA (DoubleWishbone; hardpoints are rescaled Chrono sedan template)",
   "Type":                       "Suspension",
   "Template":                   "DoubleWishbone",
+
+  "//PROVENANCE": [
+    "Read this before treating any number in this file as an EV1 measurement.",
+    "",
+    "MEASURED - printed in the manuals, and pinned by tests/test_suspension_geometry.cpp:",
+    "  Track 1470 mm (57.9 in) - EV1 chassis manual, printed page 62, 'Exterior",
+    "    Dimensions'. Half-track 0.735 m is the Spindle COM Y below.",
+    "  Camber -0.10 deg, Toe -0.05 deg at each wheel - EV1 chassis manual, printed",
+    "    page 61, 'ALIGNMENT SPECIFICATIONS', FRONT column nominals.",
+    "",
+    "NOT MEASURED - every hardpoint coordinate below is Chrono's stock sedan sample,",
+    "rescaled. Source: <chrono>/data/vehicle/sedan/suspension/Sedan_DoubleWishbone.json.",
+    "  Y x 0.921168 = 1470 / 1595.8, printed EV1 track over the sedan sample's track.",
+    "  X x ~0.92. Z was fitted to the ev1model wheelwells, not scaled.",
+    "  Masses, inertias and spring/damper rates are the sedan's, scaled down and",
+    "  rounded by hand; the collision radii and the axle inertia are the sedan's",
+    "  verbatim. No EV1 suspension hardpoint is published in anything this program",
+    "  holds - a search of both service manuals and all four parts-catalog sections",
+    "  turned up a wrench size, a tap size and hub runout limits, and no geometry.",
+    "  So these coordinates describe a Chrono sample car, not an EV1.",
+    "",
+    "TOPOLOGY IS CORRECT ON THIS AXLE. EV1 chassis manual, printed page 251: 'The",
+    "  short/long arm (SLA) independent front suspension used on the EV1 ... Each",
+    "  wheel is independently connected to the cradle/front suspension crossmember by",
+    "  a steering knuckle, wheel hub assembly, coil over shock assembly, upper and",
+    "  lower ball joint and upper and lower control arm ... steered by two front tie",
+    "  rods.' Chrono's DoubleWishbone is the right kinematic layout for that; only the",
+    "  coordinates are borrowed. Not modeled: the coil-over-shock yoke linkage that",
+    "  carries the spring load into the lower control arm, and the stabilizer bar.",
+    "",
+    "The two keys below are what the test checks the geometry against, so this note",
+    "cannot drift away from the numbers it describes."
+  ],
+  "//track_mm":                 1470,
+  "//hardpoint_scale_y":        0.921168,
 
   "Camber Angle (deg)":         -0.10,
   "Toe Angle (deg)":            -0.05,
 
-  "//track":                    "Real EV1 front track 1.496 m → spindle Y = 0.748 (was 0.735, +13 mm).",
-  "//track1":                   "Wheel-side hard points (spindle / upright COM / arm-to-upright /",
-  "//track2":                   "tierod-to-upright) all bump by +13 mm; chassis-side mounts unchanged.",
   "Spindle":
   {
     "Mass":                     1.0,
-    "COM":                      [0, 0.748, -0.08],
+    "COM":                      [0, 0.735, -0.08],
     "Inertia":                  [0.0004, 0.0004, 0.0004],
     "Radius":                   0.1,
     "Width":                    0.02
@@ -21,7 +53,7 @@
   "Upright":
   {
     "Mass":                     1.2,
-    "COM":                      [-0.02, 0.703, -0.07],
+    "COM":                      [-0.02, 0.690, -0.07],
     "Moments of Inertia":       [0.010, 0.010, 0.002],
     "Products of Inertia":      [0, 0, 0],
     "Radius":                   0.025
@@ -36,7 +68,7 @@
     "Radius":                   0.02,
     "Location Chassis Front":   [-0.090, 0.430, 0.095],
     "Location Chassis Back":    [-0.230, 0.470, 0.100],
-    "Location Upright":         [-0.037, 0.653, 0.095]
+    "Location Upright":         [-0.037, 0.640, 0.095]
   },
 
   "Lower Control Arm":
@@ -48,13 +80,13 @@
     "Radius":                   0.03,
     "Location Chassis Front":   [0.185, 0.387, -0.240],
     "Location Chassis Back":    [-0.185, 0.433, -0.235],
-    "Location Upright":         [0.0, 0.723, -0.280]
+    "Location Upright":         [0.0, 0.710, -0.280]
   },
 
   "Tierod":
   {
     "Location Chassis":         [-0.185, 0.387, -0.100],
-    "Location Upright":         [-0.138, 0.723, -0.100]
+    "Location Upright":         [-0.138, 0.710, -0.100]
   },
 
   "Spring":

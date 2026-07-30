@@ -80,30 +80,59 @@ applies the identical formula at the chassis COM each `Synchronize`.
 
 ---
 
-## Suspension-geometry audit
+## Suspension geometry: what is measured and what is borrowed
 
-Both axles use Chrono's `DoubleWishbone` template (switching to the real
-MacPherson-front / trailing-arm-rear layout remains deferred — see
-[TODO.md](TODO.md)).  The shipped hardpoints were hand-tuned, so Round 4 locks
-their physical sanity in with regression guards rather than re-deriving them:
+Three numbers per axle come off the EV1.  Every coordinate comes off a Chrono
+sample car.  Both suspension JSONs carry that split in a `//PROVENANCE` block at
+the top, and `tests/test_suspension_geometry.cpp` checks the split rather than
+describing it.
 
-* **Track widths** — front spindle half-track 0.748 m → **1.496 m** track;
-  rear 0.6405 m → **1.281 m**.  Both match the real EV1, and the rear is
-  deliberately narrower than the front for aero — an invariant the test
-  enforces (`rear track < front track`).
+**Measured — EV1 chassis manual, pinned to the printed values:**
+
+| Value | Front | Rear | Printed source |
+|---|---|---|---|
+| Track | 1470 mm (57.9 in) | 1244 mm (49.0 in) | chassis p. 62, "Exterior Dimensions" |
+| Camber | −0.10° | −0.50° | chassis p. 61, "ALIGNMENT SPECIFICATIONS" |
+| Toe (each wheel) | −0.05° | 0.00° | chassis p. 61 |
+
+The track figures set the spindle half-tracks: 0.735 m front, 0.622 m rear.
+
+**Borrowed — every hardpoint coordinate** is Chrono's stock
+`sedan/suspension/Sedan_DoubleWishbone.json`, rescaled to the printed track:
+lateral × 0.921168 (= 1470/1595.8) front and × 0.779546 (= 1244/1595.8) rear,
+longitudinal by roughly the same, vertical fitted to the ev1model wheelwells.
+Masses, inertias and spring/damper rates are the sedan's, scaled down and
+rounded; the collision radii and axle inertia are the sedan's verbatim.  No EV1
+suspension hardpoint is published in any manual this program holds, so there is
+nothing to replace them with — the point is that they are labelled.
+
+**Wrong on the rear axle.**  The front `DoubleWishbone` is the right layout —
+chassis p. 251 describes a short/long arm independent front suspension with
+upper and lower control arms and two tie rods.  The rear is not: chassis p. 271
+describes a one-piece beam axle on five links (two upper leading, two lower
+trailing, and a track bar).  There are no rear control arms, uprights or tie
+rods on an EV1, so those hardpoints describe no part.  Replacement is deferred —
+see [TODO.md](TODO.md).
+
+### What the test checks
+
+* **Track, camber and toe** are pinned to the printed page-62 and page-61
+  values, so an edit that reverts them fails.
+* **Every lateral hardpoint** must equal the sedan sample's value times the
+  scale the file declares in `//hardpoint_scale_y`, within 4 mm.  This is the
+  check that catches a partial rescale: an earlier commit moved the declared
+  front track by bumping four outboard Y coordinates 13 mm and leaving ten,
+  which left the spindle claiming one track and the arms encoding another.
+* **The `//PROVENANCE` block must still be there** and still name the sedan
+  sample.  Strip it and the coordinates read as EV1 measurements again.
 * **Masses & inertias** — every spindle/upright/control-arm mass and every
   principal moment of inertia is asserted strictly positive (catches a dropped
   or zeroed field).
 * **Springs & dampers** — spring rate 143 000 N/m and free length (0.48 m front
-  / 0.42 m rear), damping 7500 N·s/m front / 7000 rear: all asserted positive,
-  front damping ≥ rear.  These give a firm-but-plausible ride frequency for a
-  low, ~1281 kg car.
+  / 0.42 m rear), damping 7500 N·s/m front / 7000 rear: all asserted positive.
+  These give a firm-but-plausible ride frequency for a low, ~1281 kg car; they
+  are tuned, not sourced.
 * **Control-arm orientation** — each arm's outboard (upright) hardpoint sits
   further from centerline than both its inboard (chassis) mounts.  A sign flip
   here would mean an arm pointing the wrong way; the test guards against it on
   both the upper and lower arms, both axles.
-* **Alignment** — static camber (−0.10° front / −0.50° rear) and toe are
-  bounded to ±3° to catch a radians-for-degrees units slip.
-
-These are guards, not a re-derivation: they fail loudly if a future edit pushes
-the geometry out of its physically meaningful envelope.

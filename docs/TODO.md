@@ -94,15 +94,31 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   frequency) — Olley's rule typically wants rear slightly stiffer to
   control pitch, even with even weight distribution.  Keep until
   measured.
-- [ ] **Front MacPherson strut + rear trailing-arm templates.**
-  Current Chrono setup uses `DoubleWishbone` for both axles; real EV1
-  is MacPherson front / trailing-arm (twist-beam) rear.  Substantial
-  rebuild; deferred until either (a) Chrono `MacPhersonStrut` JSON
-  sample available, or (b) we have measured EV1 hardpoints.
-  *(Round 4: the existing DoubleWishbone geometry is now sanity-verified —
-  track widths, masses/inertias, spring/damper rates, control-arm
-  orientation — with regression guards in `tests/test_suspension_geometry.cpp`;
-  see [vehicle-dynamics.md](vehicle-dynamics.md).)*
+- [ ] **Rear axle template: the EV1 rear is a beam axle, not a wishbone.**
+  Chassis manual p. 271: a one-piece rear axle (aluminum end castings,
+  tubular center section) on five links — two upper leading links, two
+  lower trailing links, and a track bar — with two coil springs and two
+  shocks.  `EV1_RearDoubleWishbone.json` models control arms, uprights
+  and tie rods that do not exist on the car, and models no track bar.
+  Chrono 9.0.1's JSON factory does accept two candidates: `SolidAxle`
+  carries exactly the EV1's link set (two upper links, two lower links,
+  a track bar) but is a *steered* axle — knuckles, tie rod, drag link,
+  bell crank — which the rear is not; `GenericWheeledSuspension` is
+  fully data-driven and could express the layout as written.  The
+  blocker is not the template, it is that neither can be filled in: no
+  EV1 rear hardpoint is published (see the next item), so a swap would
+  replace one set of invented coordinates with another.  Deferred; the
+  file labels itself a stand-in in its `//PROVENANCE` block.
+  *(The front does **not** need replacing: chassis p. 251 describes a
+  short/long arm independent front suspension, which is what
+  `DoubleWishbone` models.  Earlier notes here claimed MacPherson front
+  and twist-beam rear; both were wrong.)*
+- [ ] **EV1 suspension hardpoints — no source found.**  Every coordinate
+  in both suspension JSONs is Chrono's `sedan` sample rescaled to the
+  printed track, and both files say so.  A search of both service
+  manuals and all four parts-catalog sections turned up a wrench size,
+  a tap size and hub runout limits — no geometry.  Reopen only if a
+  measured car, a drawing, or a dimensioned figure turns up.
 
 ## Outputs ev1sim could render (defer all)
 - [ ] Wiper motor visual sweep (model update needed).
