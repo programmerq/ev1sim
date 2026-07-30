@@ -19,8 +19,8 @@
 namespace electricsim::topology {
 
 inline constexpr std::uint32_t kFormatVersion = 2U;
-inline constexpr std::uint32_t kTopologyHash = 0x83088868U;
-inline constexpr std::size_t kWireCount = 237;
+inline constexpr std::uint32_t kTopologyHash = 0x424F2AB2U;
+inline constexpr std::size_t kWireCount = 336;
 
 // Named WireIds. Sequential by YAML key order; changing
 // that order or adding/removing a net changes kTopologyHash.
@@ -82,186 +82,284 @@ inline constexpr ::electricsim::io::WireId kWireBPM_CHARGE_PORT_TEMP = 55U;
 inline constexpr ::electricsim::io::WireId kWireBPM_PARK_SELECT = 56U;
 inline constexpr ::electricsim::io::WireId kWireBPM_VEHICLE_WAKEUP = 57U;
 inline constexpr ::electricsim::io::WireId kWireBPM_COUPLER_PRESENT = 58U;
-inline constexpr ::electricsim::io::WireId kWireHV_BUS_VOLTAGE_MV = 59U;
-inline constexpr ::electricsim::io::WireId kWireHV_BUS_CURRENT_MA = 60U;
-inline constexpr ::electricsim::io::WireId kWireHV_BUS_PRESENT = 61U;
-inline constexpr ::electricsim::io::WireId kWireAPM_OUTPUT_VOLTAGE_MV = 62U;
-inline constexpr ::electricsim::io::WireId kWireAPM_HV_CONTACTOR_CLOSED = 63U;
-inline constexpr ::electricsim::io::WireId kWireGM8192_BPM_TX = 64U;
-inline constexpr ::electricsim::io::WireId kWireGM8192_BTCM_TX = 65U;
-inline constexpr ::electricsim::io::WireId kWireGM8192_PIM_TX = 66U;
-inline constexpr ::electricsim::io::WireId kWireGM8192_RSA_TX = 67U;
-inline constexpr ::electricsim::io::WireId kWireGM8192_HTCM_TX = 68U;
-inline constexpr ::electricsim::io::WireId kWireGM8192_IPC_TX = 69U;
-inline constexpr ::electricsim::io::WireId kWireGM8192_APM_TX = 70U;
-inline constexpr ::electricsim::io::WireId kWireGM8192_SCANTOOL_TX = 71U;
-inline constexpr ::electricsim::io::WireId kWireGM8192_BPM_TX_CLASS2 = 72U;
-inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_LBL = 73U;
-inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_RBL = 74U;
-inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_LHBH = 75U;
-inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_RHBH = 76U;
-inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_LLBH = 77U;
-inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_RLBH = 78U;
-inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_LRSM = 79U;
-inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_RRSM = 80U;
-inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_LFML = 81U;
-inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_RFML = 82U;
-inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_LFTS = 83U;
-inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_RFTS = 84U;
-inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_LRTS = 85U;
-inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_RRTS = 86U;
-inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_LRSL = 87U;
-inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_CHMSL = 88U;
-inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_RRSL = 89U;
-inline constexpr ::electricsim::io::WireId kWireHORN_DRIVE_LINE_LOW = 90U;
-inline constexpr ::electricsim::io::WireId kWireHORN_DRIVE_LINE_HIGH = 91U;
-inline constexpr ::electricsim::io::WireId kWirePANEL_AJAR_HOOD = 92U;
-inline constexpr ::electricsim::io::WireId kWirePANEL_AJAR_TRUNK = 93U;
-inline constexpr ::electricsim::io::WireId kWirePANEL_AJAR_DOOR_LEFT = 94U;
-inline constexpr ::electricsim::io::WireId kWirePANEL_AJAR_DOOR_RIGHT = 95U;
-inline constexpr ::electricsim::io::WireId kWireCOMB_SW_LOW_BEAM_OUT = 96U;
-inline constexpr ::electricsim::io::WireId kWireCOMB_SW_FLASH_TO_PASS_OUT = 97U;
-inline constexpr ::electricsim::io::WireId kWireCOMB_SW_PARK_HEADLAMP_OUT = 98U;
-inline constexpr ::electricsim::io::WireId kWireTURN_HAZ_SW_RIGHT_TURN_OUT = 99U;
-inline constexpr ::electricsim::io::WireId kWireTURN_HAZ_SW_LEFT_TURN_OUT = 100U;
-inline constexpr ::electricsim::io::WireId kWireTURN_HAZ_SW_HAZARD_OUT = 101U;
-inline constexpr ::electricsim::io::WireId kWireTURN_HAZ_SW_HORN_OUT = 102U;
-inline constexpr ::electricsim::io::WireId kWireCRUISE_SW_SET_COAST_OUT = 103U;
-inline constexpr ::electricsim::io::WireId kWireCRUISE_SW_RESUME_ACCEL_OUT = 104U;
-inline constexpr ::electricsim::io::WireId kWireCRUISE_SW_ON_OFF_OUT = 105U;
-inline constexpr ::electricsim::io::WireId kWirePRND_SELECTOR_A = 106U;
-inline constexpr ::electricsim::io::WireId kWirePRND_SELECTOR_B = 107U;
-inline constexpr ::electricsim::io::WireId kWirePRND_SELECTOR_C = 108U;
-inline constexpr ::electricsim::io::WireId kWirePRND_SELECTOR_D = 109U;
-inline constexpr ::electricsim::io::WireId kWireWIPER_SW_DELAY_OUT = 110U;
-inline constexpr ::electricsim::io::WireId kWireWIPER_SW_REQUEST_OUT = 111U;
-inline constexpr ::electricsim::io::WireId kWireWIPER_SW_HI_OUT = 112U;
-inline constexpr ::electricsim::io::WireId kWireWIPER_SW_WASHER_SWITCH_OUT = 113U;
-inline constexpr ::electricsim::io::WireId kWireCHARGER_COUPLER_PRESENT = 114U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_MOTOR_RPM = 115U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_MOTOR_TORQUE_NM = 116U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_MOTOR_CURRENT_A = 117U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_THROTTLE_CMD_Q8 = 118U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_BRAKE_MASTER_PRESSURE_KPA = 119U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_SIM_TIME_NS = 120U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_WIPER_MOTOR_COMMAND = 121U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_WASHER_PUMP_COMMAND = 122U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_HVAC_BLOWER_LEVEL = 123U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_DEFROST_GRID_ACTIVE = 124U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_DOOR_LOCK_CMD_DRIVER = 125U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_DOOR_LOCK_CMD_PASSENGER = 126U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_POWER_WINDOW_MOTOR_DRIVER = 127U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_POWER_WINDOW_MOTOR_PASSENGER = 128U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_RSA_SHIFT_BLOCKED = 129U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_AMBIENT_TEMP_C = 130U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_AMBIENT_HUMIDITY_PCT = 131U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_SPEED_MPS = 132U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_ACCEL_LONG = 133U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_ACCEL_LAT = 134U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_YAW_RATE = 135U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_APPLIED_THROTTLE = 136U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_APPLIED_FRONT_BRAKE = 137U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_APPLIED_REAR_BRAKE = 138U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_FRONT_BRAKE_PRESSURE = 139U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_REAR_BRAKE_POSITION = 140U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_STEERING_TORQUE = 141U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_WHEEL_OMEGA_FL = 142U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_WHEEL_OMEGA_FR = 143U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_WHEEL_OMEGA_RL = 144U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_WHEEL_OMEGA_RR = 145U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_SLIP_RATIO_FL = 146U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_SLIP_RATIO_FR = 147U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_SLIP_RATIO_RL = 148U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_SLIP_RATIO_RR = 149U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_SEATBELT_TELLTALE_DRIVER = 150U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_SEATBELT_TELLTALE_PASSENGER = 151U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_TRIP_DISTANCE_M = 152U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_BRAKE_TELLTALE = 153U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_PARK_BRAKE_TELLTALE = 154U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_ANTILOCK_TELLTALE = 155U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_LOW_TRAC_TELLTALE = 156U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_AIR_BAG_TELLTALE = 157U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_SERVICE_NOW_TELLTALE = 158U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_CHECK_MESSAGES_TELLTALE = 159U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_TEMP_TELLTALE = 160U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_BATTERY_LIFE_TELLTALE = 161U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_REDUCED_PERF_TELLTALE = 162U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_CHECK_TIRE_PRESS_TELLTALE = 163U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_LEFT_TURN_TELLTALE = 164U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_RIGHT_TURN_TELLTALE = 165U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_HIGH_BEAM_TELLTALE = 166U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_PARK_LAMP_TELLTALE = 167U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_DOOR_AJAR_TELLTALE = 168U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_DIM_DUTY_PCT = 169U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_REGEN_REDUCTION_Q8 = 170U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_ISO_CLOSE_FL = 171U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_ISO_CLOSE_FR = 172U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_DUMP_OPEN_FL = 173U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_DUMP_OPEN_FR = 174U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_EMB_MOTOR_CMD_LR = 175U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_EMB_MOTOR_CMD_RR = 176U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_CYL_PRESSURE_FL_K_PA = 177U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_CYL_PRESSURE_FR_K_PA = 178U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_REGEN_DISABLE_OUT = 179U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_RETARD_REQUEST_DUTY_Q8 = 180U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_DOOR_LOCK_STATE_DRIVER = 181U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_DOOR_LOCK_STATE_PASSENGER = 182U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_DOOR_LOCK_STATE_TRUNK = 183U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_ROAD_GRADE_PCT = 184U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_PITCH_DEG = 185U;
-inline constexpr ::electricsim::io::WireId kWireDOOR_LOCK_SW_LH_LOCK_OUT = 186U;
-inline constexpr ::electricsim::io::WireId kWireDOOR_LOCK_SW_LH_UNLOCK_OUT = 187U;
-inline constexpr ::electricsim::io::WireId kWireDOOR_LOCK_SW_RH_LOCK_OUT = 188U;
-inline constexpr ::electricsim::io::WireId kWireDOOR_LOCK_SW_RH_UNLOCK_OUT = 189U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_RHJB_PMM_RUN1_BUS = 190U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_RHJB_PMM_RUN2_BUS = 191U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_RHJB_DLM_LH_LOCK = 192U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_RHJB_DLM_LH_UNLOCK = 193U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_RHJB_DLM_RH_LOCK = 194U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_RHJB_DLM_RH_UNLOCK = 195U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_RHJB_DILM_LEVEL = 196U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_RHJB_PMM_MODULE_BPLUS = 197U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_RSA_DIM_LEVEL_STEP = 198U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_LHJB_PARK_LAMPS_ON = 199U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_APM_BPLUS_ACTIVE = 200U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_AUX_BATTERY_TERMINAL_MV = 201U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_AUX_BATTERY_PRESENT = 202U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_AUX_BATTERY_SOC_PCT = 203U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_AUX_BATTERY_MAINT_WAKE_REQ = 204U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_APM_TWELVE_VOLT_OUTPUT_MA = 205U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_BRAKE_PEDAL_Q8 = 206U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_STEERING_DEG_Q8 = 207U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_GEAR_SELECTOR = 208U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_THROTTLE_Q8 = 209U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_BRAKE_SWITCH = 210U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_SEATBELT_BUCKLED = 211U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_SEATBELT_BUCKLED_PASSENGER = 212U;
-inline constexpr ::electricsim::io::WireId kWireEXT_WHEEL_SPEED_FL = 213U;
-inline constexpr ::electricsim::io::WireId kWireEXT_WHEEL_SPEED_FR = 214U;
-inline constexpr ::electricsim::io::WireId kWireEXT_WHEEL_SPEED_RL = 215U;
-inline constexpr ::electricsim::io::WireId kWireEXT_WHEEL_SPEED_RR = 216U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_IPC_TRIP_RESET_BUTTON = 217U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_MODE_BUTTON = 218U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_KEYPAD_BUTTON1 = 219U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_KEYPAD_BUTTON2 = 220U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_KEYPAD_BUTTON3 = 221U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_KEYPAD_BUTTON4 = 222U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_KEYPAD_BUTTON5 = 223U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_POWER_WINDOW_DRIVER_UP = 224U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_POWER_WINDOW_DRIVER_DOWN = 225U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_POWER_WINDOW_PASSENGER_UP = 226U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_POWER_WINDOW_PASSENGER_DOWN = 227U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_EXTERIOR_KEYPAD1 = 228U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_EXTERIOR_KEYPAD2 = 229U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_EXTERIOR_KEYPAD3 = 230U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_EXTERIOR_KEYPAD4 = 231U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_EXTERIOR_KEYPAD5 = 232U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_DOOR_HANDLE_ATTEMPT_DRIVER = 233U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_DOOR_HANDLE_ATTEMPT_PASSENGER = 234U;
-inline constexpr ::electricsim::io::WireId kWirePIM_CRUISE_ACTIVE = 235U;
-inline constexpr ::electricsim::io::WireId kWirePIM_CRUISE_SETPOINT_MPS = 236U;
-inline constexpr ::electricsim::io::WireId kWireAD_PRECHARGE_RELAY = 237U;
-inline constexpr ::electricsim::io::WireId kWireAD_MAIN_CONTACTOR = 240U;
+inline constexpr ::electricsim::io::WireId kWireBPM_SHUNT_SENSE_HEALTHY = 59U;
+inline constexpr ::electricsim::io::WireId kWireHTCM_PERIODIC_WAKE_PULSE = 60U;
+inline constexpr ::electricsim::io::WireId kWireBPM_AD_POWER_CMD = 61U;
+inline constexpr ::electricsim::io::WireId kWireHV_BUS_VOLTAGE_MV = 62U;
+inline constexpr ::electricsim::io::WireId kWireHV_BUS_CURRENT_MA = 63U;
+inline constexpr ::electricsim::io::WireId kWireHV_BUS_PRESENT = 64U;
+inline constexpr ::electricsim::io::WireId kWireAPM_OUTPUT_VOLTAGE_MV = 65U;
+inline constexpr ::electricsim::io::WireId kWireAPM_HV_CONTACTOR_CLOSED = 66U;
+inline constexpr ::electricsim::io::WireId kWireAPM_OUTPUT_CURRENT_Q8 = 67U;
+inline constexpr ::electricsim::io::WireId kWireGM8192_BPM_TX = 68U;
+inline constexpr ::electricsim::io::WireId kWireGM8192_BTCM_TX = 69U;
+inline constexpr ::electricsim::io::WireId kWireGM8192_PIM_TX = 70U;
+inline constexpr ::electricsim::io::WireId kWireGM8192_RSA_TX = 71U;
+inline constexpr ::electricsim::io::WireId kWireGM8192_HTCM_TX = 72U;
+inline constexpr ::electricsim::io::WireId kWireGM8192_IPC_TX = 73U;
+inline constexpr ::electricsim::io::WireId kWireGM8192_APM_TX = 74U;
+inline constexpr ::electricsim::io::WireId kWireGM8192_SCANTOOL_TX = 75U;
+inline constexpr ::electricsim::io::WireId kWireGM8192_BPM_TX_CLASS2 = 76U;
+inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_LBL = 77U;
+inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_RBL = 78U;
+inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_LHBH = 79U;
+inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_RHBH = 80U;
+inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_LLBH = 81U;
+inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_RLBH = 82U;
+inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_LRSM = 83U;
+inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_RRSM = 84U;
+inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_LFML = 85U;
+inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_RFML = 86U;
+inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_LFTS = 87U;
+inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_RFTS = 88U;
+inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_LRTS = 89U;
+inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_RRTS = 90U;
+inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_LRSL = 91U;
+inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_CHMSL = 92U;
+inline constexpr ::electricsim::io::WireId kWireBULB_FEED_LINE_RRSL = 93U;
+inline constexpr ::electricsim::io::WireId kWireHORN_DRIVE_LINE_LOW = 94U;
+inline constexpr ::electricsim::io::WireId kWireHORN_DRIVE_LINE_HIGH = 95U;
+inline constexpr ::electricsim::io::WireId kWirePANEL_AJAR_HOOD = 96U;
+inline constexpr ::electricsim::io::WireId kWirePANEL_AJAR_TRUNK = 97U;
+inline constexpr ::electricsim::io::WireId kWirePANEL_AJAR_DOOR_LEFT = 98U;
+inline constexpr ::electricsim::io::WireId kWirePANEL_AJAR_DOOR_RIGHT = 99U;
+inline constexpr ::electricsim::io::WireId kWireCOMB_SW_LOW_BEAM_OUT = 100U;
+inline constexpr ::electricsim::io::WireId kWireCOMB_SW_FLASH_TO_PASS_OUT = 101U;
+inline constexpr ::electricsim::io::WireId kWireCOMB_SW_PARK_HEADLAMP_OUT = 102U;
+inline constexpr ::electricsim::io::WireId kWireTURN_HAZ_SW_RIGHT_TURN_OUT = 103U;
+inline constexpr ::electricsim::io::WireId kWireTURN_HAZ_SW_LEFT_TURN_OUT = 104U;
+inline constexpr ::electricsim::io::WireId kWireTURN_HAZ_SW_HAZARD_OUT = 105U;
+inline constexpr ::electricsim::io::WireId kWireTURN_HAZ_SW_HORN_OUT = 106U;
+inline constexpr ::electricsim::io::WireId kWireCRUISE_SW_SET_COAST_OUT = 107U;
+inline constexpr ::electricsim::io::WireId kWireCRUISE_SW_RESUME_ACCEL_OUT = 108U;
+inline constexpr ::electricsim::io::WireId kWireCRUISE_SW_ON_OFF_OUT = 109U;
+inline constexpr ::electricsim::io::WireId kWirePRND_SELECTOR_A = 110U;
+inline constexpr ::electricsim::io::WireId kWirePRND_SELECTOR_B = 111U;
+inline constexpr ::electricsim::io::WireId kWirePRND_SELECTOR_C = 112U;
+inline constexpr ::electricsim::io::WireId kWirePRND_SELECTOR_D = 113U;
+inline constexpr ::electricsim::io::WireId kWireWIPER_SW_DELAY_OUT = 114U;
+inline constexpr ::electricsim::io::WireId kWireWIPER_SW_REQUEST_OUT = 115U;
+inline constexpr ::electricsim::io::WireId kWireWIPER_SW_HI_OUT = 116U;
+inline constexpr ::electricsim::io::WireId kWireWIPER_SW_WASHER_SWITCH_OUT = 117U;
+inline constexpr ::electricsim::io::WireId kWireCHARGER_COUPLER_PRESENT = 118U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_MOTOR_RPM = 119U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_MOTOR_TORQUE_NM = 120U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_MOTOR_CURRENT_A = 121U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_THROTTLE_CMD_Q8 = 122U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_BRAKE_MASTER_PRESSURE_KPA = 123U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_SIM_TIME_NS = 124U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_WIPER_MOTOR_COMMAND = 125U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_WASHER_PUMP_COMMAND = 126U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_HVAC_BLOWER_LEVEL = 127U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_DEFROST_GRID_ACTIVE = 128U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_DOOR_LOCK_CMD_DRIVER = 129U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_DOOR_LOCK_CMD_PASSENGER = 130U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_POWER_WINDOW_MOTOR_DRIVER = 131U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_POWER_WINDOW_MOTOR_PASSENGER = 132U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_RSA_SHIFT_BLOCKED = 133U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_AMBIENT_TEMP_C = 134U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_AMBIENT_HUMIDITY_PCT = 135U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_SPEED_MPS = 136U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_ACCEL_LONG = 137U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_ACCEL_LAT = 138U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_YAW_RATE = 139U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_APPLIED_THROTTLE = 140U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_APPLIED_FRONT_BRAKE = 141U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_APPLIED_REAR_BRAKE = 142U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_FRONT_BRAKE_PRESSURE = 143U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_REAR_BRAKE_POSITION = 144U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_STEERING_TORQUE = 145U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_WHEEL_OMEGA_FL = 146U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_WHEEL_OMEGA_FR = 147U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_WHEEL_OMEGA_RL = 148U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_WHEEL_OMEGA_RR = 149U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_SLIP_RATIO_FL = 150U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_SLIP_RATIO_FR = 151U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_SLIP_RATIO_RL = 152U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_SLIP_RATIO_RR = 153U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_SEATBELT_TELLTALE_DRIVER = 154U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_SEATBELT_TELLTALE_PASSENGER = 155U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_TRIP_DISTANCE_M = 156U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_BRAKE_TELLTALE = 157U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_PARK_BRAKE_TELLTALE = 158U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_ANTILOCK_TELLTALE = 159U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_LOW_TRAC_TELLTALE = 160U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_AIR_BAG_TELLTALE = 161U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_SERVICE_NOW_TELLTALE = 162U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_CHECK_MESSAGES_TELLTALE = 163U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_TEMP_TELLTALE = 164U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_BATTERY_LIFE_TELLTALE = 165U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_REDUCED_PERF_TELLTALE = 166U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_CHECK_TIRE_PRESS_TELLTALE = 167U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_LEFT_TURN_TELLTALE = 168U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_RIGHT_TURN_TELLTALE = 169U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_HIGH_BEAM_TELLTALE = 170U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_PARK_LAMP_TELLTALE = 171U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_DOOR_AJAR_TELLTALE = 172U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_DIM_DUTY_PCT = 173U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_REGEN_REDUCTION_Q8 = 174U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_ISO_CLOSE_FL = 175U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_ISO_CLOSE_FR = 176U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_DUMP_OPEN_FL = 177U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_DUMP_OPEN_FR = 178U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_EMB_MOTOR_CMD_LR = 179U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_EMB_MOTOR_CMD_RR = 180U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_CYL_PRESSURE_FL_K_PA = 181U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_CYL_PRESSURE_FR_K_PA = 182U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_REGEN_DISABLE_OUT = 183U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_RETARD_REQUEST_DUTY_Q8 = 184U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_DOOR_LOCK_STATE_DRIVER = 185U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_DOOR_LOCK_STATE_PASSENGER = 186U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_DOOR_LOCK_STATE_TRUNK = 187U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_ROAD_GRADE_PCT = 188U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_PITCH_DEG = 189U;
+inline constexpr ::electricsim::io::WireId kWireDOOR_LOCK_SW_LH_LOCK_OUT = 190U;
+inline constexpr ::electricsim::io::WireId kWireDOOR_LOCK_SW_LH_UNLOCK_OUT = 191U;
+inline constexpr ::electricsim::io::WireId kWireDOOR_LOCK_SW_RH_LOCK_OUT = 192U;
+inline constexpr ::electricsim::io::WireId kWireDOOR_LOCK_SW_RH_UNLOCK_OUT = 193U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_RHJB_PMM_RUN1_BUS = 194U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_RHJB_PMM_RUN2_BUS = 195U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_RHJB_DLM_LH_LOCK = 196U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_RHJB_DLM_LH_UNLOCK = 197U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_RHJB_DLM_RH_LOCK = 198U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_RHJB_DLM_RH_UNLOCK = 199U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_RHJB_DILM_LEVEL = 200U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_RHJB_PMM_MODULE_BPLUS = 201U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_RSA_DIM_LEVEL_STEP = 202U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_LHJB_PARK_LAMPS_ON = 203U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_APM_BPLUS_ACTIVE = 204U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_AUX_BATTERY_TERMINAL_MV = 205U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_AUX_BATTERY_PRESENT = 206U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_AUX_BATTERY_SOC_PCT = 207U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_AUX_BATTERY_MAINT_WAKE_REQ = 208U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_APM_TWELVE_VOLT_OUTPUT_MA = 209U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_BRAKE_PEDAL_Q8 = 210U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_STEERING_DEG_Q8 = 211U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_GEAR_SELECTOR = 212U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_THROTTLE_Q8 = 213U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_BRAKE_SWITCH = 214U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_SEATBELT_BUCKLED = 215U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_SEATBELT_BUCKLED_PASSENGER = 216U;
+inline constexpr ::electricsim::io::WireId kWireEXT_WHEEL_SPEED_FL = 217U;
+inline constexpr ::electricsim::io::WireId kWireEXT_WHEEL_SPEED_FR = 218U;
+inline constexpr ::electricsim::io::WireId kWireEXT_WHEEL_SPEED_RL = 219U;
+inline constexpr ::electricsim::io::WireId kWireEXT_WHEEL_SPEED_RR = 220U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_IPC_TRIP_RESET_BUTTON = 221U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_MODE_BUTTON = 222U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_KEYPAD_BUTTON1 = 223U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_KEYPAD_BUTTON2 = 224U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_KEYPAD_BUTTON3 = 225U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_KEYPAD_BUTTON4 = 226U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_KEYPAD_BUTTON5 = 227U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_POWER_WINDOW_DRIVER_UP = 228U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_POWER_WINDOW_DRIVER_DOWN = 229U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_POWER_WINDOW_PASSENGER_UP = 230U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_POWER_WINDOW_PASSENGER_DOWN = 231U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_EXTERIOR_KEYPAD1 = 232U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_EXTERIOR_KEYPAD2 = 233U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_EXTERIOR_KEYPAD3 = 234U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_EXTERIOR_KEYPAD4 = 235U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_EXTERIOR_KEYPAD5 = 236U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_DOOR_HANDLE_ATTEMPT_DRIVER = 237U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_DOOR_HANDLE_ATTEMPT_PASSENGER = 238U;
+inline constexpr ::electricsim::io::WireId kWirePIM_CRUISE_ACTIVE = 239U;
+inline constexpr ::electricsim::io::WireId kWirePIM_CRUISE_SETPOINT_MPS = 240U;
+inline constexpr ::electricsim::io::WireId kWirePIM_PHASE_CURRENT_Q8 = 241U;
+inline constexpr ::electricsim::io::WireId kWireAD_PRECHARGE_RELAY = 242U;
+inline constexpr ::electricsim::io::WireId kWireAD_MAIN_CONTACTOR = 243U;
+inline constexpr ::electricsim::io::WireId kWireAD_ISOLATION_KOHM = 244U;
+inline constexpr ::electricsim::io::WireId kWireAD_MAIN_CONTACTOR_FB = 245U;
+inline constexpr ::electricsim::io::WireId kWireAD_PRECHARGE_CONTACTOR_FB = 246U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_HTCM_PACK_TEMP_Q8 = 247U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_HTCM_INLET_TEMP_Q8 = 248U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_HTCM_COOLANT_TEMP_Q8 = 249U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_HTCM_PIM_TEMP_Q8 = 250U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_HTCM_REFRIG_LOW_KPA = 251U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_HTCM_REFRIG_HIGH_KPA = 252U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_HTCM_REFRIG_DISCHARGE_TEMP_Q8 = 253U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_HTCM_REFRIG_TEMP_Q8 = 254U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_HTCM_DRIVE_MOTOR_COOLANT_TEMP_Q8 = 255U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_HTCM_COOLANT_PUMP_TEMP_Q8 = 256U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_HTCM_COOLANT_LEVEL_LOW = 257U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_HTCM_WAKE_UP = 258U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_HTCM_OUTSIDE_AIR_TEMP_Q8 = 259U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_HTCM_COOLANT_PUMP_FEED = 260U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_HTCM_RADIATOR_FAN_FEED = 261U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_HTCM_HEATER_VALVE_FEED = 262U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_HTCM_MODE_DOOR_CMD = 263U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_HTCM_OUTSIDE_AIR_VALVE_CMD = 264U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_HTCM_REVERSING_VALVE_CMD = 265U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_HTCM_THREE_WAY_COOLANT_VALVE_CMD = 266U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_HTCM_COOLANT_RECOVERY_VALVE_CMD = 267U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_HTCM_CHARGER_RECEPTACLE_COOLANT_VALVE_CMD = 268U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_APM_KEY_ON = 269U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_APM_RUN_MODE = 270U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_APM_TARGET_SETPOINT_MV = 271U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_APM_MODULE_TEMP_CDEG = 272U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_APM_STATUS_12V_NOMINAL = 273U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_APM_APS_COMMAND_QUALIFIED = 274U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_APM_APS_COMMAND_STALE = 275U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_APM_SUBSYS_ENABLED_MASK = 276U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_APM_LAMP_REQUEST_MASK = 277U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_APM_ACTIVE_DTC_COUNT = 278U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_APM_HWS_COMMAND_ACTIVE = 279U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_APM_HWS_DRIVE_ENABLED = 280U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_APM_HWS_47V_OUTPUT_MV = 281U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_APM_HWS_FEEDBACK_MV = 282U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_APM_CMC_PWM_DUTY_PCT = 283U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_APM_CMC_TARGET_FREQ_HZ = 284U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_APM_CMC_DRIVE_ENABLED = 285U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_APM_CMC_MOTOR_INTERLOCK_CLOSED = 286U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_APM_CMC_IGBT_FAULT_ACTIVE = 287U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_APM_LOAD_SHED_ACTIVATION_COUNT = 288U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_IND_ANTILOCK = 289U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_IND_BRAKE = 290U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_IND_LOW_TRAC = 291U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_IND_PARK_BRAKE = 292U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_WHEEL_SPEED_FL = 293U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_WHEEL_SPEED_FR = 294U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_WHEEL_SPEED_RL = 295U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_WHEEL_SPEED_RR = 296U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_VEHICLE_SPEED = 297U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_AD_PACK_VOLTAGE_MV = 298U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_AD_CAP_VOLTAGE_MV = 299U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_AD_ISOLATION_KOHM = 300U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_AD_ACTIVE_DTC_BITMAP = 301U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_CHARGER_ACTUAL_CURRENT_DA = 302U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_CHARGER_ACTUAL_VOLTAGE_DV = 303U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_CHARGER_TEMP_C = 304U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_CHARGER_ENABLED = 305U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_CHARGER_SM_STATE = 306U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_CHARGER_FAULT_BITS = 307U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_CHARGER_COUPLER_TEMP_C = 308U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_CHARGER_AC_INPUT_MV = 309U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_RSA_RADIO_WAKEUP = 310U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_RSA_ACC_OUT = 311U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_RSA_BTSI_SOLENOID = 312U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_RSA_SECURITY_INDICATOR = 313U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_RSA_VALID_CODE = 314U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_ACTIVE_DTC_COUNT = 315U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_RSA_SELECTOR_LED_PARK = 316U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_RSA_SELECTOR_LED_REVERSE = 317U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_RSA_SELECTOR_LED_NEUTRAL = 318U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_RSA_SELECTOR_LED_DRIVE = 319U;
+inline constexpr ::electricsim::io::WireId kWirePSCM_THERMAL_SWITCH_OPEN = 320U;
+inline constexpr ::electricsim::io::WireId kWirePSCM_HV_DRAW_Q8 = 321U;
+inline constexpr ::electricsim::io::WireId kWireSDM_DRIVER_LOOP_RESISTANCE_MOHM = 322U;
+inline constexpr ::electricsim::io::WireId kWireSDM_PASSENGER_LOOP_RESISTANCE_MOHM = 323U;
+inline constexpr ::electricsim::io::WireId kWireSDM_AIRBAG_IND_OUT = 324U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_IPC_INGEST_HEARTBEAT = 325U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_TJB_LR_TAIL_LAMP = 326U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_TJB_RR_TAIL_LAMP = 327U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_TJB_LICENSE_LAMPS = 328U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_TJB_LR_TURN_LAMP = 329U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_TJB_RR_TURN_LAMP = 330U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_TJB_LR_STOP_LAMP = 331U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_TJB_RR_STOP_LAMP = 332U;
+inline constexpr ::electricsim::io::WireId kWireBPM_AD_FORCE_CMD = 333U;
+inline constexpr ::electricsim::io::WireId kWireAD_WELD_STATUS = 334U;
+inline constexpr ::electricsim::io::WireId kWireBPM_APM_AUX_CHARGE_CMD = 335U;
+inline constexpr ::electricsim::io::WireId kWireHTCM_COMPRESSOR_PWM_CMD = 336U;
 
 // Per-net default + init_policy constants (round-4 step 4b).
 // Used by consumers that opt into the kDefault policy — see
@@ -384,6 +482,12 @@ inline constexpr auto kWireBPM_VEHICLE_WAKEUP_Default = false;
 inline constexpr InitPolicy kWireBPM_VEHICLE_WAKEUP_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireBPM_COUPLER_PRESENT_Default = false;
 inline constexpr InitPolicy kWireBPM_COUPLER_PRESENT_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireBPM_SHUNT_SENSE_HEALTHY_Default = true;
+inline constexpr InitPolicy kWireBPM_SHUNT_SENSE_HEALTHY_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireHTCM_PERIODIC_WAKE_PULSE_Default = static_cast<std::uint8_t>(0x0U);
+inline constexpr InitPolicy kWireHTCM_PERIODIC_WAKE_PULSE_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireBPM_AD_POWER_CMD_Default = false;
+inline constexpr InitPolicy kWireBPM_AD_POWER_CMD_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireHV_BUS_VOLTAGE_MV_Default = 0x0U;
 inline constexpr InitPolicy kWireHV_BUS_VOLTAGE_MV_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireHV_BUS_CURRENT_MA_Default = 0x0U;
@@ -394,6 +498,8 @@ inline constexpr auto kWireAPM_OUTPUT_VOLTAGE_MV_Default = 0x0U;
 inline constexpr InitPolicy kWireAPM_OUTPUT_VOLTAGE_MV_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireAPM_HV_CONTACTOR_CLOSED_Default = false;
 inline constexpr InitPolicy kWireAPM_HV_CONTACTOR_CLOSED_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireAPM_OUTPUT_CURRENT_Q8_Default = static_cast<std::uint16_t>(0x0U);
+inline constexpr InitPolicy kWireAPM_OUTPUT_CURRENT_Q8_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireGM8192_BPM_TX_Default = true;
 inline constexpr InitPolicy kWireGM8192_BPM_TX_InitPolicy = InitPolicy::kDefault;
 inline constexpr auto kWireGM8192_BTCM_TX_Default = true;
@@ -704,23 +810,23 @@ inline constexpr auto kWireDRIVER_IPC_TRIP_RESET_BUTTON_Default = false;
 inline constexpr InitPolicy kWireDRIVER_IPC_TRIP_RESET_BUTTON_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireDRIVER_RSA_MODE_BUTTON_Default = static_cast<std::uint8_t>(0x0U);
 inline constexpr InitPolicy kWireDRIVER_RSA_MODE_BUTTON_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_RSA_KEYPAD_BUTTON1_Default = false;
+inline constexpr auto kWireDRIVER_RSA_KEYPAD_BUTTON1_Default = static_cast<std::uint8_t>(0x0U);
 inline constexpr InitPolicy kWireDRIVER_RSA_KEYPAD_BUTTON1_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_RSA_KEYPAD_BUTTON2_Default = false;
+inline constexpr auto kWireDRIVER_RSA_KEYPAD_BUTTON2_Default = static_cast<std::uint8_t>(0x0U);
 inline constexpr InitPolicy kWireDRIVER_RSA_KEYPAD_BUTTON2_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_RSA_KEYPAD_BUTTON3_Default = false;
+inline constexpr auto kWireDRIVER_RSA_KEYPAD_BUTTON3_Default = static_cast<std::uint8_t>(0x0U);
 inline constexpr InitPolicy kWireDRIVER_RSA_KEYPAD_BUTTON3_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_RSA_KEYPAD_BUTTON4_Default = false;
+inline constexpr auto kWireDRIVER_RSA_KEYPAD_BUTTON4_Default = static_cast<std::uint8_t>(0x0U);
 inline constexpr InitPolicy kWireDRIVER_RSA_KEYPAD_BUTTON4_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_RSA_KEYPAD_BUTTON5_Default = false;
+inline constexpr auto kWireDRIVER_RSA_KEYPAD_BUTTON5_Default = static_cast<std::uint8_t>(0x0U);
 inline constexpr InitPolicy kWireDRIVER_RSA_KEYPAD_BUTTON5_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_POWER_WINDOW_DRIVER_UP_Default = false;
+inline constexpr auto kWireDRIVER_POWER_WINDOW_DRIVER_UP_Default = static_cast<std::uint8_t>(0x0U);
 inline constexpr InitPolicy kWireDRIVER_POWER_WINDOW_DRIVER_UP_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_POWER_WINDOW_DRIVER_DOWN_Default = false;
+inline constexpr auto kWireDRIVER_POWER_WINDOW_DRIVER_DOWN_Default = static_cast<std::uint8_t>(0x0U);
 inline constexpr InitPolicy kWireDRIVER_POWER_WINDOW_DRIVER_DOWN_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_POWER_WINDOW_PASSENGER_UP_Default = false;
+inline constexpr auto kWireDRIVER_POWER_WINDOW_PASSENGER_UP_Default = static_cast<std::uint8_t>(0x0U);
 inline constexpr InitPolicy kWireDRIVER_POWER_WINDOW_PASSENGER_UP_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_POWER_WINDOW_PASSENGER_DOWN_Default = false;
+inline constexpr auto kWireDRIVER_POWER_WINDOW_PASSENGER_DOWN_Default = static_cast<std::uint8_t>(0x0U);
 inline constexpr InitPolicy kWireDRIVER_POWER_WINDOW_PASSENGER_DOWN_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireDRIVER_RSA_EXTERIOR_KEYPAD1_Default = static_cast<std::uint8_t>(0x0U);
 inline constexpr InitPolicy kWireDRIVER_RSA_EXTERIOR_KEYPAD1_InitPolicy = InitPolicy::kHold;
@@ -740,10 +846,198 @@ inline constexpr auto kWirePIM_CRUISE_ACTIVE_Default = false;
 inline constexpr InitPolicy kWirePIM_CRUISE_ACTIVE_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWirePIM_CRUISE_SETPOINT_MPS_Default = 0.0f;
 inline constexpr InitPolicy kWirePIM_CRUISE_SETPOINT_MPS_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWirePIM_PHASE_CURRENT_Q8_Default = static_cast<std::uint16_t>(0x0U);
+inline constexpr InitPolicy kWirePIM_PHASE_CURRENT_Q8_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireAD_PRECHARGE_RELAY_Default = false;
 inline constexpr InitPolicy kWireAD_PRECHARGE_RELAY_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireAD_MAIN_CONTACTOR_Default = false;
 inline constexpr InitPolicy kWireAD_MAIN_CONTACTOR_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireAD_ISOLATION_KOHM_Default = 0x0U;
+inline constexpr InitPolicy kWireAD_ISOLATION_KOHM_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireAD_MAIN_CONTACTOR_FB_Default = false;
+inline constexpr InitPolicy kWireAD_MAIN_CONTACTOR_FB_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireAD_PRECHARGE_CONTACTOR_FB_Default = false;
+inline constexpr InitPolicy kWireAD_PRECHARGE_CONTACTOR_FB_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_HTCM_PACK_TEMP_Q8_Default = static_cast<std::uint16_t>(0x0U);
+inline constexpr InitPolicy kWireCHASSIS_HTCM_PACK_TEMP_Q8_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_HTCM_INLET_TEMP_Q8_Default = static_cast<std::uint16_t>(0x0U);
+inline constexpr InitPolicy kWireCHASSIS_HTCM_INLET_TEMP_Q8_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_HTCM_COOLANT_TEMP_Q8_Default = static_cast<std::uint16_t>(0x0U);
+inline constexpr InitPolicy kWireCHASSIS_HTCM_COOLANT_TEMP_Q8_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_HTCM_PIM_TEMP_Q8_Default = static_cast<std::uint16_t>(0x0U);
+inline constexpr InitPolicy kWireCHASSIS_HTCM_PIM_TEMP_Q8_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_HTCM_REFRIG_LOW_KPA_Default = static_cast<std::uint16_t>(0x0U);
+inline constexpr InitPolicy kWireCHASSIS_HTCM_REFRIG_LOW_KPA_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_HTCM_REFRIG_HIGH_KPA_Default = static_cast<std::uint16_t>(0x0U);
+inline constexpr InitPolicy kWireCHASSIS_HTCM_REFRIG_HIGH_KPA_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_HTCM_REFRIG_DISCHARGE_TEMP_Q8_Default = static_cast<std::uint16_t>(0x0U);
+inline constexpr InitPolicy kWireCHASSIS_HTCM_REFRIG_DISCHARGE_TEMP_Q8_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_HTCM_REFRIG_TEMP_Q8_Default = static_cast<std::uint16_t>(0x0U);
+inline constexpr InitPolicy kWireCHASSIS_HTCM_REFRIG_TEMP_Q8_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_HTCM_DRIVE_MOTOR_COOLANT_TEMP_Q8_Default = static_cast<std::uint16_t>(0x0U);
+inline constexpr InitPolicy kWireCHASSIS_HTCM_DRIVE_MOTOR_COOLANT_TEMP_Q8_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_HTCM_COOLANT_PUMP_TEMP_Q8_Default = static_cast<std::uint16_t>(0x0U);
+inline constexpr InitPolicy kWireCHASSIS_HTCM_COOLANT_PUMP_TEMP_Q8_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_HTCM_COOLANT_LEVEL_LOW_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_HTCM_COOLANT_LEVEL_LOW_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_HTCM_WAKE_UP_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_HTCM_WAKE_UP_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_HTCM_OUTSIDE_AIR_TEMP_Q8_Default = static_cast<std::uint16_t>(0x0U);
+inline constexpr InitPolicy kWireCHASSIS_HTCM_OUTSIDE_AIR_TEMP_Q8_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_HTCM_COOLANT_PUMP_FEED_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_HTCM_COOLANT_PUMP_FEED_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_HTCM_RADIATOR_FAN_FEED_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_HTCM_RADIATOR_FAN_FEED_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_HTCM_HEATER_VALVE_FEED_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_HTCM_HEATER_VALVE_FEED_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_HTCM_MODE_DOOR_CMD_Default = static_cast<std::uint8_t>(0x0U);
+inline constexpr InitPolicy kWireCHASSIS_HTCM_MODE_DOOR_CMD_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_HTCM_OUTSIDE_AIR_VALVE_CMD_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_HTCM_OUTSIDE_AIR_VALVE_CMD_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_HTCM_REVERSING_VALVE_CMD_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_HTCM_REVERSING_VALVE_CMD_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_HTCM_THREE_WAY_COOLANT_VALVE_CMD_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_HTCM_THREE_WAY_COOLANT_VALVE_CMD_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_HTCM_COOLANT_RECOVERY_VALVE_CMD_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_HTCM_COOLANT_RECOVERY_VALVE_CMD_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_HTCM_CHARGER_RECEPTACLE_COOLANT_VALVE_CMD_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_HTCM_CHARGER_RECEPTACLE_COOLANT_VALVE_CMD_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_APM_KEY_ON_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_APM_KEY_ON_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_APM_RUN_MODE_Default = static_cast<std::uint8_t>(0x0U);
+inline constexpr InitPolicy kWireCHASSIS_APM_RUN_MODE_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_APM_TARGET_SETPOINT_MV_Default = static_cast<std::uint16_t>(0x0U);
+inline constexpr InitPolicy kWireCHASSIS_APM_TARGET_SETPOINT_MV_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_APM_MODULE_TEMP_CDEG_Default = 0x0U;
+inline constexpr InitPolicy kWireCHASSIS_APM_MODULE_TEMP_CDEG_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_APM_STATUS_12V_NOMINAL_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_APM_STATUS_12V_NOMINAL_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_APM_APS_COMMAND_QUALIFIED_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_APM_APS_COMMAND_QUALIFIED_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_APM_APS_COMMAND_STALE_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_APM_APS_COMMAND_STALE_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_APM_SUBSYS_ENABLED_MASK_Default = static_cast<std::uint8_t>(0x0U);
+inline constexpr InitPolicy kWireCHASSIS_APM_SUBSYS_ENABLED_MASK_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_APM_LAMP_REQUEST_MASK_Default = static_cast<std::uint8_t>(0x0U);
+inline constexpr InitPolicy kWireCHASSIS_APM_LAMP_REQUEST_MASK_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_APM_ACTIVE_DTC_COUNT_Default = static_cast<std::uint8_t>(0x0U);
+inline constexpr InitPolicy kWireCHASSIS_APM_ACTIVE_DTC_COUNT_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_APM_HWS_COMMAND_ACTIVE_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_APM_HWS_COMMAND_ACTIVE_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_APM_HWS_DRIVE_ENABLED_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_APM_HWS_DRIVE_ENABLED_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_APM_HWS_47V_OUTPUT_MV_Default = static_cast<std::uint16_t>(0x0U);
+inline constexpr InitPolicy kWireCHASSIS_APM_HWS_47V_OUTPUT_MV_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_APM_HWS_FEEDBACK_MV_Default = static_cast<std::uint16_t>(0x0U);
+inline constexpr InitPolicy kWireCHASSIS_APM_HWS_FEEDBACK_MV_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_APM_CMC_PWM_DUTY_PCT_Default = static_cast<std::uint8_t>(0x0U);
+inline constexpr InitPolicy kWireCHASSIS_APM_CMC_PWM_DUTY_PCT_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_APM_CMC_TARGET_FREQ_HZ_Default = static_cast<std::uint8_t>(0x0U);
+inline constexpr InitPolicy kWireCHASSIS_APM_CMC_TARGET_FREQ_HZ_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_APM_CMC_DRIVE_ENABLED_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_APM_CMC_DRIVE_ENABLED_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_APM_CMC_MOTOR_INTERLOCK_CLOSED_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_APM_CMC_MOTOR_INTERLOCK_CLOSED_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_APM_CMC_IGBT_FAULT_ACTIVE_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_APM_CMC_IGBT_FAULT_ACTIVE_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_APM_LOAD_SHED_ACTIVATION_COUNT_Default = static_cast<std::uint16_t>(0x0U);
+inline constexpr InitPolicy kWireCHASSIS_APM_LOAD_SHED_ACTIVATION_COUNT_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_BTCM_IND_ANTILOCK_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_BTCM_IND_ANTILOCK_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_BTCM_IND_BRAKE_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_BTCM_IND_BRAKE_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_BTCM_IND_LOW_TRAC_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_BTCM_IND_LOW_TRAC_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_BTCM_IND_PARK_BRAKE_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_BTCM_IND_PARK_BRAKE_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_BTCM_WHEEL_SPEED_FL_Default = 0.0f;
+inline constexpr InitPolicy kWireCHASSIS_BTCM_WHEEL_SPEED_FL_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_BTCM_WHEEL_SPEED_FR_Default = 0.0f;
+inline constexpr InitPolicy kWireCHASSIS_BTCM_WHEEL_SPEED_FR_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_BTCM_WHEEL_SPEED_RL_Default = 0.0f;
+inline constexpr InitPolicy kWireCHASSIS_BTCM_WHEEL_SPEED_RL_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_BTCM_WHEEL_SPEED_RR_Default = 0.0f;
+inline constexpr InitPolicy kWireCHASSIS_BTCM_WHEEL_SPEED_RR_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_BTCM_VEHICLE_SPEED_Default = 0.0f;
+inline constexpr InitPolicy kWireCHASSIS_BTCM_VEHICLE_SPEED_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_AD_PACK_VOLTAGE_MV_Default = 0x0U;
+inline constexpr InitPolicy kWireCHASSIS_AD_PACK_VOLTAGE_MV_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_AD_CAP_VOLTAGE_MV_Default = 0x0U;
+inline constexpr InitPolicy kWireCHASSIS_AD_CAP_VOLTAGE_MV_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_AD_ISOLATION_KOHM_Default = 0x0U;
+inline constexpr InitPolicy kWireCHASSIS_AD_ISOLATION_KOHM_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_AD_ACTIVE_DTC_BITMAP_Default = 0x0U;
+inline constexpr InitPolicy kWireCHASSIS_AD_ACTIVE_DTC_BITMAP_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_CHARGER_ACTUAL_CURRENT_DA_Default = 0x0U;
+inline constexpr InitPolicy kWireCHASSIS_CHARGER_ACTUAL_CURRENT_DA_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_CHARGER_ACTUAL_VOLTAGE_DV_Default = 0x0U;
+inline constexpr InitPolicy kWireCHASSIS_CHARGER_ACTUAL_VOLTAGE_DV_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_CHARGER_TEMP_C_Default = 0x0U;
+inline constexpr InitPolicy kWireCHASSIS_CHARGER_TEMP_C_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_CHARGER_ENABLED_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_CHARGER_ENABLED_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_CHARGER_SM_STATE_Default = 0x0U;
+inline constexpr InitPolicy kWireCHASSIS_CHARGER_SM_STATE_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_CHARGER_FAULT_BITS_Default = 0x0U;
+inline constexpr InitPolicy kWireCHASSIS_CHARGER_FAULT_BITS_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_CHARGER_COUPLER_TEMP_C_Default = 0x0U;
+inline constexpr InitPolicy kWireCHASSIS_CHARGER_COUPLER_TEMP_C_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_CHARGER_AC_INPUT_MV_Default = 0x0U;
+inline constexpr InitPolicy kWireCHASSIS_CHARGER_AC_INPUT_MV_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_RSA_RADIO_WAKEUP_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_RSA_RADIO_WAKEUP_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_RSA_ACC_OUT_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_RSA_ACC_OUT_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_RSA_BTSI_SOLENOID_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_RSA_BTSI_SOLENOID_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_RSA_SECURITY_INDICATOR_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_RSA_SECURITY_INDICATOR_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_RSA_VALID_CODE_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_RSA_VALID_CODE_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_IPC_ACTIVE_DTC_COUNT_Default = static_cast<std::uint8_t>(0x0U);
+inline constexpr InitPolicy kWireCHASSIS_IPC_ACTIVE_DTC_COUNT_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_RSA_SELECTOR_LED_PARK_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_RSA_SELECTOR_LED_PARK_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_RSA_SELECTOR_LED_REVERSE_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_RSA_SELECTOR_LED_REVERSE_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_RSA_SELECTOR_LED_NEUTRAL_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_RSA_SELECTOR_LED_NEUTRAL_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_RSA_SELECTOR_LED_DRIVE_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_RSA_SELECTOR_LED_DRIVE_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWirePSCM_THERMAL_SWITCH_OPEN_Default = false;
+inline constexpr InitPolicy kWirePSCM_THERMAL_SWITCH_OPEN_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWirePSCM_HV_DRAW_Q8_Default = static_cast<std::uint16_t>(0x0U);
+inline constexpr InitPolicy kWirePSCM_HV_DRAW_Q8_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireSDM_DRIVER_LOOP_RESISTANCE_MOHM_Default = 0x0U;
+inline constexpr InitPolicy kWireSDM_DRIVER_LOOP_RESISTANCE_MOHM_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireSDM_PASSENGER_LOOP_RESISTANCE_MOHM_Default = 0x0U;
+inline constexpr InitPolicy kWireSDM_PASSENGER_LOOP_RESISTANCE_MOHM_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireSDM_AIRBAG_IND_OUT_Default = false;
+inline constexpr InitPolicy kWireSDM_AIRBAG_IND_OUT_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_IPC_INGEST_HEARTBEAT_Default = 0x0U;
+inline constexpr InitPolicy kWireCHASSIS_IPC_INGEST_HEARTBEAT_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_TJB_LR_TAIL_LAMP_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_TJB_LR_TAIL_LAMP_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_TJB_RR_TAIL_LAMP_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_TJB_RR_TAIL_LAMP_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_TJB_LICENSE_LAMPS_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_TJB_LICENSE_LAMPS_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_TJB_LR_TURN_LAMP_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_TJB_LR_TURN_LAMP_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_TJB_RR_TURN_LAMP_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_TJB_RR_TURN_LAMP_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_TJB_LR_STOP_LAMP_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_TJB_LR_STOP_LAMP_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_TJB_RR_STOP_LAMP_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_TJB_RR_STOP_LAMP_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireBPM_AD_FORCE_CMD_Default = static_cast<std::uint8_t>(0x0U);
+inline constexpr InitPolicy kWireBPM_AD_FORCE_CMD_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireAD_WELD_STATUS_Default = static_cast<std::uint8_t>(0x0U);
+inline constexpr InitPolicy kWireAD_WELD_STATUS_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireBPM_APM_AUX_CHARGE_CMD_Default = false;
+inline constexpr InitPolicy kWireBPM_APM_AUX_CHARGE_CMD_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireHTCM_COMPRESSOR_PWM_CMD_Default = static_cast<std::uint8_t>(0x0U);
+inline constexpr InitPolicy kWireHTCM_COMPRESSOR_PWM_CMD_InitPolicy = InitPolicy::kHold;
 
 // Declare every wire in this topology on the given (creator)
 // table. Returns true iff all declarations succeed.
@@ -807,11 +1101,15 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(kWireBPM_PARK_SELECT, ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(kWireBPM_VEHICLE_WAKEUP, ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(kWireBPM_COUPLER_PRESENT, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireBPM_SHUNT_SENSE_HEALTHY, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireHTCM_PERIODIC_WAKE_PULSE, ::electricsim::io::WireType::kByte) && ok;
+  ok = table.declare(kWireBPM_AD_POWER_CMD, ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(kWireHV_BUS_VOLTAGE_MV, ::electricsim::io::WireType::kUint32) && ok;
   ok = table.declare(kWireHV_BUS_CURRENT_MA, ::electricsim::io::WireType::kUint32) && ok;
   ok = table.declare(kWireHV_BUS_PRESENT, ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(kWireAPM_OUTPUT_VOLTAGE_MV, ::electricsim::io::WireType::kUint32) && ok;
   ok = table.declare(kWireAPM_HV_CONTACTOR_CLOSED, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireAPM_OUTPUT_CURRENT_Q8, ::electricsim::io::WireType::kUint16) && ok;
   ok = table.declare(kWireGM8192_BPM_TX, ::electricsim::io::WireType::kBitStream) && ok;
   ok = table.declare(kWireGM8192_BTCM_TX, ::electricsim::io::WireType::kBitStream) && ok;
   ok = table.declare(kWireGM8192_PIM_TX, ::electricsim::io::WireType::kBitStream) && ok;
@@ -967,15 +1265,15 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(kWireEXT_WHEEL_SPEED_RR, ::electricsim::io::WireType::kFloat32) && ok;
   ok = table.declare(kWireDRIVER_IPC_TRIP_RESET_BUTTON, ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(kWireDRIVER_RSA_MODE_BUTTON, ::electricsim::io::WireType::kByte) && ok;
-  ok = table.declare(kWireDRIVER_RSA_KEYPAD_BUTTON1, ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(kWireDRIVER_RSA_KEYPAD_BUTTON2, ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(kWireDRIVER_RSA_KEYPAD_BUTTON3, ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(kWireDRIVER_RSA_KEYPAD_BUTTON4, ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(kWireDRIVER_RSA_KEYPAD_BUTTON5, ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(kWireDRIVER_POWER_WINDOW_DRIVER_UP, ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(kWireDRIVER_POWER_WINDOW_DRIVER_DOWN, ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(kWireDRIVER_POWER_WINDOW_PASSENGER_UP, ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(kWireDRIVER_POWER_WINDOW_PASSENGER_DOWN, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireDRIVER_RSA_KEYPAD_BUTTON1, ::electricsim::io::WireType::kByte) && ok;
+  ok = table.declare(kWireDRIVER_RSA_KEYPAD_BUTTON2, ::electricsim::io::WireType::kByte) && ok;
+  ok = table.declare(kWireDRIVER_RSA_KEYPAD_BUTTON3, ::electricsim::io::WireType::kByte) && ok;
+  ok = table.declare(kWireDRIVER_RSA_KEYPAD_BUTTON4, ::electricsim::io::WireType::kByte) && ok;
+  ok = table.declare(kWireDRIVER_RSA_KEYPAD_BUTTON5, ::electricsim::io::WireType::kByte) && ok;
+  ok = table.declare(kWireDRIVER_POWER_WINDOW_DRIVER_UP, ::electricsim::io::WireType::kByte) && ok;
+  ok = table.declare(kWireDRIVER_POWER_WINDOW_DRIVER_DOWN, ::electricsim::io::WireType::kByte) && ok;
+  ok = table.declare(kWireDRIVER_POWER_WINDOW_PASSENGER_UP, ::electricsim::io::WireType::kByte) && ok;
+  ok = table.declare(kWireDRIVER_POWER_WINDOW_PASSENGER_DOWN, ::electricsim::io::WireType::kByte) && ok;
   ok = table.declare(kWireDRIVER_RSA_EXTERIOR_KEYPAD1, ::electricsim::io::WireType::kByte) && ok;
   ok = table.declare(kWireDRIVER_RSA_EXTERIOR_KEYPAD2, ::electricsim::io::WireType::kByte) && ok;
   ok = table.declare(kWireDRIVER_RSA_EXTERIOR_KEYPAD3, ::electricsim::io::WireType::kByte) && ok;
@@ -985,8 +1283,102 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(kWireDRIVER_DOOR_HANDLE_ATTEMPT_PASSENGER, ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(kWirePIM_CRUISE_ACTIVE, ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(kWirePIM_CRUISE_SETPOINT_MPS, ::electricsim::io::WireType::kFloat32) && ok;
+  ok = table.declare(kWirePIM_PHASE_CURRENT_Q8, ::electricsim::io::WireType::kUint16) && ok;
   ok = table.declare(kWireAD_PRECHARGE_RELAY, ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(kWireAD_MAIN_CONTACTOR, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireAD_ISOLATION_KOHM, ::electricsim::io::WireType::kUint32) && ok;
+  ok = table.declare(kWireAD_MAIN_CONTACTOR_FB, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireAD_PRECHARGE_CONTACTOR_FB, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_HTCM_PACK_TEMP_Q8, ::electricsim::io::WireType::kUint16) && ok;
+  ok = table.declare(kWireCHASSIS_HTCM_INLET_TEMP_Q8, ::electricsim::io::WireType::kUint16) && ok;
+  ok = table.declare(kWireCHASSIS_HTCM_COOLANT_TEMP_Q8, ::electricsim::io::WireType::kUint16) && ok;
+  ok = table.declare(kWireCHASSIS_HTCM_PIM_TEMP_Q8, ::electricsim::io::WireType::kUint16) && ok;
+  ok = table.declare(kWireCHASSIS_HTCM_REFRIG_LOW_KPA, ::electricsim::io::WireType::kUint16) && ok;
+  ok = table.declare(kWireCHASSIS_HTCM_REFRIG_HIGH_KPA, ::electricsim::io::WireType::kUint16) && ok;
+  ok = table.declare(kWireCHASSIS_HTCM_REFRIG_DISCHARGE_TEMP_Q8, ::electricsim::io::WireType::kUint16) && ok;
+  ok = table.declare(kWireCHASSIS_HTCM_REFRIG_TEMP_Q8, ::electricsim::io::WireType::kUint16) && ok;
+  ok = table.declare(kWireCHASSIS_HTCM_DRIVE_MOTOR_COOLANT_TEMP_Q8, ::electricsim::io::WireType::kUint16) && ok;
+  ok = table.declare(kWireCHASSIS_HTCM_COOLANT_PUMP_TEMP_Q8, ::electricsim::io::WireType::kUint16) && ok;
+  ok = table.declare(kWireCHASSIS_HTCM_COOLANT_LEVEL_LOW, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_HTCM_WAKE_UP, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_HTCM_OUTSIDE_AIR_TEMP_Q8, ::electricsim::io::WireType::kUint16) && ok;
+  ok = table.declare(kWireCHASSIS_HTCM_COOLANT_PUMP_FEED, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_HTCM_RADIATOR_FAN_FEED, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_HTCM_HEATER_VALVE_FEED, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_HTCM_MODE_DOOR_CMD, ::electricsim::io::WireType::kByte) && ok;
+  ok = table.declare(kWireCHASSIS_HTCM_OUTSIDE_AIR_VALVE_CMD, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_HTCM_REVERSING_VALVE_CMD, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_HTCM_THREE_WAY_COOLANT_VALVE_CMD, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_HTCM_COOLANT_RECOVERY_VALVE_CMD, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_HTCM_CHARGER_RECEPTACLE_COOLANT_VALVE_CMD, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_APM_KEY_ON, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_APM_RUN_MODE, ::electricsim::io::WireType::kByte) && ok;
+  ok = table.declare(kWireCHASSIS_APM_TARGET_SETPOINT_MV, ::electricsim::io::WireType::kUint16) && ok;
+  ok = table.declare(kWireCHASSIS_APM_MODULE_TEMP_CDEG, ::electricsim::io::WireType::kUint32) && ok;
+  ok = table.declare(kWireCHASSIS_APM_STATUS_12V_NOMINAL, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_APM_APS_COMMAND_QUALIFIED, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_APM_APS_COMMAND_STALE, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_APM_SUBSYS_ENABLED_MASK, ::electricsim::io::WireType::kByte) && ok;
+  ok = table.declare(kWireCHASSIS_APM_LAMP_REQUEST_MASK, ::electricsim::io::WireType::kByte) && ok;
+  ok = table.declare(kWireCHASSIS_APM_ACTIVE_DTC_COUNT, ::electricsim::io::WireType::kByte) && ok;
+  ok = table.declare(kWireCHASSIS_APM_HWS_COMMAND_ACTIVE, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_APM_HWS_DRIVE_ENABLED, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_APM_HWS_47V_OUTPUT_MV, ::electricsim::io::WireType::kUint16) && ok;
+  ok = table.declare(kWireCHASSIS_APM_HWS_FEEDBACK_MV, ::electricsim::io::WireType::kUint16) && ok;
+  ok = table.declare(kWireCHASSIS_APM_CMC_PWM_DUTY_PCT, ::electricsim::io::WireType::kByte) && ok;
+  ok = table.declare(kWireCHASSIS_APM_CMC_TARGET_FREQ_HZ, ::electricsim::io::WireType::kByte) && ok;
+  ok = table.declare(kWireCHASSIS_APM_CMC_DRIVE_ENABLED, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_APM_CMC_MOTOR_INTERLOCK_CLOSED, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_APM_CMC_IGBT_FAULT_ACTIVE, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_APM_LOAD_SHED_ACTIVATION_COUNT, ::electricsim::io::WireType::kUint16) && ok;
+  ok = table.declare(kWireCHASSIS_BTCM_IND_ANTILOCK, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_BTCM_IND_BRAKE, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_BTCM_IND_LOW_TRAC, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_BTCM_IND_PARK_BRAKE, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_BTCM_WHEEL_SPEED_FL, ::electricsim::io::WireType::kFloat32) && ok;
+  ok = table.declare(kWireCHASSIS_BTCM_WHEEL_SPEED_FR, ::electricsim::io::WireType::kFloat32) && ok;
+  ok = table.declare(kWireCHASSIS_BTCM_WHEEL_SPEED_RL, ::electricsim::io::WireType::kFloat32) && ok;
+  ok = table.declare(kWireCHASSIS_BTCM_WHEEL_SPEED_RR, ::electricsim::io::WireType::kFloat32) && ok;
+  ok = table.declare(kWireCHASSIS_BTCM_VEHICLE_SPEED, ::electricsim::io::WireType::kFloat32) && ok;
+  ok = table.declare(kWireCHASSIS_AD_PACK_VOLTAGE_MV, ::electricsim::io::WireType::kUint32) && ok;
+  ok = table.declare(kWireCHASSIS_AD_CAP_VOLTAGE_MV, ::electricsim::io::WireType::kUint32) && ok;
+  ok = table.declare(kWireCHASSIS_AD_ISOLATION_KOHM, ::electricsim::io::WireType::kUint32) && ok;
+  ok = table.declare(kWireCHASSIS_AD_ACTIVE_DTC_BITMAP, ::electricsim::io::WireType::kUint32) && ok;
+  ok = table.declare(kWireCHASSIS_CHARGER_ACTUAL_CURRENT_DA, ::electricsim::io::WireType::kUint32) && ok;
+  ok = table.declare(kWireCHASSIS_CHARGER_ACTUAL_VOLTAGE_DV, ::electricsim::io::WireType::kUint32) && ok;
+  ok = table.declare(kWireCHASSIS_CHARGER_TEMP_C, ::electricsim::io::WireType::kUint32) && ok;
+  ok = table.declare(kWireCHASSIS_CHARGER_ENABLED, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_CHARGER_SM_STATE, ::electricsim::io::WireType::kUint32) && ok;
+  ok = table.declare(kWireCHASSIS_CHARGER_FAULT_BITS, ::electricsim::io::WireType::kUint32) && ok;
+  ok = table.declare(kWireCHASSIS_CHARGER_COUPLER_TEMP_C, ::electricsim::io::WireType::kUint32) && ok;
+  ok = table.declare(kWireCHASSIS_CHARGER_AC_INPUT_MV, ::electricsim::io::WireType::kUint32) && ok;
+  ok = table.declare(kWireCHASSIS_RSA_RADIO_WAKEUP, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_RSA_ACC_OUT, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_RSA_BTSI_SOLENOID, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_RSA_SECURITY_INDICATOR, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_RSA_VALID_CODE, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_IPC_ACTIVE_DTC_COUNT, ::electricsim::io::WireType::kByte) && ok;
+  ok = table.declare(kWireCHASSIS_RSA_SELECTOR_LED_PARK, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_RSA_SELECTOR_LED_REVERSE, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_RSA_SELECTOR_LED_NEUTRAL, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_RSA_SELECTOR_LED_DRIVE, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWirePSCM_THERMAL_SWITCH_OPEN, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWirePSCM_HV_DRAW_Q8, ::electricsim::io::WireType::kUint16) && ok;
+  ok = table.declare(kWireSDM_DRIVER_LOOP_RESISTANCE_MOHM, ::electricsim::io::WireType::kUint32) && ok;
+  ok = table.declare(kWireSDM_PASSENGER_LOOP_RESISTANCE_MOHM, ::electricsim::io::WireType::kUint32) && ok;
+  ok = table.declare(kWireSDM_AIRBAG_IND_OUT, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_IPC_INGEST_HEARTBEAT, ::electricsim::io::WireType::kUint32) && ok;
+  ok = table.declare(kWireCHASSIS_TJB_LR_TAIL_LAMP, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_TJB_RR_TAIL_LAMP, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_TJB_LICENSE_LAMPS, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_TJB_LR_TURN_LAMP, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_TJB_RR_TURN_LAMP, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_TJB_LR_STOP_LAMP, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_TJB_RR_STOP_LAMP, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireBPM_AD_FORCE_CMD, ::electricsim::io::WireType::kByte) && ok;
+  ok = table.declare(kWireAD_WELD_STATUS, ::electricsim::io::WireType::kByte) && ok;
+  ok = table.declare(kWireBPM_APM_AUX_CHARGE_CMD, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireHTCM_COMPRESSOR_PWM_CMD, ::electricsim::io::WireType::kByte) && ok;
   return ok;
 }
 
@@ -1053,11 +1445,15 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case kWireBPM_PARK_SELECT: return "BPM_PARK_SELECT";
     case kWireBPM_VEHICLE_WAKEUP: return "BPM_VEHICLE_WAKEUP";
     case kWireBPM_COUPLER_PRESENT: return "BPM_COUPLER_PRESENT";
+    case kWireBPM_SHUNT_SENSE_HEALTHY: return "BPM_SHUNT_SENSE_HEALTHY";
+    case kWireHTCM_PERIODIC_WAKE_PULSE: return "HTCM_PERIODIC_WAKE_PULSE";
+    case kWireBPM_AD_POWER_CMD: return "BPM_AD_POWER_CMD";
     case kWireHV_BUS_VOLTAGE_MV: return "HV_BUS_VOLTAGE_MV";
     case kWireHV_BUS_CURRENT_MA: return "HV_BUS_CURRENT_MA";
     case kWireHV_BUS_PRESENT: return "HV_BUS_PRESENT";
     case kWireAPM_OUTPUT_VOLTAGE_MV: return "APM_OUTPUT_VOLTAGE_MV";
     case kWireAPM_HV_CONTACTOR_CLOSED: return "APM_HV_CONTACTOR_CLOSED";
+    case kWireAPM_OUTPUT_CURRENT_Q8: return "APM_OUTPUT_CURRENT_Q8";
     case kWireGM8192_BPM_TX: return "GM8192_BPM_TX";
     case kWireGM8192_BTCM_TX: return "GM8192_BTCM_TX";
     case kWireGM8192_PIM_TX: return "GM8192_PIM_TX";
@@ -1231,8 +1627,102 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case kWireDRIVER_DOOR_HANDLE_ATTEMPT_PASSENGER: return "DRIVER_DOOR_HANDLE_ATTEMPT_PASSENGER";
     case kWirePIM_CRUISE_ACTIVE: return "PIM_CRUISE_ACTIVE";
     case kWirePIM_CRUISE_SETPOINT_MPS: return "PIM_CRUISE_SETPOINT_MPS";
+    case kWirePIM_PHASE_CURRENT_Q8: return "PIM_PHASE_CURRENT_Q8";
     case kWireAD_PRECHARGE_RELAY: return "AD_PRECHARGE_RELAY";
     case kWireAD_MAIN_CONTACTOR: return "AD_MAIN_CONTACTOR";
+    case kWireAD_ISOLATION_KOHM: return "AD_ISOLATION_KOHM";
+    case kWireAD_MAIN_CONTACTOR_FB: return "AD_MAIN_CONTACTOR_FB";
+    case kWireAD_PRECHARGE_CONTACTOR_FB: return "AD_PRECHARGE_CONTACTOR_FB";
+    case kWireCHASSIS_HTCM_PACK_TEMP_Q8: return "CHASSIS_HTCM_PACK_TEMP_Q8";
+    case kWireCHASSIS_HTCM_INLET_TEMP_Q8: return "CHASSIS_HTCM_INLET_TEMP_Q8";
+    case kWireCHASSIS_HTCM_COOLANT_TEMP_Q8: return "CHASSIS_HTCM_COOLANT_TEMP_Q8";
+    case kWireCHASSIS_HTCM_PIM_TEMP_Q8: return "CHASSIS_HTCM_PIM_TEMP_Q8";
+    case kWireCHASSIS_HTCM_REFRIG_LOW_KPA: return "CHASSIS_HTCM_REFRIG_LOW_KPA";
+    case kWireCHASSIS_HTCM_REFRIG_HIGH_KPA: return "CHASSIS_HTCM_REFRIG_HIGH_KPA";
+    case kWireCHASSIS_HTCM_REFRIG_DISCHARGE_TEMP_Q8: return "CHASSIS_HTCM_REFRIG_DISCHARGE_TEMP_Q8";
+    case kWireCHASSIS_HTCM_REFRIG_TEMP_Q8: return "CHASSIS_HTCM_REFRIG_TEMP_Q8";
+    case kWireCHASSIS_HTCM_DRIVE_MOTOR_COOLANT_TEMP_Q8: return "CHASSIS_HTCM_DRIVE_MOTOR_COOLANT_TEMP_Q8";
+    case kWireCHASSIS_HTCM_COOLANT_PUMP_TEMP_Q8: return "CHASSIS_HTCM_COOLANT_PUMP_TEMP_Q8";
+    case kWireCHASSIS_HTCM_COOLANT_LEVEL_LOW: return "CHASSIS_HTCM_COOLANT_LEVEL_LOW";
+    case kWireCHASSIS_HTCM_WAKE_UP: return "CHASSIS_HTCM_WAKE_UP";
+    case kWireCHASSIS_HTCM_OUTSIDE_AIR_TEMP_Q8: return "CHASSIS_HTCM_OUTSIDE_AIR_TEMP_Q8";
+    case kWireCHASSIS_HTCM_COOLANT_PUMP_FEED: return "CHASSIS_HTCM_COOLANT_PUMP_FEED";
+    case kWireCHASSIS_HTCM_RADIATOR_FAN_FEED: return "CHASSIS_HTCM_RADIATOR_FAN_FEED";
+    case kWireCHASSIS_HTCM_HEATER_VALVE_FEED: return "CHASSIS_HTCM_HEATER_VALVE_FEED";
+    case kWireCHASSIS_HTCM_MODE_DOOR_CMD: return "CHASSIS_HTCM_MODE_DOOR_CMD";
+    case kWireCHASSIS_HTCM_OUTSIDE_AIR_VALVE_CMD: return "CHASSIS_HTCM_OUTSIDE_AIR_VALVE_CMD";
+    case kWireCHASSIS_HTCM_REVERSING_VALVE_CMD: return "CHASSIS_HTCM_REVERSING_VALVE_CMD";
+    case kWireCHASSIS_HTCM_THREE_WAY_COOLANT_VALVE_CMD: return "CHASSIS_HTCM_THREE_WAY_COOLANT_VALVE_CMD";
+    case kWireCHASSIS_HTCM_COOLANT_RECOVERY_VALVE_CMD: return "CHASSIS_HTCM_COOLANT_RECOVERY_VALVE_CMD";
+    case kWireCHASSIS_HTCM_CHARGER_RECEPTACLE_COOLANT_VALVE_CMD: return "CHASSIS_HTCM_CHARGER_RECEPTACLE_COOLANT_VALVE_CMD";
+    case kWireCHASSIS_APM_KEY_ON: return "CHASSIS_APM_KEY_ON";
+    case kWireCHASSIS_APM_RUN_MODE: return "CHASSIS_APM_RUN_MODE";
+    case kWireCHASSIS_APM_TARGET_SETPOINT_MV: return "CHASSIS_APM_TARGET_SETPOINT_MV";
+    case kWireCHASSIS_APM_MODULE_TEMP_CDEG: return "CHASSIS_APM_MODULE_TEMP_CDEG";
+    case kWireCHASSIS_APM_STATUS_12V_NOMINAL: return "CHASSIS_APM_STATUS_12V_NOMINAL";
+    case kWireCHASSIS_APM_APS_COMMAND_QUALIFIED: return "CHASSIS_APM_APS_COMMAND_QUALIFIED";
+    case kWireCHASSIS_APM_APS_COMMAND_STALE: return "CHASSIS_APM_APS_COMMAND_STALE";
+    case kWireCHASSIS_APM_SUBSYS_ENABLED_MASK: return "CHASSIS_APM_SUBSYS_ENABLED_MASK";
+    case kWireCHASSIS_APM_LAMP_REQUEST_MASK: return "CHASSIS_APM_LAMP_REQUEST_MASK";
+    case kWireCHASSIS_APM_ACTIVE_DTC_COUNT: return "CHASSIS_APM_ACTIVE_DTC_COUNT";
+    case kWireCHASSIS_APM_HWS_COMMAND_ACTIVE: return "CHASSIS_APM_HWS_COMMAND_ACTIVE";
+    case kWireCHASSIS_APM_HWS_DRIVE_ENABLED: return "CHASSIS_APM_HWS_DRIVE_ENABLED";
+    case kWireCHASSIS_APM_HWS_47V_OUTPUT_MV: return "CHASSIS_APM_HWS_47V_OUTPUT_MV";
+    case kWireCHASSIS_APM_HWS_FEEDBACK_MV: return "CHASSIS_APM_HWS_FEEDBACK_MV";
+    case kWireCHASSIS_APM_CMC_PWM_DUTY_PCT: return "CHASSIS_APM_CMC_PWM_DUTY_PCT";
+    case kWireCHASSIS_APM_CMC_TARGET_FREQ_HZ: return "CHASSIS_APM_CMC_TARGET_FREQ_HZ";
+    case kWireCHASSIS_APM_CMC_DRIVE_ENABLED: return "CHASSIS_APM_CMC_DRIVE_ENABLED";
+    case kWireCHASSIS_APM_CMC_MOTOR_INTERLOCK_CLOSED: return "CHASSIS_APM_CMC_MOTOR_INTERLOCK_CLOSED";
+    case kWireCHASSIS_APM_CMC_IGBT_FAULT_ACTIVE: return "CHASSIS_APM_CMC_IGBT_FAULT_ACTIVE";
+    case kWireCHASSIS_APM_LOAD_SHED_ACTIVATION_COUNT: return "CHASSIS_APM_LOAD_SHED_ACTIVATION_COUNT";
+    case kWireCHASSIS_BTCM_IND_ANTILOCK: return "CHASSIS_BTCM_IND_ANTILOCK";
+    case kWireCHASSIS_BTCM_IND_BRAKE: return "CHASSIS_BTCM_IND_BRAKE";
+    case kWireCHASSIS_BTCM_IND_LOW_TRAC: return "CHASSIS_BTCM_IND_LOW_TRAC";
+    case kWireCHASSIS_BTCM_IND_PARK_BRAKE: return "CHASSIS_BTCM_IND_PARK_BRAKE";
+    case kWireCHASSIS_BTCM_WHEEL_SPEED_FL: return "CHASSIS_BTCM_WHEEL_SPEED_FL";
+    case kWireCHASSIS_BTCM_WHEEL_SPEED_FR: return "CHASSIS_BTCM_WHEEL_SPEED_FR";
+    case kWireCHASSIS_BTCM_WHEEL_SPEED_RL: return "CHASSIS_BTCM_WHEEL_SPEED_RL";
+    case kWireCHASSIS_BTCM_WHEEL_SPEED_RR: return "CHASSIS_BTCM_WHEEL_SPEED_RR";
+    case kWireCHASSIS_BTCM_VEHICLE_SPEED: return "CHASSIS_BTCM_VEHICLE_SPEED";
+    case kWireCHASSIS_AD_PACK_VOLTAGE_MV: return "CHASSIS_AD_PACK_VOLTAGE_MV";
+    case kWireCHASSIS_AD_CAP_VOLTAGE_MV: return "CHASSIS_AD_CAP_VOLTAGE_MV";
+    case kWireCHASSIS_AD_ISOLATION_KOHM: return "CHASSIS_AD_ISOLATION_KOHM";
+    case kWireCHASSIS_AD_ACTIVE_DTC_BITMAP: return "CHASSIS_AD_ACTIVE_DTC_BITMAP";
+    case kWireCHASSIS_CHARGER_ACTUAL_CURRENT_DA: return "CHASSIS_CHARGER_ACTUAL_CURRENT_DA";
+    case kWireCHASSIS_CHARGER_ACTUAL_VOLTAGE_DV: return "CHASSIS_CHARGER_ACTUAL_VOLTAGE_DV";
+    case kWireCHASSIS_CHARGER_TEMP_C: return "CHASSIS_CHARGER_TEMP_C";
+    case kWireCHASSIS_CHARGER_ENABLED: return "CHASSIS_CHARGER_ENABLED";
+    case kWireCHASSIS_CHARGER_SM_STATE: return "CHASSIS_CHARGER_SM_STATE";
+    case kWireCHASSIS_CHARGER_FAULT_BITS: return "CHASSIS_CHARGER_FAULT_BITS";
+    case kWireCHASSIS_CHARGER_COUPLER_TEMP_C: return "CHASSIS_CHARGER_COUPLER_TEMP_C";
+    case kWireCHASSIS_CHARGER_AC_INPUT_MV: return "CHASSIS_CHARGER_AC_INPUT_MV";
+    case kWireCHASSIS_RSA_RADIO_WAKEUP: return "CHASSIS_RSA_RADIO_WAKEUP";
+    case kWireCHASSIS_RSA_ACC_OUT: return "CHASSIS_RSA_ACC_OUT";
+    case kWireCHASSIS_RSA_BTSI_SOLENOID: return "CHASSIS_RSA_BTSI_SOLENOID";
+    case kWireCHASSIS_RSA_SECURITY_INDICATOR: return "CHASSIS_RSA_SECURITY_INDICATOR";
+    case kWireCHASSIS_RSA_VALID_CODE: return "CHASSIS_RSA_VALID_CODE";
+    case kWireCHASSIS_IPC_ACTIVE_DTC_COUNT: return "CHASSIS_IPC_ACTIVE_DTC_COUNT";
+    case kWireCHASSIS_RSA_SELECTOR_LED_PARK: return "CHASSIS_RSA_SELECTOR_LED_PARK";
+    case kWireCHASSIS_RSA_SELECTOR_LED_REVERSE: return "CHASSIS_RSA_SELECTOR_LED_REVERSE";
+    case kWireCHASSIS_RSA_SELECTOR_LED_NEUTRAL: return "CHASSIS_RSA_SELECTOR_LED_NEUTRAL";
+    case kWireCHASSIS_RSA_SELECTOR_LED_DRIVE: return "CHASSIS_RSA_SELECTOR_LED_DRIVE";
+    case kWirePSCM_THERMAL_SWITCH_OPEN: return "PSCM_THERMAL_SWITCH_OPEN";
+    case kWirePSCM_HV_DRAW_Q8: return "PSCM_HV_DRAW_Q8";
+    case kWireSDM_DRIVER_LOOP_RESISTANCE_MOHM: return "SDM_DRIVER_LOOP_RESISTANCE_MOHM";
+    case kWireSDM_PASSENGER_LOOP_RESISTANCE_MOHM: return "SDM_PASSENGER_LOOP_RESISTANCE_MOHM";
+    case kWireSDM_AIRBAG_IND_OUT: return "SDM_AIRBAG_IND_OUT";
+    case kWireCHASSIS_IPC_INGEST_HEARTBEAT: return "CHASSIS_IPC_INGEST_HEARTBEAT";
+    case kWireCHASSIS_TJB_LR_TAIL_LAMP: return "CHASSIS_TJB_LR_TAIL_LAMP";
+    case kWireCHASSIS_TJB_RR_TAIL_LAMP: return "CHASSIS_TJB_RR_TAIL_LAMP";
+    case kWireCHASSIS_TJB_LICENSE_LAMPS: return "CHASSIS_TJB_LICENSE_LAMPS";
+    case kWireCHASSIS_TJB_LR_TURN_LAMP: return "CHASSIS_TJB_LR_TURN_LAMP";
+    case kWireCHASSIS_TJB_RR_TURN_LAMP: return "CHASSIS_TJB_RR_TURN_LAMP";
+    case kWireCHASSIS_TJB_LR_STOP_LAMP: return "CHASSIS_TJB_LR_STOP_LAMP";
+    case kWireCHASSIS_TJB_RR_STOP_LAMP: return "CHASSIS_TJB_RR_STOP_LAMP";
+    case kWireBPM_AD_FORCE_CMD: return "BPM_AD_FORCE_CMD";
+    case kWireAD_WELD_STATUS: return "AD_WELD_STATUS";
+    case kWireBPM_APM_AUX_CHARGE_CMD: return "BPM_APM_AUX_CHARGE_CMD";
+    case kWireHTCM_COMPRESSOR_PWM_CMD: return "HTCM_COMPRESSOR_PWM_CMD";
     default: return ::std::string_view{};
   }
 }
@@ -1302,13 +1792,17 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case kWireBPM_AIRFLOW_VOLT: return "vehicle_sim";
     case kWireBPM_CHARGE_PORT_TEMP: return "vehicle_sim";
     case kWireBPM_PARK_SELECT: return "vehicle_sim";
-    case kWireBPM_VEHICLE_WAKEUP: return "vehicle_sim";
+    case kWireBPM_VEHICLE_WAKEUP: return "";
     case kWireBPM_COUPLER_PRESENT: return "vehicle_sim";
+    case kWireBPM_SHUNT_SENSE_HEALTHY: return "vehicle_sim";
+    case kWireHTCM_PERIODIC_WAKE_PULSE: return "";
+    case kWireBPM_AD_POWER_CMD: return "";
     case kWireHV_BUS_VOLTAGE_MV: return "hv_bus_host";
     case kWireHV_BUS_CURRENT_MA: return "hv_bus_host";
     case kWireHV_BUS_PRESENT: return "hv_bus_host";
     case kWireAPM_OUTPUT_VOLTAGE_MV: return "vehicle_sim";
     case kWireAPM_HV_CONTACTOR_CLOSED: return "vehicle_sim";
+    case kWireAPM_OUTPUT_CURRENT_Q8: return "";
     case kWireGM8192_BPM_TX: return "bpm_ecu";
     case kWireGM8192_BTCM_TX: return "btcm_ecu";
     case kWireGM8192_PIM_TX: return "pim_ecu";
@@ -1482,8 +1976,102 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case kWireDRIVER_DOOR_HANDLE_ATTEMPT_PASSENGER: return "";
     case kWirePIM_CRUISE_ACTIVE: return "";
     case kWirePIM_CRUISE_SETPOINT_MPS: return "";
+    case kWirePIM_PHASE_CURRENT_Q8: return "";
     case kWireAD_PRECHARGE_RELAY: return "";
     case kWireAD_MAIN_CONTACTOR: return "";
+    case kWireAD_ISOLATION_KOHM: return "";
+    case kWireAD_MAIN_CONTACTOR_FB: return "";
+    case kWireAD_PRECHARGE_CONTACTOR_FB: return "";
+    case kWireCHASSIS_HTCM_PACK_TEMP_Q8: return "";
+    case kWireCHASSIS_HTCM_INLET_TEMP_Q8: return "";
+    case kWireCHASSIS_HTCM_COOLANT_TEMP_Q8: return "";
+    case kWireCHASSIS_HTCM_PIM_TEMP_Q8: return "";
+    case kWireCHASSIS_HTCM_REFRIG_LOW_KPA: return "";
+    case kWireCHASSIS_HTCM_REFRIG_HIGH_KPA: return "";
+    case kWireCHASSIS_HTCM_REFRIG_DISCHARGE_TEMP_Q8: return "";
+    case kWireCHASSIS_HTCM_REFRIG_TEMP_Q8: return "";
+    case kWireCHASSIS_HTCM_DRIVE_MOTOR_COOLANT_TEMP_Q8: return "";
+    case kWireCHASSIS_HTCM_COOLANT_PUMP_TEMP_Q8: return "";
+    case kWireCHASSIS_HTCM_COOLANT_LEVEL_LOW: return "";
+    case kWireCHASSIS_HTCM_WAKE_UP: return "";
+    case kWireCHASSIS_HTCM_OUTSIDE_AIR_TEMP_Q8: return "";
+    case kWireCHASSIS_HTCM_COOLANT_PUMP_FEED: return "";
+    case kWireCHASSIS_HTCM_RADIATOR_FAN_FEED: return "";
+    case kWireCHASSIS_HTCM_HEATER_VALVE_FEED: return "";
+    case kWireCHASSIS_HTCM_MODE_DOOR_CMD: return "";
+    case kWireCHASSIS_HTCM_OUTSIDE_AIR_VALVE_CMD: return "";
+    case kWireCHASSIS_HTCM_REVERSING_VALVE_CMD: return "";
+    case kWireCHASSIS_HTCM_THREE_WAY_COOLANT_VALVE_CMD: return "";
+    case kWireCHASSIS_HTCM_COOLANT_RECOVERY_VALVE_CMD: return "";
+    case kWireCHASSIS_HTCM_CHARGER_RECEPTACLE_COOLANT_VALVE_CMD: return "";
+    case kWireCHASSIS_APM_KEY_ON: return "";
+    case kWireCHASSIS_APM_RUN_MODE: return "";
+    case kWireCHASSIS_APM_TARGET_SETPOINT_MV: return "";
+    case kWireCHASSIS_APM_MODULE_TEMP_CDEG: return "";
+    case kWireCHASSIS_APM_STATUS_12V_NOMINAL: return "";
+    case kWireCHASSIS_APM_APS_COMMAND_QUALIFIED: return "";
+    case kWireCHASSIS_APM_APS_COMMAND_STALE: return "";
+    case kWireCHASSIS_APM_SUBSYS_ENABLED_MASK: return "";
+    case kWireCHASSIS_APM_LAMP_REQUEST_MASK: return "";
+    case kWireCHASSIS_APM_ACTIVE_DTC_COUNT: return "";
+    case kWireCHASSIS_APM_HWS_COMMAND_ACTIVE: return "";
+    case kWireCHASSIS_APM_HWS_DRIVE_ENABLED: return "";
+    case kWireCHASSIS_APM_HWS_47V_OUTPUT_MV: return "";
+    case kWireCHASSIS_APM_HWS_FEEDBACK_MV: return "";
+    case kWireCHASSIS_APM_CMC_PWM_DUTY_PCT: return "";
+    case kWireCHASSIS_APM_CMC_TARGET_FREQ_HZ: return "";
+    case kWireCHASSIS_APM_CMC_DRIVE_ENABLED: return "";
+    case kWireCHASSIS_APM_CMC_MOTOR_INTERLOCK_CLOSED: return "";
+    case kWireCHASSIS_APM_CMC_IGBT_FAULT_ACTIVE: return "";
+    case kWireCHASSIS_APM_LOAD_SHED_ACTIVATION_COUNT: return "";
+    case kWireCHASSIS_BTCM_IND_ANTILOCK: return "";
+    case kWireCHASSIS_BTCM_IND_BRAKE: return "";
+    case kWireCHASSIS_BTCM_IND_LOW_TRAC: return "";
+    case kWireCHASSIS_BTCM_IND_PARK_BRAKE: return "";
+    case kWireCHASSIS_BTCM_WHEEL_SPEED_FL: return "";
+    case kWireCHASSIS_BTCM_WHEEL_SPEED_FR: return "";
+    case kWireCHASSIS_BTCM_WHEEL_SPEED_RL: return "";
+    case kWireCHASSIS_BTCM_WHEEL_SPEED_RR: return "";
+    case kWireCHASSIS_BTCM_VEHICLE_SPEED: return "";
+    case kWireCHASSIS_AD_PACK_VOLTAGE_MV: return "";
+    case kWireCHASSIS_AD_CAP_VOLTAGE_MV: return "";
+    case kWireCHASSIS_AD_ISOLATION_KOHM: return "";
+    case kWireCHASSIS_AD_ACTIVE_DTC_BITMAP: return "";
+    case kWireCHASSIS_CHARGER_ACTUAL_CURRENT_DA: return "";
+    case kWireCHASSIS_CHARGER_ACTUAL_VOLTAGE_DV: return "";
+    case kWireCHASSIS_CHARGER_TEMP_C: return "";
+    case kWireCHASSIS_CHARGER_ENABLED: return "";
+    case kWireCHASSIS_CHARGER_SM_STATE: return "";
+    case kWireCHASSIS_CHARGER_FAULT_BITS: return "";
+    case kWireCHASSIS_CHARGER_COUPLER_TEMP_C: return "";
+    case kWireCHASSIS_CHARGER_AC_INPUT_MV: return "";
+    case kWireCHASSIS_RSA_RADIO_WAKEUP: return "";
+    case kWireCHASSIS_RSA_ACC_OUT: return "";
+    case kWireCHASSIS_RSA_BTSI_SOLENOID: return "";
+    case kWireCHASSIS_RSA_SECURITY_INDICATOR: return "";
+    case kWireCHASSIS_RSA_VALID_CODE: return "";
+    case kWireCHASSIS_IPC_ACTIVE_DTC_COUNT: return "";
+    case kWireCHASSIS_RSA_SELECTOR_LED_PARK: return "";
+    case kWireCHASSIS_RSA_SELECTOR_LED_REVERSE: return "";
+    case kWireCHASSIS_RSA_SELECTOR_LED_NEUTRAL: return "";
+    case kWireCHASSIS_RSA_SELECTOR_LED_DRIVE: return "";
+    case kWirePSCM_THERMAL_SWITCH_OPEN: return "";
+    case kWirePSCM_HV_DRAW_Q8: return "";
+    case kWireSDM_DRIVER_LOOP_RESISTANCE_MOHM: return "";
+    case kWireSDM_PASSENGER_LOOP_RESISTANCE_MOHM: return "";
+    case kWireSDM_AIRBAG_IND_OUT: return "";
+    case kWireCHASSIS_IPC_INGEST_HEARTBEAT: return "";
+    case kWireCHASSIS_TJB_LR_TAIL_LAMP: return "";
+    case kWireCHASSIS_TJB_RR_TAIL_LAMP: return "";
+    case kWireCHASSIS_TJB_LICENSE_LAMPS: return "";
+    case kWireCHASSIS_TJB_LR_TURN_LAMP: return "";
+    case kWireCHASSIS_TJB_RR_TURN_LAMP: return "";
+    case kWireCHASSIS_TJB_LR_STOP_LAMP: return "";
+    case kWireCHASSIS_TJB_RR_STOP_LAMP: return "";
+    case kWireBPM_AD_FORCE_CMD: return "";
+    case kWireAD_WELD_STATUS: return "";
+    case kWireBPM_APM_AUX_CHARGE_CMD: return "";
+    case kWireHTCM_COMPRESSOR_PWM_CMD: return "htcm";
     default: return ::std::string_view{};
   }
 }
@@ -1559,11 +2147,15 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(kWireBPM_PARK_SELECT, &gen) && gen == 0) { visitor(::std::string_view{"BPM_PARK_SELECT"}, kWireBPM_PARK_SELECT); ++count; }
   if (table.write_gen(kWireBPM_VEHICLE_WAKEUP, &gen) && gen == 0) { visitor(::std::string_view{"BPM_VEHICLE_WAKEUP"}, kWireBPM_VEHICLE_WAKEUP); ++count; }
   if (table.write_gen(kWireBPM_COUPLER_PRESENT, &gen) && gen == 0) { visitor(::std::string_view{"BPM_COUPLER_PRESENT"}, kWireBPM_COUPLER_PRESENT); ++count; }
+  if (table.write_gen(kWireBPM_SHUNT_SENSE_HEALTHY, &gen) && gen == 0) { visitor(::std::string_view{"BPM_SHUNT_SENSE_HEALTHY"}, kWireBPM_SHUNT_SENSE_HEALTHY); ++count; }
+  if (table.write_gen(kWireHTCM_PERIODIC_WAKE_PULSE, &gen) && gen == 0) { visitor(::std::string_view{"HTCM_PERIODIC_WAKE_PULSE"}, kWireHTCM_PERIODIC_WAKE_PULSE); ++count; }
+  if (table.write_gen(kWireBPM_AD_POWER_CMD, &gen) && gen == 0) { visitor(::std::string_view{"BPM_AD_POWER_CMD"}, kWireBPM_AD_POWER_CMD); ++count; }
   if (table.write_gen(kWireHV_BUS_VOLTAGE_MV, &gen) && gen == 0) { visitor(::std::string_view{"HV_BUS_VOLTAGE_MV"}, kWireHV_BUS_VOLTAGE_MV); ++count; }
   if (table.write_gen(kWireHV_BUS_CURRENT_MA, &gen) && gen == 0) { visitor(::std::string_view{"HV_BUS_CURRENT_MA"}, kWireHV_BUS_CURRENT_MA); ++count; }
   if (table.write_gen(kWireHV_BUS_PRESENT, &gen) && gen == 0) { visitor(::std::string_view{"HV_BUS_PRESENT"}, kWireHV_BUS_PRESENT); ++count; }
   if (table.write_gen(kWireAPM_OUTPUT_VOLTAGE_MV, &gen) && gen == 0) { visitor(::std::string_view{"APM_OUTPUT_VOLTAGE_MV"}, kWireAPM_OUTPUT_VOLTAGE_MV); ++count; }
   if (table.write_gen(kWireAPM_HV_CONTACTOR_CLOSED, &gen) && gen == 0) { visitor(::std::string_view{"APM_HV_CONTACTOR_CLOSED"}, kWireAPM_HV_CONTACTOR_CLOSED); ++count; }
+  if (table.write_gen(kWireAPM_OUTPUT_CURRENT_Q8, &gen) && gen == 0) { visitor(::std::string_view{"APM_OUTPUT_CURRENT_Q8"}, kWireAPM_OUTPUT_CURRENT_Q8); ++count; }
   if (table.write_gen(kWireGM8192_BPM_TX, &gen) && gen == 0) { visitor(::std::string_view{"GM8192_BPM_TX"}, kWireGM8192_BPM_TX); ++count; }
   if (table.write_gen(kWireGM8192_BTCM_TX, &gen) && gen == 0) { visitor(::std::string_view{"GM8192_BTCM_TX"}, kWireGM8192_BTCM_TX); ++count; }
   if (table.write_gen(kWireGM8192_PIM_TX, &gen) && gen == 0) { visitor(::std::string_view{"GM8192_PIM_TX"}, kWireGM8192_PIM_TX); ++count; }
@@ -1737,8 +2329,102 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(kWireDRIVER_DOOR_HANDLE_ATTEMPT_PASSENGER, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_DOOR_HANDLE_ATTEMPT_PASSENGER"}, kWireDRIVER_DOOR_HANDLE_ATTEMPT_PASSENGER); ++count; }
   if (table.write_gen(kWirePIM_CRUISE_ACTIVE, &gen) && gen == 0) { visitor(::std::string_view{"PIM_CRUISE_ACTIVE"}, kWirePIM_CRUISE_ACTIVE); ++count; }
   if (table.write_gen(kWirePIM_CRUISE_SETPOINT_MPS, &gen) && gen == 0) { visitor(::std::string_view{"PIM_CRUISE_SETPOINT_MPS"}, kWirePIM_CRUISE_SETPOINT_MPS); ++count; }
+  if (table.write_gen(kWirePIM_PHASE_CURRENT_Q8, &gen) && gen == 0) { visitor(::std::string_view{"PIM_PHASE_CURRENT_Q8"}, kWirePIM_PHASE_CURRENT_Q8); ++count; }
   if (table.write_gen(kWireAD_PRECHARGE_RELAY, &gen) && gen == 0) { visitor(::std::string_view{"AD_PRECHARGE_RELAY"}, kWireAD_PRECHARGE_RELAY); ++count; }
   if (table.write_gen(kWireAD_MAIN_CONTACTOR, &gen) && gen == 0) { visitor(::std::string_view{"AD_MAIN_CONTACTOR"}, kWireAD_MAIN_CONTACTOR); ++count; }
+  if (table.write_gen(kWireAD_ISOLATION_KOHM, &gen) && gen == 0) { visitor(::std::string_view{"AD_ISOLATION_KOHM"}, kWireAD_ISOLATION_KOHM); ++count; }
+  if (table.write_gen(kWireAD_MAIN_CONTACTOR_FB, &gen) && gen == 0) { visitor(::std::string_view{"AD_MAIN_CONTACTOR_FB"}, kWireAD_MAIN_CONTACTOR_FB); ++count; }
+  if (table.write_gen(kWireAD_PRECHARGE_CONTACTOR_FB, &gen) && gen == 0) { visitor(::std::string_view{"AD_PRECHARGE_CONTACTOR_FB"}, kWireAD_PRECHARGE_CONTACTOR_FB); ++count; }
+  if (table.write_gen(kWireCHASSIS_HTCM_PACK_TEMP_Q8, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_HTCM_PACK_TEMP_Q8"}, kWireCHASSIS_HTCM_PACK_TEMP_Q8); ++count; }
+  if (table.write_gen(kWireCHASSIS_HTCM_INLET_TEMP_Q8, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_HTCM_INLET_TEMP_Q8"}, kWireCHASSIS_HTCM_INLET_TEMP_Q8); ++count; }
+  if (table.write_gen(kWireCHASSIS_HTCM_COOLANT_TEMP_Q8, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_HTCM_COOLANT_TEMP_Q8"}, kWireCHASSIS_HTCM_COOLANT_TEMP_Q8); ++count; }
+  if (table.write_gen(kWireCHASSIS_HTCM_PIM_TEMP_Q8, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_HTCM_PIM_TEMP_Q8"}, kWireCHASSIS_HTCM_PIM_TEMP_Q8); ++count; }
+  if (table.write_gen(kWireCHASSIS_HTCM_REFRIG_LOW_KPA, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_HTCM_REFRIG_LOW_KPA"}, kWireCHASSIS_HTCM_REFRIG_LOW_KPA); ++count; }
+  if (table.write_gen(kWireCHASSIS_HTCM_REFRIG_HIGH_KPA, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_HTCM_REFRIG_HIGH_KPA"}, kWireCHASSIS_HTCM_REFRIG_HIGH_KPA); ++count; }
+  if (table.write_gen(kWireCHASSIS_HTCM_REFRIG_DISCHARGE_TEMP_Q8, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_HTCM_REFRIG_DISCHARGE_TEMP_Q8"}, kWireCHASSIS_HTCM_REFRIG_DISCHARGE_TEMP_Q8); ++count; }
+  if (table.write_gen(kWireCHASSIS_HTCM_REFRIG_TEMP_Q8, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_HTCM_REFRIG_TEMP_Q8"}, kWireCHASSIS_HTCM_REFRIG_TEMP_Q8); ++count; }
+  if (table.write_gen(kWireCHASSIS_HTCM_DRIVE_MOTOR_COOLANT_TEMP_Q8, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_HTCM_DRIVE_MOTOR_COOLANT_TEMP_Q8"}, kWireCHASSIS_HTCM_DRIVE_MOTOR_COOLANT_TEMP_Q8); ++count; }
+  if (table.write_gen(kWireCHASSIS_HTCM_COOLANT_PUMP_TEMP_Q8, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_HTCM_COOLANT_PUMP_TEMP_Q8"}, kWireCHASSIS_HTCM_COOLANT_PUMP_TEMP_Q8); ++count; }
+  if (table.write_gen(kWireCHASSIS_HTCM_COOLANT_LEVEL_LOW, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_HTCM_COOLANT_LEVEL_LOW"}, kWireCHASSIS_HTCM_COOLANT_LEVEL_LOW); ++count; }
+  if (table.write_gen(kWireCHASSIS_HTCM_WAKE_UP, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_HTCM_WAKE_UP"}, kWireCHASSIS_HTCM_WAKE_UP); ++count; }
+  if (table.write_gen(kWireCHASSIS_HTCM_OUTSIDE_AIR_TEMP_Q8, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_HTCM_OUTSIDE_AIR_TEMP_Q8"}, kWireCHASSIS_HTCM_OUTSIDE_AIR_TEMP_Q8); ++count; }
+  if (table.write_gen(kWireCHASSIS_HTCM_COOLANT_PUMP_FEED, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_HTCM_COOLANT_PUMP_FEED"}, kWireCHASSIS_HTCM_COOLANT_PUMP_FEED); ++count; }
+  if (table.write_gen(kWireCHASSIS_HTCM_RADIATOR_FAN_FEED, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_HTCM_RADIATOR_FAN_FEED"}, kWireCHASSIS_HTCM_RADIATOR_FAN_FEED); ++count; }
+  if (table.write_gen(kWireCHASSIS_HTCM_HEATER_VALVE_FEED, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_HTCM_HEATER_VALVE_FEED"}, kWireCHASSIS_HTCM_HEATER_VALVE_FEED); ++count; }
+  if (table.write_gen(kWireCHASSIS_HTCM_MODE_DOOR_CMD, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_HTCM_MODE_DOOR_CMD"}, kWireCHASSIS_HTCM_MODE_DOOR_CMD); ++count; }
+  if (table.write_gen(kWireCHASSIS_HTCM_OUTSIDE_AIR_VALVE_CMD, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_HTCM_OUTSIDE_AIR_VALVE_CMD"}, kWireCHASSIS_HTCM_OUTSIDE_AIR_VALVE_CMD); ++count; }
+  if (table.write_gen(kWireCHASSIS_HTCM_REVERSING_VALVE_CMD, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_HTCM_REVERSING_VALVE_CMD"}, kWireCHASSIS_HTCM_REVERSING_VALVE_CMD); ++count; }
+  if (table.write_gen(kWireCHASSIS_HTCM_THREE_WAY_COOLANT_VALVE_CMD, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_HTCM_THREE_WAY_COOLANT_VALVE_CMD"}, kWireCHASSIS_HTCM_THREE_WAY_COOLANT_VALVE_CMD); ++count; }
+  if (table.write_gen(kWireCHASSIS_HTCM_COOLANT_RECOVERY_VALVE_CMD, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_HTCM_COOLANT_RECOVERY_VALVE_CMD"}, kWireCHASSIS_HTCM_COOLANT_RECOVERY_VALVE_CMD); ++count; }
+  if (table.write_gen(kWireCHASSIS_HTCM_CHARGER_RECEPTACLE_COOLANT_VALVE_CMD, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_HTCM_CHARGER_RECEPTACLE_COOLANT_VALVE_CMD"}, kWireCHASSIS_HTCM_CHARGER_RECEPTACLE_COOLANT_VALVE_CMD); ++count; }
+  if (table.write_gen(kWireCHASSIS_APM_KEY_ON, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_APM_KEY_ON"}, kWireCHASSIS_APM_KEY_ON); ++count; }
+  if (table.write_gen(kWireCHASSIS_APM_RUN_MODE, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_APM_RUN_MODE"}, kWireCHASSIS_APM_RUN_MODE); ++count; }
+  if (table.write_gen(kWireCHASSIS_APM_TARGET_SETPOINT_MV, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_APM_TARGET_SETPOINT_MV"}, kWireCHASSIS_APM_TARGET_SETPOINT_MV); ++count; }
+  if (table.write_gen(kWireCHASSIS_APM_MODULE_TEMP_CDEG, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_APM_MODULE_TEMP_CDEG"}, kWireCHASSIS_APM_MODULE_TEMP_CDEG); ++count; }
+  if (table.write_gen(kWireCHASSIS_APM_STATUS_12V_NOMINAL, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_APM_STATUS_12V_NOMINAL"}, kWireCHASSIS_APM_STATUS_12V_NOMINAL); ++count; }
+  if (table.write_gen(kWireCHASSIS_APM_APS_COMMAND_QUALIFIED, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_APM_APS_COMMAND_QUALIFIED"}, kWireCHASSIS_APM_APS_COMMAND_QUALIFIED); ++count; }
+  if (table.write_gen(kWireCHASSIS_APM_APS_COMMAND_STALE, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_APM_APS_COMMAND_STALE"}, kWireCHASSIS_APM_APS_COMMAND_STALE); ++count; }
+  if (table.write_gen(kWireCHASSIS_APM_SUBSYS_ENABLED_MASK, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_APM_SUBSYS_ENABLED_MASK"}, kWireCHASSIS_APM_SUBSYS_ENABLED_MASK); ++count; }
+  if (table.write_gen(kWireCHASSIS_APM_LAMP_REQUEST_MASK, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_APM_LAMP_REQUEST_MASK"}, kWireCHASSIS_APM_LAMP_REQUEST_MASK); ++count; }
+  if (table.write_gen(kWireCHASSIS_APM_ACTIVE_DTC_COUNT, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_APM_ACTIVE_DTC_COUNT"}, kWireCHASSIS_APM_ACTIVE_DTC_COUNT); ++count; }
+  if (table.write_gen(kWireCHASSIS_APM_HWS_COMMAND_ACTIVE, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_APM_HWS_COMMAND_ACTIVE"}, kWireCHASSIS_APM_HWS_COMMAND_ACTIVE); ++count; }
+  if (table.write_gen(kWireCHASSIS_APM_HWS_DRIVE_ENABLED, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_APM_HWS_DRIVE_ENABLED"}, kWireCHASSIS_APM_HWS_DRIVE_ENABLED); ++count; }
+  if (table.write_gen(kWireCHASSIS_APM_HWS_47V_OUTPUT_MV, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_APM_HWS_47V_OUTPUT_MV"}, kWireCHASSIS_APM_HWS_47V_OUTPUT_MV); ++count; }
+  if (table.write_gen(kWireCHASSIS_APM_HWS_FEEDBACK_MV, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_APM_HWS_FEEDBACK_MV"}, kWireCHASSIS_APM_HWS_FEEDBACK_MV); ++count; }
+  if (table.write_gen(kWireCHASSIS_APM_CMC_PWM_DUTY_PCT, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_APM_CMC_PWM_DUTY_PCT"}, kWireCHASSIS_APM_CMC_PWM_DUTY_PCT); ++count; }
+  if (table.write_gen(kWireCHASSIS_APM_CMC_TARGET_FREQ_HZ, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_APM_CMC_TARGET_FREQ_HZ"}, kWireCHASSIS_APM_CMC_TARGET_FREQ_HZ); ++count; }
+  if (table.write_gen(kWireCHASSIS_APM_CMC_DRIVE_ENABLED, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_APM_CMC_DRIVE_ENABLED"}, kWireCHASSIS_APM_CMC_DRIVE_ENABLED); ++count; }
+  if (table.write_gen(kWireCHASSIS_APM_CMC_MOTOR_INTERLOCK_CLOSED, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_APM_CMC_MOTOR_INTERLOCK_CLOSED"}, kWireCHASSIS_APM_CMC_MOTOR_INTERLOCK_CLOSED); ++count; }
+  if (table.write_gen(kWireCHASSIS_APM_CMC_IGBT_FAULT_ACTIVE, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_APM_CMC_IGBT_FAULT_ACTIVE"}, kWireCHASSIS_APM_CMC_IGBT_FAULT_ACTIVE); ++count; }
+  if (table.write_gen(kWireCHASSIS_APM_LOAD_SHED_ACTIVATION_COUNT, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_APM_LOAD_SHED_ACTIVATION_COUNT"}, kWireCHASSIS_APM_LOAD_SHED_ACTIVATION_COUNT); ++count; }
+  if (table.write_gen(kWireCHASSIS_BTCM_IND_ANTILOCK, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_BTCM_IND_ANTILOCK"}, kWireCHASSIS_BTCM_IND_ANTILOCK); ++count; }
+  if (table.write_gen(kWireCHASSIS_BTCM_IND_BRAKE, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_BTCM_IND_BRAKE"}, kWireCHASSIS_BTCM_IND_BRAKE); ++count; }
+  if (table.write_gen(kWireCHASSIS_BTCM_IND_LOW_TRAC, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_BTCM_IND_LOW_TRAC"}, kWireCHASSIS_BTCM_IND_LOW_TRAC); ++count; }
+  if (table.write_gen(kWireCHASSIS_BTCM_IND_PARK_BRAKE, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_BTCM_IND_PARK_BRAKE"}, kWireCHASSIS_BTCM_IND_PARK_BRAKE); ++count; }
+  if (table.write_gen(kWireCHASSIS_BTCM_WHEEL_SPEED_FL, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_BTCM_WHEEL_SPEED_FL"}, kWireCHASSIS_BTCM_WHEEL_SPEED_FL); ++count; }
+  if (table.write_gen(kWireCHASSIS_BTCM_WHEEL_SPEED_FR, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_BTCM_WHEEL_SPEED_FR"}, kWireCHASSIS_BTCM_WHEEL_SPEED_FR); ++count; }
+  if (table.write_gen(kWireCHASSIS_BTCM_WHEEL_SPEED_RL, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_BTCM_WHEEL_SPEED_RL"}, kWireCHASSIS_BTCM_WHEEL_SPEED_RL); ++count; }
+  if (table.write_gen(kWireCHASSIS_BTCM_WHEEL_SPEED_RR, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_BTCM_WHEEL_SPEED_RR"}, kWireCHASSIS_BTCM_WHEEL_SPEED_RR); ++count; }
+  if (table.write_gen(kWireCHASSIS_BTCM_VEHICLE_SPEED, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_BTCM_VEHICLE_SPEED"}, kWireCHASSIS_BTCM_VEHICLE_SPEED); ++count; }
+  if (table.write_gen(kWireCHASSIS_AD_PACK_VOLTAGE_MV, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_AD_PACK_VOLTAGE_MV"}, kWireCHASSIS_AD_PACK_VOLTAGE_MV); ++count; }
+  if (table.write_gen(kWireCHASSIS_AD_CAP_VOLTAGE_MV, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_AD_CAP_VOLTAGE_MV"}, kWireCHASSIS_AD_CAP_VOLTAGE_MV); ++count; }
+  if (table.write_gen(kWireCHASSIS_AD_ISOLATION_KOHM, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_AD_ISOLATION_KOHM"}, kWireCHASSIS_AD_ISOLATION_KOHM); ++count; }
+  if (table.write_gen(kWireCHASSIS_AD_ACTIVE_DTC_BITMAP, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_AD_ACTIVE_DTC_BITMAP"}, kWireCHASSIS_AD_ACTIVE_DTC_BITMAP); ++count; }
+  if (table.write_gen(kWireCHASSIS_CHARGER_ACTUAL_CURRENT_DA, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_CHARGER_ACTUAL_CURRENT_DA"}, kWireCHASSIS_CHARGER_ACTUAL_CURRENT_DA); ++count; }
+  if (table.write_gen(kWireCHASSIS_CHARGER_ACTUAL_VOLTAGE_DV, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_CHARGER_ACTUAL_VOLTAGE_DV"}, kWireCHASSIS_CHARGER_ACTUAL_VOLTAGE_DV); ++count; }
+  if (table.write_gen(kWireCHASSIS_CHARGER_TEMP_C, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_CHARGER_TEMP_C"}, kWireCHASSIS_CHARGER_TEMP_C); ++count; }
+  if (table.write_gen(kWireCHASSIS_CHARGER_ENABLED, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_CHARGER_ENABLED"}, kWireCHASSIS_CHARGER_ENABLED); ++count; }
+  if (table.write_gen(kWireCHASSIS_CHARGER_SM_STATE, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_CHARGER_SM_STATE"}, kWireCHASSIS_CHARGER_SM_STATE); ++count; }
+  if (table.write_gen(kWireCHASSIS_CHARGER_FAULT_BITS, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_CHARGER_FAULT_BITS"}, kWireCHASSIS_CHARGER_FAULT_BITS); ++count; }
+  if (table.write_gen(kWireCHASSIS_CHARGER_COUPLER_TEMP_C, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_CHARGER_COUPLER_TEMP_C"}, kWireCHASSIS_CHARGER_COUPLER_TEMP_C); ++count; }
+  if (table.write_gen(kWireCHASSIS_CHARGER_AC_INPUT_MV, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_CHARGER_AC_INPUT_MV"}, kWireCHASSIS_CHARGER_AC_INPUT_MV); ++count; }
+  if (table.write_gen(kWireCHASSIS_RSA_RADIO_WAKEUP, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_RSA_RADIO_WAKEUP"}, kWireCHASSIS_RSA_RADIO_WAKEUP); ++count; }
+  if (table.write_gen(kWireCHASSIS_RSA_ACC_OUT, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_RSA_ACC_OUT"}, kWireCHASSIS_RSA_ACC_OUT); ++count; }
+  if (table.write_gen(kWireCHASSIS_RSA_BTSI_SOLENOID, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_RSA_BTSI_SOLENOID"}, kWireCHASSIS_RSA_BTSI_SOLENOID); ++count; }
+  if (table.write_gen(kWireCHASSIS_RSA_SECURITY_INDICATOR, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_RSA_SECURITY_INDICATOR"}, kWireCHASSIS_RSA_SECURITY_INDICATOR); ++count; }
+  if (table.write_gen(kWireCHASSIS_RSA_VALID_CODE, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_RSA_VALID_CODE"}, kWireCHASSIS_RSA_VALID_CODE); ++count; }
+  if (table.write_gen(kWireCHASSIS_IPC_ACTIVE_DTC_COUNT, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_IPC_ACTIVE_DTC_COUNT"}, kWireCHASSIS_IPC_ACTIVE_DTC_COUNT); ++count; }
+  if (table.write_gen(kWireCHASSIS_RSA_SELECTOR_LED_PARK, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_RSA_SELECTOR_LED_PARK"}, kWireCHASSIS_RSA_SELECTOR_LED_PARK); ++count; }
+  if (table.write_gen(kWireCHASSIS_RSA_SELECTOR_LED_REVERSE, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_RSA_SELECTOR_LED_REVERSE"}, kWireCHASSIS_RSA_SELECTOR_LED_REVERSE); ++count; }
+  if (table.write_gen(kWireCHASSIS_RSA_SELECTOR_LED_NEUTRAL, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_RSA_SELECTOR_LED_NEUTRAL"}, kWireCHASSIS_RSA_SELECTOR_LED_NEUTRAL); ++count; }
+  if (table.write_gen(kWireCHASSIS_RSA_SELECTOR_LED_DRIVE, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_RSA_SELECTOR_LED_DRIVE"}, kWireCHASSIS_RSA_SELECTOR_LED_DRIVE); ++count; }
+  if (table.write_gen(kWirePSCM_THERMAL_SWITCH_OPEN, &gen) && gen == 0) { visitor(::std::string_view{"PSCM_THERMAL_SWITCH_OPEN"}, kWirePSCM_THERMAL_SWITCH_OPEN); ++count; }
+  if (table.write_gen(kWirePSCM_HV_DRAW_Q8, &gen) && gen == 0) { visitor(::std::string_view{"PSCM_HV_DRAW_Q8"}, kWirePSCM_HV_DRAW_Q8); ++count; }
+  if (table.write_gen(kWireSDM_DRIVER_LOOP_RESISTANCE_MOHM, &gen) && gen == 0) { visitor(::std::string_view{"SDM_DRIVER_LOOP_RESISTANCE_MOHM"}, kWireSDM_DRIVER_LOOP_RESISTANCE_MOHM); ++count; }
+  if (table.write_gen(kWireSDM_PASSENGER_LOOP_RESISTANCE_MOHM, &gen) && gen == 0) { visitor(::std::string_view{"SDM_PASSENGER_LOOP_RESISTANCE_MOHM"}, kWireSDM_PASSENGER_LOOP_RESISTANCE_MOHM); ++count; }
+  if (table.write_gen(kWireSDM_AIRBAG_IND_OUT, &gen) && gen == 0) { visitor(::std::string_view{"SDM_AIRBAG_IND_OUT"}, kWireSDM_AIRBAG_IND_OUT); ++count; }
+  if (table.write_gen(kWireCHASSIS_IPC_INGEST_HEARTBEAT, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_IPC_INGEST_HEARTBEAT"}, kWireCHASSIS_IPC_INGEST_HEARTBEAT); ++count; }
+  if (table.write_gen(kWireCHASSIS_TJB_LR_TAIL_LAMP, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_TJB_LR_TAIL_LAMP"}, kWireCHASSIS_TJB_LR_TAIL_LAMP); ++count; }
+  if (table.write_gen(kWireCHASSIS_TJB_RR_TAIL_LAMP, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_TJB_RR_TAIL_LAMP"}, kWireCHASSIS_TJB_RR_TAIL_LAMP); ++count; }
+  if (table.write_gen(kWireCHASSIS_TJB_LICENSE_LAMPS, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_TJB_LICENSE_LAMPS"}, kWireCHASSIS_TJB_LICENSE_LAMPS); ++count; }
+  if (table.write_gen(kWireCHASSIS_TJB_LR_TURN_LAMP, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_TJB_LR_TURN_LAMP"}, kWireCHASSIS_TJB_LR_TURN_LAMP); ++count; }
+  if (table.write_gen(kWireCHASSIS_TJB_RR_TURN_LAMP, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_TJB_RR_TURN_LAMP"}, kWireCHASSIS_TJB_RR_TURN_LAMP); ++count; }
+  if (table.write_gen(kWireCHASSIS_TJB_LR_STOP_LAMP, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_TJB_LR_STOP_LAMP"}, kWireCHASSIS_TJB_LR_STOP_LAMP); ++count; }
+  if (table.write_gen(kWireCHASSIS_TJB_RR_STOP_LAMP, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_TJB_RR_STOP_LAMP"}, kWireCHASSIS_TJB_RR_STOP_LAMP); ++count; }
+  if (table.write_gen(kWireBPM_AD_FORCE_CMD, &gen) && gen == 0) { visitor(::std::string_view{"BPM_AD_FORCE_CMD"}, kWireBPM_AD_FORCE_CMD); ++count; }
+  if (table.write_gen(kWireAD_WELD_STATUS, &gen) && gen == 0) { visitor(::std::string_view{"AD_WELD_STATUS"}, kWireAD_WELD_STATUS); ++count; }
+  if (table.write_gen(kWireBPM_APM_AUX_CHARGE_CMD, &gen) && gen == 0) { visitor(::std::string_view{"BPM_APM_AUX_CHARGE_CMD"}, kWireBPM_APM_AUX_CHARGE_CMD); ++count; }
+  if (table.write_gen(kWireHTCM_COMPRESSOR_PWM_CMD, &gen) && gen == 0) { visitor(::std::string_view{"HTCM_COMPRESSOR_PWM_CMD"}, kWireHTCM_COMPRESSOR_PWM_CMD); ++count; }
   return count;
 }
 

@@ -419,6 +419,26 @@ constexpr int           kNumDoorLockStateSignals   = 3;
 constexpr std::uint32_t kSigRsaShiftBlocked = 4088U;
 constexpr int           kNumRsaShiftBlockedSignals = 1;
 
+// BTCM retard-request PWM duty (the external BTCM → ev1sim, chassis segment).
+//   4191  vehicle.chassis.btcm.retard_request_duty_q8  uint16 Q8 % (0..25600)
+// This is the BTCM asking the propulsion side to dissipate torque as generator
+// regen (@source:manual brakes-313 REGENERATIVE BRAKING SYSTEM; the PIM reads
+// the same wire at J1-18 RETARD REQUEST IN). ev1sim subscribes so an acceptance
+// scenario can witness that regen was COMMANDED — a deceleration trace alone
+// cannot distinguish regen from friction braking.
+constexpr std::uint32_t kSigBtcmRetardRequestDutyQ8 = 4191U;
+
+// TJB rear-lamp branches (the external TJB → ev1sim, chassis segment).
+//   4198/4199  tail lamps L/R    4203/4204  stop lamps L/R
+// The LHJB bulb feed lines (4014 LRSL / 4016 RRSL) are what the TJB CONSUMES;
+// these are what it PRODUCES, downstream of its RUN1 gate. Subscribing to both
+// ends is what makes "the stop lamp lit through the trunk junction block" an
+// assertion about the TJB rather than about the LHJB.
+constexpr std::uint32_t kSigTjbLrTailLamp = 4198U;
+constexpr std::uint32_t kSigTjbRrTailLamp = 4199U;
+constexpr std::uint32_t kSigTjbLrStopLamp = 4203U;
+constexpr std::uint32_t kSigTjbRrStopLamp = 4204U;
+
 // Door-lock motor leg drives (the external RHJB → ev1sim, chassis segment).
 // RHJB's rhjb_door_lock behavioral model is a 4-output dual-H-bridge driving
 // BOTH door-lock motors (LH driver + RH passenger) in lockstep.  Each motor has
@@ -1444,6 +1464,19 @@ struct ExternalSimConnector::State {
     bool          rsa_shift_blocked       = false;
     bool          has_rsa_shift_blocked   = false;
 
+    // BTCM retard-request duty (ID 4191, chassis segment) — received from BTCM.
+    // uint16 Q8 percent, 0..25600.  0 until first received.
+    std::uint16_t btcm_retard_request_duty_q8     = 0u;
+    bool          has_btcm_retard_request_duty    = false;
+
+    // TJB rear-lamp branches (IDs 4198/4199 tail, 4203/4204 stop) — from TJB.
+    // bool: true = the trunk junction block is feeding that lamp.
+    bool          tjb_lr_tail_lamp        = false;
+    bool          tjb_rr_tail_lamp        = false;
+    bool          tjb_lr_stop_lamp        = false;
+    bool          tjb_rr_stop_lamp        = false;
+    bool          has_tjb_lamps           = false;
+
     // Door-lock motor leg drives (IDs 4092-4095, chassis segment) — received from RHJB.
     // dual-H-bridge: [0]=LH lock, [1]=LH unlock, [2]=RH lock, [3]=RH unlock.
     // bool: true = leg energised.  Consumed by ev1sim::DoorLockMotor ×2.
@@ -1809,6 +1842,26 @@ bool ExternalSimConnector::GetRsaShiftBlocked() const {
 }
 bool ExternalSimConnector::HasReceivedRsaShiftBlocked() const {
     return m_state->has_rsa_shift_blocked;
+}
+
+std::uint16_t ExternalSimConnector::GetBtcmRetardRequestDutyQ8() const {
+    return m_state->btcm_retard_request_duty_q8;
+}
+bool ExternalSimConnector::HasReceivedBtcmRetardRequestDuty() const {
+    return m_state->has_btcm_retard_request_duty;
+}
+
+bool ExternalSimConnector::GetTjbLampBranch(int branch) const {
+    switch (branch) {
+        case 0: return m_state->tjb_lr_tail_lamp;
+        case 1: return m_state->tjb_rr_tail_lamp;
+        case 2: return m_state->tjb_lr_stop_lamp;
+        case 3: return m_state->tjb_rr_stop_lamp;
+        default: return false;
+    }
+}
+bool ExternalSimConnector::HasReceivedTjbLampBranch() const {
+    return m_state->has_tjb_lamps;
 }
 
 bool ExternalSimConnector::GetDoorLockMotorDrive(int leg) const {
@@ -2651,6 +2704,18 @@ void ExternalSimConnector::DebugInjectU8(std::uint32_t signal_id,
     } else if (signal_id == kSigRsaShiftBlocked) {
         m_state->rsa_shift_blocked     = (value != 0u);
         m_state->has_rsa_shift_blocked = true;
+    } else if (signal_id == kSigTjbLrTailLamp) {
+        m_state->tjb_lr_tail_lamp = (value != 0u);
+        m_state->has_tjb_lamps    = true;
+    } else if (signal_id == kSigTjbRrTailLamp) {
+        m_state->tjb_rr_tail_lamp = (value != 0u);
+        m_state->has_tjb_lamps    = true;
+    } else if (signal_id == kSigTjbLrStopLamp) {
+        m_state->tjb_lr_stop_lamp = (value != 0u);
+        m_state->has_tjb_lamps    = true;
+    } else if (signal_id == kSigTjbRrStopLamp) {
+        m_state->tjb_rr_stop_lamp = (value != 0u);
+        m_state->has_tjb_lamps    = true;
     } else if (signal_id == kSigPimCruiseActive) {
         m_state->pim_cruise_active     = (value != 0u);
         m_state->has_pim_cruise_active = true;
@@ -2659,6 +2724,15 @@ void ExternalSimConnector::DebugInjectU8(std::uint32_t signal_id,
         m_state->has_steering_pump_speed_cmd = true;
     }
     // All other uint8 signals are not currently subscribed as inputs.
+}
+
+void ExternalSimConnector::DebugInjectU16(std::uint32_t signal_id,
+                                           std::uint16_t value) {
+    if (signal_id == kSigBtcmRetardRequestDutyQ8) {
+        m_state->btcm_retard_request_duty_q8  = value;
+        m_state->has_btcm_retard_request_duty = true;
+    }
+    // Other uint16 signals are not currently subscribed as inputs.
 }
 
 void ExternalSimConnector::DebugInjectU32(std::uint32_t signal_id,
@@ -3012,6 +3086,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         sinks.on_byte   = [this](std::uint32_t id, std::uint8_t v)  { DebugInjectU8(id, v); };
         sinks.on_float  = [this](std::uint32_t id, float v)         { DebugInjectFloat(id, v); };
         sinks.on_uint32 = [this](std::uint32_t id, std::uint32_t v) { DebugInjectU32(id, v); };
+        sinks.on_uint16 = [this](std::uint32_t id, std::uint16_t v) { DebugInjectU16(id, v); };
         st.wire->apply_consumer_overlay(sinks);
 
         // 2c. ECU-bus reads (Phase 4). These cells used to arrive as ring

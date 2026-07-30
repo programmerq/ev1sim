@@ -74,6 +74,11 @@ public:
     std::optional<float>         read_float32(std::uint32_t wire_id) const;
     std::optional<std::uint32_t> read_uint32(std::uint32_t wire_id) const;
 
+    // uint16 read. Same contract as read_bit. Added for the BTCM
+    // retard-request PWM duty (4191), the first uint16 cell ev1sim CONSUMES
+    // — write_uint16 already existed for the producer side (steering 6901).
+    std::optional<std::uint16_t> read_uint16(std::uint32_t wire_id) const;
+
     // Sinks for apply_consumer_overlay. Leave any sink empty (default-
     // constructed std::function) to skip that type; only non-empty sinks are
     // invoked. Each sink receives (signal_id, value) — the same signal_id the
@@ -83,6 +88,7 @@ public:
         std::function<void(std::uint32_t, std::uint8_t)>  on_byte;
         std::function<void(std::uint32_t, float)>         on_float;
         std::function<void(std::uint32_t, std::uint32_t)> on_uint32;
+        std::function<void(std::uint32_t, std::uint16_t)> on_uint16;
     };
 
     // For each ev1sim-consumed chassis cell that is attached + written(),

@@ -33,6 +33,15 @@ namespace ev1sim {
 //   ipc_trip_reset:  press the IPC trip-reset button (momentary).
 //   cruise_set / cruise_resume / cruise_cancel / cruise_speed_up / cruise_speed_down:
 //       press the corresponding cruise stalk button (momentary).
+//   exterior_keypad_code:  enter the factory 6-digit code "111111" on the RSA
+//       EXTERIOR keypad as a timed button sequence (~100 ms per digit, so the
+//       whole entry takes ~0.6 s — schedule any follow-on door_handle_driver
+//       at least 1 s later).
+//   door_handle_driver:  pull the driver door handle (momentary).
+//   set_horn:      value != 0 closes the driver horn contact (circuit 28) and
+//       holds it until a set_horn 0; the LHJB decides which tones sound.
+//   flash_to_pass: value != 0 holds the combination-switch flash-to-pass lever
+//       until a flash_to_pass 0.
 //
 // Conditional events (gate event-list progression):
 //   wait_for_speed:  block subsequent events until speed_mps >= value.
@@ -97,6 +106,17 @@ public:
     // without the interactive UI.
     virtual void DoorLockAll()        = 0;
     virtual void DoorUnlockAll()      = 0;
+    // RSA EXTERIOR keypad (the five buttons on the driver's door pillar) —
+    // queues the factory 6-digit code "111111" as a timed button sequence,
+    // exactly as the interactive `K` binding does. This is the physical way
+    // a locked EV1 is opened from outside; door_unlock_all is the UI
+    // shortcut that bypasses the RSA's code validation entirely.
+    virtual void ExteriorKeypadCode() = 0;
+    // Driver door handle pull. With the RSA's code-OK window open the RSA
+    // publishes door_lock_cmd = unlocked; with it closed the pull is refused.
+    virtual void DoorHandleDriver()   = 0;
+    // Combination-switch flash-to-pass lever, held until released.
+    virtual void FlashToPass(bool held) = 0;
     // Fault injection (used by external acceptance scenarios): fail=true
     // suppresses the driver THROTTLE publish (6903) on the main harness —
     // models the accelerator-pedal acquisition feed going dead at the
@@ -177,6 +197,9 @@ private:
     std::optional<double>      m_held_throttle;
     std::optional<double>      m_held_brake;
     std::optional<double>      m_held_steering;
+    // Horn contact, held like the pedals: set_horn value != 0 closes the
+    // single driver horn contact (circuit 28) until the next set_horn 0.
+    std::optional<bool>        m_held_horn;
 
     ScenarioStats              m_stats;
     std::ofstream              m_csv;
