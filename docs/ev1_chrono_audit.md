@@ -13,6 +13,9 @@ Symbol legend in the tables:
 - 🔧 fixed in the audit batch (commit log has the change)
 
 Sources for the real-EV1 numbers in this document:
+- **EV1 service manuals, transcribed in the `ev1-manual-redux` repo** — the
+  primary source, and the one section 7 should have used from the start.  Cite
+  the printed page (e.g. "chassis p. 62"), not "known specifications."
 - GM EV1 product brochure (1999), reproduced widely (e.g. ev1.org archives)
 - Wikipedia GM EV1 article (cross-checked figures)
 - "Who Killed the Electric Car?" (Paine 2006) — production / range numbers
@@ -166,33 +169,71 @@ realistic gradient at partial pedal.  Future improvement: split front
 
 ## 7. Suspension geometry
 
-| Parameter | Current | Real EV1 | Status |
+> **Corrected 2026-07-29.**  This section previously fixed the track widths to
+> 1.496 m / 1.281 m and called the front template wrong.  Both were mistakes;
+> the table below is re-sourced against the chassis manual and the correction
+> is written up under the table.
+
+| Parameter | In the JSON | Printed source | Status |
 |---|---|---|---|
-| Front template | `DoubleWishbone` | **MacPherson strut** | ❌ wrong template |
-| Rear template | `DoubleWishbone` | **trailing arm / twist beam** | ❌ wrong template |
-| Front track (inferred) | 1.470 m | 1.496 m (58.9 in) | 🔧 0.735 → 0.748 |
-| Rear track (inferred) | 1.244 m | 1.281 m (50.4 in) | 🔧 0.622 → 0.6405 |
-| Front camber | -0.10° | typical 0 to -0.5° | ✅ |
-| Rear camber | -0.50° | typical -0.5 to -1.0° | ✅ |
-| Front toe | -0.05° | typical 0 to ±0.1° | ✅ |
-| Rear toe | 0° | typical 0 to +0.1° | ✅ |
-| Spring rate (both axles) | 143000 N/m | unknown | ⚠️ identical front/rear is suspicious |
-| Damping (front / rear) | 7500 / 7000 N·s/m | unknown | ⚠️ |
+| Front template | `DoubleWishbone` | short/long arm (SLA), chassis p. 251 | ✅ right layout |
+| Rear template | `DoubleWishbone` | beam axle on five links, chassis p. 271 | ❌ wrong layout |
+| Front track | 1.470 m (spindle Y 0.735) | 1470 mm (57.9 in), chassis p. 62 | ✅ |
+| Rear track | 1.244 m (spindle Y 0.622) | 1244 mm (49.0 in), chassis p. 62 | ✅ |
+| Front camber | -0.10° | -0.10° nominal, chassis p. 61 | ✅ |
+| Rear camber | -0.50° | -0.50° nominal, chassis p. 61 | ✅ |
+| Front toe | -0.05° | -0.05° per wheel, chassis p. 61 | ✅ |
+| Rear toe | 0° | 0.00° per wheel, chassis p. 61 | ✅ |
+| All hardpoint coordinates | rescaled Chrono `sedan` sample | nothing published | ⚠️ template geometry, labelled as such in the files |
+| Spring rate (both axles) | 143000 N/m | nothing published | ⚠️ |
+| Damping (front / rear) | 7500 / 7000 N·s/m | nothing published | ⚠️ |
 
-**Suspension template mismatch is a known limitation.**  Switching to a
-real `MacPhersonStrut` template (front) and a `MultiLink` or trailing-arm
-approximation (rear) would be a substantial rebuild — different hard
-points, different visualization, different tuning surface.  Deferred until
-either (a) a Chrono `MacPhersonStrut` JSON sample is available to start
-from, or (b) we have measurements / drawings of EV1's actual suspension
-geometry to drive the redesign.
+### What the printed source says, and what this audit got wrong
 
-For now the `DoubleWishbone` approximation gives roughly correct
-roll / pitch / squat behavior at typical driving inputs — close enough for
-the electronics-driven scenarios we're running.
+**Track.**  EV1 chassis manual, printed page 62, "Exterior Dimensions": *Track
+Front 1470 mm (57.9 in)*, *Track Rear 1244 mm (49.0 in)*.  GM's own EV1 product
+site gives the same pair.  The 1.496 m / 1.281 m figures this audit introduced
+have no source: **1281 mm is the Overall Height from the same table, two rows
+above Track Rear.**  The files shipped with 1470/1244, this audit replaced them,
+and a later regression test pinned the replacements — which is what made a
+transcription slip look like a deliberate choice.  Restored to the printed
+values, with the test now pinning those.
 
-The track-width fixes are clean: just bump the spindle / control-arm Y
-coordinates by the half-difference.
+**Front layout.**  Chassis manual page 251: *"The short/long arm (SLA)
+independent front suspension used on the EV1 … a steering knuckle, wheel hub
+assembly, coil over shock assembly, upper and lower ball joint and upper and
+lower control arm … steered by two front tie rods."*  SLA is a double wishbone,
+so the front template is the right kinematic layout.  This audit's "MacPherson
+strut" was wrong.  Unmodeled on that axle: the coil-over-shock yoke linkage and
+the stabilizer bar.
+
+**Rear layout.**  Chassis manual page 271: *"a rear axle assembly with aluminum
+end castings and a tubular center section … two coil springs, two twin tube
+shock absorbers and five connecting links … two upper suspension leading links,
+two lower suspension trailing links, and a track bar."*  A one-piece beam axle
+on five links — not a twist beam, and not independent.  The `DoubleWishbone`
+template models nothing that exists back there: no control arms, no uprights, no
+tie rods, and a track bar (Panhard rod) with no counterpart in the template.
+Chrono's JSON factory does offer closer templates — `SolidAxle` carries the same
+link set but is a steered axle, and `GenericWheeledSuspension` could express the
+layout exactly — but neither can be filled in without hardpoints, so the file
+stays a stand-in and says so in its own header.
+
+**Hardpoints.**  Every coordinate in both files is Chrono's stock
+`sedan/suspension/Sedan_DoubleWishbone.json` rescaled: lateral coordinates by
+1470/1595.8 = 0.921168 front and 1244/1595.8 = 0.779546 rear, longitudinal by
+about the same, vertical fitted to the ev1model wheelwells.  No EV1 suspension
+hardpoint is published anywhere this program holds — a search of both service
+manuals and all four parts-catalog sections produced a wrench size, a tap size
+and hub runout limits.  So there is nothing to replace them with, and the
+deliverable is that they are labelled instead of implied.
+`tests/test_suspension_geometry.cpp` checks each lateral coordinate against the
+sedan value times the scale the file declares, so a future track edit either
+moves all of them or fails.
+
+**Alignment.**  Camber and toe are the one part of these files that is measured.
+This audit validated them against "typical" ranges; page 61 prints all four
+nominals and all four match.  They are now pinned to the printed values.
 
 ## 8. Steering
 
