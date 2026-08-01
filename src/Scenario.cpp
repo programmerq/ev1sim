@@ -343,8 +343,31 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
         // HVAC blower level mirrored from the chassis bus (4082) — the
         // commanded fan speed enum (0=OFF, 1=LOW, 2=MED, 3=HIGH). Cast to int
         // so it prints as a number, not the char of a small uint8_t.
+        //
+        // BEFORE THE FIRST 4082 ARRIVES this reports OFF (0), not the raw
+        // cache. ExternalSimConnector seeds hvac_blower_level to 0xFF as its
+        // "nothing received yet" marker, and 255 is OUTSIDE this field's own
+        // declared 0..3 enum — so emitting the raw cache published a value the
+        // column's own contract says cannot occur. Measured on the 2026-07-31
+        // electricsim nightly: 255 from t=0.017 s to t=1.241 s, while the
+        // RSA->RHJB-PMM->HTCM key-on chain settled, which turned that run's
+        // actuator-range rule (max(hvac_blower_level) <= 3) red on a number no
+        // module ever commanded. The HTCM cannot be the source — it clamps its
+        // own setpoint to 3 (ev1/htcm tests: "level 255 clamped to 3").
+        //
+        // Reporting OFF matches the documented convention of every neighbouring
+        // mirrored field above ("false until first received", "0 until first
+        // received") and is physically honest for a COMMAND: no command
+        // received yet is not commanding the fan. Deliberately NOT emitted as
+        // an empty cell — an empty cell is already this writer's "unknown field
+        // name" output (see the final else), and electricsim's VAT keys its
+        // never-produced-column diagnostic on all-blank columns, so a blank
+        // here would make "the signal never arrived" indistinguishable from
+        // "this scenario named a field that does not exist".
         else if (f == "hvac_blower_level")
-            m_csv << static_cast<int>(bus.GetHvacBlowerLevel());
+            m_csv << (bus.HasReceivedHvacBlowerLevel()
+                          ? static_cast<int>(bus.GetHvacBlowerLevel())
+                          : 0);
         // Door-lock motor leg drives mirrored from the chassis bus
         // (4092 LH lock / 4093 LH unlock / 4094 RH lock / 4095 RH unlock) —
         // 1 = the junction block is energising that motor leg, 0 otherwise.

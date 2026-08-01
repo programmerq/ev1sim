@@ -609,24 +609,41 @@ TEST_CASE("Scenario: HVAC blower level stats field reads the bus mirror as int",
     DriverCommand cmd{};
     VehicleState state{};
 
-    // Row 1: nothing received — blower level default sentinel (0xFF -> 255).
+    // Row 1: nothing received yet — must read OFF (0).
     s.MaybeSampleStats(0.0, state, bus, cmd);
 
     // Row 2: blower commanded HIGH (chassis 4082 = 3). Must print as an int.
     bus.DebugInjectU8(4082, 3u);  // 4082 = HVAC blower level enum
     s.MaybeSampleStats(0.15, state, bus, cmd);
 
+    // Row 3: a real OFF command reads 0 too — for a COMMAND, "none issued
+    // yet" and "commanded off" are the same physical claim.
+    bus.DebugInjectU8(4082, 0u);
+    s.MaybeSampleStats(0.30, state, bus, cmd);
+
     s.Close();
 
     std::ifstream f(tmp_csv);
     REQUIRE(f.is_open());
-    std::string header, row1, row2;
+    std::string header, row1, row2, row3;
     std::getline(f, header);
     CHECK(header == "sim_time_s,hvac_blower_level");
     std::getline(f, row1);
     std::getline(f, row2);
-    CHECK(row1 == "0,255");      // default sentinel, cast to int (not a char)
-    CHECK(row2 == "0.15,3");     // blower level mirrored as an int
+    std::getline(f, row3);
+    // This row asserted "0,255" until 2026-07-31 — the not-received marker was
+    // FROZEN here as expected output, so the leak was blessed rather than
+    // missed. 255 is outside this field's own declared 0..3 enum, and on the
+    // 2026-07-31 electricsim nightly it turned the actuator-range rule
+    // max(hvac_blower_level) <= 3 red on a value no module ever commanded (the
+    // HTCM clamps its own setpoint to 3).
+    CHECK(row1 == "0,0");
+    CHECK(row1.find("255") == std::string::npos);
+    CHECK(row2 == "0.15,3");     // blower level mirrored as an int...
+    // ...and as an int, not the CHAR 3 (ETX). That was this test's original
+    // purpose and it still holds: a mis-cast uint8_t would not render "3".
+    CHECK(row2.substr(row2.find(',') + 1) == "3");
+    CHECK(row3 == "0.3,0");
     f.close();
     std::filesystem::remove(tmp_csv);
 }
@@ -840,3 +857,4 @@ TEST_CASE("Scenario: fail_throttle_input dispatches with fail/restore value",
     CHECK(hooks.fail_throttle == 1);
     CHECK(hooks.restore_throttle == 1);
 }
+
