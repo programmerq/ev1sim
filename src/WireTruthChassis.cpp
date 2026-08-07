@@ -318,11 +318,20 @@ static bool RefuseConductorWrite(std::uint32_t wire_id, const char* accessor) {
     }
     // Loud, once per (cell, accessor) pair — a wrong-owner write that repeats every
     // tick must not be able to bury the rest of the log, but it must also never be
-    // silent.
+    // silent. Keyed on the wire id and a hash of the FULL accessor name: every
+    // write_* accessor name starts with 'w', so keying on just the first byte
+    // (the prior form of this key) collapsed all six accessors onto the same slot
+    // per wire_id — a second, genuinely different violation on the same cell (e.g.
+    // write_bit fires, then write_byte hits the same wrongly-classified conductor)
+    // was silently swallowed instead of getting its own report.
     static std::unordered_map<std::uint64_t, bool> reported;
+    std::uint64_t accessor_hash = 1469598103934665603ULL;  // FNV-1a offset basis
+    for (const char* p = accessor; *p != '\0'; ++p) {
+        accessor_hash ^= static_cast<unsigned char>(*p);
+        accessor_hash *= 1099511628211ULL;  // FNV-1a prime
+    }
     const std::uint64_t key =
-        (static_cast<std::uint64_t>(wire_id) << 8) ^
-        static_cast<std::uint64_t>(accessor[0]);
+        (static_cast<std::uint64_t>(wire_id) << 32) ^ accessor_hash;
     if (!reported[key]) {
         reported[key] = true;
         std::cerr << "[ExternalSim] REFUSED " << accessor << " to conductor cell "

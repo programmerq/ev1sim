@@ -18,11 +18,13 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <string>
 
-#include <unistd.h>  // getpid
+#include <unistd.h>  // getpid, close, dup, dup2
 
 #include "WireTruthChassis.h"
 #include "ExternalSimConnector.h"  // end-to-end: wire -> overlay -> getter
@@ -775,4 +777,105 @@ TEST_CASE("WireTruthChassis::ad_precharge_relay follows AD_PRECHARGE_RELAY",
     REQUIRE(wire->ad_precharge_relay() == std::optional<bool>(true));
     REQUIRE(ad->write_bit(topo::kWireAD_PRECHARGE_RELAY, false));
     REQUIRE(wire->ad_precharge_relay() == std::optional<bool>(false));
+}
+
+// ---------------------------------------------------------------------------
+// RefuseConductorWrite — the runtime half of the conductor discipline
+// (src/WireTruthChassis.cpp). Redirects stderr to a temp file so the test can
+// count the diagnostics the refusal path prints, not just its return value.
+// @design 2026-08-07 — adversarial-review finding: the refusal's dedup key
+// used only accessor[0], and every write_* accessor name starts with 'w', so
+// a second violation via a DIFFERENT accessor on the SAME cell was silently
+// swallowed instead of getting its own report. This pins the fix.
+// ---------------------------------------------------------------------------
+namespace {
+
+// RAII: redirect stderr to a temp file for the scope's lifetime, restoring
+// the original stream on destruction (including on a REQUIRE failure, which
+// Catch2 raises as an exception — the destructor still runs during unwind).
+class StderrCapture {
+ public:
+    StderrCapture() {
+        std::snprintf(path_, sizeof(path_), "/tmp/ev1sim_stderr_capture_%d_XXXXXX",
+                      static_cast<int>(::getpid()));
+        int fd = ::mkstemp(path_);
+        REQUIRE(fd >= 0);
+        ::close(fd);
+        std::fflush(stderr);
+        saved_ = ::dup(fileno(stderr));
+        REQUIRE(saved_ >= 0);
+        REQUIRE(std::freopen(path_, "w", stderr) != nullptr);
+    }
+    ~StderrCapture() {
+        std::fflush(stderr);
+        ::dup2(saved_, fileno(stderr));
+        ::close(saved_);
+        std::remove(path_);
+    }
+    StderrCapture(const StderrCapture&) = delete;
+    StderrCapture& operator=(const StderrCapture&) = delete;
+
+    // Read back everything written so far (flushes first).
+    std::string contents() const {
+        std::fflush(stderr);
+        std::string out;
+        std::FILE* f = std::fopen(path_, "r");
+        if (f == nullptr) return out;
+        char buf[4096];
+        std::size_t n;
+        while ((n = std::fread(buf, 1, sizeof(buf), f)) > 0) {
+            out.append(buf, n);
+        }
+        std::fclose(f);
+        return out;
+    }
+
+ private:
+    char path_[64]{};
+    int saved_{-1};
+};
+
+// Count non-overlapping occurrences of `needle` in `haystack`.
+std::size_t count_occurrences(const std::string& haystack, const std::string& needle) {
+    std::size_t count = 0;
+    std::size_t pos = 0;
+    while ((pos = haystack.find(needle, pos)) != std::string::npos) {
+        ++count;
+        pos += needle.size();
+    }
+    return count;
+}
+
+}  // namespace
+
+TEST_CASE("RefuseConductorWrite: a write via a DIFFERENT accessor on the same "
+          "conductor cell gets its own report, not a swallowed duplicate",
+          "[wire_truth][conductor_discipline]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("refuse_multi_accessor");
+    auto producer = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(producer != nullptr);
+
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+
+    // HORN_DRIVE_LINE_LOW is a `class: conductor` cell (see the horn round-trip
+    // test above) — ev1sim has no legitimate write path to it.
+    const WireId conductor_id = conductor_wire_id(topo::kWireHORN_DRIVE_LINE_LOW);
+
+    StderrCapture capture;
+    REQUIRE_FALSE(wire->write_bit(conductor_id, true));    // accessor 1: "write_bit"
+    REQUIRE_FALSE(wire->write_byte(conductor_id, 1u));      // accessor 2: "write_byte"
+    const std::string log = capture.contents();
+
+    // Each accessor must produce its OWN "REFUSED ... <accessor>" line naming
+    // itself. Before the fix, both calls hashed to the same dedup key (every
+    // write_* name starts with 'w'), so the second line never printed.
+    REQUIRE(count_occurrences(log, "REFUSED write_bit") == 1);
+    REQUIRE(count_occurrences(log, "REFUSED write_byte") == 1);
+
+    // Same accessor, same cell, again: THIS repeat must stay deduplicated —
+    // the guarantee is "once per (cell, accessor) pair", not "once per call".
+    REQUIRE_FALSE(wire->write_bit(conductor_id, false));
+    REQUIRE(count_occurrences(capture.contents(), "REFUSED write_bit") == 1);
 }
