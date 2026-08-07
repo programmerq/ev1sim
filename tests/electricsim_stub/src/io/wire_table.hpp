@@ -33,19 +33,19 @@
 #include <memory>
 #include <string>
 
-// The ONE holder of the conductor publish capability (plan section 4.1: "One friend.
-// If you need two, you have split the solver and the answer is to fix the split, not
-// the friend list."). Forward-declared here so SolverToken can name it.
+// The ONE holder of the conductor publish capability — a "one friend" rule: if a
+// caller needs two, the fix is to fix the split, not grow the friend list.
+// Forward-declared here so SolverToken can name it.
 //
-// WHY IT IS NOT src/net/solver/publish.cpp AS PLAN SECTION 4.1 SAYS: src/net/ compiles
-// STANDALONE against nothing but the C++ standard library (plan section 4A, requirement
-// section 11), and tests/circuit_truth/net_core_build.sh proves that by GLOBBING every
-// .cpp under src/net/ and compiling it with `-I src/net` and no other include path. A
+// WHY IT IS NOT src/net/solver/publish.cpp: src/net/ compiles STANDALONE against
+// nothing but the C++ standard library — no embedded-hardware dependencies — and
+// tests/circuit_truth/net_core_build.sh proves that by GLOBBING every .cpp under
+// src/net/ and compiling it with `-I src/net` and no other include path. A
 // publish.cpp under src/net/solver/ would have to include src/io/wire_table.hpp and
-// would break that build — i.e. it would break the one suite plan section 2.4 says must
-// be green at every commit. The publish edge therefore lives one directory out, in
-// src/net_host/, which is the solver HOST of plan section 4.6. Still exactly one place;
-// still nothing else may name SolverToken.
+// would break that build — the one suite that must stay green at every commit. The
+// publish edge therefore lives one directory out, in src/net_host/, which hosts the
+// solver's I/O-facing integration points. Still exactly one place; still nothing
+// else may name SolverToken.
 namespace electricsim::net_host {
 class ConductorPublisher;
 }  // namespace electricsim::net_host
@@ -54,7 +54,7 @@ namespace electricsim::io {
 
 using WireId = std::uint32_t;
 
-// ─── Cell classes (plan sections 4.1, 4.5, 7.3 step 1) ────────────────────
+// ─── Cell classes ───────────────────────────────────────────────────────
 //
 // Every cell in config/topology.yaml carries a `class:` key. It is REQUIRED and
 // validated: scripts/gen_topology_header.py fails the build on a cell with no
@@ -83,7 +83,7 @@ enum class CellClass : std::uint8_t {
   kUnclassifiedLegacy = 4,
 };
 
-// ConductorId — the opaque handle for a `class: conductor` cell (plan section 4.1).
+// ConductorId — the opaque handle for a `class: conductor` cell.
 //
 // A scoped enum over WireId: zero runtime cost, no implicit conversion in either
 // direction. The generated header emits `inline constexpr ConductorId kWireX{123U};`
@@ -91,10 +91,10 @@ enum class CellClass : std::uint8_t {
 // there is NO path from a module TU to a value-write of that cell — with or without an
 // `@wire` comment, on one line or on five. That last clause is the measurement that
 // motivated the type: 4 of LHJB's 19 conductor writes are multi-line calls a
-// line-oriented grep misses, and all four are conductor writes (plan section 4).
+// line-oriented grep misses, and all four are conductor writes.
 enum class ConductorId : WireId {};
 
-// ElementStateId — the opaque handle for a `class: element_state` cell (plan section 4.5).
+// ElementStateId — the opaque handle for a `class: element_state` cell.
 //
 // The transport SURVIVES the migration; only the semantics change. These are the cells a
 // module writes to say "my contact is closed" / "my converter is enabled" — a CAUSE. The
@@ -105,8 +105,8 @@ enum class ElementStateId : WireId {};
 
 // SolverToken — proof that a value is the output of a provenance computation.
 //
-// Plan section 4.1 [v3]: the token is NOT "you are on the allow-list of things that may
-// produce voltage" (that rule is deleted, plan section 4.0). It is: THIS VALUE IS THE
+// The token is NOT "you are on the allow-list of things that may
+// produce voltage" — that older allow-list model is deliberately gone. It is: THIS VALUE IS THE
 // OUTPUT OF A PROVENANCE COMPUTATION, and it is constructible only where that
 // computation happens. A future agent tempted to friend a second TU is being tempted to
 // publish energisation that no provenance path backs.
@@ -302,7 +302,7 @@ class WireTable {
   bool read_uint64_sample(WireId id, Sample<std::uint64_t>* out) const;
   bool read_float32_sample(WireId id, Sample<float>* out) const;
 
-  // ─── Conductor cells (plan section 4.1) ─────────────────────────────
+  // ─── Conductor cells ──────────────────────────────────────────────────
   //
   // publish_conductor is the ONLY write path to a `class: conductor` cell, and it
   // demands a SolverToken, which is constructible in exactly one place (see the
@@ -316,23 +316,23 @@ class WireTable {
   // which is the same defect as a defaulting read wearing a smaller hat.
   //
   // And there is NO read_bit_or_default(ConductorId, ...) — not "for symmetry", not
-  // "for the tests", not "just for the transition" (plan section 4.1, stated three
-  // times because a defaulting overload would rebuild the consumer-side fallback on
+  // "for the tests", not "just for the transition". Deliberately restated at each
+  // call site: a defaulting overload would rebuild the consumer-side fallback on
   // the exact cells the type-split exists to protect, in a header nobody reviews
-  // twice). The absence is enforced by the absence of an implicit conversion: passing
+  // twice. The absence is enforced by the absence of an implicit conversion: passing
   // a ConductorId to the WireId overload does not compile.
   bool publish_conductor(ConductorId id, bool energised, const SolverToken& token);
   bool read_bit_sample(ConductorId id, Sample<bool>* out) const;
 
-  // ─── Element-state cells (plan section 4.5) ─────────────────────────
+  // ─── Element-state cells ────────────────────────────────────────────────
   //
   // The module-decided half of the element model: contact `closed`, converter/source
   // `enable`, transducer mechanical input. Modules WRITE these (they are causes) and
-  // the solver READS them. Same segment, same seqlock, same write_gen — plan section
-  // 2.3: "Zero lines of new IPC."
+  // the solver READS them. Same segment, same seqlock, same write_gen — zero lines
+  // of new IPC.
   //
   // Same no-defaulting-read rule as ConductorId, for the same reason: an element whose
-  // `closed` is unwritten is TOPOLOGICALLY ABSENT (property P-T10), which a defaulting
+  // `closed` is unwritten is TOPOLOGICALLY ABSENT, which a defaulting
   // read would silently turn into "closed" or "open" — a claim the graph never made.
   bool write_element_state(ElementStateId id, bool closed);
   bool read_bit_sample(ElementStateId id, Sample<bool>* out) const;

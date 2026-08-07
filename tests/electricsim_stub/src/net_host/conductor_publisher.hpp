@@ -1,23 +1,22 @@
-// src/net_host/conductor_publisher.hpp — THE publish edge (plan section 4.1).
+// src/net_host/conductor_publisher.hpp — THE publish edge.
 //
 // This is the one and only holder of io::SolverToken's private constructor. Nothing
 // else in the tree may name SolverToken, and nothing else can therefore reach
 // WireTable::publish_conductor().
 //
-// WHY IT IS HERE AND NOT IN src/net/solver/publish.cpp, WHICH IS WHERE PLAN SECTION
-// 4.1 PUTS IT. src/net/ compiles STANDALONE against nothing but the C++ standard
-// library — that is plan section 4A's layering rule and requirement section 11's
-// "compile as host libraries without embedded hardware dependencies", and
+// WHY IT IS HERE AND NOT IN src/net/solver/publish.cpp. src/net/ compiles
+// STANDALONE against nothing but the C++ standard library — no embedded-hardware
+// dependencies — and
 // tests/circuit_truth/net_core_build.sh enforces it by GLOBBING every .cpp under
 // src/net/ and compiling each with `-I src/net` and no other include path. A
 // publish.cpp under src/net/solver/ would have to include src/io/wire_table.hpp, so
-// it would break that build — i.e. it would break the one suite plan section 2.4
-// says must be green at every commit. The publish edge therefore lives one directory
-// out, in the solver HOST of plan section 4.6.
+// it would break that build — the one suite that must stay green at every commit.
+// The publish edge therefore lives one directory out, in src/net_host/, which hosts
+// the solver's I/O-facing integration points.
 //
-// The rule that mattered is preserved exactly: ONE place constructs the token. Plan
-// section 4.1: "One friend. If you need two, you have split the solver and the answer
-// is to fix the split, not the friend list."
+// The rule that mattered is preserved exactly: ONE place constructs the token —
+// "one friend"; if a caller needs two, the fix is to fix the split, not grow the
+// friend list.
 
 #pragma once
 
@@ -35,7 +34,7 @@ class ConductorPublisher {
   // Publish one conductor cell's derived energisation.
   //
   // `energised` must be the output of the solver's provenance computation for the
-  // node this cell belongs to (plan section 4.0's P-P1..P-P3). There is no runtime
+  // node this cell belongs to. There is no runtime
   // way to check that here, which is precisely why the capability is scoped to this
   // class instead of being a flag on a call: the check is "who is allowed to hold
   // the token", and the answer is one class in one file.

@@ -122,10 +122,9 @@ static_assert(sizeof(Header) == kHeaderSize, "Header must be 64 bytes");
 //                              class (round-3 reviews; round-4 design memo
 //                              docs/wire_truth_written_ness.md).
 //   bytes 8..63   padding    — false-sharing isolation. Reserved for the
-//                              multi-word (bytes[N]) seqlock that the
-//                              parent design memo §"Optional per-cell or
-//                              per-group wake mechanism" sketches; the
-//                              seqlock's sequence counter unifies with
+//                              multi-word (bytes[N]) seqlock sketched for a
+//                              future per-cell or per-group wake mechanism;
+//                              the seqlock's sequence counter unifies with
 //                              write_gen when that arrives.
 //
 // Writer ordering — value first (release), then write_gen bump (also
@@ -156,16 +155,18 @@ static_assert(std::atomic<std::uint64_t>::is_always_lock_free,
 // no kFormatVersion bump, and the creator zero-fills it so a fresh or
 // pre-barrier segment reads as a fully-inert (enabled == 0) BarrierState. See
 // docs/proposals/primitive4_cosim_determinism_2026-06-25.md.
-// @design 2026-06-28 claude — MEMBERSHIP/LIVENESS trade-off. The DECIDED DESIGN
-// (proposal §"DECIDED DESIGN") sketched 5 atomics including an `epoch` and an
+// @design 2026-06-28 claude — MEMBERSHIP/LIVENESS trade-off. An earlier sketch
+// had 5 atomics including an `epoch` and an
 // `expected` consumer count for self-registration. The shipped struct drops
 // those two: consumer count is passed out-of-band (EV1SIM_FLEET_N, set by
 // vat/fleet.py only for an all-converted fleet) and liveness is a bounded
 // timeout, not self-registration. Consequence + accepted deviation from
-// AGENTS.md §6 (the robust-mutex "next locker recovers" posture): if a consumer
+// this codebase's usual self-healing "next locker recovers" robust-mutex
+// posture: if a consumer
 // CRASHES mid-tick the leader can't reach ack_count and eats the full
-// barrier_await_acks timeout that tick (it never wedges *forever* — the point of
-// §6 — but it isn't instant-self-healing either). Acceptable because the barrier
+// barrier_await_acks timeout that tick (it never wedges *forever* — that
+// posture is still honored — but it isn't instant-self-healing either).
+// Acceptable because the barrier
 // is opt-in (armed only for ev1sim-led, all-converted fleets) so it never
 // touches the general substrate, and the timeout is generous by design (live-
 // but-slow peers are the normal case). Hardening path if it bites: have the
@@ -426,7 +427,8 @@ void bump_write_gen_saturating(Cell& cell) {
 //   hang the fleet tick loop (UartRx::tick) for every consumer. On exceeding
 //   the cap the reader treats it as "no new bits this tick" (got=0, ok=true,
 //   cursor unchanged) and returns rather than blocking — mirroring the
-//   self-healing robust-mutex transport (AGENTS.md §6). The normal
+//   self-healing "next locker recovers" contract used by this codebase's
+//   robust-mutex transport. The normal
 //   uncontended / single-in-flight-append path returns on the first or
 //   second iteration, so the cap never bites in practice.
 //
@@ -1279,10 +1281,10 @@ bool WireTable::write_bit(WireId id, bool value) {
   return true;
 }
 
-// ─── Conductor / element-state cells (plan sections 4.1, 4.5) ──────────────
+// ─── Conductor / element-state cells ───────────────────────────────────────
 //
-// Both delegate to the WireId path: the transport is unchanged (plan section 2.3 —
-// "same segment, same WireTable, same seqlock, same write_gen"). What changed is who
+// Both delegate to the WireId path: the transport is unchanged — same segment,
+// same WireTable, same seqlock, same write_gen. What changed is who
 // can NAME the cell, and that is decided at compile time by the argument type, not
 // here at runtime. These four bodies are the only place in the tree that converts a
 // ConductorId or an ElementStateId back to a WireId.
@@ -1291,7 +1293,7 @@ bool WireTable::publish_conductor(ConductorId id, bool energised,
                                   const SolverToken& token) {
   // `token` carries no data. Its whole job is to be unconstructible outside
   // ConductorPublisher, so reaching this line at all is proof the value came out of a
-  // provenance computation (plan section 4.1 [v3]).
+  // provenance computation.
   (void)token;
   return write_bit(static_cast<WireId>(id), energised);
 }
