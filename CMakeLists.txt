@@ -192,7 +192,13 @@ set(_electricsim_sources
 # survive on a wire-truth tree; probe them so a partial checkout is "stale".
 set(_electricsim_headers
     "src/io/topology/topology_generated.h"
-    "src/io/ev1_chassis_signals.hpp")
+    "src/io/ev1_chassis_signals.hpp"
+    # The publish edge for conductor cells. Conductor energisation is an OUTPUT of
+    # the external sim's solver, so the substrate gives those cells no write
+    # overload; this header is the one place that can set one. ev1sim never
+    # publishes a conductor in production (it consumes them), but its tests stand in
+    # for the producer and use this same edge rather than casting the type away.
+    "src/net_host/conductor_publisher.hpp")
 
 # Helper: returns TRUE in ${_out_var} if every required source + header exists
 # under ${_root}.  Probing every file (not just one) catches partially-deleted
@@ -261,8 +267,13 @@ if(ELECTRICSIM_DIR)
             list(APPEND _electricsim_sources_abs "${ELECTRICSIM_DIR}/${_src}")
         endforeach()
         add_library(electricsim_wire_substrate STATIC ${_electricsim_sources_abs})
+        # src/io is the substrate's own include root (headers include each other
+        # as "wire_table.hpp", "topology/...").  src/ is additionally needed so
+        # "net_host/conductor_publisher.hpp" resolves — that header sits outside
+        # src/io deliberately (it depends on the substrate, not the reverse).
         target_include_directories(electricsim_wire_substrate PUBLIC
-            "${ELECTRICSIM_DIR}/src/io")
+            "${ELECTRICSIM_DIR}/src/io"
+            "${ELECTRICSIM_DIR}/src")
         find_package(Threads REQUIRED)
         target_link_libraries(electricsim_wire_substrate PUBLIC Threads::Threads)
         set(EV1SIM_HAVE_EXTERNAL_SIM TRUE)
@@ -437,7 +448,9 @@ if(BUILD_TESTS)
     # WireTruthChassis, so it only compiles when the substrate is present.
     set(EV1SIM_WIRE_TRUTH_TEST_SRC "")
     if(EV1SIM_HAVE_WIRE_TRUTH)
-        set(EV1SIM_WIRE_TRUTH_TEST_SRC tests/test_wire_truth_chassis.cpp)
+        set(EV1SIM_WIRE_TRUTH_TEST_SRC
+            tests/test_wire_truth_chassis.cpp
+            tests/test_wire_truth_attach_outcome.cpp)
     endif()
 
     add_executable(ev1sim_tests
@@ -503,6 +516,41 @@ if(BUILD_TESTS)
     include(CTest)
     include(Catch)
     catch_discover_tests(ev1sim_tests)
+
+    # ── Vendored-stub honesty checks ────────────────────────────────────────
+    # tests/electricsim_stub/ is a second copy of the external sim's substrate
+    # sources. Second copies drift, and this one did — silently, in 5 of 15 files,
+    # including the substrate itself. These run with the ordinary suite so the copy
+    # cannot rot between the occasions somebody remembers to look.
+    #
+    # stub_sync verifies the copy against its manifest, and additionally against the
+    # real external-sim tree when one is configured. stub_sync_selftest is the proof
+    # that stub_sync can FAIL: without it, a green stub_sync means nothing, which is
+    # exactly the trap the static_assert drift guards fell into (they compared the
+    # vendored constants to themselves and passed by construction).
+    add_test(NAME stub_sync_selftest
+             COMMAND bash ${CMAKE_SOURCE_DIR}/tests/electricsim_stub/selftest_check_stub_sync.sh)
+    set_tests_properties(stub_sync_selftest PROPERTIES LABELS "guard" TIMEOUT 120)
+
+    # --require-upstream only when ELECTRICSIM_DIR names a real tree rather than the
+    # vendored stub itself. Pointing the check at the stub would compare the copy to
+    # itself — green by construction, the defect restated.
+    set(_stub_dir "${CMAKE_SOURCE_DIR}/tests/electricsim_stub")
+    if(ELECTRICSIM_DIR AND NOT "${ELECTRICSIM_DIR}" STREQUAL "${_stub_dir}")
+        add_test(NAME stub_sync
+                 COMMAND bash ${CMAKE_SOURCE_DIR}/tests/electricsim_stub/check_stub_sync.sh
+                         --upstream "${ELECTRICSIM_DIR}" --require-upstream)
+    else()
+        add_test(NAME stub_sync
+                 COMMAND bash ${CMAKE_SOURCE_DIR}/tests/electricsim_stub/check_stub_sync.sh)
+    endif()
+    set_tests_properties(stub_sync PROPERTIES LABELS "guard" TIMEOUT 120)
+
+    # ev1sim consumes conductor cells and never produces one. A ratchet, failing
+    # on != — see the script for why <= would be defeatable.
+    add_test(NAME conductor_discipline
+             COMMAND bash ${CMAKE_SOURCE_DIR}/tests/check_conductor_discipline.sh)
+    set_tests_properties(conductor_discipline PROPERTIES LABELS "guard" TIMEOUT 120)
 
     # ── ABS integration gate (opt-in; needs a built electricsim) ─────────────
     # The brake-plant ABS behaviour can only be validated with ev1sim AND

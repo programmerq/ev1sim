@@ -826,7 +826,7 @@ inline constexpr std::uint32_t kSigChassisRhjbDilmLevel    = 4186U;  // DILM: in
 //     -> RHJB J9.C16 (WHT 2027A "CHARGER RECEPTACLE")
 //     -> PMM (Power Moding Module) WAKE input.
 // @source:redux ev1_lhjb_module.yaml J1.A2 (2027G) + J8.C16 (2027A);
-//   /home/user/ev1-manual-redux/harness/ev1_rhjb_module.yaml J9.C16 (2027A
+//   ev1_rhjb_module.yaml J9.C16 (2027A
 //   "CHARGER RECEPTACLE"); ESM elec-321 + batt-786 (charge-receptacle wake-up),
 //   elec-320/321 (PMM 2027-family wake-up master).
 //
@@ -1066,5 +1066,38 @@ inline constexpr std::uint32_t kSigChassisRhjbPmmModuleBPlus = 4196U;
 //   notes/manual_supplements.yaml#2026-06-13-sla-battery-shared-chemistry.
 // ---------------------------------------------------------------------------
 inline constexpr std::uint32_t kSigChassisApmTwelveVoltOutputMa = 4197U;
+
+// ---------------------------------------------------------------------------
+// TJB rear-lamp branch outputs (electricsim/TJB → chassis bus)
+// Signal IDs 4198–4204.  Encoding: uint8 bool per branch — 1 = branch hot.
+//
+// The Trunk Junction Block distributes the LHJB's rear lighting feeds (park /
+// turn-left / turn-right / brake, all under RUN1) to the physical rear-lamp
+// branches: LR/RR tail, license, LR/RR turn, LR/RR stop.
+// @source:manual EV1 Electrical Service Manual, trunk junction block chapter
+//   (rear lamp + license branch distribution from LHJB feeds) — the branch
+//   set mirrors ev1_tjb_outputs_t (ev1/junction_boxes/junction_boxes.h).
+//
+// Before these cells the TJB had NO live process at all — ev1_tjb_tick and
+// its 13 route_* families were unit-tested dormant code (owner round-2
+// decision D-08a, 2026-07-05: wire dormant module code into live processes).
+// ex_tjb_controller consumes RUN1 + the LHJB feed cells and publishes these
+// seven branches. Observational today (consumers: []); candidates for the
+// ev1sim rear-lamp contract — a possible future migration is TJB taking over
+// rear-lamp production from the LHJB-written BULB_FEED_LINE_* cells, which is
+// a cross-repo contract change (docs/3d_sim_contract.md) deliberately NOT
+// done here.
+//
+// Publisher: ex_tjb_controller (ev1/tjb/tjb_host.cpp).
+// Consumers: none in-repo (observational; ev1sim candidate).
+// @design 2026-07-05 — ID allocation 4198–4204, next free chassis block.
+// ---------------------------------------------------------------------------
+inline constexpr std::uint32_t kSigChassisTjbLrTailLamp   = 4198U;
+inline constexpr std::uint32_t kSigChassisTjbRrTailLamp   = 4199U;
+inline constexpr std::uint32_t kSigChassisTjbLicenseLamps = 4200U;
+inline constexpr std::uint32_t kSigChassisTjbLrTurnLamp   = 4201U;
+inline constexpr std::uint32_t kSigChassisTjbRrTurnLamp   = 4202U;
+inline constexpr std::uint32_t kSigChassisTjbLrStopLamp   = 4203U;
+inline constexpr std::uint32_t kSigChassisTjbRrStopLamp   = 4204U;
 
 }  // namespace electricsim::io

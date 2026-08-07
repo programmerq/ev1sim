@@ -16,7 +16,10 @@
 #include <string>
 #include <thread>
 
-#if !defined(_WIN32)
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#else
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -50,12 +53,23 @@ std::chrono::milliseconds attach_timeout_from_env() {
   return std::chrono::milliseconds(ms);
 }
 
-#if !defined(_WIN32)
-// Quietly probe whether the named segment exists. Returns true if a
-// non-creating shm_open succeeds (and closes the fd); false on ENOENT
-// or any other open failure. Used by the attach-poll loop to suppress
-// the per-iteration stderr noise WireTable::attach() would emit.
+// Quietly probe whether the named segment exists. Returns true if the
+// platform's "open existing read-only" call succeeds (and the handle is
+// closed); false on missing-segment or any other open failure. Used by
+// the attach-poll loop to suppress the per-iteration stderr noise
+// WireTable::attach() would emit.
 bool segment_exists(const std::string& name) {
+#if defined(_WIN32)
+  // Win32 names live in the per-session Local\ namespace; strip the
+  // leading POSIX-style slash (if any) the same way WireTable does.
+  const std::string win = (name.empty() || name[0] != '/')
+                          ? name
+                          : name.substr(1);
+  HANDLE h = ::OpenFileMappingA(FILE_MAP_READ, FALSE, win.c_str());
+  if (h == nullptr) return false;
+  ::CloseHandle(h);
+  return true;
+#else
   const std::string posix = (name.empty() || name[0] == '/')
                             ? name
                             : std::string("/") + name;
@@ -63,8 +77,8 @@ bool segment_exists(const std::string& name) {
   if (fd < 0) return false;
   ::close(fd);
   return true;
-}
 #endif
+}
 
 }  // namespace
 
@@ -100,7 +114,6 @@ std::unique_ptr<::electricsim::io::WireTable> try_open_from_env(
     auto table = ::electricsim::io::WireTable::create(opts, declare_cb);
     if (table != nullptr) return table;
 
-#if !defined(_WIN32)
     // create() failed — most likely the segment already exists (a
     // previous driver process died without unlinking; shm segments
     // outlive their creator). Recover.
@@ -123,6 +136,7 @@ std::unique_ptr<::electricsim::io::WireTable> try_open_from_env(
       return adopted;
     }
 
+#if !defined(_WIN32)
     // Step 2: the orphan is UNUSABLE (corrupt, wrong topology hash,
     // wrong version, or a creator that died mid-init). Only now is
     // unlink + recreate safe: a reader could not have validly attached
@@ -133,6 +147,11 @@ std::unique_ptr<::electricsim::io::WireTable> try_open_from_env(
     // Caveat: single-creator model. Concurrent legitimate creators
     // would step on each other; for the wire-truth design that's a
     // usage error, not a supported scenario.
+    //
+    // Win32: there is no equivalent of shm_unlink; named-mapping
+    // lifetime is "until the last handle closes." If adopt() failed,
+    // there's no recovery without manual process cleanup. Operator
+    // kills the stale process; Windows reclaims the name automatically.
     if (segment_exists(name)) {
       const std::string posix = (name[0] == '/') ? std::string(name)
                                                  : std::string("/") + name;
@@ -145,20 +164,24 @@ std::unique_ptr<::electricsim::io::WireTable> try_open_from_env(
         if (table != nullptr) return table;
       }
     }
+#else
+    std::fprintf(stderr,
+                 "topology::try_open_from_env: segment %s exists and adopt "
+                 "failed; Win32 has no shm_unlink — kill the stale process "
+                 "manually and retry. Wire-truth disabled for this process.\n",
+                 name);
 #endif
     return nullptr;
   }
 
   // Attacher path. Wait briefly for the segment to exist — handles
   // the "controller booted before the test_plant created the segment"
-  // race. Probing via raw shm_open keeps the polling quiet; only
-  // when the segment is observed do we hand off to WireTable::attach
-  // (which logs further failures normally). (Bugbot review of epic
-  // PR #85: attach was never retried, leaving the controller
-  // permanently wire-truth-disabled on a slightly slow producer.)
-#if defined(_WIN32)
-  return ::electricsim::io::WireTable::attach(opts);
-#else
+  // race. Probing via raw shm_open / OpenFileMappingA keeps the
+  // polling quiet; only when the segment is observed do we hand off
+  // to WireTable::attach (which logs further failures normally).
+  // (Bugbot review of epic PR #85: attach was never retried, leaving
+  // the controller permanently wire-truth-disabled on a slightly slow
+  // producer.)
   const auto deadline =
       std::chrono::steady_clock::now() + attach_timeout_from_env();
   while (true) {
@@ -175,7 +198,6 @@ std::unique_ptr<::electricsim::io::WireTable> try_open_from_env(
     }
     std::this_thread::sleep_for(kAttachPollInterval);
   }
-#endif
 }
 
 }  // namespace electricsim::topology

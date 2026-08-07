@@ -46,8 +46,11 @@ public:
     // honours ELECTRICSIM_WIRES_NAME / ELECTRICSIM_WIRES_ROLE exactly as every
     // external-sim controller does (run_ev1_vehicle.sh sets these). Returns
     // nullptr when wire-truth is disabled (env unset), the segment never comes
-    // up, the topology hash mismatches, or the substrate is compiled out. A
-    // nullptr return is the normal "external sim not present" path.
+    // up, the topology hash mismatches, or the substrate is compiled out.
+    //
+    // A nullptr return is AMBIGUOUS and callers must not treat it as "external sim
+    // not present" — call LastAttachOutcome() to find out which of those cases
+    // actually happened. See AttachOutcome below for why.
     static std::unique_ptr<WireTruthChassis> OpenFromEnv(
         const char* default_role = "attacher");
 
@@ -56,6 +59,49 @@ public:
     // nullptr on any attach failure (missing segment / hash mismatch / stub).
     static std::unique_ptr<WireTruthChassis> Attach(
         const std::string& segment_name);
+
+    // Why the last OpenFromEnv() attempt did or did not yield a live substrate.
+    //
+    // THIS ENUM EXISTS BECAUSE nullptr WAS AMBIGUOUS. OpenFromEnv() returns
+    // nullptr both when nobody asked for the substrate and when the substrate was
+    // asked for and did not come up. Those are opposite facts, and collapsing them
+    // into one pointer is what let ev1sim run a whole session with every wire dark:
+    // the connector's `if (wire)` guard is false either way, no diagnostic is
+    // printed, and the vehicle looks alive while consuming nothing. A topology
+    // change on the producer side lands in exactly that window — this binary keeps
+    // running against a segment whose hash it no longer matches.
+    //
+    // Three-valued on purpose so the caller can treat the middle case as the error
+    // it is (see the attach site in ExternalSimConnector.cpp, which refuses to run
+    // dark rather than degrade silently).
+    enum class AttachOutcome {
+        // OpenFromEnv() has not been called in this process yet.
+        kNotAttempted,
+        // Wire truth was never requested: ELECTRICSIM_WIRES_NAME unset/empty, or
+        // the substrate is compiled out of this binary. NOT an error — this is the
+        // documented "run ev1sim standalone" path.
+        kDisabled,
+        // Live substrate; the segment's topology hash matched this binary's.
+        kAttached,
+        // The environment ASKED for wire truth and it did not come up: segment
+        // absent or down, or the segment's topology hash differs from the one this
+        // binary was compiled against. This is an error, and never a reason to
+        // continue — a co-sim that has lost its electrical fleet produces
+        // confident, wrong output.
+        kRequestedButUnavailable,
+    };
+
+    // The outcome of the most recent OpenFromEnv() call in this process.
+    static AttachOutcome LastAttachOutcome();
+
+    // Stable spelling of an AttachOutcome, for logs and test assertions.
+    static const char* AttachOutcomeName(AttachOutcome outcome);
+
+    // The topology hash THIS BINARY was compiled against. When an attach fails
+    // with kRequestedButUnavailable this is half of what a reader needs; the other
+    // half lives in whichever peer created the segment. Zero when the substrate is
+    // compiled out.
+    static std::uint32_t CompiledTopologyHash();
 
     // True once the shared WireTable is attached (hash matched).
     bool attached() const;
