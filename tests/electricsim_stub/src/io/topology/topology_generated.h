@@ -3,8 +3,16 @@
 //
 // CI runs `python3 scripts/gen_topology_header.py --check`
 // to fail the build if config/topology.yaml is edited
-// without regenerating this header (same pattern as
-// scripts/audit_serial_messages.py --check).
+// without regenerating this header.
+//
+// This header is vendored verbatim into a public consumer's
+// CI stub, so every word below is published and the copy
+// cannot be scrubbed on that side without breaking its
+// byte-identity sync guard. Comments here therefore cite
+// only the cross-repo contract, docs/3d_sim_contract.md;
+// design rationale lives beside the code that emits each
+// construct, in scripts/gen_topology_header.py. The
+// generator refuses to emit anything else.
 
 #ifndef ELECTRICSIM_SRC_IO_TOPOLOGY_TOPOLOGY_GENERATED_H_
 #define ELECTRICSIM_SRC_IO_TOPOLOGY_TOPOLOGY_GENERATED_H_
@@ -14,7 +22,7 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <string_view>  // wire_name_for / for_each_unwritten (round-4 4e)
+#include <string_view>  // wire_name_for / for_each_unwritten
 
 namespace electricsim::topology {
 
@@ -22,7 +30,7 @@ inline constexpr std::uint32_t kFormatVersion = 2U;
 inline constexpr std::uint32_t kTopologyHash = 0xC0D81E38U;
 inline constexpr std::size_t kWireCount = 411;
 
-// Per-class cell counts (circuit-truth step 2). Emitted so a
+// Per-class cell counts. Emitted so a
 // receipt can print the classification without re-parsing YAML,
 // and so a test can assert against them. The legacy count is held
 // by a DECREASING ratchet in the generator that fails on !=.
@@ -34,7 +42,7 @@ inline constexpr std::size_t kUnclassifiedLegacyCellCount = 193;
 // Named cell ids. Sequential by YAML key order; changing that
 // order or adding/removing a net changes kTopologyHash.
 //
-// THE TYPE IS DECIDED BY `class:` (plan sections 4.1 / 4.5):
+// THE TYPE IS DECIDED BY `class:`:
 //   class: conductor      -> ConductorId     (solver-published;
 //                            there is NO write_bit() overload, so a
 //                            module value-write is a COMPILE ERROR)
@@ -453,7 +461,7 @@ inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REAR_EMB_RR{409U
 inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REGEN_DISABLE{410U};
 inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_BRAKE_SW_OUT{411U};
 
-// Per-net default + init_policy constants (round-4 step 4b).
+// Per-net default + init_policy constants.
 // Used by consumers that opt into the kDefault policy — see
 // wire_defaults.hpp::read_*_or_default. The values are
 // folded into kTopologyHash above, so a producer/consumer
@@ -1699,7 +1707,7 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   return ok;
 }
 
-// WireId → wire-name (round-4 step 4e). Returns an empty
+// WireId → wire-name. Returns an empty
 // view for an unknown id. String storage is static so the
 // returned view is safe for the program's lifetime.
 inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
@@ -2119,7 +2127,7 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
   }
 }
 
-// WireId → driver-name (round-8). Returns an empty view
+// WireId → driver-name. Returns an empty view
 // for an unknown id OR a net whose YAML omits `driver:`.
 // The driver field is documentation/provenance — it is NOT
 // part of kTopologyHash (an attacher with an older or newer
@@ -2970,7 +2978,7 @@ inline ::std::size_t for_each_unwritten(
   return count;
 }
 
-// WireId -> CellClass (circuit-truth step 2). Runtime introspection
+// WireId -> CellClass. Runtime introspection
 // for receipts and diagnostics: it lets the solver host print
 // "published N conductor cells" without a second copy of the
 // classification living in C++. Returns kUnknown for an unknown id.
