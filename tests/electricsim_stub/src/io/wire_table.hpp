@@ -464,7 +464,6 @@ class WireTable {
   // elsewhere): the shm counters are source-of-truth, so a lost/absent wake only
   // costs latency. Every wait is bounded by timeout_ms; on a crashed peer the
   // wait returns false (never wedges) so the caller can abort the run.
-  // See docs/proposals/primitive4_cosim_determinism_2026-06-25.md.
 
   // Leader: arm the barrier (idempotent). After this, consumers that are
   // sim-time masters will block-and-ack.

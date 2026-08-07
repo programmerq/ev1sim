@@ -10,9 +10,9 @@
 # an opaque identifier, recorded so a reader can tell WHICH upstream state
 # this copy reflects — without it the manifest says the copy is consistent
 # but not what it is consistent with.
-provenance 87cfbf2416cb4c9fe9f608c8e824e70af6995d04
+provenance 2b36756ced6067646bb44954fd6f0ed9352fb82e
 count 17
-ec540a8669e1baa4c34e43bebd7d91c9582190b8775a852378499d469c7b6f4d  src/io/ev1_chassis_signals.hpp
+3e6172472f7ef61504e73271de812d4d1a2b6bcf7ecb9dbbc8db4369e003fde4  src/io/ev1_chassis_signals.hpp
 6138b31116288d8fd59b913c8fae8822c4bf220ea3d263e13d8a8d4677562305  src/io/gm8192/gm8192_frame.c
 49f12fda831b14968858aab4db2802f6c74ce4f7e5a344684cd83e35a1bc1865  src/io/gm8192/gm8192_frame.h
 bee015b0a4e8f179cab6aa49b7f741c7b987858715a8e5f5c3b09c8c48cfd156  src/io/gm8192/gm8192_rx_framer.cpp
@@ -26,6 +26,6 @@ d653d95870e91d3d7899bb629294cbf39f37cabd9ce77f8bd2a5c9bf14551665  src/io/topolog
 4de1a0879f848fb0527d36fc14864fa7e06090583da5562eda813997fc50b74e  src/io/uart/uart_rx.hpp
 6f4f8443e5c2453e0623ac0b2a423e72a790e77804cad1b81b9f224019727c70  src/io/uart/uart_tx.cpp
 75553acf521b211868d701d05d42ab5c1727c176f918fc8962fe26745bd15821  src/io/uart/uart_tx.hpp
-eeba1a0ad1fe2e67479766607a1ab8cfe690f422b8857823323d50833e32f04b  src/io/wire_table.cpp
-75251aab2dc48f2d917a7f08947c7c71943439c42d4f3b42946c4e74cfe49fbb  src/io/wire_table.hpp
+1bd12bf19de4e11b41f5236f8e82a7814a748aef45a9151a61fcd9c4257a3d0a  src/io/wire_table.cpp
+5c83a8bc4ab4951fab0ab88717d9520f2cab043c86295a6651c56696939a9cd2  src/io/wire_table.hpp
 d85ac2f73c74171d68141011d7693f60e5eb3a5ffe262d57930ff8fb07e3d65e  src/net_host/conductor_publisher.hpp

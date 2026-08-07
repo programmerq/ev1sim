@@ -153,8 +153,7 @@ static_assert(std::atomic<std::uint64_t>::is_always_lock_free,
 // Overlaid on Header::reserved[28] (byte offset 36). Three lock-free 32-bit
 // atomics = 12 bytes of 28; ABI-invisible — reserved[] is not in kTopologyHash,
 // no kFormatVersion bump, and the creator zero-fills it so a fresh or
-// pre-barrier segment reads as a fully-inert (enabled == 0) BarrierState. See
-// docs/proposals/primitive4_cosim_determinism_2026-06-25.md.
+// pre-barrier segment reads as a fully-inert (enabled == 0) BarrierState.
 // @design 2026-06-28 claude — MEMBERSHIP/LIVENESS trade-off. An earlier sketch
 // had 5 atomics including an `epoch` and an
 // `expected` consumer count for self-registration. The shipped struct drops

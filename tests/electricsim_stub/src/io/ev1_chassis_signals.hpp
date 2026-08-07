@@ -1079,8 +1079,8 @@ inline constexpr std::uint32_t kSigChassisApmTwelveVoltOutputMa = 4197U;
 //   set mirrors ev1_tjb_outputs_t (ev1/junction_boxes/junction_boxes.h).
 //
 // Before these cells the TJB had NO live process at all — ev1_tjb_tick and
-// its 13 route_* families were unit-tested dormant code (owner round-2
-// decision D-08a, 2026-07-05: wire dormant module code into live processes).
+// its 13 route_* families were unit-tested dormant code, now wired into a
+// live process for the first time.
 // ex_tjb_controller consumes RUN1 + the LHJB feed cells and publishes these
 // seven branches. Observational today (consumers: []); candidates for the
 // ev1sim rear-lamp contract — a possible future migration is TJB taking over
