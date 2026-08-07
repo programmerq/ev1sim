@@ -3,6 +3,7 @@
 
 #include <array>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <string>
@@ -20,6 +21,12 @@
 #endif
 
 namespace {
+
+// Exit code for "the environment asked for the wire-truth substrate and it did not
+// come up". Distinct from 1 so an orchestrator can tell this apart from an ordinary
+// failure without scraping the log: a run that ends here produced NO valid data, as
+// opposed to one that ran and failed a check. See the attach site below.
+constexpr int kExitWireTruthUnavailable = 70;
 
 // ---------------------------------------------------------------------------
 // Signal ID layout
@@ -3005,6 +3012,64 @@ void ExternalSimConnector::Tick(double sim_time_s) {
     if (!st.wire && !st.wire_attach_tried) {
         st.wire_attach_tried = true;
         st.wire = ev1sim::WireTruthChassis::OpenFromEnv("attacher");
+
+        // The silent-detach guard.
+        //
+        // Until this block existed, a failed attach was indistinguishable from a
+        // deliberate standalone run: OpenFromEnv() returned nullptr, `if (st.wire)`
+        // below was false, nothing was printed, and wire_attach_tried latched so it
+        // was never retried. ev1sim then ran a full session with every wire dark —
+        // rendering a vehicle whose lamps, telltales and horn were all reading their
+        // "producer hasn't moved yet" defaults, at full frame rate, with no error.
+        //
+        // The most likely cause is also the least visible one: the external sim's
+        // topology hash moved and this binary was not rebuilt, so WireTable::attach
+        // refuses on the hash gate. In the external sim's own tree that refusal is
+        // loud. Here it was not.
+        //
+        // A co-sim that has lost its electrical fleet is not degraded, it is wrong,
+        // and the run that follows produces confident garbage that a later reader
+        // cannot distinguish from a real result. So: refuse to run.
+        //
+        // The ONLY supported way to run ev1sim without the substrate is to leave
+        // ELECTRICSIM_WIRES_NAME unset. That path reports kDisabled and is untouched
+        // here — this fires only when the environment ASKED for wire truth.
+        if (const auto outcome = ev1sim::WireTruthChassis::LastAttachOutcome();
+            outcome == ev1sim::WireTruthChassis::AttachOutcome::kRequestedButUnavailable) {
+            const char* name = std::getenv("ELECTRICSIM_WIRES_NAME");
+            std::cerr
+                << "\n"
+                   "[ExternalSim] FATAL: wire-truth substrate requested but unavailable\n"
+                   "    ELECTRICSIM_WIRES_NAME = "
+                << (name != nullptr ? name : "(unset)")
+                << "\n"
+                   "    attach outcome         = "
+                << ev1sim::WireTruthChassis::AttachOutcomeName(outcome)
+                << "\n"
+                   "    this binary's topology hash = 0x"
+                << std::hex << std::uppercase
+                << ev1sim::WireTruthChassis::CompiledTopologyHash()
+                << std::dec << std::nouppercase
+                << "\n"
+                   "\n"
+                   "    The environment asked for the wire-truth substrate and it did\n"
+                   "    not come up. Either the segment is absent/down, or its topology\n"
+                   "    hash differs from the one above — which is what happens when the\n"
+                   "    external sim's topology changes and this binary is not rebuilt.\n"
+                   "\n"
+                   "    ev1sim is refusing to continue rather than run with every wire\n"
+                   "    dark: a session with no electrical fleet still renders, still\n"
+                   "    records stats, and is indistinguishable from a real run.\n"
+                   "\n"
+                   "    Fixes, in the order they are usually needed:\n"
+                   "      1. Rebuild ev1sim against the current external-sim tree.\n"
+                   "      2. Check the segment creator is up and used this segment name.\n"
+                   "      3. To run ev1sim standalone on purpose, unset "
+                   "ELECTRICSIM_WIRES_NAME.\n"
+                << std::flush;
+            std::exit(kExitWireTruthUnavailable);
+        }
+
         if (st.wire && st.wire->attached()) {
             // Phase 4: the shared WireTable is now ev1sim's only bus, so a
             // successful attach is what marks the connector "Connected"

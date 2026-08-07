@@ -18,11 +18,13 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <string>
 
-#include <unistd.h>  // getpid
+#include <unistd.h>  // getpid, close, dup, dup2
 
 #include "WireTruthChassis.h"
 #include "ExternalSimConnector.h"  // end-to-end: wire -> overlay -> getter
@@ -32,9 +34,12 @@
 #include "wire_table.hpp"
 #include "gm8192/gm8192_frame.h"  // gm8192_encode (build a $41 frame for the snoop test)
 #include "uart/uart_tx.hpp"       // electricsim::io::UartTx (serialise onto a TX cell)
+#include "net_host/conductor_publisher.hpp"  // the publish edge for conductor cells
 
 namespace {
 
+using electricsim::io::ConductorId;
+using electricsim::io::WireId;
 using electricsim::io::WireTable;
 using electricsim::io::WireTableOptions;
 
@@ -58,6 +63,30 @@ std::unique_ptr<WireTable> create_fleet_table(const std::string& name,
     });
 }
 
+// Publish a conductor cell the way the external sim's solver does.
+//
+// A conductor's energisation is an OUTPUT of the external sim's provenance
+// computation, so the substrate deliberately gives conductor cells no write_bit()
+// overload: no peer can assert that its own feed is hot. These tests stand in for
+// that solver — they seed a lamp feed or horn line and then check ev1sim reads it
+// — so they publish through the same edge the solver uses, net_host::
+// ConductorPublisher, rather than casting the type away.
+//
+// Casting would have been one line shorter and would have quietly made the test a
+// place where conductor writes are legal. Then the day the publish edge changes,
+// these tests keep passing against an API nobody uses.
+bool publish_conductor(WireTable& table, ConductorId id, bool energised) {
+    electricsim::net_host::ConductorPublisher publisher(table);
+    return publisher.publish(id, energised);
+}
+
+// Numeric id of a conductor cell, for the read accessors (which take a runtime
+// id). Reads are the legitimate direction for ev1sim — see ReadOnlyWireId in
+// src/WireTruthChassis.cpp for the same conversion on the production side.
+constexpr WireId conductor_wire_id(ConductorId id) {
+    return static_cast<WireId>(id);
+}
+
 }  // namespace
 
 TEST_CASE("WireTruthChassis: horn drive lines round-trip external sim -> ev1sim",
@@ -67,8 +96,7 @@ TEST_CASE("WireTruthChassis: horn drive lines round-trip external sim -> ev1sim"
     REQUIRE(producer != nullptr);  // creator path must succeed
 
     // external sim (LHJB) writes the low-tone horn drive line on the wire.
-    REQUIRE(producer->write_bit(
-        electricsim::topology::kWireHORN_DRIVE_LINE_LOW, true));
+    REQUIRE(publish_conductor(*producer, electricsim::topology::kWireHORN_DRIVE_LINE_LOW, true));
 
     auto wire = ev1sim::WireTruthChassis::Attach(seg);
     REQUIRE(wire != nullptr);
@@ -80,10 +108,8 @@ TEST_CASE("WireTruthChassis: horn drive lines round-trip external sim -> ev1sim"
     REQUIRE(wire->horn_high_drive() == std::nullopt);
 
     // Producer flips low off and writes high on; the consumer tracks it.
-    REQUIRE(producer->write_bit(
-        electricsim::topology::kWireHORN_DRIVE_LINE_LOW, false));
-    REQUIRE(producer->write_bit(
-        electricsim::topology::kWireHORN_DRIVE_LINE_HIGH, true));
+    REQUIRE(publish_conductor(*producer, electricsim::topology::kWireHORN_DRIVE_LINE_LOW, false));
+    REQUIRE(publish_conductor(*producer, electricsim::topology::kWireHORN_DRIVE_LINE_HIGH, true));
     REQUIRE(wire->horn_low_drive() == std::optional<bool>(false));
     REQUIRE(wire->horn_high_drive() == std::optional<bool>(true));
 }
@@ -103,7 +129,7 @@ TEST_CASE("WireTruthChassis: never-written cell reads as nullopt (fallback)",
     // BEFORE the external sim's producer has moved onto the wire.
     REQUIRE(wire->horn_low_drive() == std::nullopt);
     REQUIRE(wire->horn_high_drive() == std::nullopt);
-    REQUIRE(wire->read_bit(electricsim::topology::kWireHORN_DRIVE_LINE_LOW) ==
+    REQUIRE(wire->read_bit(conductor_wire_id(electricsim::topology::kWireHORN_DRIVE_LINE_LOW)) ==
             std::nullopt);
 }
 
@@ -118,11 +144,19 @@ TEST_CASE("WireTruthChassis: producer write is visible to a peer reader",
 
     // ev1sim writes a bit (the producer direction for ev1sim-sourced cells);
     // the creator peer observes it through the shared table.
-    REQUIRE(wire->write_bit(electricsim::topology::kWireHORN_DRIVE_LINE_HIGH,
-                            true));
+    //
+    // This case used to demonstrate the producer direction on HORN_DRIVE_LINE_HIGH,
+    // which the migration reclassified as a CONDUCTOR — a cell whose energisation
+    // the external sim's solver derives and no peer asserts. ev1sim cannot write it
+    // any more, and should never have: the horn line is something ev1sim READS to
+    // decide whether to sound the horn. The cell here is PANEL_AJAR_HOOD, one of the
+    // 85 cells ev1sim genuinely produces (a hood switch is a physical input ev1sim
+    // owns), so the test now demonstrates the producer direction on a cell where
+    // ev1sim actually has one.
+    REQUIRE(wire->write_bit(electricsim::topology::kWirePANEL_AJAR_HOOD, true));
     bool seen = false;
     REQUIRE(creator->read_bit(
-        electricsim::topology::kWireHORN_DRIVE_LINE_HIGH, &seen));
+        electricsim::topology::kWirePANEL_AJAR_HOOD, &seen));
     REQUIRE(seen == true);
 }
 
@@ -315,8 +349,7 @@ TEST_CASE("WireTruthChassis::apply_consumer_overlay: written cells invoke matchi
     REQUIRE(creator != nullptr);
 
     // external sim (LHJB / IPC / BTCM / BPM) writes one cell of each consumed type.
-    REQUIRE(creator->write_bit(
-        electricsim::topology::kWireBULB_FEED_LINE_LBL, true));
+    REQUIRE(publish_conductor(*creator, electricsim::topology::kWireBULB_FEED_LINE_LBL, true));
     REQUIRE(creator->write_byte(
         electricsim::topology::kWireCHASSIS_HVAC_BLOWER_LEVEL,
         static_cast<std::uint8_t>(2u)));
@@ -411,8 +444,8 @@ TEST_CASE("Horn round-trip end-to-end: wire -> connector overlay -> getter",
     const std::string seg = unique_segment("e2e_horn");
     auto lhjb = create_fleet_table(seg, electricsim::topology::kTopologyHash);
     REQUIRE(lhjb != nullptr);
-    REQUIRE(lhjb->write_bit(electricsim::topology::kWireHORN_DRIVE_LINE_LOW, true));
-    REQUIRE(lhjb->write_bit(electricsim::topology::kWireHORN_DRIVE_LINE_HIGH, true));
+    REQUIRE(publish_conductor(*lhjb, electricsim::topology::kWireHORN_DRIVE_LINE_LOW, true));
+    REQUIRE(publish_conductor(*lhjb, electricsim::topology::kWireHORN_DRIVE_LINE_HIGH, true));
 
     // ev1sim side: attach the wire + run the SAME sinks the connector installs
     // in Tick() (on_bit -> DebugInjectDelta, etc.), then read the getters.
@@ -431,7 +464,7 @@ TEST_CASE("Horn round-trip end-to-end: wire -> connector overlay -> getter",
     CHECK(c.GetHornHighCmd());
 
     // Producer drops the low tone; ev1sim tracks it on the next overlay pass.
-    REQUIRE(lhjb->write_bit(electricsim::topology::kWireHORN_DRIVE_LINE_LOW, false));
+    REQUIRE(publish_conductor(*lhjb, electricsim::topology::kWireHORN_DRIVE_LINE_LOW, false));
     wire->apply_consumer_overlay(sinks);
     CHECK_FALSE(c.GetHornLowCmd());
     CHECK(c.GetHornHighCmd());
@@ -454,7 +487,7 @@ TEST_CASE("Batches A/J/K/L render through the connector overlay (wire -> getter)
     REQUIRE(prod != nullptr);
 
     // external sim producers write one representative cell per landed batch.
-    REQUIRE(prod->write_bit (topo::kWireBULB_FEED_LINE_LBL,           true)); // A bit
+    REQUIRE(publish_conductor(*prod, topo::kWireBULB_FEED_LINE_LBL, true)); // A bit
     REQUIRE(prod->write_byte(topo::kWireCHASSIS_WIPER_MOTOR_COMMAND,  3u));   // J byte
     REQUIRE(prod->write_bit (topo::kWireCHASSIS_WASHER_PUMP_COMMAND,  true)); // J bit
     REQUIRE(prod->write_byte(topo::kWireCHASSIS_HVAC_BLOWER_LEVEL,    4u));   // K byte
@@ -498,10 +531,10 @@ TEST_CASE("Batch M: IPC telltales + trip render through the connector overlay",
     auto ipc = create_fleet_table(seg, topo::kTopologyHash);
     REQUIRE(ipc != nullptr);
 
-    REQUIRE(ipc->write_bit    (topo::kWireCHASSIS_IPC_SEATBELT_TELLTALE_DRIVER, true));
-    REQUIRE(ipc->write_bit    (topo::kWireCHASSIS_IPC_BRAKE_TELLTALE,           true));
-    REQUIRE(ipc->write_bit    (topo::kWireCHASSIS_IPC_ANTILOCK_TELLTALE,        true));
-    REQUIRE(ipc->write_bit    (topo::kWireCHASSIS_IPC_SERVICE_NOW_TELLTALE,     true));
+    REQUIRE(publish_conductor(*ipc, topo::kWireCHASSIS_IPC_SEATBELT_TELLTALE_DRIVER, true));
+    REQUIRE(publish_conductor(*ipc, topo::kWireCHASSIS_IPC_BRAKE_TELLTALE, true));
+    REQUIRE(publish_conductor(*ipc, topo::kWireCHASSIS_IPC_ANTILOCK_TELLTALE, true));
+    REQUIRE(publish_conductor(*ipc, topo::kWireCHASSIS_IPC_SERVICE_NOW_TELLTALE, true));
     REQUIRE(ipc->write_float32(topo::kWireCHASSIS_IPC_TRIP_DISTANCE_M,          12.5f));
 
     ExternalSimConnector c;
@@ -618,10 +651,10 @@ TEST_CASE("WireTruthChassis::ad_state_enum reconstructs the AD line code",
 
     // Helper to write the four contributing cells.
     auto set_lines = [&](bool a, bool b, bool c, bool power) {
-        REQUIRE(ad->write_bit(topo::kWireAD_STATE_A, a));
-        REQUIRE(ad->write_bit(topo::kWireAD_STATE_B, b));
-        REQUIRE(ad->write_bit(topo::kWireAD_STATE_C, c));
-        REQUIRE(ad->write_bit(topo::kWireAD_POWER_SUPPLY, power));
+        REQUIRE(publish_conductor(*ad, topo::kWireAD_STATE_A, a));
+        REQUIRE(publish_conductor(*ad, topo::kWireAD_STATE_B, b));
+        REQUIRE(publish_conductor(*ad, topo::kWireAD_STATE_C, c));
+        REQUIRE(publish_conductor(*ad, topo::kWireAD_POWER_SUPPLY, power));
     };
 
     // OK = (0,0,0) power -> 0 (AD_STATE_OK).
@@ -744,4 +777,105 @@ TEST_CASE("WireTruthChassis::ad_precharge_relay follows AD_PRECHARGE_RELAY",
     REQUIRE(wire->ad_precharge_relay() == std::optional<bool>(true));
     REQUIRE(ad->write_bit(topo::kWireAD_PRECHARGE_RELAY, false));
     REQUIRE(wire->ad_precharge_relay() == std::optional<bool>(false));
+}
+
+// ---------------------------------------------------------------------------
+// RefuseConductorWrite — the runtime half of the conductor discipline
+// (src/WireTruthChassis.cpp). Redirects stderr to a temp file so the test can
+// count the diagnostics the refusal path prints, not just its return value.
+// @design 2026-08-07 — adversarial-review finding: the refusal's dedup key
+// used only accessor[0], and every write_* accessor name starts with 'w', so
+// a second violation via a DIFFERENT accessor on the SAME cell was silently
+// swallowed instead of getting its own report. This pins the fix.
+// ---------------------------------------------------------------------------
+namespace {
+
+// RAII: redirect stderr to a temp file for the scope's lifetime, restoring
+// the original stream on destruction (including on a REQUIRE failure, which
+// Catch2 raises as an exception — the destructor still runs during unwind).
+class StderrCapture {
+ public:
+    StderrCapture() {
+        std::snprintf(path_, sizeof(path_), "/tmp/ev1sim_stderr_capture_%d_XXXXXX",
+                      static_cast<int>(::getpid()));
+        int fd = ::mkstemp(path_);
+        REQUIRE(fd >= 0);
+        ::close(fd);
+        std::fflush(stderr);
+        saved_ = ::dup(fileno(stderr));
+        REQUIRE(saved_ >= 0);
+        REQUIRE(std::freopen(path_, "w", stderr) != nullptr);
+    }
+    ~StderrCapture() {
+        std::fflush(stderr);
+        ::dup2(saved_, fileno(stderr));
+        ::close(saved_);
+        std::remove(path_);
+    }
+    StderrCapture(const StderrCapture&) = delete;
+    StderrCapture& operator=(const StderrCapture&) = delete;
+
+    // Read back everything written so far (flushes first).
+    std::string contents() const {
+        std::fflush(stderr);
+        std::string out;
+        std::FILE* f = std::fopen(path_, "r");
+        if (f == nullptr) return out;
+        char buf[4096];
+        std::size_t n;
+        while ((n = std::fread(buf, 1, sizeof(buf), f)) > 0) {
+            out.append(buf, n);
+        }
+        std::fclose(f);
+        return out;
+    }
+
+ private:
+    char path_[64]{};
+    int saved_{-1};
+};
+
+// Count non-overlapping occurrences of `needle` in `haystack`.
+std::size_t count_occurrences(const std::string& haystack, const std::string& needle) {
+    std::size_t count = 0;
+    std::size_t pos = 0;
+    while ((pos = haystack.find(needle, pos)) != std::string::npos) {
+        ++count;
+        pos += needle.size();
+    }
+    return count;
+}
+
+}  // namespace
+
+TEST_CASE("RefuseConductorWrite: a write via a DIFFERENT accessor on the same "
+          "conductor cell gets its own report, not a swallowed duplicate",
+          "[wire_truth][conductor_discipline]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("refuse_multi_accessor");
+    auto producer = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(producer != nullptr);
+
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+
+    // HORN_DRIVE_LINE_LOW is a `class: conductor` cell (see the horn round-trip
+    // test above) — ev1sim has no legitimate write path to it.
+    const WireId conductor_id = conductor_wire_id(topo::kWireHORN_DRIVE_LINE_LOW);
+
+    StderrCapture capture;
+    REQUIRE_FALSE(wire->write_bit(conductor_id, true));    // accessor 1: "write_bit"
+    REQUIRE_FALSE(wire->write_byte(conductor_id, 1u));      // accessor 2: "write_byte"
+    const std::string log = capture.contents();
+
+    // Each accessor must produce its OWN "REFUSED ... <accessor>" line naming
+    // itself. Before the fix, both calls hashed to the same dedup key (every
+    // write_* name starts with 'w'), so the second line never printed.
+    REQUIRE(count_occurrences(log, "REFUSED write_bit") == 1);
+    REQUIRE(count_occurrences(log, "REFUSED write_byte") == 1);
+
+    // Same accessor, same cell, again: THIS repeat must stay deduplicated —
+    // the guarantee is "once per (cell, accessor) pair", not "once per call".
+    REQUIRE_FALSE(wire->write_bit(conductor_id, false));
+    REQUIRE(count_occurrences(capture.contents(), "REFUSED write_bit") == 1);
 }

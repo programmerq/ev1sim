@@ -1,15 +1,19 @@
 /*
- * env_open — opens a process-local WireTable based on environment
- * variables. The intended migration pattern is:
+ * env_open — opens the process's handle to the wire-truth substrate (a
+ * WireTable) from environment variables. Since the ring-bus transport was
+ * removed (commit 19f17aa0, 2026-06-17) this is THE way a binary joins the
+ * bus; there is no other transport to fall back to.
  *
  *   1. Each producer/consumer binary calls topology::try_open_from_env()
  *      once at startup.
- *   2. If the env var is unset, the helper returns nullptr — existing
- *      ring-bus behavior is unaffected.
- *   3. If set, the helper opens (create or attach) the WireTable
- *      configured by the env vars and the producer/consumer code can
- *      dual-write / dual-read against it for a documented set of wires
- *      (Step 1c: RUN1).
+ *   2. If ELECTRICSIM_WIRES_NAME is unset/empty (the "wire-truth disabled"
+ *      state) or the open fails, the helper returns nullptr. With no ring
+ *      fallback, a substrate-dependent binary treats nullptr as a hard
+ *      error and refuses to boot (these null-checks are what
+ *      scripts/audit_bus_attach_check.py enforces).
+ *   3. Otherwise the helper opens (create or attach) the WireTable
+ *      configured by the env vars; the binary then reads/writes typed
+ *      cells by WireId.
  *
  * Environment variables:
  *
@@ -23,13 +27,14 @@
  *                              against the generated kTopologyHash so
  *                              ABI drift refuses to start.
  *
- * Why env vars and not a config file? The wire-truth substrate is a
- * substrate-level concern with no per-binary knobs to tune; "is this
- * binary in wire-truth mode?" is exactly the kind of cross-cutting
- * flag env vars handle cleanly, mirroring how ELECTRICSIM_BUS_NAME
- * already gates the ring-bus segment.
+ * Why env vars and not a config file? "Is this binary on the wire-truth
+ * substrate, and as creator or attacher?" is a cross-cutting startup flag
+ * with no per-binary knobs to tune — exactly what env vars handle cleanly.
  *
  * @design 2026-06-08 claude — epic/wire-truth-substrate, step 1c.
+ * @design 2026-06-24 claude — refreshed after the ring-bus removal
+ *   (19f17aa0): the dual-substrate / ELECTRICSIM_BUS_NAME framing is gone;
+ *   the WireTable substrate is now the sole IPC fabric.
  */
 
 #ifndef ELECTRICSIM_SRC_IO_TOPOLOGY_ENV_OPEN_HPP_

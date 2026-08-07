@@ -14,7 +14,9 @@
 #include "wire_table.hpp"                 // electricsim::io::WireTable
 #include "gm8192/gm8192_rx_framer.hpp"    // electricsim::io::Gm8192RxFramer (frame snoop)
 
+#include <cstdlib>
 #include <cstring>
+#include <iostream>
 #include <unordered_map>
 #include <utility>
 
@@ -22,6 +24,36 @@
 using namespace electricsim::topology;
 using electricsim::io::WireId;
 using electricsim::io::WireType;
+
+// ---------------------------------------------------------------------------
+// ReadOnlyWireId — the ONE way a ConductorId becomes a numeric id in ev1sim.
+//
+// The external sim's topology now emits conductor cells as a distinct type with no
+// write overload, so that a module cannot state that its own feed is hot: a
+// conductor's energisation is an OUTPUT of the solver, not a claim any peer makes
+// about itself. ev1sim is downstream of that solver and CONSUMES conductor cells
+// (lamp feeds, telltales, horn drive) — reading them is legitimate and is the
+// whole reason ev1sim attaches at all.
+//
+// But ev1sim's read accessors take a plain numeric id, because at runtime the ids
+// arrive from the consumer registry rather than as constants. So a conversion has
+// to exist somewhere. This is it, and it is deliberately shaped so it cannot
+// become a write:
+//
+//   * It is named for what it authorises. A future reader reaching for it to build
+//     a write has to type "ReadOnly" to do it.
+//   * It is the ONLY place in src/ that names the conductor type — enforced by
+//     tests/check_conductor_discipline.sh, a ratchet that fails on != so a second
+//     site cannot be introduced by netting one against a deleted legitimate use.
+//   * The write path refuses conductor cells at runtime regardless (see
+//     RefuseConductorWrite below), so even reaching a numeric conductor id does
+//     not buy a write.
+//
+// The type-split's guarantee is preserved where it matters: there is no expression
+// in ev1sim that writes a conductor cell.
+static constexpr WireId ReadOnlyWireId(electricsim::io::ConductorId id) {
+    return static_cast<WireId>(id);
+}
 
 namespace ev1sim {
 
@@ -189,13 +221,55 @@ struct WireTruthChassis::Impl {
 WireTruthChassis::WireTruthChassis() : impl_(std::make_unique<Impl>()) {}
 WireTruthChassis::~WireTruthChassis() = default;
 
+// Outcome of the most recent OpenFromEnv(). Process-wide because the attach is a
+// once-per-process fleet event; the connector attaches exactly once and latches.
+static WireTruthChassis::AttachOutcome g_last_attach_outcome =
+    WireTruthChassis::AttachOutcome::kNotAttempted;
+
+// Was wire truth REQUESTED? This is the distinction OpenFromEnv()'s nullptr
+// cannot carry. It mirrors try_open_from_env's own gate exactly: an unset or
+// empty ELECTRICSIM_WIRES_NAME is the documented "disabled" state, and anything
+// else is a request. Read here rather than inferred from the failure so that
+// "nobody asked" can never be reported for a run that did ask.
+static bool WireTruthRequested() {
+    const char* name = std::getenv("ELECTRICSIM_WIRES_NAME");
+    return name != nullptr && name[0] != '\0';
+}
+
 std::unique_ptr<WireTruthChassis> WireTruthChassis::OpenFromEnv(
     const char* default_role) {
+    const bool requested = WireTruthRequested();
     auto table = electricsim::topology::try_open_from_env(default_role);
-    if (!table) return nullptr;  // disabled / segment down / hash mismatch
+    if (!table) {
+        // The two nullptr cases are opposite facts — see AttachOutcome in the
+        // header. Recording which one happened is the whole point: the caller
+        // decides, and it can only decide if it is told.
+        g_last_attach_outcome = requested ? AttachOutcome::kRequestedButUnavailable
+                                          : AttachOutcome::kDisabled;
+        return nullptr;
+    }
     std::unique_ptr<WireTruthChassis> self(new WireTruthChassis());
     self->impl_->table = std::move(table);
+    g_last_attach_outcome = AttachOutcome::kAttached;
     return self;
+}
+
+WireTruthChassis::AttachOutcome WireTruthChassis::LastAttachOutcome() {
+    return g_last_attach_outcome;
+}
+
+const char* WireTruthChassis::AttachOutcomeName(AttachOutcome outcome) {
+    switch (outcome) {
+        case AttachOutcome::kNotAttempted:            return "NOT_ATTEMPTED";
+        case AttachOutcome::kDisabled:                return "DISABLED";
+        case AttachOutcome::kAttached:                return "ATTACHED";
+        case AttachOutcome::kRequestedButUnavailable: return "REQUESTED_BUT_UNAVAILABLE";
+    }
+    return "UNKNOWN";
+}
+
+std::uint32_t WireTruthChassis::CompiledTopologyHash() {
+    return electricsim::topology::kTopologyHash;
 }
 
 std::unique_ptr<WireTruthChassis> WireTruthChassis::Attach(
@@ -222,33 +296,90 @@ std::optional<bool> WireTruthChassis::read_bit(std::uint32_t wire_id) const {
     return sample.value;
 }
 
+// RefuseConductorWrite — the runtime half of the conductor discipline.
+//
+// The compile-time half (the ConductorId type) protects code that names a cell as
+// a CONSTANT. ev1sim's write accessors take a runtime id, so the type is not in
+// play at these call sites and a numeric conductor id could reach them — from the
+// producer registry, from a ring signal_id mapping, or from a future caller that
+// computes an id.
+//
+// ev1sim produces 85 cells and NONE of them is a conductor (measured against the
+// migrated topology: every ProducerRegistry cell is semantic or element-state).
+// So this refusal is not a policy choice about what ev1sim ought to write — it is
+// a statement of what ev1sim already does, made enforceable. Correct operation
+// never trips it, and it fires the moment that stops being true.
+//
+// Returns true if the write must be refused, having reported it.
+static bool RefuseConductorWrite(std::uint32_t wire_id, const char* accessor) {
+    if (cell_class_for(static_cast<WireId>(wire_id)) !=
+        electricsim::io::CellClass::kConductor) {
+        return false;
+    }
+    // Loud, once per (cell, accessor) pair — a wrong-owner write that repeats every
+    // tick must not be able to bury the rest of the log, but it must also never be
+    // silent. Keyed on the wire id and a hash of the FULL accessor name: every
+    // write_* accessor name starts with 'w', so keying on just the first byte
+    // (the prior form of this key) collapsed all six accessors onto the same slot
+    // per wire_id — a second, genuinely different violation on the same cell (e.g.
+    // write_bit fires, then write_byte hits the same wrongly-classified conductor)
+    // was silently swallowed instead of getting its own report.
+    static std::unordered_map<std::uint64_t, bool> reported;
+    std::uint64_t accessor_hash = 1469598103934665603ULL;  // FNV-1a offset basis
+    for (const char* p = accessor; *p != '\0'; ++p) {
+        accessor_hash ^= static_cast<unsigned char>(*p);
+        accessor_hash *= 1099511628211ULL;  // FNV-1a prime
+    }
+    const std::uint64_t key =
+        (static_cast<std::uint64_t>(wire_id) << 32) ^ accessor_hash;
+    if (!reported[key]) {
+        reported[key] = true;
+        std::cerr << "[ExternalSim] REFUSED " << accessor << " to conductor cell "
+                  << wire_id << " (" << wire_name_for(static_cast<WireId>(wire_id))
+                  << ")\n"
+                     "    A conductor's energisation is solved from the circuit, not\n"
+                     "    asserted by a peer. ev1sim consumes conductor cells and must\n"
+                     "    never produce one. If ev1sim genuinely needs to drive this,\n"
+                     "    it is an element-state or semantic cell in the topology, not\n"
+                     "    a conductor — fix the classification, not this check.\n"
+                  << std::flush;
+    }
+    return true;
+}
+
 bool WireTruthChassis::write_bit(std::uint32_t wire_id, bool value) {
     if (!attached()) return false;
+    if (RefuseConductorWrite(wire_id, "write_bit")) return false;
     return impl_->table->write_bit(wire_id, value);
 }
 
 bool WireTruthChassis::write_byte(std::uint32_t wire_id, std::uint8_t value) {
     if (!attached()) return false;
+    if (RefuseConductorWrite(wire_id, "write_byte")) return false;
     return impl_->table->write_byte(wire_id, value);
 }
 
 bool WireTruthChassis::write_uint16(std::uint32_t wire_id, std::uint16_t value) {
     if (!attached()) return false;
+    if (RefuseConductorWrite(wire_id, "write_uint16")) return false;
     return impl_->table->write_uint16(wire_id, value);
 }
 
 bool WireTruthChassis::write_uint32(std::uint32_t wire_id, std::uint32_t value) {
     if (!attached()) return false;
+    if (RefuseConductorWrite(wire_id, "write_uint32")) return false;
     return impl_->table->write_uint32(wire_id, value);
 }
 
 bool WireTruthChassis::write_uint64(std::uint32_t wire_id, std::uint64_t value) {
     if (!attached()) return false;
+    if (RefuseConductorWrite(wire_id, "write_uint64")) return false;
     return impl_->table->write_uint64(wire_id, value);
 }
 
 bool WireTruthChassis::write_float32(std::uint32_t wire_id, float value) {
     if (!attached()) return false;
+    if (RefuseConductorWrite(wire_id, "write_float32")) return false;
     return impl_->table->write_float32(wire_id, value);
 }
 
@@ -367,26 +498,26 @@ struct ConsumerCell {
 static const std::unordered_map<std::uint32_t, ConsumerCell>& ConsumerRegistry() {
     static const std::unordered_map<std::uint32_t, ConsumerCell> kRegistry = {
         // Bulb feed lines (bit)
-        {4000U, {kWireBULB_FEED_LINE_LBL,              WireType::kBit}},
-        {4001U, {kWireBULB_FEED_LINE_RBL,              WireType::kBit}},
-        {4002U, {kWireBULB_FEED_LINE_LHBH,             WireType::kBit}},
-        {4003U, {kWireBULB_FEED_LINE_RHBH,             WireType::kBit}},
-        {4004U, {kWireBULB_FEED_LINE_LLBH,             WireType::kBit}},
-        {4005U, {kWireBULB_FEED_LINE_RLBH,             WireType::kBit}},
-        {4006U, {kWireBULB_FEED_LINE_LRSM,             WireType::kBit}},
-        {4007U, {kWireBULB_FEED_LINE_RRSM,             WireType::kBit}},
-        {4008U, {kWireBULB_FEED_LINE_LFML,             WireType::kBit}},
-        {4009U, {kWireBULB_FEED_LINE_RFML,             WireType::kBit}},
-        {4010U, {kWireBULB_FEED_LINE_LFTS,             WireType::kBit}},
-        {4011U, {kWireBULB_FEED_LINE_RFTS,             WireType::kBit}},
-        {4012U, {kWireBULB_FEED_LINE_LRTS,             WireType::kBit}},
-        {4013U, {kWireBULB_FEED_LINE_RRTS,             WireType::kBit}},
-        {4014U, {kWireBULB_FEED_LINE_LRSL,             WireType::kBit}},
-        {4015U, {kWireBULB_FEED_LINE_CHMSL,            WireType::kBit}},
-        {4016U, {kWireBULB_FEED_LINE_RRSL,             WireType::kBit}},
+        {4000U, {ReadOnlyWireId(kWireBULB_FEED_LINE_LBL),              WireType::kBit}},
+        {4001U, {ReadOnlyWireId(kWireBULB_FEED_LINE_RBL),              WireType::kBit}},
+        {4002U, {ReadOnlyWireId(kWireBULB_FEED_LINE_LHBH),             WireType::kBit}},
+        {4003U, {ReadOnlyWireId(kWireBULB_FEED_LINE_RHBH),             WireType::kBit}},
+        {4004U, {ReadOnlyWireId(kWireBULB_FEED_LINE_LLBH),             WireType::kBit}},
+        {4005U, {ReadOnlyWireId(kWireBULB_FEED_LINE_RLBH),             WireType::kBit}},
+        {4006U, {ReadOnlyWireId(kWireBULB_FEED_LINE_LRSM),             WireType::kBit}},
+        {4007U, {ReadOnlyWireId(kWireBULB_FEED_LINE_RRSM),             WireType::kBit}},
+        {4008U, {ReadOnlyWireId(kWireBULB_FEED_LINE_LFML),             WireType::kBit}},
+        {4009U, {ReadOnlyWireId(kWireBULB_FEED_LINE_RFML),             WireType::kBit}},
+        {4010U, {ReadOnlyWireId(kWireBULB_FEED_LINE_LFTS),             WireType::kBit}},
+        {4011U, {ReadOnlyWireId(kWireBULB_FEED_LINE_RFTS),             WireType::kBit}},
+        {4012U, {ReadOnlyWireId(kWireBULB_FEED_LINE_LRTS),             WireType::kBit}},
+        {4013U, {ReadOnlyWireId(kWireBULB_FEED_LINE_RRTS),             WireType::kBit}},
+        {4014U, {ReadOnlyWireId(kWireBULB_FEED_LINE_LRSL),             WireType::kBit}},
+        {4015U, {ReadOnlyWireId(kWireBULB_FEED_LINE_CHMSL),            WireType::kBit}},
+        {4016U, {ReadOnlyWireId(kWireBULB_FEED_LINE_RRSL),             WireType::kBit}},
         // Horn drive lines (bit)
-        {4020U, {kWireHORN_DRIVE_LINE_LOW,              WireType::kBit}},
-        {4021U, {kWireHORN_DRIVE_LINE_HIGH,             WireType::kBit}},
+        {4020U, {ReadOnlyWireId(kWireHORN_DRIVE_LINE_LOW),              WireType::kBit}},
+        {4021U, {ReadOnlyWireId(kWireHORN_DRIVE_LINE_HIGH),             WireType::kBit}},
         // Motor current (float32)
         {4072U, {kWireCHASSIS_MOTOR_CURRENT_A,          WireType::kFloat32}},
         // PIM commanded throttle (byte, PIM -> ev1sim). MISSING from the
@@ -417,45 +548,45 @@ static const std::unordered_map<std::uint32_t, ConsumerCell>& ConsumerRegistry()
         // RSA shift-blocked cue (bit)
         {4088U, {kWireCHASSIS_RSA_SHIFT_BLOCKED,        WireType::kBit}},
         // IPC seatbelt telltales (bit)
-        {4130U, {kWireCHASSIS_IPC_SEATBELT_TELLTALE_DRIVER,    WireType::kBit}},
-        {4131U, {kWireCHASSIS_IPC_SEATBELT_TELLTALE_PASSENGER, WireType::kBit}},
+        {4130U, {ReadOnlyWireId(kWireCHASSIS_IPC_SEATBELT_TELLTALE_DRIVER),    WireType::kBit}},
+        {4131U, {ReadOnlyWireId(kWireCHASSIS_IPC_SEATBELT_TELLTALE_PASSENGER), WireType::kBit}},
         // IPC trip distance (float32)
         {4132U, {kWireCHASSIS_IPC_TRIP_DISTANCE_M,      WireType::kFloat32}},
         // IPC BTCM / airbag telltales (bit)
-        {4134U, {kWireCHASSIS_IPC_BRAKE_TELLTALE,       WireType::kBit}},
-        {4135U, {kWireCHASSIS_IPC_PARK_BRAKE_TELLTALE,  WireType::kBit}},
-        {4136U, {kWireCHASSIS_IPC_ANTILOCK_TELLTALE,    WireType::kBit}},
-        {4138U, {kWireCHASSIS_IPC_AIR_BAG_TELLTALE,     WireType::kBit}},
+        {4134U, {ReadOnlyWireId(kWireCHASSIS_IPC_BRAKE_TELLTALE),       WireType::kBit}},
+        {4135U, {ReadOnlyWireId(kWireCHASSIS_IPC_PARK_BRAKE_TELLTALE),  WireType::kBit}},
+        {4136U, {ReadOnlyWireId(kWireCHASSIS_IPC_ANTILOCK_TELLTALE),    WireType::kBit}},
+        {4138U, {ReadOnlyWireId(kWireCHASSIS_IPC_AIR_BAG_TELLTALE),     WireType::kBit}},
         // IPC extra LCD telltales (bit)
-        {4140U, {kWireCHASSIS_IPC_SERVICE_NOW_TELLTALE,      WireType::kBit}},
-        {4141U, {kWireCHASSIS_IPC_CHECK_MESSAGES_TELLTALE,   WireType::kBit}},
-        {4142U, {kWireCHASSIS_IPC_TEMP_TELLTALE,             WireType::kBit}},
-        {4143U, {kWireCHASSIS_IPC_BATTERY_LIFE_TELLTALE,     WireType::kBit}},
-        {4144U, {kWireCHASSIS_IPC_REDUCED_PERF_TELLTALE,     WireType::kBit}},
-        {4145U, {kWireCHASSIS_IPC_CHECK_TIRE_PRESS_TELLTALE, WireType::kBit}},
+        {4140U, {ReadOnlyWireId(kWireCHASSIS_IPC_SERVICE_NOW_TELLTALE),      WireType::kBit}},
+        {4141U, {ReadOnlyWireId(kWireCHASSIS_IPC_CHECK_MESSAGES_TELLTALE),   WireType::kBit}},
+        {4142U, {ReadOnlyWireId(kWireCHASSIS_IPC_TEMP_TELLTALE),             WireType::kBit}},
+        {4143U, {ReadOnlyWireId(kWireCHASSIS_IPC_BATTERY_LIFE_TELLTALE),     WireType::kBit}},
+        {4144U, {ReadOnlyWireId(kWireCHASSIS_IPC_REDUCED_PERF_TELLTALE),     WireType::kBit}},
+        {4145U, {ReadOnlyWireId(kWireCHASSIS_IPC_CHECK_TIRE_PRESS_TELLTALE), WireType::kBit}},
         // BTCM actuator state — chassis bus (bit / float32)
-        {4147U, {kWireCHASSIS_BTCM_ISO_CLOSE_FL,        WireType::kBit}},
-        {4148U, {kWireCHASSIS_BTCM_ISO_CLOSE_FR,        WireType::kBit}},
-        {4149U, {kWireCHASSIS_BTCM_DUMP_OPEN_FL,        WireType::kBit}},
-        {4150U, {kWireCHASSIS_BTCM_DUMP_OPEN_FR,        WireType::kBit}},
+        {4147U, {ReadOnlyWireId(kWireCHASSIS_BTCM_ISO_CLOSE_FL),        WireType::kBit}},
+        {4148U, {ReadOnlyWireId(kWireCHASSIS_BTCM_ISO_CLOSE_FR),        WireType::kBit}},
+        {4149U, {ReadOnlyWireId(kWireCHASSIS_BTCM_DUMP_OPEN_FL),        WireType::kBit}},
+        {4150U, {ReadOnlyWireId(kWireCHASSIS_BTCM_DUMP_OPEN_FR),        WireType::kBit}},
         {4151U, {kWireCHASSIS_BTCM_EMB_MOTOR_CMD_LR,    WireType::kFloat32}},
         {4152U, {kWireCHASSIS_BTCM_EMB_MOTOR_CMD_RR,    WireType::kFloat32}},
         {4153U, {kWireCHASSIS_BTCM_CYL_PRESSURE_FL_K_PA, WireType::kFloat32}},
         {4154U, {kWireCHASSIS_BTCM_CYL_PRESSURE_FR_K_PA, WireType::kFloat32}},
         // IPC turn / high-beam / park-lamp / door-ajar telltales + dim duty (bit / byte)
-        {4158U, {kWireCHASSIS_IPC_LEFT_TURN_TELLTALE,   WireType::kBit}},
-        {4159U, {kWireCHASSIS_IPC_RIGHT_TURN_TELLTALE,  WireType::kBit}},
-        {4160U, {kWireCHASSIS_IPC_HIGH_BEAM_TELLTALE,   WireType::kBit}},
-        {4161U, {kWireCHASSIS_IPC_PARK_LAMP_TELLTALE,   WireType::kBit}},
-        {4162U, {kWireCHASSIS_IPC_DOOR_AJAR_TELLTALE,   WireType::kBit}},
+        {4158U, {ReadOnlyWireId(kWireCHASSIS_IPC_LEFT_TURN_TELLTALE),   WireType::kBit}},
+        {4159U, {ReadOnlyWireId(kWireCHASSIS_IPC_RIGHT_TURN_TELLTALE),  WireType::kBit}},
+        {4160U, {ReadOnlyWireId(kWireCHASSIS_IPC_HIGH_BEAM_TELLTALE),   WireType::kBit}},
+        {4161U, {ReadOnlyWireId(kWireCHASSIS_IPC_PARK_LAMP_TELLTALE),   WireType::kBit}},
+        {4162U, {ReadOnlyWireId(kWireCHASSIS_IPC_DOOR_AJAR_TELLTALE),   WireType::kBit}},
         {4163U, {kWireCHASSIS_IPC_DIM_DUTY_PCT,         WireType::kByte}},
         // RHJB PMM run buses + DLM legs + DILM level (bit / byte)
-        {4180U, {kWireCHASSIS_RHJB_PMM_RUN1_BUS,        WireType::kBit}},
-        {4181U, {kWireCHASSIS_RHJB_PMM_RUN2_BUS,        WireType::kBit}},
-        {4182U, {kWireCHASSIS_RHJB_DLM_LH_LOCK,         WireType::kBit}},
-        {4183U, {kWireCHASSIS_RHJB_DLM_LH_UNLOCK,       WireType::kBit}},
-        {4184U, {kWireCHASSIS_RHJB_DLM_RH_LOCK,         WireType::kBit}},
-        {4185U, {kWireCHASSIS_RHJB_DLM_RH_UNLOCK,       WireType::kBit}},
+        {4180U, {ReadOnlyWireId(kWireCHASSIS_RHJB_PMM_RUN1_BUS),        WireType::kBit}},
+        {4181U, {ReadOnlyWireId(kWireCHASSIS_RHJB_PMM_RUN2_BUS),        WireType::kBit}},
+        {4182U, {ReadOnlyWireId(kWireCHASSIS_RHJB_DLM_LH_LOCK),         WireType::kBit}},
+        {4183U, {ReadOnlyWireId(kWireCHASSIS_RHJB_DLM_LH_UNLOCK),       WireType::kBit}},
+        {4184U, {ReadOnlyWireId(kWireCHASSIS_RHJB_DLM_RH_LOCK),         WireType::kBit}},
+        {4185U, {ReadOnlyWireId(kWireCHASSIS_RHJB_DLM_RH_UNLOCK),       WireType::kBit}},
         {4186U, {kWireCHASSIS_RHJB_DILM_LEVEL,          WireType::kByte}},
         // BTCM retard-request PWM duty (uint16, Q8 percent 0..25600). This is
         // the wire the BTCM asks the propulsion side for regen torque on
@@ -470,10 +601,10 @@ static const std::unordered_map<std::uint32_t, ConsumerCell>& ConsumerRegistry()
         // junction block; these two are what the TJB actually hands the rear
         // stop lamps, downstream of its RUN1 gate. Asserting on the LHJB feed
         // alone cannot tell a live TJB from an absent one.
-        {4203U, {kWireCHASSIS_TJB_LR_STOP_LAMP,         WireType::kBit}},
-        {4204U, {kWireCHASSIS_TJB_RR_STOP_LAMP,         WireType::kBit}},
-        {4198U, {kWireCHASSIS_TJB_LR_TAIL_LAMP,         WireType::kBit}},
-        {4199U, {kWireCHASSIS_TJB_RR_TAIL_LAMP,         WireType::kBit}},
+        {4203U, {ReadOnlyWireId(kWireCHASSIS_TJB_LR_STOP_LAMP),         WireType::kBit}},
+        {4204U, {ReadOnlyWireId(kWireCHASSIS_TJB_RR_STOP_LAMP),         WireType::kBit}},
+        {4198U, {ReadOnlyWireId(kWireCHASSIS_TJB_LR_TAIL_LAMP),         WireType::kBit}},
+        {4199U, {ReadOnlyWireId(kWireCHASSIS_TJB_RR_TAIL_LAMP),         WireType::kBit}},
         // Aux battery (uint32 / bit / byte)
         {4192U, {kWireCHASSIS_AUX_BATTERY_TERMINAL_MV,  WireType::kUint32}},
         {4193U, {kWireCHASSIS_AUX_BATTERY_PRESENT,      WireType::kBit}},
@@ -539,11 +670,11 @@ int WireTruthChassis::apply_consumer_overlay(const ConsumerSinks& sinks) const {
 }
 
 std::optional<bool> WireTruthChassis::horn_low_drive() const {
-    return read_bit(electricsim::topology::kWireHORN_DRIVE_LINE_LOW);
+    return read_bit(ReadOnlyWireId(electricsim::topology::kWireHORN_DRIVE_LINE_LOW));
 }
 
 std::optional<bool> WireTruthChassis::horn_high_drive() const {
-    return read_bit(electricsim::topology::kWireHORN_DRIVE_LINE_HIGH);
+    return read_bit(ReadOnlyWireId(electricsim::topology::kWireHORN_DRIVE_LINE_HIGH));
 }
 
 // ── ECU-bus semantic helpers (wire-truth Phase 4) ───────────────────────────
@@ -574,10 +705,10 @@ std::optional<std::uint32_t> WireTruthChassis::ad_state_enum() const {
     // All four contributing cells must be written; otherwise a partial set
     // would decode to a wrong state, so we return nullopt (caller keeps its
     // "no data" path) until the AD has driven the full line set.
-    const auto a     = read_bit(electricsim::topology::kWireAD_STATE_A);
-    const auto b     = read_bit(electricsim::topology::kWireAD_STATE_B);
-    const auto c     = read_bit(electricsim::topology::kWireAD_STATE_C);
-    const auto power = read_bit(electricsim::topology::kWireAD_POWER_SUPPLY);
+    const auto a     = read_bit(ReadOnlyWireId(electricsim::topology::kWireAD_STATE_A));
+    const auto b     = read_bit(ReadOnlyWireId(electricsim::topology::kWireAD_STATE_B));
+    const auto c     = read_bit(ReadOnlyWireId(electricsim::topology::kWireAD_STATE_C));
+    const auto power = read_bit(ReadOnlyWireId(electricsim::topology::kWireAD_POWER_SUPPLY));
     if (!a || !b || !c || !power) return std::nullopt;
 
     // AD_STATE_POWER_LOST = 8 (ad_state.h). Power-lost dominates the lines.
@@ -672,6 +803,27 @@ std::unique_ptr<WireTruthChassis> WireTruthChassis::OpenFromEnv(const char*) {
 std::unique_ptr<WireTruthChassis> WireTruthChassis::Attach(const std::string&) {
     return nullptr;
 }
+
+// Compiled out: the substrate is absent from this binary, so wire truth cannot be
+// "requested but unavailable" — there is nothing to request it of. kDisabled is
+// the honest answer and it keeps the connector's fatal path from firing on a
+// build that was never meant to have a substrate. The distinction is not lost:
+// EV1SIM_HAVE_WIRE_TRUTH is a build-time fact a reader can check directly,
+// whereas the runtime hash mismatch this enum exists for is not.
+WireTruthChassis::AttachOutcome WireTruthChassis::LastAttachOutcome() {
+    return AttachOutcome::kDisabled;
+}
+const char* WireTruthChassis::AttachOutcomeName(AttachOutcome outcome) {
+    switch (outcome) {
+        case AttachOutcome::kNotAttempted:            return "NOT_ATTEMPTED";
+        case AttachOutcome::kDisabled:                return "DISABLED";
+        case AttachOutcome::kAttached:                return "ATTACHED";
+        case AttachOutcome::kRequestedButUnavailable: return "REQUESTED_BUT_UNAVAILABLE";
+    }
+    return "UNKNOWN";
+}
+std::uint32_t WireTruthChassis::CompiledTopologyHash() { return 0U; }
+
 bool WireTruthChassis::attached() const { return false; }
 std::optional<bool> WireTruthChassis::read_bit(std::uint32_t) const {
     return std::nullopt;

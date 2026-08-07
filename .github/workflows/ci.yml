@@ -153,6 +153,23 @@ jobs:
           fi
           grep "electricsim connector:" cmake-configure.log
 
+      # Fail fast and visibly if the vendored stub has been hand-edited or is
+      # incomplete. ctest runs this too, but as its own step a drift failure names
+      # itself in the job list instead of being one line inside a 500-test log.
+      #
+      # No external-sim tree exists here, so this is the INTEGRITY leg only: it
+      # proves the copy is what it claims to be, not that the copy is current.
+      # Staleness is caught by the same script with --upstream, wherever a real
+      # tree is available.
+      - name: Check vendored stub integrity
+        run: tests/electricsim_stub/check_stub_sync.sh
+
+      # The proof that the check above can fail. Without it a green stub check says
+      # nothing — which is exactly how the previous static_assert drift guards
+      # stayed green while 5 of the 15 vendored files rotted.
+      - name: Prove the stub check can fail
+        run: tests/electricsim_stub/selftest_check_stub_sync.sh
+
       - name: Build unit tests (EV1SIM_HAVE_EXTERNAL_SIM=1)
         run: cmake --build build --target ev1sim_tests -j"$(nproc)"
 

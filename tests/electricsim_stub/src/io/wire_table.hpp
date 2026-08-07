@@ -33,9 +33,106 @@
 #include <memory>
 #include <string>
 
+// The ONE holder of the conductor publish capability — a "one friend" rule: if a
+// caller needs two, the fix is to fix the split, not grow the friend list.
+// Forward-declared here so SolverToken can name it.
+//
+// WHY IT IS NOT src/net/solver/publish.cpp: src/net/ compiles STANDALONE against
+// nothing but the C++ standard library — no embedded-hardware dependencies — and
+// tests/circuit_truth/net_core_build.sh proves that by GLOBBING every .cpp under
+// src/net/ and compiling it with `-I src/net` and no other include path. A
+// publish.cpp under src/net/solver/ would have to include src/io/wire_table.hpp and
+// would break that build — the one suite that must stay green at every commit. The
+// publish edge therefore lives one directory out, in src/net_host/, which hosts the
+// solver's I/O-facing integration points. Still exactly one place; still nothing
+// else may name SolverToken.
+namespace electricsim::net_host {
+class ConductorPublisher;
+}  // namespace electricsim::net_host
+
 namespace electricsim::io {
 
 using WireId = std::uint32_t;
+
+// ─── Cell classes ───────────────────────────────────────────────────────
+//
+// Every cell in config/topology.yaml carries a `class:` key. It is REQUIRED and
+// validated: scripts/gen_topology_header.py fails the build on a cell with no
+// `class:` and on an unrecognised value ("absent means CHECKED" — a silently
+// unclassified cell would be "absent means powered" rebuilt inside the fix).
+//
+//   kConductor          a physical conductor. Its energisation is an OUTPUT of the
+//                       solver's provenance computation, never something a module
+//                       asserts about itself. Emitted as ConductorId — a strong type
+//                       with NO write_bit() overload, so an illegitimate conductor
+//                       write is a compile error rather than an audit finding.
+//   kElementState       a module-decided element INPUT (contact `closed`, converter
+//                       `enable`, transducer mechanical input). Modules write CAUSES;
+//                       the solver reads them. Emitted as ElementStateId.
+//   kSemantic           an ordinary cell (commands, telemetry, counters). Plain WireId,
+//                       unchanged write surface.
+//   kUnclassifiedLegacy the one-time pin on the cells that predate the classification.
+//                       Held by a DECREASING ratchet in the generator that fails on
+//                       `!=`, never `<=` — a `<=` check would let a module bank headroom
+//                       for two free writes later.
+enum class CellClass : std::uint8_t {
+  kUnknown = 0,
+  kConductor = 1,
+  kElementState = 2,
+  kSemantic = 3,
+  kUnclassifiedLegacy = 4,
+};
+
+// ConductorId — the opaque handle for a `class: conductor` cell.
+//
+// A scoped enum over WireId: zero runtime cost, no implicit conversion in either
+// direction. The generated header emits `inline constexpr ConductorId kWireX{123U};`
+// in place of the old `inline constexpr WireId kWireX = 123U;`, and from that moment
+// there is NO path from a module TU to a value-write of that cell — with or without an
+// `@wire` comment, on one line or on five. That last clause is the measurement that
+// motivated the type: 4 of LHJB's 19 conductor writes are multi-line calls a
+// line-oriented grep misses, and all four are conductor writes.
+enum class ConductorId : WireId {};
+
+// ElementStateId — the opaque handle for a `class: element_state` cell.
+//
+// The transport SURVIVES the migration; only the semantics change. These are the cells a
+// module writes to say "my contact is closed" / "my converter is enabled" — a CAUSE. The
+// solver reads them, runs the graph, and publishes the CONSEQUENCE to conductor cells.
+// Distinct from ConductorId because the write direction is the opposite one: modules may
+// write these and the solver may not.
+enum class ElementStateId : WireId {};
+
+// SolverToken — proof that a value is the output of a provenance computation.
+//
+// The token is NOT "you are on the allow-list of things that may
+// produce voltage" — that older allow-list model is deliberately gone. It is: THIS VALUE IS THE
+// OUTPUT OF A PROVENANCE COMPUTATION, and it is constructible only where that
+// computation happens. A future agent tempted to friend a second TU is being tempted to
+// publish energisation that no provenance path backs.
+//
+// Non-copyable and non-movable on purpose: a token that can be copied can be stashed in
+// a global and handed to anyone, which turns the capability into a formality.
+class SolverToken {
+ public:
+  SolverToken(const SolverToken&) = delete;
+  SolverToken& operator=(const SolverToken&) = delete;
+  SolverToken(SolverToken&&) = delete;
+  SolverToken& operator=(SolverToken&&) = delete;
+
+ private:
+  // NOT `= default`. Under C++17 a `= default` first declaration is user-DECLARED but
+  // not user-PROVIDED, which leaves SolverToken an AGGREGATE (it has no base classes,
+  // no virtuals, and every member -- there are none -- would be public). Aggregate
+  // initialisation (`io::SolverToken tok{};`) does not call a constructor at all, so
+  // the private-access check below never runs and any TU can mint a token. A
+  // user-PROVIDED body (this one) removes the type from aggregate-hood, so `tok{}`
+  // goes through overload resolution like any other call and the private access
+  // check fires. Verified three-valued in src/net_host/tests/type_split_compile_receipt.sh
+  // leg 3b (circuit-truth session 2 phase 4, finding V4-1).
+  SolverToken() noexcept {}
+  friend class ::electricsim::net_host::ConductorPublisher;
+};
 
 enum class WireType : std::uint8_t {
   kBit = 1,      // 1-bit semantic, 1-byte storage (0 or 1).
@@ -205,6 +302,41 @@ class WireTable {
   bool read_uint64_sample(WireId id, Sample<std::uint64_t>* out) const;
   bool read_float32_sample(WireId id, Sample<float>* out) const;
 
+  // ─── Conductor cells ──────────────────────────────────────────────────
+  //
+  // publish_conductor is the ONLY write path to a `class: conductor` cell, and it
+  // demands a SolverToken, which is constructible in exactly one place (see the
+  // SolverToken declaration above). There is deliberately no ConductorId overload of
+  // write_bit(): a module that wants to assert its own feed is hot has no expression
+  // for it that compiles.
+  //
+  // Reads are NOT the problem and stay working — but only the read that CARRIES
+  // WRITTEN-NESS. read_bit(ConductorId, bool*) does not exist either, because a plain
+  // read collapses "de-energised" and "nobody has solved this yet" into one `false`,
+  // which is the same defect as a defaulting read wearing a smaller hat.
+  //
+  // And there is NO read_bit_or_default(ConductorId, ...) — not "for symmetry", not
+  // "for the tests", not "just for the transition". Deliberately restated at each
+  // call site: a defaulting overload would rebuild the consumer-side fallback on
+  // the exact cells the type-split exists to protect, in a header nobody reviews
+  // twice. The absence is enforced by the absence of an implicit conversion: passing
+  // a ConductorId to the WireId overload does not compile.
+  bool publish_conductor(ConductorId id, bool energised, const SolverToken& token);
+  bool read_bit_sample(ConductorId id, Sample<bool>* out) const;
+
+  // ─── Element-state cells ────────────────────────────────────────────────
+  //
+  // The module-decided half of the element model: contact `closed`, converter/source
+  // `enable`, transducer mechanical input. Modules WRITE these (they are causes) and
+  // the solver READS them. Same segment, same seqlock, same write_gen — zero lines
+  // of new IPC.
+  //
+  // Same no-defaulting-read rule as ConductorId, for the same reason: an element whose
+  // `closed` is unwritten is TOPOLOGICALLY ABSENT, which a defaulting
+  // read would silently turn into "closed" or "open" — a claim the graph never made.
+  bool write_element_state(ElementStateId id, bool closed);
+  bool read_bit_sample(ElementStateId id, Sample<bool>* out) const;
+
   // Typed write accessors. Return false if the id is undeclared or
   // the declared type does not match. Any attached process may write,
   // but the wire-truth model expects exactly one declared driver per
@@ -280,19 +412,6 @@ class WireTable {
   std::size_t cell_count() const noexcept;
   bool is_creator() const noexcept;
 
-  // ── Co-sim tick barrier (primitive-4 B) — leader side ───────────────
-  // The real electricsim wire_table implements these atop the segment
-  // header's reserved bytes (a futex-backed per-tick lockstep). ev1sim's
-  // WireTruthChassis drives only the LEADER side (arm / publish-tick /
-  // await-acks); the integrated-build compiles that path against this
-  // stub, so the methods must exist with matching signatures. No-ops
-  // here — the stub has no real fleet consumers to synchronize, and
-  // await-acks reports success so the connector's Tick proceeds.
-  void barrier_arm() {}
-  void barrier_publish_tick() {}
-  bool barrier_await_acks(std::uint32_t /*consumer_count*/,
-                          int /*timeout_ms*/) { return true; }
-
   // has_cell may insert into the process-local id_to_index cache on
   // a late-declare miss, so it can theoretically allocate and throw
   // std::bad_alloc. NOT noexcept. (Bugbot PR #86 fourth-round low
@@ -314,6 +433,61 @@ class WireTable {
   //
   // Same lazy-cache-update path as has_cell, so NOT noexcept.
   bool write_gen(WireId id, std::uint32_t* out_gen) const;
+
+  // ── Co-sim tick barrier (primitive-4 B) ──────────────────────────
+  //
+  // A deterministic per-tick lockstep between the ev1sim PUBLISHER (leader) and
+  // the electricsim controller CONSUMERS, so the co-sim produces identical
+  // outcomes across runs and host speeds. Without it, consumers free-run over
+  // the latest-value-wins cells and skip a run-to-run-variable subset of
+  // CHASSIS_SIM_TIME_NS (4075) samples → non-deterministic ABS modulation.
+  //
+  // State lives in Header::reserved[] (ABI-invisible: not in kTopologyHash, no
+  // kFormatVersion bump). The barrier is INERT unless a leader calls
+  // barrier_arm(): a fresh segment's reserved[] is zero (enabled == 0), and a
+  // pre-barrier binary never touches these bytes. Consumers must additionally
+  // gate participation on SimClock::is_sim_time_master() so a standalone
+  // controller (no 4075 publisher) never engages — keeping every existing test
+  // byte-identical.
+  //
+  // Protocol (leader holds the first tick until all `consumer_count` consumers
+  // have acked it, so every consumer starts from the SAME tick → deterministic;
+  // membership needs no shm registry — the leader is told the count out-of-band
+  // via EV1SIM_FLEET_N):
+  //   leader:   barrier_arm() once; then per physics tick, AFTER publishing all
+  //             cells (4075 last): barrier_publish_tick(); barrier_await_acks(N).
+  //   consumer: per loop pass when barrier_active() && is_sim_time_master():
+  //             process the tick it just read, barrier_ack(); subsequent passes
+  //             barrier_await_tick(&prev_gen) to BLOCK for the next tick.
+  //
+  // Wake is ADVISORY (Linux futex on the gen words; portable spin-poll fallback
+  // elsewhere): the shm counters are source-of-truth, so a lost/absent wake only
+  // costs latency. Every wait is bounded by timeout_ms; on a crashed peer the
+  // wait returns false (never wedges) so the caller can abort the run.
+
+  // Leader: arm the barrier (idempotent). After this, consumers that are
+  // sim-time masters will block-and-ack.
+  void barrier_arm();
+  // Leader: open a new tick — reset the ack counter, bump the publish
+  // generation, wake blocked consumers. Call AFTER publishing all cells.
+  void barrier_publish_tick();
+  // Leader: block until `consumer_count` consumers have acked the current tick,
+  // or `timeout_ms` elapses. Returns true if all acked, false on timeout (a
+  // consumer crashed/never-joined — the caller should abort the run).
+  bool barrier_await_acks(std::uint32_t consumer_count, int timeout_ms);
+
+  // Consumer: is a leader driving the barrier?
+  bool barrier_active() const;
+  // Consumer: block until the publish generation advances past *prev_gen (a new
+  // tick), updating *prev_gen, or until timeout_ms. Returns true on a new tick,
+  // false on timeout (leader gone). A fresh consumer passes *prev_gen == 0.
+  bool barrier_await_tick(std::uint32_t* prev_gen, int timeout_ms) const;
+  // Consumer: signal that this consumer has finished processing the current
+  // tick (bumps the ack counter, wakes the leader).
+  void barrier_ack();
+  // Current publish generation (the tick the leader has opened). Consumers use
+  // it to seed *prev_gen when joining mid-stream. 0 before the first tick.
+  std::uint32_t barrier_publish_gen() const;
 
   // ── TEST-ONLY fault-injection hooks ──────────────────────────────
   //

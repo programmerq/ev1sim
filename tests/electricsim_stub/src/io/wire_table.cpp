@@ -42,12 +42,21 @@
 #include <thread>
 #include <unordered_map>
 
-#if !defined(_WIN32)
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#else
 #include <fcntl.h>
-#include <sys/mman.h>
+#include "topology/shm_test_helpers.hpp"
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#if defined(__linux__)
+#include <climits>        // INT_MAX (FUTEX_WAKE count)
+#include <ctime>          // struct timespec (FUTEX_WAIT timeout)
+#include <linux/futex.h>  // FUTEX_WAIT / FUTEX_WAKE
+#include <sys/syscall.h>  // SYS_futex
+#endif
 #endif
 
 namespace electricsim::io {
@@ -113,10 +122,9 @@ static_assert(sizeof(Header) == kHeaderSize, "Header must be 64 bytes");
 //                              class (round-3 reviews; round-4 design memo
 //                              docs/wire_truth_written_ness.md).
 //   bytes 8..63   padding    — false-sharing isolation. Reserved for the
-//                              multi-word (bytes[N]) seqlock that the
-//                              parent design memo §"Optional per-cell or
-//                              per-group wake mechanism" sketches; the
-//                              seqlock's sequence counter unifies with
+//                              multi-word (bytes[N]) seqlock sketched for a
+//                              future per-cell or per-group wake mechanism;
+//                              the seqlock's sequence counter unifies with
 //                              write_gen when that arrives.
 //
 // Writer ordering — value first (release), then write_gen bump (also
@@ -140,6 +148,102 @@ static_assert(sizeof(Cell) == 64, "Cell must be 64 bytes");
 // and silently break the shared cell); assert it at compile time.
 static_assert(std::atomic<std::uint64_t>::is_always_lock_free,
               "kUint64 cells require a lock-free 64-bit atomic");
+
+// ── Co-sim tick barrier state (primitive-4 B) ───────────────────────────────
+// Overlaid on Header::reserved[28] (byte offset 36). Three lock-free 32-bit
+// atomics = 12 bytes of 28; ABI-invisible — reserved[] is not in kTopologyHash,
+// no kFormatVersion bump, and the creator zero-fills it so a fresh or
+// pre-barrier segment reads as a fully-inert (enabled == 0) BarrierState.
+// @design 2026-06-28 claude — MEMBERSHIP/LIVENESS trade-off. An earlier sketch
+// had 5 atomics including an `epoch` and an
+// `expected` consumer count for self-registration. The shipped struct drops
+// those two: consumer count is passed out-of-band (EV1SIM_FLEET_N, set by
+// vat/fleet.py only for an all-converted fleet) and liveness is a bounded
+// timeout, not self-registration. Consequence + accepted deviation from
+// this codebase's usual self-healing "next locker recovers" robust-mutex
+// posture: if a consumer
+// CRASHES mid-tick the leader can't reach ack_count and eats the full
+// barrier_await_acks timeout that tick (it never wedges *forever* — that
+// posture is still honored — but it isn't instant-self-healing either).
+// Acceptable because the barrier
+// is opt-in (armed only for ev1sim-led, all-converted fleets) so it never
+// touches the general substrate, and the timeout is generous by design (live-
+// but-slow peers are the normal case). Hardening path if it bites: have the
+// leader treat a consumer PID-exit (vat already monitors fleet PIDs) as an
+// immediate abort instead of waiting the timeout. Tracked alongside the proposal.
+struct BarrierState {
+  std::atomic<std::uint32_t> enabled;      // 0 = inert; 1 = leader armed
+  std::atomic<std::uint32_t> publish_gen;  // per-tick generation (consumer-wait word)
+  std::atomic<std::uint32_t> ack_count;    // consumers that acked the tick (leader-wait word)
+};
+static_assert(sizeof(BarrierState) <= sizeof(Header::reserved),
+              "BarrierState must fit in Header::reserved[]");
+static_assert(std::atomic<std::uint32_t>::is_always_lock_free,
+              "barrier counters require lock-free 32-bit atomics");
+
+// reserved[] starts at offset 36 (4-byte aligned: every prior header field is a
+// 4- or 8-byte scalar/atomic), and each BarrierState member is a 4-byte atomic,
+// so all three are naturally aligned. The creator memsets reserved to 0 before
+// publishing init_complete, so this overlay reads as zero (inert) until armed.
+inline BarrierState* barrier_of(Header* h) {
+  return reinterpret_cast<BarrierState*>(h->reserved);
+}
+inline const BarrierState* barrier_of(const Header* h) {
+  return reinterpret_cast<const BarrierState*>(h->reserved);
+}
+
+// ── Advisory cross-process wake for the barrier ─────────────────────────────
+// Linux: futex(FUTEX_WAIT/WAKE) on the shared 32-bit word — cross-process
+// correct because the (non-PRIVATE) futex keys on the underlying physical page
+// of a MAP_SHARED mapping, not the per-process virtual address. Elsewhere: a
+// portable short-sleep poll. Both are ADVISORY: the atomic is the source of
+// truth and every wait re-checks under a bounded slice, so a lost/absent wake
+// only costs latency, never correctness (docs/wire_truth_substrate.md).
+constexpr int kBarrierWaitSliceMs = 25;  // max latency a missed wake can add
+
+inline void barrier_futex_wake(std::atomic<std::uint32_t>* word) {
+#if defined(__linux__)
+  ::syscall(SYS_futex, reinterpret_cast<std::uint32_t*>(word),
+            FUTEX_WAKE, INT_MAX, nullptr, nullptr, 0);
+#else
+  (void)word;  // poll fallback: the waiter re-checks on its own slice.
+#endif
+}
+
+// Block while *word == expected, up to a single ~kBarrierWaitSliceMs slice.
+// Returns immediately if the value already differs. Returns regardless after
+// the slice (the caller's loop re-checks the atomic and the overall deadline).
+inline void barrier_futex_wait_slice(std::atomic<std::uint32_t>* word,
+                                     std::uint32_t expected) {
+#if defined(__linux__)
+  struct timespec ts;
+  ts.tv_sec = 0;
+  ts.tv_nsec = static_cast<long>(kBarrierWaitSliceMs) * 1000000L;
+  ::syscall(SYS_futex, reinterpret_cast<std::uint32_t*>(word),
+            FUTEX_WAIT, expected, &ts, nullptr, 0);
+#else
+  (void)word;
+  (void)expected;
+  std::this_thread::sleep_for(std::chrono::milliseconds(kBarrierWaitSliceMs));
+#endif
+}
+
+// Wait until `word` != `expected`, up to timeout_ms of WALL time (the wait
+// duration does not affect any sim-time computation — it only governs how long
+// we block — so using steady_clock here does not reintroduce nondeterminism).
+// Returns true if the value changed, false on timeout.
+inline bool barrier_wait_word_changed(std::atomic<std::uint32_t>* word,
+                                      std::uint32_t expected, int timeout_ms) {
+  const auto deadline =
+      std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
+  for (;;) {
+    if (word->load(std::memory_order_acquire) != expected) return true;
+    if (std::chrono::steady_clock::now() >= deadline) {
+      return word->load(std::memory_order_acquire) != expected;
+    }
+    barrier_futex_wait_slice(word, expected);
+  }
+}
 
 // {raw, generation} snapshot of a Cell. Internal — the typed
 // read_*_sample accessors decode raw to the cell's type and copy
@@ -322,7 +426,8 @@ void bump_write_gen_saturating(Cell& cell) {
 //   hang the fleet tick loop (UartRx::tick) for every consumer. On exceeding
 //   the cap the reader treats it as "no new bits this tick" (got=0, ok=true,
 //   cursor unchanged) and returns rather than blocking — mirroring the
-//   self-healing robust-mutex transport (AGENTS.md §6). The normal
+//   self-healing "next locker recovers" contract used by this codebase's
+//   robust-mutex transport. The normal
 //   uncontended / single-in-flight-append path returns on the first or
 //   second iteration, so the cap never bites in practice.
 //
@@ -442,15 +547,30 @@ std::string posix_name(const std::string& name) {
   return "/" + name;
 }
 
+#if defined(_WIN32)
+// Win32 shared-memory object name. The kernel resolves names in the
+// per-session `Local\` namespace by default; strip any leading
+// POSIX-style slash so the same configured `name` works on both
+// platforms (an attacher passing `/esct_foo` on Windows would otherwise
+// create a name in a `\` subnamespace that the producer's
+// `CreateFileMappingA("esct_foo")` can't resolve).
+std::string win32_name(const std::string& name) {
+  if (!name.empty() && name[0] == '/') return name.substr(1);
+  return name;
+}
+#endif
+
 }  // namespace
 
 struct WireTable::Impl {
   bool is_creator{false};
-  std::string segment_name;       // includes leading "/" on POSIX
+  std::string segment_name;       // includes leading "/" on POSIX; bare name on Win32
   std::size_t mapping_size{0};
   void* mapped{nullptr};
 
-#if !defined(_WIN32)
+#if defined(_WIN32)
+  HANDLE hMapping{nullptr};       // CreateFileMappingA / OpenFileMappingA handle
+#else
   int fd{-1};
 #endif
 
@@ -470,20 +590,32 @@ struct WireTable::Impl {
   ~Impl() { cleanup(); }
 
   void cleanup() {
-#if !defined(_WIN32)
     if (mapped != nullptr && mapping_size > 0) {
+#if defined(_WIN32)
+      ::UnmapViewOfFile(mapped);
+#else
       ::munmap(mapped, mapping_size);
+#endif
     }
     mapped = nullptr;
+#if defined(_WIN32)
+    if (hMapping != nullptr) {
+      ::CloseHandle(hMapping);
+      hMapping = nullptr;
+    }
+    // Win32 has no shm_unlink: when the last handle to a paging-file-
+    // backed mapping is closed, the kernel reclaims the name. The
+    // `is_creator` flag + segment_name distinction is therefore moot on
+    // Windows; cleanup is implicit. (POSIX path keeps the explicit
+    // unlink because POSIX shm names outlive their last fd.)
+#else
     if (fd != -1) {
       ::close(fd);
       fd = -1;
     }
     if (is_creator && !segment_name.empty()) {
-      ::shm_unlink(segment_name.c_str());
+      electricsim::io::shm_unlink_quiet(segment_name);
     }
-#else
-    (void)mapping_size;
 #endif
   }
 
@@ -597,14 +729,6 @@ std::unique_ptr<WireTable> WireTable::create(const WireTableOptions& opts) {
 std::unique_ptr<WireTable> WireTable::create(
     const WireTableOptions& opts,
     const std::function<bool(WireTable&)>& declare_fn) {
-#if defined(_WIN32)
-  (void)opts;
-  (void)declare_fn;
-  std::fprintf(stderr,
-               "WireTable::create: Windows backend not implemented yet "
-               "(epic/wire-truth-substrate step 1 is POSIX-only)\n");
-  return nullptr;
-#else
   // Reject zero-sized options at the create() seam, matching the
   // checks attach() performs against the published header. Without
   // this, create()-then-attach() would succeed on the creator and
@@ -656,9 +780,54 @@ std::unique_ptr<WireTable> WireTable::create(
   auto table = std::unique_ptr<WireTable>(new WireTable());
   Impl* impl = table->impl_.get();
   impl->is_creator = true;
-  impl->segment_name = posix_name(opts.name);
   impl->mapping_size = total_segment_bytes(opts.max_cells, opts.cell_area_bytes);
 
+#if defined(_WIN32)
+  // Win32 backend: CreateFileMappingA with INVALID_HANDLE_VALUE backs
+  // the mapping in the paging file (matches POSIX shm_open semantics —
+  // ephemeral, per-boot, no file-system footprint). The size is encoded
+  // in the high/low DWORD pair on the create call (POSIX path uses a
+  // separate ftruncate). ERROR_ALREADY_EXISTS after a non-null return
+  // means another live process opened the same name first; refuse to
+  // adopt under the O_EXCL invariant the POSIX path also enforces.
+  impl->segment_name = win32_name(opts.name);
+  const std::uint64_t sz = impl->mapping_size;
+  impl->hMapping = ::CreateFileMappingA(
+      INVALID_HANDLE_VALUE,
+      nullptr,
+      PAGE_READWRITE,
+      static_cast<DWORD>((sz >> 32) & 0xFFFFFFFFULL),
+      static_cast<DWORD>(sz & 0xFFFFFFFFULL),
+      impl->segment_name.c_str());
+  if (impl->hMapping == nullptr) {
+    std::fprintf(stderr,
+                 "WireTable::create: CreateFileMappingA(%s) failed: error %lu\n",
+                 impl->segment_name.c_str(),
+                 static_cast<unsigned long>(::GetLastError()));
+    return nullptr;
+  }
+  if (::GetLastError() == ERROR_ALREADY_EXISTS) {
+    std::fprintf(stderr,
+                 "WireTable::create: segment %s already exists; refusing to "
+                 "adopt under O_EXCL semantics\n",
+                 impl->segment_name.c_str());
+    ::CloseHandle(impl->hMapping);
+    impl->hMapping = nullptr;
+    return nullptr;
+  }
+  impl->mapped = ::MapViewOfFile(impl->hMapping, FILE_MAP_ALL_ACCESS, 0, 0,
+                                 static_cast<SIZE_T>(impl->mapping_size));
+  if (impl->mapped == nullptr) {
+    std::fprintf(stderr,
+                 "WireTable::create: MapViewOfFile(%s) failed: error %lu\n",
+                 impl->segment_name.c_str(),
+                 static_cast<unsigned long>(::GetLastError()));
+    return nullptr;
+  }
+  // Win32 maps a freshly-created paging-file-backed mapping zero-filled,
+  // matching POSIX `mmap(shm_open + ftruncate)`.
+#else
+  impl->segment_name = posix_name(opts.name);
   impl->fd = ::shm_open(impl->segment_name.c_str(),
                         O_RDWR | O_CREAT | O_EXCL, 0666);
   if (impl->fd < 0) {
@@ -684,6 +853,7 @@ std::unique_ptr<WireTable> WireTable::create(
                  impl->segment_name.c_str(), std::strerror(errno));
     return nullptr;
   }
+#endif
 
   // Initialize header. mmap of a freshly-truncated segment is
   // zero-filled, so init_complete starts at 0 ("creator still
@@ -732,7 +902,6 @@ std::unique_ptr<WireTable> WireTable::create(
   // release/acquire on cell_count and is independent of this fence.
   impl->header->init_complete.store(1, std::memory_order_release);
   return table;
-#endif
 }
 
 std::unique_ptr<WireTable> WireTable::attach(const WireTableOptions& opts) {
@@ -745,13 +914,6 @@ std::unique_ptr<WireTable> WireTable::adopt(const WireTableOptions& opts) {
 
 std::unique_ptr<WireTable> WireTable::attach_impl(const WireTableOptions& opts,
                                                  bool take_ownership) {
-#if defined(_WIN32)
-  (void)opts;
-  (void)take_ownership;
-  std::fprintf(stderr,
-               "WireTable::attach: Windows backend not implemented yet\n");
-  return nullptr;
-#else
   auto table = std::unique_ptr<WireTable>(new WireTable());
   Impl* impl = table->impl_.get();
   // Keep is_creator=false through mapping + validation so that ANY
@@ -761,8 +923,49 @@ std::unique_ptr<WireTable> WireTable::attach_impl(const WireTableOptions& opts,
   // Ownership is conferred only on the success path below, just before
   // we return.
   impl->is_creator = false;
-  impl->segment_name = posix_name(opts.name);
 
+#if defined(_WIN32)
+  // Win32 backend: OpenFileMappingA returns a handle to the existing
+  // named mapping (NULL if missing — matches POSIX shm_open's ENOENT).
+  // MapViewOfFile(... 0) maps the entire mapping; VirtualQuery on the
+  // result reports the actual region size (POSIX uses fstat for the
+  // same purpose).
+  impl->segment_name = win32_name(opts.name);
+  impl->hMapping = ::OpenFileMappingA(FILE_MAP_ALL_ACCESS, FALSE,
+                                      impl->segment_name.c_str());
+  if (impl->hMapping == nullptr) {
+    std::fprintf(stderr,
+                 "WireTable::attach: OpenFileMappingA(%s) failed: error %lu\n",
+                 impl->segment_name.c_str(),
+                 static_cast<unsigned long>(::GetLastError()));
+    return nullptr;
+  }
+  impl->mapped = ::MapViewOfFile(impl->hMapping, FILE_MAP_ALL_ACCESS, 0, 0, 0);
+  if (impl->mapped == nullptr) {
+    std::fprintf(stderr,
+                 "WireTable::attach: MapViewOfFile(%s) failed: error %lu\n",
+                 impl->segment_name.c_str(),
+                 static_cast<unsigned long>(::GetLastError()));
+    return nullptr;
+  }
+  MEMORY_BASIC_INFORMATION mbi{};
+  if (::VirtualQuery(impl->mapped, &mbi, sizeof(mbi)) != sizeof(mbi)) {
+    std::fprintf(stderr,
+                 "WireTable::attach: VirtualQuery on mapping %s failed: "
+                 "error %lu\n",
+                 impl->segment_name.c_str(),
+                 static_cast<unsigned long>(::GetLastError()));
+    return nullptr;
+  }
+  impl->mapping_size = static_cast<std::size_t>(mbi.RegionSize);
+  if (impl->mapping_size < kHeaderSize) {
+    std::fprintf(stderr,
+                 "WireTable::attach: segment %s too small (%zu bytes)\n",
+                 impl->segment_name.c_str(), impl->mapping_size);
+    return nullptr;
+  }
+#else
+  impl->segment_name = posix_name(opts.name);
   impl->fd = ::shm_open(impl->segment_name.c_str(), O_RDWR, 0);
   if (impl->fd < 0) {
     std::fprintf(stderr,
@@ -793,6 +996,7 @@ std::unique_ptr<WireTable> WireTable::attach_impl(const WireTableOptions& opts,
                  impl->segment_name.c_str(), std::strerror(errno));
     return nullptr;
   }
+#endif
 
   impl->header = static_cast<Header*>(impl->mapped);
 
@@ -938,7 +1142,6 @@ std::unique_ptr<WireTable> WireTable::attach_impl(const WireTableOptions& opts,
   // unlinks on clean shutdown. attach path leaves this false.
   impl->is_creator = take_ownership;
   return table;
-#endif
 }
 
 // ─── declare ───────────────────────────────────────────────────────
@@ -1075,6 +1278,35 @@ bool WireTable::write_bit(WireId id, bool value) {
   cell->value.store(value ? 1u : 0u, std::memory_order_release);
   bump_write_gen_saturating(*cell);
   return true;
+}
+
+// ─── Conductor / element-state cells ───────────────────────────────────────
+//
+// Both delegate to the WireId path: the transport is unchanged — same segment,
+// same WireTable, same seqlock, same write_gen. What changed is who
+// can NAME the cell, and that is decided at compile time by the argument type, not
+// here at runtime. These four bodies are the only place in the tree that converts a
+// ConductorId or an ElementStateId back to a WireId.
+
+bool WireTable::publish_conductor(ConductorId id, bool energised,
+                                  const SolverToken& token) {
+  // `token` carries no data. Its whole job is to be unconstructible outside
+  // ConductorPublisher, so reaching this line at all is proof the value came out of a
+  // provenance computation.
+  (void)token;
+  return write_bit(static_cast<WireId>(id), energised);
+}
+
+bool WireTable::read_bit_sample(ConductorId id, Sample<bool>* out) const {
+  return read_bit_sample(static_cast<WireId>(id), out);
+}
+
+bool WireTable::write_element_state(ElementStateId id, bool closed) {
+  return write_bit(static_cast<WireId>(id), closed);
+}
+
+bool WireTable::read_bit_sample(ElementStateId id, Sample<bool>* out) const {
+  return read_bit_sample(static_cast<WireId>(id), out);
 }
 
 bool WireTable::write_byte(WireId id, std::uint8_t value) {
@@ -1396,6 +1628,65 @@ std::size_t WireTable::cell_count() const noexcept {
 
 bool WireTable::is_creator() const noexcept {
   return impl_->is_creator;
+}
+
+// ── Co-sim tick barrier (primitive-4 B) ─────────────────────────────────────
+
+void WireTable::barrier_arm() {
+  BarrierState* b = barrier_of(impl_->header);
+  // publish_gen/ack_count are already zero from the creator's reserved[] memset;
+  // arm last (release) so a consumer that observes enabled==1 also sees them.
+  b->enabled.store(1u, std::memory_order_release);
+}
+
+void WireTable::barrier_publish_tick() {
+  BarrierState* b = barrier_of(impl_->header);
+  // Reset the ack counter for the new tick BEFORE advancing the generation, so
+  // a consumer woken by the gen bump never observes a stale (previous-tick) ack
+  // count. The barrier guarantees no consumer is still acking the prior tick
+  // here: the leader only calls this after barrier_await_acks() returned for it.
+  b->ack_count.store(0u, std::memory_order_release);
+  b->publish_gen.fetch_add(1u, std::memory_order_acq_rel);
+  barrier_futex_wake(&b->publish_gen);
+}
+
+bool WireTable::barrier_await_acks(std::uint32_t consumer_count, int timeout_ms) {
+  BarrierState* b = barrier_of(impl_->header);
+  const auto deadline =
+      std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
+  for (;;) {
+    const std::uint32_t acked = b->ack_count.load(std::memory_order_acquire);
+    if (acked >= consumer_count) return true;
+    if (std::chrono::steady_clock::now() >= deadline) {
+      return b->ack_count.load(std::memory_order_acquire) >= consumer_count;
+    }
+    // Block on the ack word; consumers wake it after each fetch_add. The slice
+    // bounds a missed wake; re-loop re-reads ack_count and the deadline.
+    barrier_futex_wait_slice(&b->ack_count, acked);
+  }
+}
+
+bool WireTable::barrier_active() const {
+  return barrier_of(impl_->header)->enabled.load(std::memory_order_acquire) != 0u;
+}
+
+std::uint32_t WireTable::barrier_publish_gen() const {
+  return barrier_of(impl_->header)->publish_gen.load(std::memory_order_acquire);
+}
+
+bool WireTable::barrier_await_tick(std::uint32_t* prev_gen, int timeout_ms) const {
+  BarrierState* b = barrier_of(impl_->header);
+  if (barrier_wait_word_changed(&b->publish_gen, *prev_gen, timeout_ms)) {
+    *prev_gen = b->publish_gen.load(std::memory_order_acquire);
+    return true;
+  }
+  return false;
+}
+
+void WireTable::barrier_ack() {
+  BarrierState* b = barrier_of(impl_->header);
+  b->ack_count.fetch_add(1u, std::memory_order_acq_rel);
+  barrier_futex_wake(&b->ack_count);
 }
 
 bool WireTable::has_cell(WireId id) const {

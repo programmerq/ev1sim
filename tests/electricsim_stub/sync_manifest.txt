@@ -1,0 +1,31 @@
+# electricsim_stub vendored-copy manifest — DO NOT HAND-EDIT.
+#
+# Regenerate with:
+#   tests/electricsim_stub/check_stub_sync.sh --update --upstream <external-sim tree>
+#
+# Verified by check_stub_sync.sh; that script's ability to FAIL is itself
+# verified by selftest_check_stub_sync.sh, registered as a CTest.
+#
+# 'provenance' is the external-sim commit these copies were taken from. It is
+# an opaque identifier, recorded so a reader can tell WHICH upstream state
+# this copy reflects — without it the manifest says the copy is consistent
+# but not what it is consistent with.
+provenance 2b36756ced6067646bb44954fd6f0ed9352fb82e
+count 17
+3e6172472f7ef61504e73271de812d4d1a2b6bcf7ecb9dbbc8db4369e003fde4  src/io/ev1_chassis_signals.hpp
+6138b31116288d8fd59b913c8fae8822c4bf220ea3d263e13d8a8d4677562305  src/io/gm8192/gm8192_frame.c
+49f12fda831b14968858aab4db2802f6c74ce4f7e5a344684cd83e35a1bc1865  src/io/gm8192/gm8192_frame.h
+bee015b0a4e8f179cab6aa49b7f741c7b987858715a8e5f5c3b09c8c48cfd156  src/io/gm8192/gm8192_rx_framer.cpp
+90b56c85f1aecfe5283ba7ae3b882d7e5ba73d71131e4e615544fd1539a980a7  src/io/gm8192/gm8192_rx_framer.hpp
+0e2dd90213e349a5c9c2123efdbb8c66f1a2a6d5b560c49cab3578d7e510b745  src/io/topology/env_open.cpp
+89825d539f6866cb814022fbfe9197a7bae0a5623e2032fb7479b868be06a521  src/io/topology/env_open.hpp
+f68e4031181b914cdb665797b5ffa296b9e5b4f2a2f50374e49b9a3679f790e6  src/io/topology/shm_test_helpers.hpp
+d653d95870e91d3d7899bb629294cbf39f37cabd9ce77f8bd2a5c9bf14551665  src/io/topology/topology_generated.h
+1f1927b0c839c5903e22a50593d7e1a47ae440119e5ab62750374cb638587ad3  src/io/topology/wire_defaults.hpp
+3bb39577cb7c34bc8aa58e46304f5a1fe35ae599a68badf3e03c5e94b62856d2  src/io/uart/uart_rx.cpp
+4de1a0879f848fb0527d36fc14864fa7e06090583da5562eda813997fc50b74e  src/io/uart/uart_rx.hpp
+6f4f8443e5c2453e0623ac0b2a423e72a790e77804cad1b81b9f224019727c70  src/io/uart/uart_tx.cpp
+75553acf521b211868d701d05d42ab5c1727c176f918fc8962fe26745bd15821  src/io/uart/uart_tx.hpp
+1bd12bf19de4e11b41f5236f8e82a7814a748aef45a9151a61fcd9c4257a3d0a  src/io/wire_table.cpp
+5c83a8bc4ab4951fab0ab88717d9520f2cab043c86295a6651c56696939a9cd2  src/io/wire_table.hpp
+d85ac2f73c74171d68141011d7693f60e5eb3a5ffe262d57930ff8fb07e3d65e  src/net_host/conductor_publisher.hpp
