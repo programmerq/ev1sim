@@ -80,6 +80,15 @@ bool publish_conductor(WireTable& table, ConductorId id, bool energised) {
     return publisher.publish(id, energised);
 }
 
+// The millivolt form of the same edge, for conductor cells carrying a measured
+// potential rather than a bare energised/not bit — the aux battery terminal is the
+// first of those. Same reasoning as above: the test stands in for the solver, so it
+// seeds the cell through the publisher rather than casting the conductor type away.
+bool publish_conductor_mv(WireTable& table, ConductorId id, std::uint32_t millivolts) {
+    electricsim::net_host::ConductorPublisher publisher(table);
+    return publisher.publish_mv(id, millivolts);
+}
+
 // Numeric id of a conductor cell, for the read accessors (which take a runtime
 // id). Reads are the legitimate direction for ev1sim — see ReadOnlyWireId in
 // src/WireTruthChassis.cpp for the same conversion on the production side.
@@ -336,10 +345,13 @@ TEST_CASE("WireTruthChassis::mirror_signal: unregistered signal_id returns false
 // writes the cells onto the wire — then ev1sim's apply_consumer_overlay reads
 // them and invokes the matching sinks.
 //
-//   bit     4000  kWireBULB_FEED_LINE_LBL
+//   bit     4000  kWireBULB_FEED_LINE_LBL               (conductor — published)
 //   byte    4082  kWireCHASSIS_HVAC_BLOWER_LEVEL
 //   float32 4132  kWireCHASSIS_IPC_TRIP_DISTANCE_M
-//   uint32  4192  kWireCHASSIS_AUX_BATTERY_TERMINAL_MV
+//   uint32  4192  kWireCHASSIS_AUX_BATTERY_TERMINAL_MV  (conductor — published_mv)
+//
+// The two conductors are seeded through ConductorPublisher, not write_*: their
+// values are solver outputs, so the substrate gives them no write overload.
 // ---------------------------------------------------------------------------
 
 TEST_CASE("WireTruthChassis::apply_consumer_overlay: written cells invoke matching sinks",
@@ -355,8 +367,8 @@ TEST_CASE("WireTruthChassis::apply_consumer_overlay: written cells invoke matchi
         static_cast<std::uint8_t>(2u)));
     REQUIRE(creator->write_float32(
         electricsim::topology::kWireCHASSIS_IPC_TRIP_DISTANCE_M, 123.5f));
-    REQUIRE(creator->write_uint32(
-        electricsim::topology::kWireCHASSIS_AUX_BATTERY_TERMINAL_MV, 12650u));
+    REQUIRE(publish_conductor_mv(
+        *creator, electricsim::topology::kWireCHASSIS_AUX_BATTERY_TERMINAL_MV, 12650u));
     // PIM commanded throttle (4073) — the cell the wire-truth migration dropped from
     // the consumer set (restored 2026-07-04); pin it here so it can't fall out
     // again silently (the VAT safety failsafe assertions read this via stats).

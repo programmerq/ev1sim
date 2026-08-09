@@ -49,13 +49,41 @@ class ConductorPublisher {
     return ok;
   }
 
+  // Publish one conductor cell's derived POTENTIAL, in millivolts (finding R-2's
+  // closure; see WireTable::publish_conductor_mv).
+  //
+  // Only call this when the observation says the potential is DEFINED
+  // (NodeObservation::voltage_defined()). A floating node has no voltage against any
+  // reference, and the caller must refuse rather than publish a confident 0 — see
+  // SolverHost::step.
+  //
+  // Counted into the same `published_` total as the bit form, because from a receipt's
+  // point of view it is the same event: the solver spoke about a cell. It is NOT
+  // counted into `energised_` — "how many conductors are hot" is a count of BITS, and
+  // folding mV cells in would make the fleet's hot-conductor number rise merely
+  // because a rail acquired an analog mirror. The mV cells get their own counter so
+  // the two can never be confused for one another in a provenance line.
+  bool publish_mv(io::ConductorId id, std::uint32_t millivolts) {
+    const bool ok = table_->publish_conductor_mv(id, millivolts, token_);
+    if (ok) {
+      ++published_;
+      ++published_mv_;
+    } else {
+      ++refused_;
+    }
+    return ok;
+  }
+
   // Receipt counters. `refused` is not decoration: publish_conductor returns false on
   // an undeclared id or a type mismatch, and a host that published nothing all tick
   // because every id was wrong would otherwise look identical to a dark vehicle.
   std::uint64_t published() const noexcept { return published_; }
   std::uint64_t published_energised() const noexcept { return energised_; }
+  std::uint64_t published_millivolts() const noexcept { return published_mv_; }
   std::uint64_t refused() const noexcept { return refused_; }
-  void reset_counters() noexcept { published_ = energised_ = refused_ = 0; }
+  void reset_counters() noexcept {
+    published_ = energised_ = published_mv_ = refused_ = 0;
+  }
 
  private:
   io::WireTable* table_;
@@ -65,6 +93,7 @@ class ConductorPublisher {
   io::SolverToken token_{};
   std::uint64_t published_ = 0;
   std::uint64_t energised_ = 0;
+  std::uint64_t published_mv_ = 0;
   std::uint64_t refused_ = 0;
 };
 

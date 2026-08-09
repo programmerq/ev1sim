@@ -1301,12 +1301,32 @@ bool WireTable::read_bit_sample(ConductorId id, Sample<bool>* out) const {
   return read_bit_sample(static_cast<WireId>(id), out);
 }
 
+bool WireTable::publish_conductor_mv(ConductorId id, std::uint32_t millivolts,
+                                     const SolverToken& token) {
+  // Same token, same argument as the bit form: a node's potential is an output of the
+  // same provenance computation that decided whether it is energised at all.
+  (void)token;
+  return write_uint32(static_cast<WireId>(id), millivolts);
+}
+
+bool WireTable::read_uint32_sample(ConductorId id, Sample<std::uint32_t>* out) const {
+  return read_uint32_sample(static_cast<WireId>(id), out);
+}
+
 bool WireTable::write_element_state(ElementStateId id, bool closed) {
   return write_bit(static_cast<WireId>(id), closed);
 }
 
 bool WireTable::read_bit_sample(ElementStateId id, Sample<bool>* out) const {
   return read_bit_sample(static_cast<WireId>(id), out);
+}
+
+bool WireTable::write_element_state_mv(ElementStateId id, std::uint32_t millivolts) {
+  return write_uint32(static_cast<WireId>(id), millivolts);
+}
+
+bool WireTable::read_uint32_sample(ElementStateId id, Sample<std::uint32_t>* out) const {
+  return read_uint32_sample(static_cast<WireId>(id), out);
 }
 
 bool WireTable::write_byte(WireId id, std::uint8_t value) {

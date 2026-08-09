@@ -605,10 +605,16 @@ static const std::unordered_map<std::uint32_t, ConsumerCell>& ConsumerRegistry()
         {4204U, {ReadOnlyWireId(kWireCHASSIS_TJB_RR_STOP_LAMP),         WireType::kBit}},
         {4198U, {ReadOnlyWireId(kWireCHASSIS_TJB_LR_TAIL_LAMP),         WireType::kBit}},
         {4199U, {ReadOnlyWireId(kWireCHASSIS_TJB_RR_TAIL_LAMP),         WireType::kBit}},
-        // Aux battery (uint32 / bit / byte)
-        {4192U, {kWireCHASSIS_AUX_BATTERY_TERMINAL_MV,  WireType::kUint32}},
-        {4193U, {kWireCHASSIS_AUX_BATTERY_PRESENT,      WireType::kBit}},
-        {4194U, {kWireCHASSIS_AUX_BATTERY_SOC_PCT,      WireType::kByte}},
+        // Aux battery (uint32 / bit / byte). TERMINAL_MV and PRESENT are
+        // CONDUCTOR cells: the external sim's battery model derives terminal
+        // voltage and presence from the circuit and publishes the answer, so
+        // they arrive through ReadOnlyWireId like every other conductor ev1sim
+        // reads. SOC_PCT is not — state of charge is an estimator output, not a
+        // conductor energisation, so it stays a plain WireId. Wrapping it would
+        // claim a classification the topology does not make.
+        {4192U, {ReadOnlyWireId(kWireCHASSIS_AUX_BATTERY_TERMINAL_MV), WireType::kUint32}},
+        {4193U, {ReadOnlyWireId(kWireCHASSIS_AUX_BATTERY_PRESENT),     WireType::kBit}},
+        {4194U, {kWireCHASSIS_AUX_BATTERY_SOC_PCT,                     WireType::kByte}},
         // NOTE: HV bus 4155-4157 and charge-wake 4187 are intentionally ABSENT.
         // They are externally-produced cells (topology `driver:`), not ev1sim
         // consumer cells. ev1sim does not read them from this class.

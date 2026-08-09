@@ -27,17 +27,17 @@
 namespace electricsim::topology {
 
 inline constexpr std::uint32_t kFormatVersion = 2U;
-inline constexpr std::uint32_t kTopologyHash = 0xC0D81E38U;
-inline constexpr std::size_t kWireCount = 411;
+inline constexpr std::uint32_t kTopologyHash = 0x6FCC0257U;
+inline constexpr std::size_t kWireCount = 412;
 
 // Per-class cell counts. Emitted so a
 // receipt can print the classification without re-parsing YAML,
 // and so a test can assert against them. The legacy count is held
 // by a DECREASING ratchet in the generator that fails on !=.
-inline constexpr std::size_t kConductorCellCount = 83;
-inline constexpr std::size_t kElementStateCellCount = 62;
+inline constexpr std::size_t kConductorCellCount = 85;
+inline constexpr std::size_t kElementStateCellCount = 63;
 inline constexpr std::size_t kSemanticCellCount = 73;
-inline constexpr std::size_t kUnclassifiedLegacyCellCount = 193;
+inline constexpr std::size_t kUnclassifiedLegacyCellCount = 191;
 
 // Named cell ids. Sequential by YAML key order; changing that
 // order or adding/removing a net changes kTopologyHash.
@@ -253,8 +253,8 @@ inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_RHJB_PMM_MODULE_BPL
 inline constexpr ::electricsim::io::WireId kWireCHASSIS_RSA_DIM_LEVEL_STEP = 202U;
 inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_LHJB_PARK_LAMPS_ON{203U};
 inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_APM_BPLUS_ACTIVE{204U};
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_AUX_BATTERY_TERMINAL_MV = 205U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_AUX_BATTERY_PRESENT = 206U;
+inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_AUX_BATTERY_TERMINAL_MV{205U};
+inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_AUX_BATTERY_PRESENT{206U};
 inline constexpr ::electricsim::io::WireId kWireCHASSIS_AUX_BATTERY_SOC_PCT = 207U;
 inline constexpr ::electricsim::io::WireId kWireCHASSIS_AUX_BATTERY_MAINT_WAKE_REQ = 208U;
 inline constexpr ::electricsim::io::WireId kWireCHASSIS_APM_TWELVE_VOLT_OUTPUT_MA = 209U;
@@ -460,6 +460,7 @@ inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REAR_EMB_LR{408U
 inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REAR_EMB_RR{409U};
 inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REGEN_DISABLE{410U};
 inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_BRAKE_SW_OUT{411U};
+inline constexpr ::electricsim::io::ElementStateId kWireCHASSIS_ES_AUX_BATTERY_TERMINAL_MV{412U};
 
 // Per-net default + init_policy constants.
 // Used by consumers that opt into the kDefault policy — see
@@ -1288,6 +1289,8 @@ inline constexpr auto kWireBTCM_ES_REGEN_DISABLE_Default = false;
 inline constexpr InitPolicy kWireBTCM_ES_REGEN_DISABLE_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireBTCM_ES_BRAKE_SW_OUT_Default = false;
 inline constexpr InitPolicy kWireBTCM_ES_BRAKE_SW_OUT_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_ES_AUX_BATTERY_TERMINAL_MV_Default = 0x0U;
+inline constexpr InitPolicy kWireCHASSIS_ES_AUX_BATTERY_TERMINAL_MV_InitPolicy = InitPolicy::kHold;
 
 // Declare every wire in this topology on the given (creator)
 // table. Returns true iff all declarations succeed.
@@ -1497,8 +1500,8 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(kWireCHASSIS_RSA_DIM_LEVEL_STEP, ::electricsim::io::WireType::kByte) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireCHASSIS_LHJB_PARK_LAMPS_ON), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireCHASSIS_APM_BPLUS_ACTIVE), ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(kWireCHASSIS_AUX_BATTERY_TERMINAL_MV, ::electricsim::io::WireType::kUint32) && ok;
-  ok = table.declare(kWireCHASSIS_AUX_BATTERY_PRESENT, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireCHASSIS_AUX_BATTERY_TERMINAL_MV), ::electricsim::io::WireType::kUint32) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireCHASSIS_AUX_BATTERY_PRESENT), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(kWireCHASSIS_AUX_BATTERY_SOC_PCT, ::electricsim::io::WireType::kByte) && ok;
   ok = table.declare(kWireCHASSIS_AUX_BATTERY_MAINT_WAKE_REQ, ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(kWireCHASSIS_APM_TWELVE_VOLT_OUTPUT_MA, ::electricsim::io::WireType::kUint32) && ok;
@@ -1704,6 +1707,7 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REGEN_DISABLE), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_BRAKE_SW_OUT), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireCHASSIS_ES_AUX_BATTERY_TERMINAL_MV), ::electricsim::io::WireType::kUint32) && ok;
   return ok;
 }
 
@@ -1916,8 +1920,8 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case kWireCHASSIS_RSA_DIM_LEVEL_STEP: return "CHASSIS_RSA_DIM_LEVEL_STEP";
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_LHJB_PARK_LAMPS_ON): return "CHASSIS_LHJB_PARK_LAMPS_ON";
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_APM_BPLUS_ACTIVE): return "CHASSIS_APM_BPLUS_ACTIVE";
-    case kWireCHASSIS_AUX_BATTERY_TERMINAL_MV: return "CHASSIS_AUX_BATTERY_TERMINAL_MV";
-    case kWireCHASSIS_AUX_BATTERY_PRESENT: return "CHASSIS_AUX_BATTERY_PRESENT";
+    case static_cast<::electricsim::io::WireId>(kWireCHASSIS_AUX_BATTERY_TERMINAL_MV): return "CHASSIS_AUX_BATTERY_TERMINAL_MV";
+    case static_cast<::electricsim::io::WireId>(kWireCHASSIS_AUX_BATTERY_PRESENT): return "CHASSIS_AUX_BATTERY_PRESENT";
     case kWireCHASSIS_AUX_BATTERY_SOC_PCT: return "CHASSIS_AUX_BATTERY_SOC_PCT";
     case kWireCHASSIS_AUX_BATTERY_MAINT_WAKE_REQ: return "CHASSIS_AUX_BATTERY_MAINT_WAKE_REQ";
     case kWireCHASSIS_APM_TWELVE_VOLT_OUTPUT_MA: return "CHASSIS_APM_TWELVE_VOLT_OUTPUT_MA";
@@ -2123,6 +2127,7 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR): return "BTCM_ES_REAR_EMB_RR";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REGEN_DISABLE): return "BTCM_ES_REGEN_DISABLE";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_BRAKE_SW_OUT): return "BTCM_ES_BRAKE_SW_OUT";
+    case static_cast<::electricsim::io::WireId>(kWireCHASSIS_ES_AUX_BATTERY_TERMINAL_MV): return "CHASSIS_ES_AUX_BATTERY_TERMINAL_MV";
     default: return ::std::string_view{};
   }
 }
@@ -2340,8 +2345,8 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case kWireCHASSIS_RSA_DIM_LEVEL_STEP: return "";
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_LHJB_PARK_LAMPS_ON): return "";
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_APM_BPLUS_ACTIVE): return "";
-    case kWireCHASSIS_AUX_BATTERY_TERMINAL_MV: return "";
-    case kWireCHASSIS_AUX_BATTERY_PRESENT: return "";
+    case static_cast<::electricsim::io::WireId>(kWireCHASSIS_AUX_BATTERY_TERMINAL_MV): return "";
+    case static_cast<::electricsim::io::WireId>(kWireCHASSIS_AUX_BATTERY_PRESENT): return "";
     case kWireCHASSIS_AUX_BATTERY_SOC_PCT: return "";
     case kWireCHASSIS_AUX_BATTERY_MAINT_WAKE_REQ: return "";
     case kWireCHASSIS_APM_TWELVE_VOLT_OUTPUT_MA: return "";
@@ -2547,6 +2552,7 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR): return "btcm_ecu";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REGEN_DISABLE): return "btcm_ecu";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_BRAKE_SW_OUT): return "btcm_ecu";
+    case static_cast<::electricsim::io::WireId>(kWireCHASSIS_ES_AUX_BATTERY_TERMINAL_MV): return "aux_battery_host";
     default: return ::std::string_view{};
   }
 }
@@ -2768,8 +2774,8 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(kWireCHASSIS_RSA_DIM_LEVEL_STEP, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_RSA_DIM_LEVEL_STEP"}, kWireCHASSIS_RSA_DIM_LEVEL_STEP); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireCHASSIS_LHJB_PARK_LAMPS_ON), &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_LHJB_PARK_LAMPS_ON"}, static_cast<::electricsim::io::WireId>(kWireCHASSIS_LHJB_PARK_LAMPS_ON)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireCHASSIS_APM_BPLUS_ACTIVE), &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_APM_BPLUS_ACTIVE"}, static_cast<::electricsim::io::WireId>(kWireCHASSIS_APM_BPLUS_ACTIVE)); ++count; }
-  if (table.write_gen(kWireCHASSIS_AUX_BATTERY_TERMINAL_MV, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_AUX_BATTERY_TERMINAL_MV"}, kWireCHASSIS_AUX_BATTERY_TERMINAL_MV); ++count; }
-  if (table.write_gen(kWireCHASSIS_AUX_BATTERY_PRESENT, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_AUX_BATTERY_PRESENT"}, kWireCHASSIS_AUX_BATTERY_PRESENT); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireCHASSIS_AUX_BATTERY_TERMINAL_MV), &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_AUX_BATTERY_TERMINAL_MV"}, static_cast<::electricsim::io::WireId>(kWireCHASSIS_AUX_BATTERY_TERMINAL_MV)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireCHASSIS_AUX_BATTERY_PRESENT), &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_AUX_BATTERY_PRESENT"}, static_cast<::electricsim::io::WireId>(kWireCHASSIS_AUX_BATTERY_PRESENT)); ++count; }
   if (table.write_gen(kWireCHASSIS_AUX_BATTERY_SOC_PCT, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_AUX_BATTERY_SOC_PCT"}, kWireCHASSIS_AUX_BATTERY_SOC_PCT); ++count; }
   if (table.write_gen(kWireCHASSIS_AUX_BATTERY_MAINT_WAKE_REQ, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_AUX_BATTERY_MAINT_WAKE_REQ"}, kWireCHASSIS_AUX_BATTERY_MAINT_WAKE_REQ); ++count; }
   if (table.write_gen(kWireCHASSIS_APM_TWELVE_VOLT_OUTPUT_MA, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_APM_TWELVE_VOLT_OUTPUT_MA"}, kWireCHASSIS_APM_TWELVE_VOLT_OUTPUT_MA); ++count; }
@@ -2975,6 +2981,7 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_ES_REAR_EMB_RR"}, static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REGEN_DISABLE), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_ES_REGEN_DISABLE"}, static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REGEN_DISABLE)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_BRAKE_SW_OUT), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_ES_BRAKE_SW_OUT"}, static_cast<::electricsim::io::WireId>(kWireBTCM_ES_BRAKE_SW_OUT)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireCHASSIS_ES_AUX_BATTERY_TERMINAL_MV), &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_ES_AUX_BATTERY_TERMINAL_MV"}, static_cast<::electricsim::io::WireId>(kWireCHASSIS_ES_AUX_BATTERY_TERMINAL_MV)); ++count; }
   return count;
 }
 
@@ -3192,8 +3199,8 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case kWireCHASSIS_RSA_DIM_LEVEL_STEP: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_LHJB_PARK_LAMPS_ON): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_APM_BPLUS_ACTIVE): return ::electricsim::io::CellClass::kConductor;
-    case kWireCHASSIS_AUX_BATTERY_TERMINAL_MV: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
-    case kWireCHASSIS_AUX_BATTERY_PRESENT: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
+    case static_cast<::electricsim::io::WireId>(kWireCHASSIS_AUX_BATTERY_TERMINAL_MV): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireCHASSIS_AUX_BATTERY_PRESENT): return ::electricsim::io::CellClass::kConductor;
     case kWireCHASSIS_AUX_BATTERY_SOC_PCT: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
     case kWireCHASSIS_AUX_BATTERY_MAINT_WAKE_REQ: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
     case kWireCHASSIS_APM_TWELVE_VOLT_OUTPUT_MA: return ::electricsim::io::CellClass::kSemantic;
@@ -3399,6 +3406,7 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REGEN_DISABLE): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_BRAKE_SW_OUT): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireCHASSIS_ES_AUX_BATTERY_TERMINAL_MV): return ::electricsim::io::CellClass::kElementState;
     default: return ::electricsim::io::CellClass::kUnknown;
   }
 }
