@@ -99,6 +99,32 @@ if [ "${UPDATE}" = "1" ]; then
         echo "check_stub_sync --update: '${UPSTREAM}' is not an external-sim tree" >&2
         exit 3
     fi
+
+    # Recording is only honest if the copy really IS what the provenance line will
+    # say it is. Until this loop existed, --update hashed whatever was on disk and
+    # stamped it with the upstream's HEAD sha WITHOUT ever comparing the two — its
+    # own error text above promised a check it did not perform, so a hand-edited
+    # stub could be minted as "provenance <sha>" for content that never existed at
+    # that sha, and the CI integrity leg would then certify it as IN_SYNC forever.
+    # Refuse instead, with the same DRIFTED exit code the verification path uses.
+    update_bad=0
+    while IFS= read -r rel; do
+        [ -z "${rel}" ] && continue
+        if [ ! -f "${UPSTREAM}/${rel}" ]; then
+            echo "  GONE       ${rel} (vendored here, not present upstream)" >&2
+            update_bad=1
+        elif ! cmp -s "${STUB_DIR}/${rel}" "${UPSTREAM}/${rel}"; then
+            echo "  DRIFTED    ${rel} (differs from upstream)" >&2
+            update_bad=1
+        fi
+    done < <(vendored_files)
+    if [ "${update_bad}" != "0" ]; then
+        echo "check_stub_sync --update: refusing to record — the files above do NOT" >&2
+        echo "  match '${UPSTREAM}'. Recording now would stamp this upstream's commit" >&2
+        echo "  onto content that does not exist there. Re-copy them first." >&2
+        exit 1
+    fi
+
     provenance="$(cd "${UPSTREAM}" && git rev-parse HEAD 2>/dev/null || echo "unknown")"
     {
         echo "# electricsim_stub vendored-copy manifest — DO NOT HAND-EDIT."

@@ -609,9 +609,12 @@ static const std::unordered_map<std::uint32_t, ConsumerCell>& ConsumerRegistry()
         // CONDUCTOR cells: the external sim's battery model derives terminal
         // voltage and presence from the circuit and publishes the answer, so
         // they arrive through ReadOnlyWireId like every other conductor ev1sim
-        // reads. SOC_PCT is not — state of charge is an estimator output, not a
-        // conductor energisation, so it stays a plain WireId. Wrapping it would
-        // claim a classification the topology does not make.
+        // reads. They moved there from unclassified-legacy, not from semantic —
+        // cell_class_for() in topology_generated.h is the record.
+        //
+        // SOC_PCT stays a plain WireId because upstream still declares it one;
+        // it is still unclassified-legacy, i.e. not yet classified either way.
+        // Wrapping it would claim a classification the topology has not made.
         {4192U, {ReadOnlyWireId(kWireCHASSIS_AUX_BATTERY_TERMINAL_MV), WireType::kUint32}},
         {4193U, {ReadOnlyWireId(kWireCHASSIS_AUX_BATTERY_PRESENT),     WireType::kBit}},
         {4194U, {kWireCHASSIS_AUX_BATTERY_SOC_PCT,                     WireType::kByte}},
