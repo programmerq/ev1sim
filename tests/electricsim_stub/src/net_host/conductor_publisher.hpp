@@ -49,8 +49,10 @@ class ConductorPublisher {
     return ok;
   }
 
-  // Publish one conductor cell's derived POTENTIAL, in millivolts (finding R-2's
-  // closure; see WireTable::publish_conductor_mv).
+  // Publish one conductor cell's derived POTENTIAL, in millivolts — the analog half of
+  // publish() above, and it carries the same capability for the same reason. See
+  // WireTable::publish_conductor_mv for that reason, stated once; it is not repeated
+  // here, because a rationale kept in two files is a rationale that drifts in one.
   //
   // Only call this when the observation says the potential is DEFINED
   // (NodeObservation::voltage_defined()). A floating node has no voltage against any

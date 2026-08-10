@@ -187,13 +187,32 @@ future-UI input on one side, chassis-segment signal publishing on the other.
 
 ## Vendored stub hygiene
 
-- [ ] **Vendored electricsim stub carries upstream-internal references (needs
-  an upstream scrub + re-vendor).**  `tests/electricsim_stub/src/io/wire_table.hpp`
+- [x] **Vendored electricsim stub carried upstream-internal references — scrubbed
+  upstream, re-vendored here.**  `tests/electricsim_stub/src/io/wire_table.hpp`
   and `tests/electricsim_stub/src/net_host/conductor_publisher.hpp` picked up
   upstream review-finding identifiers and source paths when PR #48 re-vendored
   the stub set.  Both files are intentionally byte-identical to their upstream
   originals, and the stub's integrity check treats any local edit as drift, so
-  the references can't be scrubbed in this repo — the fix has to land upstream
-  in electricsim first. Tracked there as
-  `BL-2026-08-09-vendored-stub-leaks-private-refs-to-ev1sim`; once that scrub
-  lands, re-vendor the two files here.
+  the references could not be scrubbed in this repo — the fix landed upstream in
+  electricsim first (tracked there as
+  `BL-2026-08-09-vendored-stub-leaks-private-refs-to-ev1sim`), and this repo
+  re-vendored both files from that commit.
+
+  **The identifiers are gone.  The source paths stay, deliberately.**  Upstream
+  ruled that a path naming a real source file is not a private reference — it
+  points at a file, where a finding id points at a document a reader outside that
+  repo cannot open — and that the same rule had already been applied when these
+  files were scrubbed the first time.  So `src/net/net_types.hpp` and
+  `config/nets/<module>.yaml` remain in `wire_table.hpp`, and the third path this
+  entry implied was in these two files, `src/io/topology/feed_query.hpp`, turns
+  out to sit in `tests/electricsim_stub/src/io/ev1_chassis_signals.hpp` instead.
+
+- [ ] **`ev1_chassis_signals.hpp` still carries upstream section citations.**
+  The scrub above covered two of the 17 vendored files.
+  `tests/electricsim_stub/src/io/ev1_chassis_signals.hpp` was untouched by it and
+  by the scrub before it, and still cites upstream planning documents by section
+  number in several comments.  Same constraint as before — byte-identical by
+  design, so it cannot be fixed here.  Upstream carries the worklist on
+  `BL-2026-08-10-no-private-ref-audit-on-vendorable-files`, together with the
+  automated check whose absence is why this keeps recurring; re-vendor that file
+  here once it lands.

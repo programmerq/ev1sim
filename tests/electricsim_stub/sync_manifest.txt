@@ -10,7 +10,7 @@
 # an opaque identifier, recorded so a reader can tell WHICH upstream state
 # this copy reflects — without it the manifest says the copy is consistent
 # but not what it is consistent with.
-provenance d53d44f673911069d54db301b0edc0a9196fe853
+provenance 1a6cc33d295902226958afdd007baf21e183022a
 count 17
 037db52b5f62f48fd765560b925e6b47ae143946c9248566053a1e03d5feebc6  src/io/ev1_chassis_signals.hpp
 6138b31116288d8fd59b913c8fae8822c4bf220ea3d263e13d8a8d4677562305  src/io/gm8192/gm8192_frame.c
@@ -27,5 +27,5 @@ f68e4031181b914cdb665797b5ffa296b9e5b4f2a2f50374e49b9a3679f790e6  src/io/topolog
 6f4f8443e5c2453e0623ac0b2a423e72a790e77804cad1b81b9f224019727c70  src/io/uart/uart_tx.cpp
 75553acf521b211868d701d05d42ab5c1727c176f918fc8962fe26745bd15821  src/io/uart/uart_tx.hpp
 c881a68a148dea7157273ebc8769debb5d636f1f04cffaa9bec0ff371091908c  src/io/wire_table.cpp
-e023231ea3990fd28fef9c5c2966cf50461b2ac8af3e92ee88fbbcb33c60c988  src/io/wire_table.hpp
-8def670a10db6c32d8ab883c79df8227c3f3a4f19afb29137068d1a4107c74fc  src/net_host/conductor_publisher.hpp
+77ade70d6aac6cac53b8ab596a8784b19422d847e1cfc36276b935584a482070  src/io/wire_table.hpp
+ff63eb9191a327a02c627ac1ee5ad4bf53ce2042dc14341edbaa0176a16f0b49  src/net_host/conductor_publisher.hpp
