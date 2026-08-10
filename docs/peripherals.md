@@ -66,6 +66,30 @@ Wire level: `uint8`/bool, `1` = leg energised.  These are electricsim's own
 Connector accessors: `GetDoorLockMotorDrive(leg)` / `HasReceivedDoorLockMotorDrive(leg)`
 where `leg` ∈ {0=LH lock, 1=LH unlock, 2=RH lock, 3=RH unlock}.
 
+### Scenario CSV columns, and which layer each reports
+
+Three layers, three column families. Which one a rule should score depends on
+what that rule is auditing.
+
+| Column | Reports | Source |
+|---|---|---|
+| `door_lock_motor_{lh,rh}_{lock,unlock}` | the **relay leg**, exactly as published | chassis 4182-4185 |
+| `door_lock_motor_*_drive` | the same value, older spelling | chassis 4182-4185 |
+| `door_lock_winding_{lh,rh}_{lock,unlock}` | the **winding**: its leg driven **and** the opposite leg not | `DoorLockMotor` |
+| `door_lock_stroke_{lh,rh}` | pawl travel, `0.0` unlocked stop → `1.0` locked stop | `DoorLockMotor` |
+| `door_lock_motor_{lh,rh}_stalled` | winding live with the pawl already at that stop | `DoorLockMotor` |
+| `door_lock_state_{driver,passenger}` | the latched result, the same value published on 4165/4166 | `DoorLocks` |
+| `door_lock_switch_{lh,rh}_{lock,unlock}` | the rocker contact ev1sim published | chassis 4170-4173 |
+
+**A rule auditing the relays must score the LEG.** The upstream interlock rule
+is "a LOCK press must never energise the UNLOCK leg", and its whole purpose is
+catching both relays closed at once. The winding column reads `0` throughout a
+lock pulse whatever the junction block does with the unlock relay — closing both
+relays parks both brushes on one rail — so scoring the winding there would make
+that rule unable to fail on the fault it names. The winding is the honest input
+to the plant and the honest thing to model; it is the wrong answer to hand a
+rule that is auditing relays.
+
 ---
 
 ## `door_lock_switch` — the door-mounted lock/unlock rockers (LH + RH)

@@ -1252,6 +1252,126 @@ TEST_CASE("DoorLockMotor: stalls against the end stop with the winding still liv
 }
 
 // ---------------------------------------------------------------------------
+// StepDoorLockPlant — the leg -> stroke -> latch chain, end to end.
+//
+// This lives on PhysicalWorld rather than inside SimApp's tick precisely so it
+// can be driven here: SimApp.cpp is not compiled into the Chrono-free test
+// target, so while the chain lived there, handing the plant four zeroes instead
+// of the real legs changed no test result.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("StepDoorLockPlant: a lock pulse strokes both motors and latches both doors",
+          "[PhysicalWorld][DoorLockPlant]") {
+    using S = DoorLocks::State;
+    PhysicalWorld w;
+    REQUIRE(w.door_locks().driver()    == S::UNLOCKED);
+    REQUIRE(w.door_locks().passenger() == S::UNLOCKED);
+
+    // The junction block drives both LOCK legs in lockstep for a 600 ms pulse.
+    // Nothing latches while the pawls are still travelling.
+    for (int i = 0; i < 4; ++i) {                       // 4 x 50 ms = 0.2 s
+        const auto step = w.StepDoorLockPlant(0.05, true, false, true, false);
+        CHECK_FALSE(step.latched[0]);
+        CHECK_FALSE(step.latched[1]);
+    }
+    CHECK(w.door_locks().driver()    == S::UNLOCKED);
+    CHECK(w.door_lock_motor_lh().stroke() == DoorLockMotor::Stroke::MID_STROKE);
+
+    // Reaching the stop is the event that moves the latch, once.
+    bool saw_latch = false;
+    for (int i = 0; i < 8; ++i) {
+        const auto step = w.StepDoorLockPlant(0.05, true, false, true, false);
+        if (step.latched[0]) {
+            CHECK(step.latched[1]);                     // both doors, in lockstep
+            CHECK(step.now_locked[0]);
+            CHECK(step.now_locked[1]);
+            CHECK_FALSE(saw_latch);                     // reported exactly once
+            saw_latch = true;
+        }
+    }
+    CHECK(saw_latch);
+    CHECK(w.door_locks().driver()    == S::LOCKED);
+    CHECK(w.door_locks().passenger() == S::LOCKED);
+    CHECK(w.door_lock_motor_lh().position() == 1.0);
+    CHECK(w.door_lock_motor_lh().stalled());            // still driven, at the stop
+
+    // The pulse releases: nothing further latches and nothing unwinds.
+    for (int i = 0; i < 4; ++i) {
+        const auto step = w.StepDoorLockPlant(0.05, false, false, false, false);
+        CHECK_FALSE(step.latched[0]);
+    }
+    CHECK(w.door_locks().driver() == S::LOCKED);
+    CHECK_FALSE(w.door_lock_motor_lh().stalled());
+
+    // An UNLOCK pulse runs it back and latches the other way.
+    saw_latch = false;
+    for (int i = 0; i < 12; ++i) {
+        const auto step = w.StepDoorLockPlant(0.05, false, true, false, true);
+        if (step.latched[0]) {
+            CHECK_FALSE(step.now_locked[0]);
+            saw_latch = true;
+        }
+    }
+    CHECK(saw_latch);
+    CHECK(w.door_locks().driver()    == S::UNLOCKED);
+    CHECK(w.door_locks().passenger() == S::UNLOCKED);
+}
+
+TEST_CASE("StepDoorLockPlant: legs are not crossed between the two doors",
+          "[PhysicalWorld][DoorLockPlant]") {
+    // Four distinct leg patterns, so a swap of any pair is visible.  A test that
+    // drove both LOCK legs together could not tell LH from RH at all.
+    PhysicalWorld w;
+    w.StepDoorLockPlant(0.10, /*lh_lock=*/true, false, /*rh_lock=*/false, false);
+    CHECK(w.door_lock_motor_lh().position() > 0.0);
+    CHECK(w.door_lock_motor_rh().position() == 0.0);
+
+    w.door_lock_motor_lh().set_position(0.0);
+    w.StepDoorLockPlant(0.10, false, false, /*rh_lock=*/true, false);
+    CHECK(w.door_lock_motor_lh().position() == 0.0);
+    CHECK(w.door_lock_motor_rh().position() > 0.0);
+
+    // Unlock legs, same test in reverse.
+    w.door_lock_motor_lh().set_position(1.0);
+    w.door_lock_motor_rh().set_position(1.0);
+    w.StepDoorLockPlant(0.10, false, /*lh_unlock=*/true, false, false);
+    CHECK(w.door_lock_motor_lh().position() < 1.0);
+    CHECK(w.door_lock_motor_rh().position() == 1.0);
+
+    w.door_lock_motor_lh().set_position(1.0);
+    w.StepDoorLockPlant(0.10, false, false, false, /*rh_unlock=*/true);
+    CHECK(w.door_lock_motor_lh().position() == 1.0);
+    CHECK(w.door_lock_motor_rh().position() < 1.0);
+}
+
+TEST_CASE("StepDoorLockPlant: both relays closed moves nothing",
+          "[PhysicalWorld][DoorLockPlant]") {
+    // Shoot-through: both commons on one rail, no differential, no torque.  The
+    // acceptance rules see this on the raw leg columns; the plant sees a motor
+    // that does not turn.
+    PhysicalWorld w;
+    for (int i = 0; i < 20; ++i) w.StepDoorLockPlant(0.05, true, true, true, true);
+    CHECK(w.door_lock_motor_lh().position() == 0.0);
+    CHECK(w.door_lock_motor_rh().position() == 0.0);
+    CHECK(w.door_locks().driver() == DoorLocks::State::UNLOCKED);
+    CHECK_FALSE(w.door_lock_motor_lh().lock_energised());
+    CHECK_FALSE(w.door_lock_motor_lh().unlock_energised());
+}
+
+TEST_CASE("StepDoorLockSwitches ages both rockers",
+          "[PhysicalWorld][DoorLockSwitch]") {
+    PhysicalWorld w;
+    w.door_lock_switch_lh().press_lock();
+    w.door_lock_switch_rh().press_unlock();
+    w.StepDoorLockSwitches(0.05);
+    CHECK(w.door_lock_switch_lh().lock_contact());
+    CHECK(w.door_lock_switch_rh().unlock_contact());
+    w.StepDoorLockSwitches(0.50);
+    CHECK_FALSE(w.door_lock_switch_lh().any_contact());
+    CHECK_FALSE(w.door_lock_switch_rh().any_contact());
+}
+
+// ---------------------------------------------------------------------------
 // DoorLockSwitch — the door-mounted momentary rocker.
 // ---------------------------------------------------------------------------
 

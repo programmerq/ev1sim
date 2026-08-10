@@ -885,12 +885,17 @@ public:
 
     /// Advance the mechanical stroke for dt seconds given the two H-bridge legs.
     void update(double dt, bool lock_drive, bool unlock_drive) {
-        // Winding energisation — NOT a copy of either relay command.  The two
-        // SPDT relay commons sit across ONE reversible motor, so current flows
-        // only when the legs DIFFER: both high (or both low) parks both brushes
-        // on the same rail, no differential, no torque.  A controller that
-        // closed both relays therefore shows up here as a motor that never
-        // turned, which is what the car does.
+        // Winding energisation — a DERIVED electrical state, not a copy of
+        // either relay command.  The two SPDT relay commons sit across ONE
+        // reversible motor, so current flows only when the legs DIFFER: both
+        // high (or both low) parks both brushes on the same rail, no
+        // differential, no torque.  A controller that closed both relays shows
+        // up here as a motor that never turned, which is what the car does.
+        //
+        // NOTE this is deliberately NOT what the door_lock_motor_* stats
+        // columns report — those carry the raw legs, because "both relays
+        // closed" has to stay VISIBLE to the acceptance rule that hunts it.
+        // See the column block in Scenario.cpp.
         m_lock_energised   = lock_drive && !unlock_drive;
         m_unlock_energised = unlock_drive && !lock_drive;
         m_ran = false;
@@ -901,15 +906,18 @@ public:
             m_pos += step;            // run toward LOCKED
         } else if (m_unlock_energised) {
             m_pos -= step;            // run toward UNLOCKED
+        } else {
+            return;                   // both high or both low → motor off
         }
-        // both high or both low → motor off (hold position).
         if (m_pos > 1.0) m_pos = 1.0; // end-of-travel limit (LOCKED)
         if (m_pos < 0.0) m_pos = 0.0; // end-of-travel limit (UNLOCKED)
         // Snap the last ulp onto the stop.  Summing dt/traverse over a stroke
         // lands a few 1e-16 short of the limit as often as past it, and the
         // short case reports MID_STROKE with the pawl physically home — which
         // held the latch (and door_lock_state_*) one sample late, an artefact
-        // of the arithmetic rather than of anything the motor did.
+        // of the arithmetic rather than of anything the motor did.  Reached
+        // only on a driven tick, so an undriven motor parked near a stop never
+        // reports that it moved.
         constexpr double kStopEps = 1e-9;
         if (m_pos < kStopEps)       m_pos = 0.0;
         if (m_pos > 1.0 - kStopEps) m_pos = 1.0;
@@ -979,7 +987,9 @@ private:
 ///
 /// A press survives at least one update() regardless of how coarse the tick is,
 /// so the publish path can never step over an entire press and leave the DLM
-/// with no edge to see.
+/// with no edge to see.  The one exception is a SECOND press in the same tick,
+/// which replaces the first: one rocker has one contact state, and the publish
+/// path samples it once per tick, so there is no honest way to send both.
 class DoorLockSwitch {
 public:
     struct Config {
@@ -1266,6 +1276,58 @@ public:
     DoorLockSwitch&       door_lock_switch_rh()       { return m_door_lock_sw_rh; }
     const DoorLockSwitch& door_lock_switch_rh() const { return m_door_lock_sw_rh; }
 
+    /// What one StepDoorLockPlant call changed, for the caller's logging/audio.
+    struct DoorLockPlantStep {
+        /// A door reached an end of travel this tick and its latch moved with
+        /// it.  Index 0 = LH/driver, 1 = RH/passenger.
+        bool latched[2]  = {false, false};
+        /// The state each latch settled into when latched[i] is true.
+        bool now_locked[2] = {false, false};
+    };
+
+    /// Advance the door-lock plant one tick from the four RHJB motor-leg drives
+    /// (leg order: LH lock, LH unlock, RH lock, RH unlock) and mirror each
+    /// motor's end of travel into DoorLocks.
+    ///
+    /// This lives here rather than in the caller so the leg → stroke → latch
+    /// chain is reachable from a unit test.  It was inside SimApp's tick, which
+    /// the Chrono-free test target does not compile, so nothing could tell a
+    /// plant that ran from a plant that was handed all-zeroes.
+    DoorLockPlantStep StepDoorLockPlant(double dt,
+                                        bool lh_lock, bool lh_unlock,
+                                        bool rh_lock, bool rh_unlock) {
+        DoorLockPlantStep out;
+        DoorLockMotor* motors[2] = {&m_door_lock_motor_lh, &m_door_lock_motor_rh};
+        const bool lock_drv[2]   = {lh_lock, rh_lock};
+        const bool unlock_drv[2] = {lh_unlock, rh_unlock};
+        for (int door = 0; door < 2; ++door) {
+            motors[door]->update(dt, lock_drv[door], unlock_drv[door]);
+            const auto stroke = motors[door]->stroke();
+            if (static_cast<int>(stroke) == m_last_dlm_stroke[door]) continue;
+            m_last_dlm_stroke[door] = static_cast<int>(stroke);
+            // Only an end-of-travel limit moves the latch; mid-stroke does not.
+            if (stroke != DoorLockMotor::Stroke::LOCKED &&
+                stroke != DoorLockMotor::Stroke::UNLOCKED) {
+                continue;
+            }
+            const auto st = (stroke == DoorLockMotor::Stroke::LOCKED)
+                                ? DoorLocks::State::LOCKED
+                                : DoorLocks::State::UNLOCKED;
+            if (door == 0) m_door_locks.set_driver(st);
+            else           m_door_locks.set_passenger(st);
+            out.latched[door]    = true;
+            out.now_locked[door] = (st == DoorLocks::State::LOCKED);
+        }
+        return out;
+    }
+
+    /// Age both door-lock rockers one tick.  Call once per tick, before reading
+    /// the contacts for publish.
+    void StepDoorLockSwitches(double dt) {
+        m_door_lock_sw_lh.update(dt);
+        m_door_lock_sw_rh.update(dt);
+    }
+
     Sounder&       sounder()       { return m_sounder; }
     const Sounder& sounder() const { return m_sounder; }
 
@@ -1320,6 +1382,12 @@ private:
     DoorLockMotor          m_door_lock_motor_rh;   // passenger door
     DoorLockSwitch         m_door_lock_sw_lh;      // driver-door rocker
     DoorLockSwitch         m_door_lock_sw_rh;      // passenger-door rocker
+    // Last stroke enum seen per door (cast of DoorLockMotor::Stroke), so
+    // StepDoorLockPlant moves a latch only on the transition INTO an end of
+    // travel, not every tick it sits there.  Seeded to UNLOCKED (0), the motors'
+    // initial stroke, so the first tick after the legs appear does not report a
+    // spurious "reached UNLOCKED".
+    int                    m_last_dlm_stroke[2] = {0, 0};
     Sounder                m_sounder;
     PowerSteeringPumpMotor m_steering_pump;
     HvacControls           m_hvac;

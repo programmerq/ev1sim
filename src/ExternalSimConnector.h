@@ -555,7 +555,7 @@ public:
     void SetHvacAcRequest(bool on);
     void SetHvacDefrostRequest(bool on);
 
-    /// Outgoing door-lock STATE feedback (IDs 4155-4157, chassis segment) →
+    /// Outgoing door-lock STATE feedback (IDs 4165-4167, chassis segment) →
     /// external sim.  The resulting latched state of ev1sim::DoorLocks
     /// (driver/passenger/trunk; true = LOCKED), published on change each tick so
     /// an RSA/IPC central-locking consumer can confirm the actuated state.

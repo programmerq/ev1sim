@@ -165,9 +165,11 @@ void Scenario::Tick(double sim_time, const VehicleState& state,
         } else if (e.action == "door_lock_all")       { hooks.DoorLockAll();
         } else if (e.action == "door_unlock_all")     { hooks.DoorUnlockAll();
         } else if (e.action == "door_lock_switch")    {
-            // value != 0 → LOCK press, value == 0 → UNLOCK press: the same
-            // 1=locked / 0=unlocked encoding the door_lock_cmd_* columns use.
-            hooks.DoorLockSwitchPress(e.value != 0.0);
+            // value  != 0 → LOCK press, == 0 → UNLOCK press: the same
+            //               1=locked / 0=unlocked encoding the door_lock_cmd_*
+            //               columns use.
+            // value2 == 0 → LH/driver rocker (default), != 0 → RH/passenger.
+            hooks.DoorLockSwitchPress(e.value != 0.0, e.value2 == 0.0);
         } else if (e.action == "exterior_keypad_code"){ hooks.ExteriorKeypadCode();
         } else if (e.action == "door_handle_driver")  { hooks.DoorHandleDriver();
         } else if (e.action == "set_horn")            { m_held_horn = (e.value != 0.0);
@@ -208,6 +210,23 @@ void Scenario::OpenStats() {
     std::cout << "[Scenario] stats → " << m_stats.output_csv
               << " (fields: " << m_stats.fields.size()
               << ", period " << m_stats.sample_period_s << " s)\n";
+}
+
+void Scenario::WarnUnknownField(const std::string& f) {
+    // An unrecognised stats field is written as an EMPTY cell, and that stays
+    // true: the acceptance tooling downstream keys its never-produced diagnostic
+    // on an all-blank column, so making it a 0 would hide a missing producer
+    // behind a plausible number.
+    //
+    // What changes here is that the run says so. A scenario naming a field this
+    // writer does not implement used to be silent on this side and only visible
+    // two repos away, as a rule scored on data nobody measured — which is how
+    // the door-lock columns went four nightlies without anyone noticing they
+    // were empty. Once per distinct name, so a 20 Hz sampler cannot flood.
+    if (!m_warned_fields.insert(f).second) return;
+    std::cerr << "[Scenario] stats field '" << f << "' is not implemented by "
+              << "Scenario::MaybeSampleStats — its column will be BLANK in "
+              << "every row of " << m_stats.output_csv << "\n";
 }
 
 void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
@@ -374,44 +393,52 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
             m_csv << (bus.HasReceivedHvacBlowerLevel()
                           ? static_cast<int>(bus.GetHvacBlowerLevel())
                           : 0);
-        // ── Door locks: the relay legs, the motors, and the latch ────────────
+        // ── Door locks: the relay legs, the winding, and the mechanics ───────
         //
-        // Three layers, deliberately distinct columns, because collapsing them
-        // is how a lock scenario ends up unable to fail:
+        // Three layers, deliberately distinct columns.  None of them echoes the
+        // scenario's own press — that goes out on the switch contacts
+        // (4170-4173), and everything below is what came back.
         //
-        //   *_drive  — the RELAY LEG as the junction block published it
-        //              (4182 LH lock / 4183 LH unlock / 4184 RH lock /
-        //              4185 RH unlock).  1 = that leg is energised.  Raw bus
-        //              mirror; says nothing about whether a motor turned.
-        //   (no suffix) — the MOTOR WINDING, from ev1sim's door_lock_motor
-        //              plant.  The two relay commons sit across one reversible
-        //              motor, so a winding is live only when its leg is driven
-        //              AND the opposite leg is not; both legs driven puts both
-        //              brushes on the same rail and the motor sits still.  This
-        //              is what the body acceptance criteria score.
-        //   *_stroke / door_lock_state_* — the MECHANICS: normalized pawl
-        //              travel (0 = unlocked stop, 1 = locked stop) and the
-        //              latched per-door result.  A drive that never moves the
-        //              pawl shows up here as a flat stroke.
+        //   door_lock_motor_*  — the RELAY LEG exactly as the junction block
+        //              published it (4182 LH lock / 4183 LH unlock / 4184 RH
+        //              lock / 4185 RH unlock).  1 = that leg is energised.
+        //              `door_lock_motor_*_drive` is an accepted synonym.
+        //   door_lock_winding_* — the derived ELECTRICAL state of the motor:
+        //              live only when its leg is driven AND the opposite leg is
+        //              not, because two relay commons sit across one reversible
+        //              motor and closing both parks the brushes on one rail.
+        //   *_stroke / *_stalled / door_lock_state_* — the MECHANICS: pawl
+        //              travel 0..1, whether a live winding is against its stop,
+        //              and the latched per-door result.
         //
-        // A scenario's own lock/unlock press appears in NONE of these — it goes
-        // out on the switch contacts (4170-4173) and everything below is what
-        // came back.
-        else if (f == "door_lock_motor_lh_lock_drive")
+        // THE LEG IS WHAT THE ACCEPTANCE RULES SCORE, deliberately.  Their
+        // interlock rule is "a LOCK press must never energise the UNLOCK leg",
+        // and its whole purpose is catching both relays closed at once.  Serve
+        // that rule the winding instead and it reads 0 through a lock pulse no
+        // matter what the junction block did with the unlock relay — the one
+        // failure it exists to catch becomes the one failure it cannot see.
+        // The winding is the honest input to the PLANT (a motor with both
+        // relays closed does not turn); it is the wrong answer to give a rule
+        // that is auditing the relays.
+        else if (f == "door_lock_motor_lh_lock" ||
+                 f == "door_lock_motor_lh_lock_drive")
             m_csv << (bus.GetDoorLockMotorDrive(0) ? 1 : 0);
-        else if (f == "door_lock_motor_lh_unlock_drive")
+        else if (f == "door_lock_motor_lh_unlock" ||
+                 f == "door_lock_motor_lh_unlock_drive")
             m_csv << (bus.GetDoorLockMotorDrive(1) ? 1 : 0);
-        else if (f == "door_lock_motor_rh_lock_drive")
+        else if (f == "door_lock_motor_rh_lock" ||
+                 f == "door_lock_motor_rh_lock_drive")
             m_csv << (bus.GetDoorLockMotorDrive(2) ? 1 : 0);
-        else if (f == "door_lock_motor_rh_unlock_drive")
+        else if (f == "door_lock_motor_rh_unlock" ||
+                 f == "door_lock_motor_rh_unlock_drive")
             m_csv << (bus.GetDoorLockMotorDrive(3) ? 1 : 0);
-        else if (f == "door_lock_motor_lh_lock")
+        else if (f == "door_lock_winding_lh_lock")
             m_csv << (physical.door_lock_motor_lh().lock_energised() ? 1 : 0);
-        else if (f == "door_lock_motor_lh_unlock")
+        else if (f == "door_lock_winding_lh_unlock")
             m_csv << (physical.door_lock_motor_lh().unlock_energised() ? 1 : 0);
-        else if (f == "door_lock_motor_rh_lock")
+        else if (f == "door_lock_winding_rh_lock")
             m_csv << (physical.door_lock_motor_rh().lock_energised() ? 1 : 0);
-        else if (f == "door_lock_motor_rh_unlock")
+        else if (f == "door_lock_winding_rh_unlock")
             m_csv << (physical.door_lock_motor_rh().unlock_energised() ? 1 : 0);
         // Pawl travel, 0..1.  The one column that distinguishes "the motor was
         // energised" from "the lock actually moved".
@@ -441,6 +468,10 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
             m_csv << (bus.GetDoorLockSwitchContact(0) ? 1 : 0);
         else if (f == "door_lock_switch_lh_unlock")
             m_csv << (bus.GetDoorLockSwitchContact(1) ? 1 : 0);
+        else if (f == "door_lock_switch_rh_lock")
+            m_csv << (bus.GetDoorLockSwitchContact(2) ? 1 : 0);
+        else if (f == "door_lock_switch_rh_unlock")
+            m_csv << (bus.GetDoorLockSwitchContact(3) ? 1 : 0);
         // Two-tone horn commands (1 = commanded sounding, 0 otherwise).
         else if (f == "horn_low_cmd")
             m_csv << (bus.GetHornLowCmd() ? 1 : 0);
@@ -502,9 +533,9 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
                     break;
                 }
             }
-            if (!matched) m_csv << "";  // unknown bulb abbrev
+            if (!matched) { WarnUnknownField(f); m_csv << ""; }
         }
-        else                                  m_csv << "";  // unknown field
+        else { WarnUnknownField(f); m_csv << ""; }   // unknown field
     };
 
     bool first = true;

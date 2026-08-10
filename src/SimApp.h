@@ -45,7 +45,7 @@ public:
     void CruiseSpeedDown()   override;
     void DoorLockAll()       override;
     void DoorUnlockAll()     override;
-    void DoorLockSwitchPress(bool lock) override;
+    void DoorLockSwitchPress(bool lock, bool driver_door) override;
     void ExteriorKeypadCode() override;
     void DoorHandleDriver()  override;
     void FlashToPass(bool held) override;
@@ -268,9 +268,6 @@ private:
     // 0xFF = never received.
     std::uint8_t m_last_pw_motor_cmd[2]  = {0xFFu, 0xFFu};  // [0]=driver,[1]=passenger
 
-    // Last-applied door-lock motor stroke per door (cast of DoorLockMotor::Stroke;
-    // 0 == UNLOCKED, the motors' initial stroke).  Suppresses repeated DoorLocks
-    // writes / log lines, including a spurious "reached UNLOCKED" on the first
-    // tick after the motor-leg drives first appear.
-    int m_last_dlm_stroke[2] = {0, 0};                 // [0]=LH/driver, [1]=RH/passenger
+    // (Door-lock stroke edge-tracking moved into PhysicalWorld::StepDoorLockPlant
+    //  so the leg → stroke → latch chain is reachable from a unit test.)
 };

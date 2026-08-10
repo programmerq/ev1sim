@@ -401,7 +401,7 @@ constexpr int           kNumDoorLockPwSignals         = 4;  // 4084+4085+4086+40
 
 // Door lock STATE feedback (ev1sim → external sim, chassis segment).
 // The resulting per-door latched state of ev1sim::DoorLocks, after the
-// door_lock_motor (4092-4095) reaches end-of-travel or the RSA cmd (4084/4085)
+// door_lock_motor (4182-4185) reaches end-of-travel or the RSA cmd (4084/4085)
 // mirror is applied.  Closes the central-locking loop so RSA/IPC can confirm
 // the actuated state.
 // MOVED 4155-4157 → 4165-4167: the old block had been allocated ev1sim-side
@@ -465,13 +465,16 @@ constexpr std::uint32_t kSigTjbRrStopLamp = 4204U;
 // same four wires as kSigChassisRhjbDlm* (4182-4185) — which is what
 // WireTruthChassis's consumer overlay maps CHASSIS_RHJB_DLM_* onto — but this
 // dispatch kept listening on the retired IDs.  Every leg the RHJB published
-// arrived under an ID nothing here handled and was dropped on the floor:
-// GetDoorLockMotorDrive() answered its never-received default forever, the
-// door_lock_motor_* stats columns stayed blank, and the body acceptance case
-// scored them as never produced.  The EV1SIM_CHASSIS_ID_MATCHES lines in the
-// drift-guard block below now pin all four to the contract's own constants, so
-// a repeat divergence is a compile error in the integrated build instead of a
-// silently dead signal.
+// arrived under an ID nothing here handled and was dropped on the floor, so
+// GetDoorLockMotorDrive() answered its never-received default for the whole run
+// and the door_lock_motor plant behind it never moved.  (The blank columns in
+// the body acceptance case were a SECOND, independent gap — the field names its
+// criteria ask for did not exist in Scenario.cpp's writer at all, and an
+// unrecognised field is written as an empty cell.  Fixing only this mapping
+// would have turned those columns from blank into a flat zero.)  The
+// EV1SIM_CHASSIS_ID_MATCHES lines in the drift-guard block below now pin all
+// four to the contract's own constants, so a repeat divergence is a compile
+// error in the integrated build instead of a silently dead signal.
 constexpr std::uint32_t kSigDoorLockMotorLhLockDrive   = 4182U;
 constexpr std::uint32_t kSigDoorLockMotorLhUnlockDrive = 4183U;
 constexpr std::uint32_t kSigDoorLockMotorRhLockDrive   = 4184U;
@@ -1569,7 +1572,7 @@ struct ExternalSimConnector::State {
     std::int8_t   hvac_ac_request_pub      = -1;
     std::int8_t   hvac_defrost_request_pub = -1;
 
-    // Door lock STATE feedback (IDs 4155-4157, chassis segment) — published to external sim.
+    // Door lock STATE feedback (IDs 4165-4167, chassis segment) — published to external sim.
     // 0=unlocked, 1=locked.  Mirror of ev1sim::DoorLocks; publish-on-change.
     bool          door_lock_state_driver       = false;   // default UNLOCKED (DoorLocks default)
     bool          door_lock_state_passenger     = false;
@@ -2989,9 +2992,12 @@ EV1SIM_CHASSIS_ID_MATCHES(kDynamicsBase,                 kSigChassisSpeedMps);
 // integrated (EV1SIM_HAVE_EXTERNAL_SIM) build until external sim catches up.
 // When external sim adds the canonical constants (suggested names below), move
 // each into the guard above so drift is caught from then on.
-// (The four door-lock motor legs left this list when they were re-pointed off
-// the retired 4092-4095 allocation onto the contract's kSigChassisRhjbDlm*
-// 4182-4185 — they are guarded above now.)
+// Two groups left this list in the door-lock-producer change, and both left it
+// by being GUARDED above rather than by being deleted: the four motor legs
+// (re-pointed off the retired 4092-4095 allocation onto kSigChassisRhjbDlm*
+// 4182-4185) and the three door-lock STATE cells (adopted at 4165-4167 and
+// guarded since contract 1.3.0, but never struck from this list — a row here
+// for an ID that IS guarded is the same stale claim in the other direction).
 //   kSigSounderPiezoDrive          (4096) → kSigChassisSounderPiezoDrive
 //   kSigPscmPumpSpeedCmdQ8         (4097) → kSigChassisPscmPumpSpeedCmdQ8
 //   kSigPscmPumpInterlockClosed    (4098) → kSigChassisPscmPumpInterlockClosed
@@ -3000,9 +3006,6 @@ EV1SIM_CHASSIS_ID_MATCHES(kDynamicsBase,                 kSigChassisSpeedMps);
 //   kSigHvacModeRequest            (4126) → kSigChassisHvacModeRequest
 //   kSigHvacAcRequest              (4127) → kSigChassisHvacAcRequest
 //   kSigHvacDefrostRequest         (4128) → kSigChassisHvacDefrostRequest
-//   kSigDoorLockStateDriver        (4155) → kSigChassisDoorLockStateDriver
-//   kSigDoorLockStatePassenger     (4156) → kSigChassisDoorLockStatePassenger
-//   kSigDoorLockStateTrunk         (4157) → kSigChassisDoorLockStateTrunk
 //   kSigSteeringCmd                (4076) → kSigChassisSteeringCmd
 
 #undef EV1SIM_CHASSIS_ID_MATCHES
@@ -3469,7 +3472,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         pub_hvac_u8(kSigHvacDefrostRequest, st.hvac_defrost_request ? 1u : 0u, st.hvac_defrost_request_pub);
     }
 
-    // Door lock STATE feedback (IDs 4155-4157) — publish deltas on change.
+    // Door lock STATE feedback (IDs 4165-4167) — publish deltas on change.
     {
         auto pub_lock = [&](std::uint32_t id, bool val, std::int8_t& pub) {
             const std::int8_t v = val ? 1 : 0;

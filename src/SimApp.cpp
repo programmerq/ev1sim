@@ -1240,8 +1240,7 @@ void SimApp::ConsumeBodyActuatorPeripherals(double dt) {
     // these cells, so with no press they publish a defined all-open state
     // instead of sitting unwritten.
     {
-        m_physical->door_lock_switch_lh().update(dt);
-        m_physical->door_lock_switch_rh().update(dt);
+        m_physical->StepDoorLockSwitches(dt);
         const auto& lh = m_physical->door_lock_switch_lh();
         const auto& rh = m_physical->door_lock_switch_rh();
         m_external_sim->SetDoorLockSwitchContacts(
@@ -1253,36 +1252,28 @@ void SimApp::ConsumeBodyActuatorPeripherals(double dt) {
     // The RHJB dual-H-bridge motor-leg drives: advance each motor and mirror its
     // end-of-travel stroke into DoorLocks.  Until the RHJB has published a leg
     // the motors never move and the high-level 4084/4085 RSA mirror remains
-    // authoritative.
+    // authoritative.  The plant step itself lives in PhysicalWorld so a unit
+    // test can drive it — this file is not in the Chrono-free test target.
     {
-        using S = ev1sim::DoorLocks::State;
-        using Stroke = ev1sim::DoorLockMotor::Stroke;
         const bool have_legs =
             m_external_sim->HasReceivedDoorLockMotorDrive(0) ||
             m_external_sim->HasReceivedDoorLockMotorDrive(1) ||
             m_external_sim->HasReceivedDoorLockMotorDrive(2) ||
             m_external_sim->HasReceivedDoorLockMotorDrive(3);
         if (have_legs) {
-            ev1sim::DoorLockMotor* motors[2] = {
-                &m_physical->door_lock_motor_lh(),   // door 0 = driver
-                &m_physical->door_lock_motor_rh()};  // door 1 = passenger
+            const auto step = m_physical->StepDoorLockPlant(
+                dt,
+                m_external_sim->GetDoorLockMotorDrive(0),
+                m_external_sim->GetDoorLockMotorDrive(1),
+                m_external_sim->GetDoorLockMotorDrive(2),
+                m_external_sim->GetDoorLockMotorDrive(3));
             for (int door = 0; door < 2; ++door) {
-                const bool lock_drv   = m_external_sim->GetDoorLockMotorDrive(door * 2);
-                const bool unlock_drv = m_external_sim->GetDoorLockMotorDrive(door * 2 + 1);
-                motors[door]->update(dt, lock_drv, unlock_drv);
-                const Stroke stroke = motors[door]->stroke();
-                if (static_cast<int>(stroke) == m_last_dlm_stroke[door]) continue;
-                m_last_dlm_stroke[door] = static_cast<int>(stroke);
-                // Only an end-of-travel limit changes the latched lock state.
-                if (stroke == Stroke::LOCKED || stroke == Stroke::UNLOCKED) {
-                    const S st = (stroke == Stroke::LOCKED) ? S::LOCKED : S::UNLOCKED;
-                    if (door == 0) m_physical->door_locks().set_driver(st);
-                    else           m_physical->door_locks().set_passenger(st);
-                    std::cout << "[SimApp] Door-lock motor "
-                              << (door == 0 ? "LH/driver" : "RH/passenger")
-                              << " reached " << motors[door]->stroke_name() << "\n";
-                    if (m_sounder_audio) m_sounder_audio->PlayClick();  // solenoid click
-                }
+                if (!step.latched[door]) continue;
+                std::cout << "[SimApp] Door-lock motor "
+                          << (door == 0 ? "LH/driver" : "RH/passenger")
+                          << " reached "
+                          << (step.now_locked[door] ? "LOCKED" : "UNLOCKED") << "\n";
+                if (m_sounder_audio) m_sounder_audio->PlayClick();  // solenoid click
             }
         }
     }
@@ -2621,14 +2612,17 @@ void SimApp::DoorUnlockAll() {
     if (m_physical) m_physical->door_locks().unlock_all();
 }
 
-void SimApp::DoorLockSwitchPress(bool lock) {
-    // The DRIVER's rocker only.  The RHJB's lock module ORs the LH and RH
-    // inputs, so one press on one door is what commands both motors — pressing
-    // both switches would hide whether that OR works.
+void SimApp::DoorLockSwitchPress(bool lock, bool driver_door) {
+    // ONE rocker per press.  The RHJB's lock module ORs the LH and RH inputs,
+    // so a single press is what commands both motors — pressing both switches
+    // together would hide whether that OR works.
     if (!m_physical) return;
-    if (lock) m_physical->door_lock_switch_lh().press_lock();
-    else      m_physical->door_lock_switch_lh().press_unlock();
-    std::cout << "[SimApp] Door-lock switch (LH/driver): "
+    auto& sw = driver_door ? m_physical->door_lock_switch_lh()
+                           : m_physical->door_lock_switch_rh();
+    if (lock) sw.press_lock();
+    else      sw.press_unlock();
+    std::cout << "[SimApp] Door-lock switch ("
+              << (driver_door ? "LH/driver" : "RH/passenger") << "): "
               << (lock ? "LOCK" : "UNLOCK") << " pressed\n";
 }
 

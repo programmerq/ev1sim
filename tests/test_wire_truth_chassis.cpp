@@ -801,10 +801,17 @@ TEST_CASE("WireTruthChassis::ad_precharge_relay follows AD_PRECHARGE_RELAY",
 // own DebugInjectDelta tests kept passing, because they inject on the dispatch
 // side and never touch the overlay.
 //
-// This test refuses to be satisfiable that way: the RHJB half writes the WIRE
-// CELL BY NAME, the ev1sim half runs the connector's REAL sinks, and the
-// assertion is on the public getter.  Nothing in it names a numeric chassis ID,
-// so it can only pass when the overlay and the dispatch agree.
+// The INBOUND half here refuses to be satisfiable that way: it writes the wire
+// cell BY NAME, routes it through the overlay, and asserts on the public getter,
+// naming no numeric chassis ID anywhere along the path — so it can only pass
+// when the overlay and the dispatch agree.  It drives the four legs to four
+// DIFFERENT values, so a swap of any pair is visible; driving both LOCK legs
+// together would leave an LH<->RH cross-wire invisible.
+//
+// The OUTBOUND half is weaker by construction: mirror_signal takes a signal id,
+// so those lines do name 4170-4173.  It pins signal-id -> cell routing only.
+// That the connector's own Tick actually emits those four is pinned separately,
+// in test_wire_truth_attach_outcome.cpp.
 // ---------------------------------------------------------------------------
 TEST_CASE("Door-lock loop end-to-end: RHJB legs in, switch contacts out",
           "[wire_truth][e2e]") {
@@ -817,11 +824,19 @@ TEST_CASE("Door-lock loop end-to-end: RHJB legs in, switch contacts out",
     auto wire = ev1sim::WireTruthChassis::Attach(seg);
     REQUIRE(wire != nullptr);
 
+    // The same sink set the connector installs in Tick(), including the on_bit
+    // double-dispatch: some byte-coerced-bool cells are served from
+    // DebugInjectU8 even though their wire is a bit, and a single-dispatch
+    // stand-in silently drops those.
     ev1sim::WireTruthChassis::ConsumerSinks sinks;
-    sinks.on_bit    = [&c](std::uint32_t id, bool v)          { c.DebugInjectDelta(id, v); };
+    sinks.on_bit    = [&c](std::uint32_t id, bool v) {
+        c.DebugInjectDelta(id, v);
+        c.DebugInjectU8(id, v ? 1u : 0u);
+    };
     sinks.on_byte   = [&c](std::uint32_t id, std::uint8_t v)  { c.DebugInjectU8(id, v); };
     sinks.on_float  = [&c](std::uint32_t id, float v)         { c.DebugInjectFloat(id, v); };
     sinks.on_uint32 = [&c](std::uint32_t id, std::uint32_t v) { c.DebugInjectU32(id, v); };
+    sinks.on_uint16 = [&c](std::uint32_t id, std::uint16_t v) { c.DebugInjectU16(id, v); };
 
     // Nothing on the wire yet: the connector must still report never-received,
     // so the assertions below cannot be satisfied by a default that happens to
@@ -832,20 +847,39 @@ TEST_CASE("Door-lock loop end-to-end: RHJB legs in, switch contacts out",
     // --- Inbound: the RHJB's lock module drives both LOCK legs. ---
     // The legs are conductor cells (their energisation is the solver's output),
     // so this stands in for the solver via the same publish edge it uses.
+    // Four DIFFERENT values, so every leg is distinguishable from every other.
+    // A physical DLM never drives this combination; that is the point — the
+    // question here is whether each wire lands on the leg it names.
     REQUIRE(publish_conductor(*rhjb, topo::kWireCHASSIS_RHJB_DLM_LH_LOCK,   true));
     REQUIRE(publish_conductor(*rhjb, topo::kWireCHASSIS_RHJB_DLM_LH_UNLOCK, false));
-    REQUIRE(publish_conductor(*rhjb, topo::kWireCHASSIS_RHJB_DLM_RH_LOCK,   true));
-    REQUIRE(publish_conductor(*rhjb, topo::kWireCHASSIS_RHJB_DLM_RH_UNLOCK, false));
+    REQUIRE(publish_conductor(*rhjb, topo::kWireCHASSIS_RHJB_DLM_RH_LOCK,   false));
+    REQUIRE(publish_conductor(*rhjb, topo::kWireCHASSIS_RHJB_DLM_RH_UNLOCK, true));
     REQUIRE(wire->apply_consumer_overlay(sinks) >= 4);
 
-    CHECK(c.GetDoorLockMotorDrive(0));         // LH lock energised
-    CHECK_FALSE(c.GetDoorLockMotorDrive(1));   // LH unlock idle
-    CHECK(c.GetDoorLockMotorDrive(2));         // RH lock energised, in lockstep
-    CHECK_FALSE(c.GetDoorLockMotorDrive(3));
+    CHECK(c.GetDoorLockMotorDrive(0));         // LH lock
+    CHECK_FALSE(c.GetDoorLockMotorDrive(1));   // LH unlock
+    CHECK_FALSE(c.GetDoorLockMotorDrive(2));   // RH lock
+    CHECK(c.GetDoorLockMotorDrive(3));         // RH unlock
     for (int leg = 0; leg < 4; ++leg)
         CHECK(c.HasReceivedDoorLockMotorDrive(leg));
 
-    // The pulse ends: the legs drop and ev1sim tracks the release.
+    // Invert all four: a mapping that happened to satisfy the pattern above by
+    // luck cannot satisfy its complement too.
+    REQUIRE(publish_conductor(*rhjb, topo::kWireCHASSIS_RHJB_DLM_LH_LOCK,   false));
+    REQUIRE(publish_conductor(*rhjb, topo::kWireCHASSIS_RHJB_DLM_LH_UNLOCK, true));
+    REQUIRE(publish_conductor(*rhjb, topo::kWireCHASSIS_RHJB_DLM_RH_LOCK,   true));
+    REQUIRE(publish_conductor(*rhjb, topo::kWireCHASSIS_RHJB_DLM_RH_UNLOCK, false));
+    wire->apply_consumer_overlay(sinks);
+    CHECK_FALSE(c.GetDoorLockMotorDrive(0));
+    CHECK(c.GetDoorLockMotorDrive(1));
+    CHECK(c.GetDoorLockMotorDrive(2));
+    CHECK_FALSE(c.GetDoorLockMotorDrive(3));
+
+    // A real lock pulse, then its release, which is what the plant consumes.
+    REQUIRE(publish_conductor(*rhjb, topo::kWireCHASSIS_RHJB_DLM_LH_UNLOCK, false));
+    REQUIRE(publish_conductor(*rhjb, topo::kWireCHASSIS_RHJB_DLM_LH_LOCK,   true));
+    wire->apply_consumer_overlay(sinks);
+    CHECK(c.GetDoorLockMotorDrive(0));
     REQUIRE(publish_conductor(*rhjb, topo::kWireCHASSIS_RHJB_DLM_LH_LOCK, false));
     REQUIRE(publish_conductor(*rhjb, topo::kWireCHASSIS_RHJB_DLM_RH_LOCK, false));
     wire->apply_consumer_overlay(sinks);
