@@ -184,3 +184,16 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   controls.  ev1sim's PhysicalWorld pattern should grow a hardware
   backend that maps real switches to chassis-bus signals (replacing
   keyboard input).
+
+## Vendored stub hygiene
+
+- [ ] **Vendored electricsim stub carries upstream-internal references (needs
+  an upstream scrub + re-vendor).**  `tests/electricsim_stub/src/io/wire_table.hpp`
+  and `tests/electricsim_stub/src/net_host/conductor_publisher.hpp` picked up
+  upstream review-finding identifiers and source paths when PR #48 re-vendored
+  the stub set.  Both files are intentionally byte-identical to their upstream
+  originals, and the stub's integrity check treats any local edit as drift, so
+  the references can't be scrubbed in this repo — the fix has to land upstream
+  in electricsim first. Tracked there as
+  `BL-2026-08-09-vendored-stub-leaks-private-refs-to-ev1sim`; once that scrub
+  lands, re-vendor the two files here.
