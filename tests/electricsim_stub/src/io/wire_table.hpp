@@ -324,6 +324,34 @@ class WireTable {
   bool publish_conductor(ConductorId id, bool energised, const SolverToken& token);
   bool read_bit_sample(ConductorId id, Sample<bool>* out) const;
 
+  // THE MILLIVOLT HALF OF THE SAME ANSWER — finding R-2's closure.
+  //
+  // Until the battery-model pass, publish_conductor() published a bool and NOTHING
+  // ELSE, so — recorded twice in scripts/gen_topology_header.py's movement log, once
+  // in pass 3 and again in pass 4 — *"a uint32 cell cannot be a conductor at all"*.
+  // That sentence is a statement about this API, not about the vehicle. Every analog
+  // supply rail in the fleet (the 12 V aux post, the HV DC link, the APM's 12 V
+  // output) was therefore forced OUT of the conductor class and into
+  // `unclassified-legacy`, where any process may write it — which is how
+  // CHASSIS_AUX_BATTERY_TERMINAL_MV ended up owned by a host process that no VAT
+  // fleet spawns, and how the whole 12 V distribution graph came to have no producer.
+  //
+  // A node's potential is an OUTPUT of the same provenance computation that decides
+  // whether it is energised at all (src/net/net_types.hpp NodeObservation::voltage_mv,
+  // valid IFF voltage_defined()). It is the same answer, carried to more decimal
+  // places. So it gets the same token, the same sole-writer guarantee, and the same
+  // refusal to default.
+  //
+  // WHY THERE IS NO `read_uint32(ConductorId, uint32*)`. Same reason as the bit form:
+  // a plain read collapses "this rail is at 0 mV" (bonded to chassis) and "nobody has
+  // solved this yet" into one zero. The mV case is WORSE than the bit case, because 0
+  // mV is a physically meaningful reading that a grounded node genuinely has —
+  // is_grounded_zero() exists precisely to keep it distinct from floating. Only the
+  // sample form, which carries written-ness, exists.
+  bool publish_conductor_mv(ConductorId id, std::uint32_t millivolts,
+                            const SolverToken& token);
+  bool read_uint32_sample(ConductorId id, Sample<std::uint32_t>* out) const;
+
   // ─── Element-state cells ────────────────────────────────────────────────
   //
   // The module-decided half of the element model: contact `closed`, converter/source
@@ -336,6 +364,21 @@ class WireTable {
   // read would silently turn into "closed" or "open" — a claim the graph never made.
   bool write_element_state(ElementStateId id, bool closed);
   bool read_bit_sample(ElementStateId id, Sample<bool>* out) const;
+
+  // The ANALOG cause. A source element's terminal state is a number, not a bit: an
+  // SLA cell at 40% state-of-charge sits at a different open-circuit voltage than the
+  // same cell at 100%, and that difference is the whole reason a chemistry model
+  // exists. This is the transport for it.
+  //
+  // Same three-valued contract as the bit form and for the same reason: UNWRITTEN IS
+  // NOT ZERO VOLTS. A source whose mV cause has never been written is not a flat
+  // battery — it is a battery no chemistry model is watching, and the solver falls
+  // back to the element's AUTHORED open_circuit_mv (a reviewed number in
+  // config/nets/<module>.yaml, not a runtime guess). Writing zero here IS the claim
+  // "this battery is flat", and it darkens the car. The two must never be the same
+  // input, which is why the read is sample-only.
+  bool write_element_state_mv(ElementStateId id, std::uint32_t millivolts);
+  bool read_uint32_sample(ElementStateId id, Sample<std::uint32_t>* out) const;
 
   // Typed write accessors. Return false if the id is undeclared or
   // the declared type does not match. Any attached process may write,

@@ -66,7 +66,16 @@ typed_sites="$(grep -rnE '\bConductorId\b' \
 n_typed_sites="$(printf '%s' "${typed_sites}" | grep -c . || true)"
 
 # Leg 2: does any production code reach the conductor publish edge?
-publishes="$(grep -rnE 'ConductorPublisher|publish_conductor' \
+#
+# The alternation must name EVERY publish verb, not just the type. A call through
+# an already-built handle (`pub_.publish_mv(id, mv)`) never spells
+# ConductorPublisher, so a verb missing from this list is a publish this leg
+# reports as zero. That is not hypothetical: the battery pass added publish_mv() /
+# publish_conductor_mv() beside the original bit form, and until they were added
+# here a millivolt publish through a handle scanned clean. When upstream grows
+# another publish verb, it belongs in this alternation in the same commit that
+# vendors it.
+publishes="$(grep -rnE 'ConductorPublisher|publish_conductor|publish_mv' \
     "${SRC}" --include='*.cpp' --include='*.h' --include='*.hpp' 2>/dev/null \
     | strip_comments || true)"
 n_publishes="$(printf '%s' "${publishes}" | grep -c . || true)"

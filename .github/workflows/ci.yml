@@ -123,8 +123,20 @@ jobs:
   # (the `#else` branch); this one compiles the guarded transport/publish path
   # that branch `#if`-excludes — the class of breakage that let the main-harness
   # horn bug reach main.  No real electricsim checkout, no secret; still Chrono-
-  # free.  (Live chassis-ID drift detection vs the real electricsim is out of
-  # scope here — the stub's IDs are pinned to ev1sim's; see the stub README.)
+  # free.
+  #
+  # WHAT THIS JOB CANNOT SEE. The stub's ids are pinned to ELECTRICSIM's — the
+  # manifest's `provenance` line names the exact upstream commit they were copied
+  # from. So "has upstream moved since?" is a real question, and this job cannot
+  # answer it: electricsim is a private repo and this workflow holds no credential
+  # for it, by design. The stub check below therefore runs its INTEGRITY leg only
+  # (the copy is what it claims to be), never its UPSTREAM leg (the copy is
+  # current). A stub that is internally perfect and months behind passes here.
+  #
+  # The upstream leg needs both trees at once, which is the VAT nightly's
+  # situation, not this one. Until it runs somewhere unattended, upstream drift is
+  # found the way it was found last time: an integrated build against a real
+  # checkout stops compiling.
   integrated-build:
     if: github.event_name != 'schedule'   # cron only warms chrono-smoke's cache
     runs-on: ubuntu-latest

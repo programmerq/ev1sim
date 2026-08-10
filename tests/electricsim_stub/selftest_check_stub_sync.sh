@@ -19,8 +19,9 @@
 #   5. manifest truncated             -> DRIFTED   (1)   a check narrowed to nothing
 #   6. upstream byte differs          -> DRIFTED   (1)   the real drift case
 #   7. upstream absent + --require    -> UNAVAIL   (2)   a skip that must not pass
+#   8. --update on a drifted copy     -> REFUSED   (1)   a provenance never verified
 #
-# Legs 1-5 need no external-sim tree, so they run in CI. Legs 6-7 synthesise a
+# Legs 1-5 need no external-sim tree, so they run in CI. Legs 6-8 synthesise a
 # fake upstream out of the stub itself, so they need no external-sim tree either.
 #
 # Exit 0 iff every leg produced the demanded verdict.
@@ -85,8 +86,16 @@ leg "4 unlisted extra file -> DRIFTED" 1 "${WORK}/extra/check_stub_sync.sh"
 # ── Leg 5: a truncated manifest fails instead of narrowing ──────────────────
 # The subtle one. A manifest cut down to two entries would let a naive checker
 # verify two files and report success. The declared count is what stops that.
+#
+# The cut point matters and was previously wrong. The header is 12 comment lines,
+# then `provenance` (13) and `count` (14), then the entries. Cutting at 12 leaves a
+# manifest with no entries and no count, which exits through the "empty or
+# unparseable" branch — a real failure, but a DIFFERENT one, so the leg passed
+# without ever reaching the count-vs-entries cross-check it names. Cut at 16:
+# provenance + `count 17` + exactly 2 entries, so the declared count and the listed
+# entries disagree, which is the branch under test.
 fresh_copy "${WORK}/truncated"
-head -n 12 "${STUB_SRC}/sync_manifest.txt" > "${WORK}/truncated/sync_manifest.txt"
+head -n 16 "${STUB_SRC}/sync_manifest.txt" > "${WORK}/truncated/sync_manifest.txt"
 leg "5 truncated manifest -> DRIFTED" 1 "${WORK}/truncated/check_stub_sync.sh"
 
 # ── Leg 6: upstream drift is caught ─────────────────────────────────────────
@@ -115,12 +124,35 @@ leg "7b upstream absent, not required -> IN_SYNC" 0 \
     "${WORK}/no_upstream/check_stub_sync.sh" \
     --upstream "${WORK}/definitely_not_here"
 
+# ── Leg 8: --update refuses to record a copy upstream does not have ─────────
+# --update writes the provenance line every later reader trusts. It used to hash
+# whatever was on disk and stamp it with the upstream's HEAD sha without comparing
+# the two, so a hand-edited stub could be minted as "provenance <sha>" for content
+# that never existed at that sha — and the integrity leg would then certify that
+# forever, because the manifest and the tree agreed with each other. The refusal
+# is the fix; this leg is the proof the refusal fires.
+fresh_copy "${WORK}/update_drift"
+mkdir -p "${WORK}/fake_upstream_upd"
+cp -r "${STUB_SRC}/src" "${WORK}/fake_upstream_upd/src"
+printf '\n// selftest: upstream does not have this edit\n' \
+    >> "${WORK}/update_drift/src/io/wire_table.hpp"
+leg "8 --update on a drifted copy -> REFUSED" 1 \
+    "${WORK}/update_drift/check_stub_sync.sh" \
+    --update --upstream "${WORK}/fake_upstream_upd"
+
+# The same call on a copy that DOES match upstream must still succeed, or the
+# refusal above would just be "--update is broken" rather than "--update checks".
+fresh_copy "${WORK}/update_clean"
+leg "8b --update on a matching copy -> RECORDED" 0 \
+    "${WORK}/update_clean/check_stub_sync.sh" \
+    --update --upstream "${WORK}/fake_upstream_upd"
+
 echo ""
 if [ "${fails}" != "0" ]; then
     echo "selftest FAILED: ${fails} leg(s) did not produce the demanded verdict."
     echo "check_stub_sync.sh is not proven to work — treat its green as meaningless."
     exit 1
 fi
-echo "selftest passed: all 8 legs produced the demanded verdict."
+echo "selftest passed: all 10 legs produced the demanded verdict."
 echo "The guard fails on drift and passes in sync — its verdict tracks its input."
 exit 0

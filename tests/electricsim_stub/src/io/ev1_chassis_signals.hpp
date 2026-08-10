@@ -1026,10 +1026,13 @@ inline constexpr std::uint32_t kSigChassisAuxBatteryMaintWakeReq = 4195U;
 //   here on change after each power-moding tick — the same pattern it already
 //   uses for run1_bus (4180) / run2_bus (4181).
 // Consumers: the run-mode controllers (BTCM, PIM, …) gate their supervisor boot
-//   on this via SwitchedFeedGate (src/models/battery/switched_feed_gate.hpp) —
-//   "no module B+ → MCU stays dark".  SwitchedFeedGate is default-powered until
-//   the feed is first observed, so existing harnesses / tests that never publish
-//   4196 behave exactly as before.
+//   on this — "no module B+ → MCU stays dark".  They USED to do it through
+//   SwitchedFeedGate (src/models/battery/switched_feed_gate.hpp), which was
+//   default-powered until the feed was first observed, so a harness that never
+//   published 4196 behaved as if it had.  That header is deleted and the gate
+//   is now io::energised() over the module's feed conductor
+//   (src/io/topology/feed_query.hpp): a harness that never publishes 4196 gets
+//   a dark MCU, which is the correct answer and NOT the old one.
 // @source:manual electrical p280/p281 — PMM switched-B+ distribution downstream
 //   of the SLEEP/AWAKE/RUN state machine (the run-mode module supply).
 // @design 2026-06-14 — first free chassis ID above the aux-battery maintenance
