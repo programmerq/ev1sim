@@ -507,13 +507,24 @@ public:
     bool GetTjbLampBranch(int branch) const;
     bool HasReceivedTjbLampBranch() const;
 
-    /// Incoming door-lock motor leg drives from RHJB (IDs 4092-4095, chassis segment).
+    /// Incoming door-lock motor leg drives from RHJB (IDs 4182-4185, chassis segment).
     /// RHJB's dual-H-bridge drives both door-lock motors in lockstep; each motor
     /// has a LOCK leg and an UNLOCK leg.  leg index: 0=LH lock, 1=LH unlock,
     /// 2=RH lock, 3=RH unlock.  bool: true = leg energised.  Out-of-range → false.
     /// Consumed by ev1sim::DoorLockMotor (×2).
     bool GetDoorLockMotorDrive(int leg) const;
     bool HasReceivedDoorLockMotorDrive(int leg) const;
+
+    /// Outgoing door-lock switch contacts (IDs 4170-4173, chassis segment) →
+    /// RHJB.  The door-mounted rockers modelled by ev1sim::DoorLockSwitch (×2);
+    /// each contact is momentary and the DLM one-shots on the RISING edge, so
+    /// these are the stimulus that makes the motor legs above move at all.
+    /// Published on change each tick.  Contact index matches the leg index:
+    /// 0=LH lock, 1=LH unlock, 2=RH lock, 3=RH unlock.
+    void SetDoorLockSwitchContacts(bool lh_lock, bool lh_unlock,
+                                   bool rh_lock, bool rh_unlock);
+    /// Last value latched by SetDoorLockSwitchContacts.  Out-of-range → false.
+    bool GetDoorLockSwitchContact(int contact) const;
 
     /// Incoming sounder / piezo drive from the LHJB flasher (ID 4096, chassis segment).
     /// bool: true = piezo energised (the TURN/HAZ "click").  Returns false if

@@ -19,6 +19,7 @@
 
 #include "Scenario.h"
 #include "ExternalSimConnector.h"
+#include "PhysicalWorld.h"
 #include "VehicleState.h"
 
 namespace {
@@ -31,6 +32,7 @@ struct CountingHooks : public ev1sim::ScenarioHooks {
     int cruise_set = 0, cruise_resume = 0, cruise_cancel = 0;
     int cruise_speed_up = 0, cruise_speed_down = 0;
     int door_lock_all = 0, door_unlock_all = 0;
+    int door_lock_sw_lock = 0, door_lock_sw_unlock = 0;
     int exterior_keypad_code = 0, door_handle_driver = 0;
     int flash_to_pass_on = 0, flash_to_pass_off = 0;
     int fail_throttle = 0, restore_throttle = 0;
@@ -50,6 +52,9 @@ struct CountingHooks : public ev1sim::ScenarioHooks {
     void CruiseSpeedDown()   override { ++cruise_speed_down; }
     void DoorLockAll()       override { ++door_lock_all; }
     void DoorUnlockAll()     override { ++door_unlock_all; }
+    void DoorLockSwitchPress(bool lock) override {
+        if (lock) ++door_lock_sw_lock; else ++door_lock_sw_unlock;
+    }
     void ExteriorKeypadCode() override { ++exterior_keypad_code; }
     void DoorHandleDriver()  override { ++door_handle_driver; }
     void FlashToPass(bool held) override {
@@ -435,19 +440,21 @@ TEST_CASE("Scenario: stats CSV writes header + sampled rows at the configured pe
     s.OpenStats();
 
     ExternalSimConnector bus;
+
+    ev1sim::PhysicalWorld phys;
     DriverCommand cmd{};
     cmd.throttle = 0.4;
 
     VehicleState state{};
     state.speed_mps = 10.0;
 
-    s.MaybeSampleStats(0.0,  state, bus, cmd);
+    s.MaybeSampleStats(0.0,  state, phys, bus, cmd);
     // Within the period — should NOT sample again.
     state.speed_mps = 11.0;
-    s.MaybeSampleStats(0.05, state, bus, cmd);
+    s.MaybeSampleStats(0.05, state, phys, bus, cmd);
     // Crossed the period — sample.
     state.speed_mps = 12.0;
-    s.MaybeSampleStats(0.15, state, bus, cmd);
+    s.MaybeSampleStats(0.15, state, phys, bus, cmd);
 
     s.Close();
 
@@ -484,12 +491,14 @@ TEST_CASE("Scenario: pitch/grade stats fields read the vehicle state",
     s.OpenStats();
 
     ExternalSimConnector bus;
+
+    ev1sim::PhysicalWorld phys;
     DriverCommand cmd{};
     VehicleState state{};
     state.pitch_deg      = -1.25;   // nose down (braking squat)
     state.road_grade_pct = 6.0;     // 6% uphill
 
-    s.MaybeSampleStats(0.0, state, bus, cmd);
+    s.MaybeSampleStats(0.0, state, phys, bus, cmd);
     s.Close();
 
     std::ifstream f(tmp_csv);
@@ -521,18 +530,20 @@ TEST_CASE("Scenario: AD / bulb / horn stats fields read the bus mirrors",
     s.OpenStats();
 
     ExternalSimConnector bus;
+
+    ev1sim::PhysicalWorld phys;
     DriverCommand cmd{};
     VehicleState state{};
 
     // Row 1: nothing received — AD fields 0, bulb 0, horn 0, unknown blank.
-    s.MaybeSampleStats(0.0, state, bus, cmd);
+    s.MaybeSampleStats(0.0, state, phys, bus, cmd);
 
     // Row 2: precharge in progress + stop lamp lit + low horn sounding.
     bus.DebugInjectDelta(5225, true);   // precharge relay closed
     bus.DebugInjectU32(5230, 6u);       // state: precharging
     bus.DebugInjectDelta(4014, true);   // LRSL (left rear stop lamp) feed
     bus.DebugInjectDelta(4020, true);   // horn low command
-    s.MaybeSampleStats(0.15, state, bus, cmd);
+    s.MaybeSampleStats(0.15, state, phys, bus, cmd);
 
     s.Close();
 
@@ -566,15 +577,17 @@ TEST_CASE("Scenario: IPC air-bag telltale stats field reads the bus mirror",
     s.OpenStats();
 
     ExternalSimConnector bus;
+
+    ev1sim::PhysicalWorld phys;
     DriverCommand cmd{};
     VehicleState state{};
 
     // Row 1: nothing received — telltale defaults off (latched false).
-    s.MaybeSampleStats(0.0, state, bus, cmd);
+    s.MaybeSampleStats(0.0, state, phys, bus, cmd);
 
     // Row 2: SIR/SDM air-bag telltale lit (chassis 4138 = 1).
     bus.DebugInjectU8(4138, 1u);  // 4138 = kSigChassisIpcAirBagTelltale
-    s.MaybeSampleStats(0.15, state, bus, cmd);
+    s.MaybeSampleStats(0.15, state, phys, bus, cmd);
 
     s.Close();
 
@@ -606,20 +619,22 @@ TEST_CASE("Scenario: HVAC blower level stats field reads the bus mirror as int",
     s.OpenStats();
 
     ExternalSimConnector bus;
+
+    ev1sim::PhysicalWorld phys;
     DriverCommand cmd{};
     VehicleState state{};
 
     // Row 1: nothing received yet — must read OFF (0).
-    s.MaybeSampleStats(0.0, state, bus, cmd);
+    s.MaybeSampleStats(0.0, state, phys, bus, cmd);
 
     // Row 2: blower commanded HIGH (chassis 4082 = 3). Must print as an int.
     bus.DebugInjectU8(4082, 3u);  // 4082 = HVAC blower level enum
-    s.MaybeSampleStats(0.15, state, bus, cmd);
+    s.MaybeSampleStats(0.15, state, phys, bus, cmd);
 
     // Row 3: a real OFF command reads 0 too — for a COMMAND, "none issued
     // yet" and "commanded off" are the same physical claim.
     bus.DebugInjectU8(4082, 0u);
-    s.MaybeSampleStats(0.30, state, bus, cmd);
+    s.MaybeSampleStats(0.30, state, phys, bus, cmd);
 
     s.Close();
 
@@ -667,16 +682,18 @@ TEST_CASE("Scenario: door-lock motor leg drives read the bus mirror",
     s.OpenStats();
 
     ExternalSimConnector bus;
+
+    ev1sim::PhysicalWorld phys;
     DriverCommand cmd{};
     VehicleState state{};
 
     // Row 1: nothing received — all four legs default off.
-    s.MaybeSampleStats(0.0, state, bus, cmd);
+    s.MaybeSampleStats(0.0, state, phys, bus, cmd);
 
-    // Row 2: energise the two LOCK legs (4092 LH lock, 4094 RH lock).
-    bus.DebugInjectDelta(4092, true);   // LH lock drive
-    bus.DebugInjectDelta(4094, true);   // RH lock drive
-    s.MaybeSampleStats(0.15, state, bus, cmd);
+    // Row 2: energise the two LOCK legs (4182 LH lock, 4184 RH lock).
+    bus.DebugInjectDelta(4182, true);   // LH lock drive
+    bus.DebugInjectDelta(4184, true);   // RH lock drive
+    s.MaybeSampleStats(0.15, state, phys, bus, cmd);
 
     s.Close();
 
@@ -696,6 +713,115 @@ TEST_CASE("Scenario: door-lock motor leg drives read the bus mirror",
     std::filesystem::remove(tmp_csv);
 }
 
+TEST_CASE("Scenario: door_lock_motor_* columns report the MOTOR, not the leg",
+          "[Scenario]") {
+    // The columns the body acceptance criteria score are the winding state of
+    // ev1sim's door-lock motor plant, driven by the leg drives through the
+    // contract.  The rows below pin the two places a motor and its relay leg
+    // disagree: both legs driven (no differential, motor still), and a live
+    // winding whose pawl is already home (stalled, stroke flat at the stop).
+    using ev1sim::Scenario;
+    using ev1sim::ScenarioStats;
+
+    auto tmp_csv = std::filesystem::temp_directory_path() /
+                   "ev1sim_scenario_stats_doorlock_motor_test.csv";
+    Scenario s;
+    ScenarioStats st{tmp_csv.string(),
+                     {"sim_time_s",
+                      "door_lock_motor_lh_lock_drive",
+                      "door_lock_motor_lh_lock",
+                      "door_lock_motor_lh_unlock",
+                      "door_lock_stroke_lh",
+                      "door_lock_motor_lh_stalled",
+                      "door_lock_state_driver"},
+                     0.10};
+    s.set_stats(st);
+    s.OpenStats();
+
+    ExternalSimConnector bus;
+
+    ev1sim::PhysicalWorld phys;
+    DriverCommand cmd{};
+    VehicleState state{};
+    auto& motor = phys.door_lock_motor_lh();
+
+    // Row 1: quiescent — no leg, no winding, pawl at the unlocked stop.
+    motor.update(0.05, false, false);
+    s.MaybeSampleStats(0.0, state, phys, bus, cmd);
+
+    // Row 2: the LOCK leg is live and the pawl is halfway across.
+    bus.DebugInjectDelta(4182, true);
+    motor.update(0.25, true, false);          // 0.25 s of a 0.5 s traverse
+    s.MaybeSampleStats(0.15, state, phys, bus, cmd);
+
+    // Row 3: still driven, now against the locked stop — stalled, and the
+    // latched door state has followed.
+    motor.update(0.40, true, false);
+    phys.door_locks().set_driver(ev1sim::DoorLocks::State::LOCKED);
+    s.MaybeSampleStats(0.30, state, phys, bus, cmd);
+
+    // Row 4: BOTH legs driven.  The leg column still reads 1 — the relay really
+    // is closed — but both brushes are on the same rail, so the winding column
+    // reads 0 and the pawl does not move.  A column that merely echoed the leg
+    // could not tell these two rows apart.
+    bus.DebugInjectDelta(4183, true);
+    motor.update(0.20, true, true);
+    s.MaybeSampleStats(0.45, state, phys, bus, cmd);
+
+    s.Close();
+
+    std::ifstream f(tmp_csv);
+    REQUIRE(f.is_open());
+    std::string header, r1, r2, r3, r4;
+    std::getline(f, header);
+    std::getline(f, r1);
+    std::getline(f, r2);
+    std::getline(f, r3);
+    std::getline(f, r4);
+    CHECK(header == "sim_time_s,door_lock_motor_lh_lock_drive,"
+                    "door_lock_motor_lh_lock,door_lock_motor_lh_unlock,"
+                    "door_lock_stroke_lh,door_lock_motor_lh_stalled,"
+                    "door_lock_state_driver");
+    CHECK(r1 == "0,0,0,0,0,0,0");
+    CHECK(r2 == "0.15,1,1,0,0.5,0,0");   // driving, mid-stroke, not stalled
+    CHECK(r3 == "0.3,1,1,0,1,1,1");      // home: stalled, door latched LOCKED
+    CHECK(r4 == "0.45,1,0,0,1,0,1");     // both legs closed -> no winding, no stall
+    f.close();
+    std::filesystem::remove(tmp_csv);
+}
+
+TEST_CASE("Scenario: door_lock_switch presses the driver rocker, not the lock state",
+          "[Scenario]") {
+    using ev1sim::Scenario;
+    using ev1sim::ScenarioEvent;
+
+    Scenario s;
+    s.set_events({{1.0, "door_lock_switch", 1.0, 0.0},
+                  {2.0, "door_lock_switch", 0.0, 0.0}});
+
+    CountingHooks hooks;
+    DriverCommand cmd{};
+    VehicleState state{};
+
+    s.Tick(0.5, state, hooks, cmd);
+    CHECK(hooks.door_lock_sw_lock   == 0);
+    CHECK(hooks.door_lock_sw_unlock == 0);
+
+    s.Tick(1.0, state, hooks, cmd);     // value != 0 -> LOCK press
+    CHECK(hooks.door_lock_sw_lock   == 1);
+    CHECK(hooks.door_lock_sw_unlock == 0);
+
+    s.Tick(2.0, state, hooks, cmd);     // value == 0 -> UNLOCK press
+    CHECK(hooks.door_lock_sw_lock   == 1);
+    CHECK(hooks.door_lock_sw_unlock == 1);
+
+    // The action never touches the lock state directly — that is the junction
+    // block's job, and a scenario that set it here would be asserting its own
+    // answer.
+    CHECK(hooks.door_lock_all   == 0);
+    CHECK(hooks.door_unlock_all == 0);
+}
+
 TEST_CASE("Scenario: ad_precharge_participated latches once the relay closes",
           "[Scenario]") {
     using ev1sim::Scenario;
@@ -711,20 +837,22 @@ TEST_CASE("Scenario: ad_precharge_participated latches once the relay closes",
     s.OpenStats();
 
     ExternalSimConnector bus;
+
+    ev1sim::PhysicalWorld phys;
     DriverCommand cmd{};
     VehicleState state{};
 
     // Row 1: nothing received — participation latch defaults off.
-    s.MaybeSampleStats(0.0, state, bus, cmd);
+    s.MaybeSampleStats(0.0, state, phys, bus, cmd);
 
     // Row 2: precharge relay closes (chassis 5225 = 1) — latch sets.
     bus.DebugInjectDelta(5225, true);
-    s.MaybeSampleStats(0.15, state, bus, cmd);
+    s.MaybeSampleStats(0.15, state, phys, bus, cmd);
 
     // Row 3: relay re-opens (5225 = 0) BEFORE the next sample — the
     // instantaneous state is now false, but the latch must remain 1.
     bus.DebugInjectDelta(5225, false);
-    s.MaybeSampleStats(0.30, state, bus, cmd);
+    s.MaybeSampleStats(0.30, state, phys, bus, cmd);
 
     s.Close();
 
@@ -769,6 +897,8 @@ TEST_CASE("Scenario: abs-phase / rear-EMB stats columns stay live across a "
     s.OpenStats();
 
     ExternalSimConnector bus;
+
+    ev1sim::PhysicalWorld phys;
     DriverCommand cmd{};
     VehicleState state{};
 
@@ -789,7 +919,7 @@ TEST_CASE("Scenario: abs-phase / rear-EMB stats columns stay live across a "
     CHECK_FALSE(bus.GetAbsPhaseFront(std::chrono::milliseconds(200)).fl_fresh);
     CHECK(bus.GetAbsPhaseFront(std::chrono::milliseconds(3000)).fl_fresh);
 
-    s.MaybeSampleStats(0.0, state, bus, cmd);
+    s.MaybeSampleStats(0.0, state, phys, bus, cmd);
     s.Close();
 
     std::ifstream f(tmp_csv);

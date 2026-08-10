@@ -14,6 +14,8 @@ class ExternalSimConnector;
 
 namespace ev1sim {
 
+class PhysicalWorld;
+
 // One scheduled scenario action. Fires when sim_time crosses at_time_s.
 //
 // Action semantics:
@@ -38,6 +40,13 @@ namespace ev1sim {
 //       whole entry takes ~0.6 s — schedule any follow-on door_handle_driver
 //       at least 1 s later).
 //   door_handle_driver:  pull the driver door handle (momentary).
+//   door_lock_switch:  press the driver-door lock rocker once — value != 0 is
+//       a LOCK press, value == 0 an UNLOCK press (same 1=locked/0=unlocked
+//       encoding as the door_lock_cmd_* columns).  The contact closes for a
+//       few hundred ms and opens again, because the junction block's lock
+//       module one-shots on the RISING edge and a held rocker never re-pulses.
+//       Nothing about the lock state is asserted here: what the motors then do
+//       is the electronics' answer, read back on the door_lock_motor_* columns.
 //   set_horn:      value != 0 closes the driver horn contact (circuit 28) and
 //       holds it until a set_horn 0; the LHJB decides which tones sound.
 //   flash_to_pass: value != 0 holds the combination-switch flash-to-pass lever
@@ -106,6 +115,12 @@ public:
     // without the interactive UI.
     virtual void DoorLockAll()        = 0;
     virtual void DoorUnlockAll()      = 0;
+    // One momentary press of the DRIVER-door lock rocker: lock=true closes the
+    // LOCK contact, lock=false the UNLOCK contact.  Unlike DoorLockAll this does
+    // NOT set a lock state — it closes a switch contact and leaves the outcome
+    // to the junction block, so a scenario using it exercises the electronics
+    // instead of asserting the answer it wanted.
+    virtual void DoorLockSwitchPress(bool lock) = 0;
     // RSA EXTERIOR keypad (the five buttons on the driver's door pillar) —
     // queues the factory 6-digit code "111111" as a timed button sequence,
     // exactly as the interactive `K` binding does. This is the physical way
@@ -153,7 +168,15 @@ public:
     void OpenStats();
 
     // Sample stats if the configured sample period has elapsed.
+    //
+    // `physical` is the body-peripheral plant: some columns report what an
+    // ev1sim actuator DID (a door-lock motor's winding state and stroke), which
+    // is not derivable from `state` or from `bus` alone.  It is a required
+    // argument rather than an optional one so a caller that forgot it is a
+    // compile error — the alternative silently writes a column of zeros, which
+    // is indistinguishable from a plant that never moved.
     void MaybeSampleStats(double sim_time, const VehicleState& state,
+                          const PhysicalWorld& physical,
                           const ExternalSimConnector& bus,
                           const DriverCommand& applied_cmd);
 

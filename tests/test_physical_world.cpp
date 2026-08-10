@@ -1201,6 +1201,131 @@ TEST_CASE("DoorLockMotor: 600 ms drive pulse reaches the latch", "[PhysicalWorld
     CHECK(m.stroke() == DoorLockMotor::Stroke::LOCKED);
 }
 
+TEST_CASE("DoorLockMotor: a winding is live only when the legs differ",
+          "[PhysicalWorld][DoorLockMotor]") {
+    // Two SPDT relay commons across one reversible motor: both legs closed puts
+    // both brushes on the same rail, so neither winding has a differential.
+    // This is what keeps the energised columns from being a copy of the relay
+    // commands — they disagree exactly here.
+    DoorLockMotor m;
+    m.update(0.05, false, false);
+    CHECK_FALSE(m.lock_energised());
+    CHECK_FALSE(m.unlock_energised());
+
+    m.update(0.05, true, false);
+    CHECK(m.lock_energised());
+    CHECK_FALSE(m.unlock_energised());
+    CHECK(m.ran_last_update());
+
+    m.update(0.05, false, true);
+    CHECK_FALSE(m.lock_energised());
+    CHECK(m.unlock_energised());
+
+    m.update(0.05, true, true);          // both relays closed
+    CHECK_FALSE(m.lock_energised());
+    CHECK_FALSE(m.unlock_energised());
+    CHECK_FALSE(m.ran_last_update());    // and the armature did not turn
+}
+
+TEST_CASE("DoorLockMotor: stalls against the end stop with the winding still live",
+          "[PhysicalWorld][DoorLockMotor]") {
+    // The real motor keeps drawing current after the pawl is home; that is why
+    // the drive pulse has to be momentary. stalled() separates "still driving"
+    // from "still moving".
+    DoorLockMotor m;
+    m.update(0.25, true, false);         // mid-stroke
+    CHECK(m.ran_last_update());
+    CHECK_FALSE(m.stalled());
+
+    m.update(0.40, true, false);         // reaches the locked stop this tick
+    CHECK(m.position() == 1.0);
+    CHECK(m.ran_last_update());          // it did move, then clamped
+    CHECK(m.stalled());
+
+    m.update(0.10, true, false);         // held against the stop
+    CHECK(m.lock_energised());
+    CHECK_FALSE(m.ran_last_update());
+    CHECK(m.stalled());
+
+    m.update(0.10, false, false);        // pulse released
+    CHECK_FALSE(m.stalled());
+}
+
+// ---------------------------------------------------------------------------
+// DoorLockSwitch — the door-mounted momentary rocker.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("DoorLockSwitch: both contacts open at construction",
+          "[PhysicalWorld][DoorLockSwitch]") {
+    DoorLockSwitch sw;
+    CHECK_FALSE(sw.lock_contact());
+    CHECK_FALSE(sw.unlock_contact());
+    CHECK_FALSE(sw.any_contact());
+    sw.update(1.0);                       // ageing an unpressed switch is a no-op
+    CHECK_FALSE(sw.any_contact());
+}
+
+TEST_CASE("DoorLockSwitch: a press closes one contact then opens it",
+          "[PhysicalWorld][DoorLockSwitch]") {
+    DoorLockSwitch sw;                    // default 0.25 s press
+    sw.press_lock();
+    CHECK(sw.lock_contact());
+    CHECK_FALSE(sw.unlock_contact());     // never both — one rocker, two throws
+
+    sw.update(0.05);
+    CHECK(sw.lock_contact());
+    sw.update(0.30);                      // past the press duration
+    CHECK_FALSE(sw.lock_contact());
+    CHECK_FALSE(sw.any_contact());
+
+    sw.press_unlock();
+    CHECK(sw.unlock_contact());
+    CHECK_FALSE(sw.lock_contact());
+    sw.update(0.05);
+    sw.update(0.30);
+    CHECK_FALSE(sw.any_contact());
+}
+
+TEST_CASE("DoorLockSwitch: a press survives a tick longer than the press itself",
+          "[PhysicalWorld][DoorLockSwitch]") {
+    // The junction block one-shots on the rising edge, so a press that opened
+    // and closed inside a single tick would leave it with no edge to see and
+    // the whole door-lock chain would read as a healthy quiescent car.  A press
+    // is always observable for at least one update().
+    DoorLockSwitch sw;
+    sw.press_lock();
+    sw.update(5.0);                       // one absurdly coarse tick
+    CHECK(sw.lock_contact());             // still closed — the edge got out
+    sw.update(5.0);
+    CHECK_FALSE(sw.lock_contact());       // and released on the next one
+}
+
+TEST_CASE("DoorLockMotor: a full stroke lands exactly on the stop",
+          "[PhysicalWorld][DoorLockMotor]") {
+    // Summing dt/traverse over a stroke can land a few 1e-16 short of the
+    // limit, which reports MID_STROKE with the pawl physically home and holds
+    // the latched door state one sample late.  Ten 0.05 s steps of a 0.5 s
+    // traverse is one of the sums that does it.
+    DoorLockMotor m;
+    m.set_position(1.0);
+    for (int i = 0; i < 10; ++i) m.update(0.05, false, true);
+    CHECK(m.position() == 0.0);
+    CHECK(m.stroke() == DoorLockMotor::Stroke::UNLOCKED);
+
+    for (int i = 0; i < 10; ++i) m.update(0.05, true, false);
+    CHECK(m.position() == 1.0);
+    CHECK(m.stroke() == DoorLockMotor::Stroke::LOCKED);
+}
+
+TEST_CASE("DoorLockSwitch: release opens the contact immediately",
+          "[PhysicalWorld][DoorLockSwitch]") {
+    DoorLockSwitch sw;
+    sw.press_lock();
+    REQUIRE(sw.lock_contact());
+    sw.release();
+    CHECK_FALSE(sw.any_contact());
+}
+
 // ---------------------------------------------------------------------------
 // Sounder — LHJB flasher piezo "click".
 // ---------------------------------------------------------------------------

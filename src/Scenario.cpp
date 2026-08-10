@@ -7,6 +7,7 @@
 #include <sstream>
 
 #include "ExternalSimConnector.h"
+#include "PhysicalWorld.h"
 
 namespace ev1sim {
 
@@ -163,6 +164,10 @@ void Scenario::Tick(double sim_time, const VehicleState& state,
         } else if (e.action == "cruise_speed_down")   { hooks.CruiseSpeedDown();
         } else if (e.action == "door_lock_all")       { hooks.DoorLockAll();
         } else if (e.action == "door_unlock_all")     { hooks.DoorUnlockAll();
+        } else if (e.action == "door_lock_switch")    {
+            // value != 0 → LOCK press, value == 0 → UNLOCK press: the same
+            // 1=locked / 0=unlocked encoding the door_lock_cmd_* columns use.
+            hooks.DoorLockSwitchPress(e.value != 0.0);
         } else if (e.action == "exterior_keypad_code"){ hooks.ExteriorKeypadCode();
         } else if (e.action == "door_handle_driver")  { hooks.DoorHandleDriver();
         } else if (e.action == "set_horn")            { m_held_horn = (e.value != 0.0);
@@ -206,6 +211,7 @@ void Scenario::OpenStats() {
 }
 
 void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
+                                const PhysicalWorld& physical,
                                 const ExternalSimConnector& bus,
                                 const DriverCommand& applied_cmd) {
     if (!m_csv_opened) return;
@@ -368,10 +374,29 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
             m_csv << (bus.HasReceivedHvacBlowerLevel()
                           ? static_cast<int>(bus.GetHvacBlowerLevel())
                           : 0);
-        // Door-lock motor leg drives mirrored from the chassis bus
-        // (4092 LH lock / 4093 LH unlock / 4094 RH lock / 4095 RH unlock) —
-        // 1 = the junction block is energising that motor leg, 0 otherwise.
-        // Lets body/HMI scenarios assert the lock/unlock actuation timeline.
+        // ── Door locks: the relay legs, the motors, and the latch ────────────
+        //
+        // Three layers, deliberately distinct columns, because collapsing them
+        // is how a lock scenario ends up unable to fail:
+        //
+        //   *_drive  — the RELAY LEG as the junction block published it
+        //              (4182 LH lock / 4183 LH unlock / 4184 RH lock /
+        //              4185 RH unlock).  1 = that leg is energised.  Raw bus
+        //              mirror; says nothing about whether a motor turned.
+        //   (no suffix) — the MOTOR WINDING, from ev1sim's door_lock_motor
+        //              plant.  The two relay commons sit across one reversible
+        //              motor, so a winding is live only when its leg is driven
+        //              AND the opposite leg is not; both legs driven puts both
+        //              brushes on the same rail and the motor sits still.  This
+        //              is what the body acceptance criteria score.
+        //   *_stroke / door_lock_state_* — the MECHANICS: normalized pawl
+        //              travel (0 = unlocked stop, 1 = locked stop) and the
+        //              latched per-door result.  A drive that never moves the
+        //              pawl shows up here as a flat stroke.
+        //
+        // A scenario's own lock/unlock press appears in NONE of these — it goes
+        // out on the switch contacts (4170-4173) and everything below is what
+        // came back.
         else if (f == "door_lock_motor_lh_lock_drive")
             m_csv << (bus.GetDoorLockMotorDrive(0) ? 1 : 0);
         else if (f == "door_lock_motor_lh_unlock_drive")
@@ -380,6 +405,42 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
             m_csv << (bus.GetDoorLockMotorDrive(2) ? 1 : 0);
         else if (f == "door_lock_motor_rh_unlock_drive")
             m_csv << (bus.GetDoorLockMotorDrive(3) ? 1 : 0);
+        else if (f == "door_lock_motor_lh_lock")
+            m_csv << (physical.door_lock_motor_lh().lock_energised() ? 1 : 0);
+        else if (f == "door_lock_motor_lh_unlock")
+            m_csv << (physical.door_lock_motor_lh().unlock_energised() ? 1 : 0);
+        else if (f == "door_lock_motor_rh_lock")
+            m_csv << (physical.door_lock_motor_rh().lock_energised() ? 1 : 0);
+        else if (f == "door_lock_motor_rh_unlock")
+            m_csv << (physical.door_lock_motor_rh().unlock_energised() ? 1 : 0);
+        // Pawl travel, 0..1.  The one column that distinguishes "the motor was
+        // energised" from "the lock actually moved".
+        else if (f == "door_lock_stroke_lh")
+            m_csv << physical.door_lock_motor_lh().position();
+        else if (f == "door_lock_stroke_rh")
+            m_csv << physical.door_lock_motor_rh().position();
+        // Winding live but the pawl is already against its stop — the real
+        // motor stalls there for the rest of the pulse, so a drive that is
+        // stalled for seconds is the held-drive failure this case hunts.
+        else if (f == "door_lock_motor_lh_stalled")
+            m_csv << (physical.door_lock_motor_lh().stalled() ? 1 : 0);
+        else if (f == "door_lock_motor_rh_stalled")
+            m_csv << (physical.door_lock_motor_rh().stalled() ? 1 : 0);
+        // Latched per-door state after the stroke reached an end of travel —
+        // the same value ev1sim feeds back to the bus on 4165/4166.
+        else if (f == "door_lock_state_driver")
+            m_csv << (physical.door_locks().driver() ==
+                          DoorLocks::State::LOCKED ? 1 : 0);
+        else if (f == "door_lock_state_passenger")
+            m_csv << (physical.door_locks().passenger() ==
+                          DoorLocks::State::LOCKED ? 1 : 0);
+        // The driver stimulus itself (4170-4173), so a run that produced no
+        // motor drive can be read as "the press never went out" vs "the
+        // junction block ignored it".
+        else if (f == "door_lock_switch_lh_lock")
+            m_csv << (bus.GetDoorLockSwitchContact(0) ? 1 : 0);
+        else if (f == "door_lock_switch_lh_unlock")
+            m_csv << (bus.GetDoorLockSwitchContact(1) ? 1 : 0);
         // Two-tone horn commands (1 = commanded sounding, 0 otherwise).
         else if (f == "horn_low_cmd")
             m_csv << (bus.GetHornLowCmd() ? 1 : 0);
