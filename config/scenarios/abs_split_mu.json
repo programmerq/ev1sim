@@ -25,8 +25,8 @@
     {"at_time_s": 1.30, "action": "prnd_up"},
 
     {"//": "Ease onto the pedal over ~0.75 s (not a step to full throttle —",
-     "//1": "that spins the drive wheels from a dead stop, see",
-     "//2": "abs_high_mu_stop.json for the measured before/after)."},
+     "//1": "that spins the drive wheels from a dead stop; see the PR",
+     "//2": "description for the measured before/after)."},
     {"at_time_s": 1.50, "action": "set_throttle", "value": 0.25},
     {"at_time_s": 1.75, "action": "set_throttle", "value": 0.50},
     {"at_time_s": 2.00, "action": "set_throttle", "value": 0.75},
