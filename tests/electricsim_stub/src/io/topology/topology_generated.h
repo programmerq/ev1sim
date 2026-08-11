@@ -27,8 +27,8 @@
 namespace electricsim::topology {
 
 inline constexpr std::uint32_t kFormatVersion = 2U;
-inline constexpr std::uint32_t kTopologyHash = 0x6FCC0257U;
-inline constexpr std::size_t kWireCount = 412;
+inline constexpr std::uint32_t kTopologyHash = 0x907392A1U;
+inline constexpr std::size_t kWireCount = 413;
 
 // Per-class cell counts. Emitted so a
 // receipt can print the classification without re-parsing YAML,
@@ -36,7 +36,7 @@ inline constexpr std::size_t kWireCount = 412;
 // by a DECREASING ratchet in the generator that fails on !=.
 inline constexpr std::size_t kConductorCellCount = 85;
 inline constexpr std::size_t kElementStateCellCount = 63;
-inline constexpr std::size_t kSemanticCellCount = 73;
+inline constexpr std::size_t kSemanticCellCount = 74;
 inline constexpr std::size_t kUnclassifiedLegacyCellCount = 191;
 
 // Named cell ids. Sequential by YAML key order; changing that
@@ -461,6 +461,7 @@ inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REAR_EMB_RR{409U
 inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REGEN_DISABLE{410U};
 inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_BRAKE_SW_OUT{411U};
 inline constexpr ::electricsim::io::ElementStateId kWireCHASSIS_ES_AUX_BATTERY_TERMINAL_MV{412U};
+inline constexpr ::electricsim::io::WireId kWireWIPER_SW_DELAY_TAP = 413U;
 
 // Per-net default + init_policy constants.
 // Used by consumers that opt into the kDefault policy — see
@@ -1291,6 +1292,8 @@ inline constexpr auto kWireBTCM_ES_BRAKE_SW_OUT_Default = false;
 inline constexpr InitPolicy kWireBTCM_ES_BRAKE_SW_OUT_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireCHASSIS_ES_AUX_BATTERY_TERMINAL_MV_Default = 0x0U;
 inline constexpr InitPolicy kWireCHASSIS_ES_AUX_BATTERY_TERMINAL_MV_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireWIPER_SW_DELAY_TAP_Default = static_cast<std::uint8_t>(0x0U);
+inline constexpr InitPolicy kWireWIPER_SW_DELAY_TAP_InitPolicy = InitPolicy::kHold;
 
 // Declare every wire in this topology on the given (creator)
 // table. Returns true iff all declarations succeed.
@@ -1708,6 +1711,7 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REGEN_DISABLE), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_BRAKE_SW_OUT), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireCHASSIS_ES_AUX_BATTERY_TERMINAL_MV), ::electricsim::io::WireType::kUint32) && ok;
+  ok = table.declare(kWireWIPER_SW_DELAY_TAP, ::electricsim::io::WireType::kByte) && ok;
   return ok;
 }
 
@@ -2128,6 +2132,7 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REGEN_DISABLE): return "BTCM_ES_REGEN_DISABLE";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_BRAKE_SW_OUT): return "BTCM_ES_BRAKE_SW_OUT";
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_ES_AUX_BATTERY_TERMINAL_MV): return "CHASSIS_ES_AUX_BATTERY_TERMINAL_MV";
+    case kWireWIPER_SW_DELAY_TAP: return "WIPER_SW_DELAY_TAP";
     default: return ::std::string_view{};
   }
 }
@@ -2553,6 +2558,7 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REGEN_DISABLE): return "btcm_ecu";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_BRAKE_SW_OUT): return "btcm_ecu";
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_ES_AUX_BATTERY_TERMINAL_MV): return "aux_battery_host";
+    case kWireWIPER_SW_DELAY_TAP: return "";
     default: return ::std::string_view{};
   }
 }
@@ -2982,6 +2988,7 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REGEN_DISABLE), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_ES_REGEN_DISABLE"}, static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REGEN_DISABLE)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_BRAKE_SW_OUT), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_ES_BRAKE_SW_OUT"}, static_cast<::electricsim::io::WireId>(kWireBTCM_ES_BRAKE_SW_OUT)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireCHASSIS_ES_AUX_BATTERY_TERMINAL_MV), &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_ES_AUX_BATTERY_TERMINAL_MV"}, static_cast<::electricsim::io::WireId>(kWireCHASSIS_ES_AUX_BATTERY_TERMINAL_MV)); ++count; }
+  if (table.write_gen(kWireWIPER_SW_DELAY_TAP, &gen) && gen == 0) { visitor(::std::string_view{"WIPER_SW_DELAY_TAP"}, kWireWIPER_SW_DELAY_TAP); ++count; }
   return count;
 }
 
@@ -3407,6 +3414,7 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REGEN_DISABLE): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_BRAKE_SW_OUT): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_ES_AUX_BATTERY_TERMINAL_MV): return ::electricsim::io::CellClass::kElementState;
+    case kWireWIPER_SW_DELAY_TAP: return ::electricsim::io::CellClass::kSemantic;
     default: return ::electricsim::io::CellClass::kUnknown;
   }
 }
