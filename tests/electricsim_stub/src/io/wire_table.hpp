@@ -129,7 +129,9 @@ class SolverToken {
   // user-PROVIDED body (this one) removes the type from aggregate-hood, so `tok{}`
   // goes through overload resolution like any other call and the private access
   // check fires. Verified three-valued in src/net_host/tests/type_split_compile_receipt.sh
-  // leg 3b (circuit-truth session 2 phase 4, finding V4-1).
+  // leg 3b, which requires `SolverToken tok{};` OUTSIDE ConductorPublisher to fail to
+  // compile — the one initializer syntax the direct-init leg beside it cannot see, and
+  // therefore the leg that would go red the day this body became `= default`.
   SolverToken() noexcept {}
   friend class ::electricsim::net_host::ConductorPublisher;
 };
@@ -151,8 +153,7 @@ enum class WireType : std::uint8_t {
   // reader drains the bits appended since its own private cursor. The
   // cell occupies more than one 64-byte slot and uses a per-cell seqlock
   // (the "future bytes[N]" seam this header reserved at lines 9-10).
-  // @design 2026-06-13 claude — round-19, sub-PR 4-C½;
-  //   notes/manual_supplements.yaml#2026-06-13-gm8192-bit-ring-cell.
+  // @design 2026-06-13 claude — round-19, sub-PR 4-C½.
   kBitStream = 6,
 
   // kUint64 — 8-byte unsigned scalar. Added for the chassis sim-time
@@ -324,17 +325,19 @@ class WireTable {
   bool publish_conductor(ConductorId id, bool energised, const SolverToken& token);
   bool read_bit_sample(ConductorId id, Sample<bool>* out) const;
 
-  // THE MILLIVOLT HALF OF THE SAME ANSWER — finding R-2's closure.
+  // THE MILLIVOLT HALF OF THE SAME ANSWER.
   //
   // Until the battery-model pass, publish_conductor() published a bool and NOTHING
-  // ELSE, so — recorded twice in scripts/gen_topology_header.py's movement log, once
-  // in pass 3 and again in pass 4 — *"a uint32 cell cannot be a conductor at all"*.
-  // That sentence is a statement about this API, not about the vehicle. Every analog
-  // supply rail in the fleet (the 12 V aux post, the HV DC link, the APM's 12 V
-  // output) was therefore forced OUT of the conductor class and into
-  // `unclassified-legacy`, where any process may write it — which is how
-  // CHASSIS_AUX_BATTERY_TERMINAL_MV ended up owned by a host process that no VAT
-  // fleet spawns, and how the whole 12 V distribution graph came to have no producer.
+  // ELSE. The working rule that fell out of that — *"a uint32 cell cannot be a
+  // conductor at all"* — was written down more than once while the cell classes were
+  // being assigned, and it is a statement about THIS API, not about the vehicle: an
+  // analog rail is no less a conductor for being measured in millivolts; there was
+  // simply no verb here to publish one. Every analog supply rail in the fleet (the
+  // 12 V aux post, the HV DC link, the APM's 12 V output) was therefore forced OUT
+  // of the conductor class and into `unclassified-legacy`, where any process may
+  // write it — which is how CHASSIS_AUX_BATTERY_TERMINAL_MV ended up owned by a host
+  // process that no VAT fleet spawns, and how the whole 12 V distribution graph came
+  // to have no producer.
   //
   // A node's potential is an OUTPUT of the same provenance computation that decides
   // whether it is energised at all (src/net/net_types.hpp NodeObservation::voltage_mv,
