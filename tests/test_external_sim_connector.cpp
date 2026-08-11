@@ -34,7 +34,8 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     constexpr int kNumDoorLockPw    = 4;   // door_lock_cmd driver/passenger (4084/4085)
                                            // + power_window_motor driver/passenger (4086/4087)
     constexpr int kNumRsaShiftBlocked = 1; // rsa_shift_blocked (4088)
-    constexpr int kNumDoorLockMotor = 4;   // door_lock_motor leg drives (4092-4095) — RHJB → ev1sim
+    constexpr int kNumDoorLockMotor = 4;   // door_lock_motor leg drives (4182-4185) — RHJB → ev1sim
+    constexpr int kNumDoorLockSwitch = 4;  // door_lock_switch contacts (4170-4173) — ev1sim → RHJB
     constexpr int kNumSounder       = 1;   // sounder piezo_drive (4096) — LHJB flasher → ev1sim
     constexpr int kNumSteeringPump  = 2;   // pump speed_cmd_q8 (4097, in) + interlock_closed (4098, out)
     constexpr int kNumHvacControls  = 5;   // hvac setpoint/fan/mode/ac/defrost requests (4124-4128) — ev1sim → HTCM
@@ -86,7 +87,8 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
                          kNumThrottleCmd + kNumSteeringCmd + kNumBrake + kNumWiper +
                          kNumHvac + kNumAmbient + kNumDoorLockPw +
                          kNumRsaShiftBlocked +
-                         kNumDoorLockMotor + kNumSounder + kNumSteeringPump +
+                         kNumDoorLockMotor + kNumDoorLockSwitch +
+                         kNumSounder + kNumSteeringPump +
                          kNumHvacControls + kNumDoorLockState +
                          kNumIpcTelltale + kNumIpcTripDist + kNumIpcBtcmTelltale +
                          kNumIpcExtraTelltale +
@@ -111,7 +113,8 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     int hvac_count            = 0;   // hvac_blower_level (4082) + defrost_grid_active (4083)
     int door_lock_pw_count    = 0;   // door lock cmds (4084/4085) + pw motor cmds (4086/4087)
     int rsa_shift_blocked_count = 0; // rsa_shift_blocked (4088)
-    int door_lock_motor_count = 0;   // door-lock motor leg drives (4092-4095)
+    int door_lock_motor_count = 0;   // door-lock motor leg drives (4182-4185)
+    int door_lock_switch_count = 0;  // door-lock switch contacts (4170-4173)
     int sounder_count         = 0;   // sounder piezo_drive (4096)
     int steering_pump_count   = 0;   // pump speed_cmd_q8 (4097) + interlock_closed (4098)
     int hvac_controls_count   = 0;   // hvac setpoint/fan/mode/ac/defrost (4124-4128)
@@ -185,9 +188,12 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
         } else if (e.signal_id == 4088) {
             CHECK(e.input_to_sim);          // RSA shift-blocked cue flows into ev1sim
             ++rsa_shift_blocked_count;
-        } else if (e.signal_id >= 4092 && e.signal_id <= 4095) {
+        } else if (e.signal_id >= 4182 && e.signal_id <= 4185) {
             CHECK(e.input_to_sim);          // door-lock motor leg drives flow into ev1sim
             ++door_lock_motor_count;
+        } else if (e.signal_id >= 4170 && e.signal_id <= 4173) {
+            CHECK_FALSE(e.input_to_sim);    // door-lock switch contacts flow out to RHJB
+            ++door_lock_switch_count;
         } else if (e.signal_id == 4096) {
             CHECK(e.input_to_sim);          // sounder piezo drive flows into ev1sim
             ++sounder_count;
@@ -293,8 +299,10 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     CHECK(door_lock_pw_count      == kNumDoorLockPw);
     // rsa_shift_blocked_count: RSA shift-blocked cue (4088).
     CHECK(rsa_shift_blocked_count == kNumRsaShiftBlocked);
-    // door_lock_motor_count: RHJB dual-H-bridge motor leg drives (4092-4095).
+    // door_lock_motor_count: RHJB dual-H-bridge motor leg drives (4182-4185).
     CHECK(door_lock_motor_count   == kNumDoorLockMotor);
+    // door_lock_switch_count: the rocker contacts ev1sim publishes (4170-4173).
+    CHECK(door_lock_switch_count  == kNumDoorLockSwitch);
     // sounder_count: LHJB flasher piezo drive (4096).
     CHECK(sounder_count           == kNumSounder);
     // steering_pump_count: PSCM pump speed cmd (4097, in) + interlock-closed (4098, out).
@@ -734,16 +742,25 @@ TEST_CASE("SetChargeCouplerPresent stores without crashing", "[ExternalSim]") {
 }
 
 // ---------------------------------------------------------------------------
-// Door-lock motor leg drives (4092-4095) — RHJB dual-H-bridge → ev1sim.
+// Door-lock motor leg drives (4182-4185) — RHJB dual-H-bridge → ev1sim — and
+// the switch contacts (4170-4173) ev1sim publishes back the other way.
+//
+// These IDs are the chassis contract's own (kSigChassisRhjbDlm* /
+// kSigDoorLockSw_*), pinned by static_assert in ExternalSimConnector.cpp.  The
+// leg tests below inject on the connector's dispatch ID directly, so on their
+// own they would pass just as happily against a retired allocation nothing
+// publishes — which is exactly what happened.  The end-to-end proof that the
+// ID the RHJB writes is the ID this dispatch answers lives in
+// test_wire_truth_chassis.cpp ("Door-lock loop end-to-end").
 // ---------------------------------------------------------------------------
 
 TEST_CASE("Door-lock motor endpoints have correct IDs and direction", "[ExternalSim]") {
     struct Row { std::uint32_t sid; const char* qualified; };
     const Row rows[] = {
-        {4092, "vehicle.body.door_lock_motor.lh_lock_drive"},
-        {4093, "vehicle.body.door_lock_motor.lh_unlock_drive"},
-        {4094, "vehicle.body.door_lock_motor.rh_lock_drive"},
-        {4095, "vehicle.body.door_lock_motor.rh_unlock_drive"},
+        {4182, "vehicle.body.door_lock_motor.lh_lock_drive"},
+        {4183, "vehicle.body.door_lock_motor.lh_unlock_drive"},
+        {4184, "vehicle.body.door_lock_motor.rh_lock_drive"},
+        {4185, "vehicle.body.door_lock_motor.rh_unlock_drive"},
     };
     for (const auto& r : rows) {
         const auto* ep = ExternalSimConnector::FindEndpoint(r.sid);
@@ -753,26 +770,68 @@ TEST_CASE("Door-lock motor endpoints have correct IDs and direction", "[External
     }
 }
 
+TEST_CASE("Door-lock switch endpoints have correct IDs and direction", "[ExternalSim]") {
+    struct Row { std::uint32_t sid; const char* qualified; };
+    const Row rows[] = {
+        {4170, "vehicle.body.door_lock_switch.lh_lock_out"},
+        {4171, "vehicle.body.door_lock_switch.lh_unlock_out"},
+        {4172, "vehicle.body.door_lock_switch.rh_lock_out"},
+        {4173, "vehicle.body.door_lock_switch.rh_unlock_out"},
+    };
+    for (const auto& r : rows) {
+        const auto* ep = ExternalSimConnector::FindEndpoint(r.sid);
+        REQUIRE(ep != nullptr);
+        CHECK(std::string(ep->qualified_name) == r.qualified);
+        CHECK_FALSE(ep->input_to_sim);   // ev1sim drives these out to the RHJB
+    }
+}
+
 TEST_CASE("Injected door-lock motor leg drives latch per leg", "[ExternalSim]") {
     ExternalSimConnector c;
     for (int leg = 0; leg < 4; ++leg)
         CHECK_FALSE(c.HasReceivedDoorLockMotorDrive(leg));
 
-    c.DebugInjectDelta(4092, true);   // LH lock leg
-    c.DebugInjectDelta(4095, true);   // RH unlock leg
+    c.DebugInjectDelta(4182, true);   // LH lock leg
+    c.DebugInjectDelta(4185, true);   // RH unlock leg
     CHECK(c.GetDoorLockMotorDrive(0));
     CHECK(c.HasReceivedDoorLockMotorDrive(0));
     CHECK_FALSE(c.GetDoorLockMotorDrive(1));   // LH unlock not driven
     CHECK(c.GetDoorLockMotorDrive(3));         // RH unlock driven
 
-    c.DebugInjectDelta(4092, false);
+    c.DebugInjectDelta(4182, false);
     CHECK_FALSE(c.GetDoorLockMotorDrive(0));
     CHECK(c.HasReceivedDoorLockMotorDrive(0));  // latched on first ever write
+
+    // The retired allocation must stay dead: an inject on 4092-4095 is a signal
+    // ID this connector no longer knows, and must not reach a leg.
+    ExternalSimConnector stale;
+    for (std::uint32_t id = 4092; id <= 4095; ++id) stale.DebugInjectDelta(id, true);
+    for (int leg = 0; leg < 4; ++leg)
+        CHECK_FALSE(stale.HasReceivedDoorLockMotorDrive(leg));
 
     // Out-of-range legs are safe (return false, no crash).
     CHECK_FALSE(c.GetDoorLockMotorDrive(-1));
     CHECK_FALSE(c.GetDoorLockMotorDrive(4));
     CHECK_FALSE(c.HasReceivedDoorLockMotorDrive(99));
+}
+
+TEST_CASE("Door-lock switch contacts latch what was set", "[ExternalSim]") {
+    ExternalSimConnector c;
+    for (int i = 0; i < 4; ++i) CHECK_FALSE(c.GetDoorLockSwitchContact(i));
+
+    c.SetDoorLockSwitchContacts(true, false, false, false);   // LH LOCK pressed
+    CHECK(c.GetDoorLockSwitchContact(0));
+    CHECK_FALSE(c.GetDoorLockSwitchContact(1));
+    CHECK_FALSE(c.GetDoorLockSwitchContact(2));
+    CHECK_FALSE(c.GetDoorLockSwitchContact(3));
+    CHECK_NOTHROW(c.Tick(0.0));
+
+    c.SetDoorLockSwitchContacts(false, false, false, false);  // released
+    for (int i = 0; i < 4; ++i) CHECK_FALSE(c.GetDoorLockSwitchContact(i));
+
+    // Out-of-range contacts are safe.
+    CHECK_FALSE(c.GetDoorLockSwitchContact(-1));
+    CHECK_FALSE(c.GetDoorLockSwitchContact(4));
 }
 
 // ---------------------------------------------------------------------------

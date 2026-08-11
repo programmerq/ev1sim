@@ -29,6 +29,7 @@
 #include <unistd.h>  // getpid
 
 #include "WireTruthChassis.h"
+#include "ExternalSimConnector.h"
 
 #include "topology/topology_generated.h"
 #include "wire_table.hpp"
@@ -179,4 +180,79 @@ TEST_CASE("CompiledTopologyHash reports this binary's hash",
     REQUIRE(ev1sim::WireTruthChassis::CompiledTopologyHash() ==
             electricsim::topology::kTopologyHash);
     REQUIRE(ev1sim::WireTruthChassis::CompiledTopologyHash() != 0U);
+}
+
+// ---------------------------------------------------------------------------
+// The door-lock rocker contacts reach the wire through the connector's OWN
+// publish path (ExternalSimConnector::Tick), not through a hand-rolled call.
+//
+// This file already owns the env-var plumbing an attach needs, which is what
+// this test needs too: the point is to exercise the real
+// SetDoorLockSwitchContacts -> Tick -> publish-on-change -> WireTable chain,
+// so deleting that publish block makes a test go red. Asserting only that the
+// setter latches a value would leave the whole outbound half — the half that
+// gives the junction block's lock module an edge to fire on — with nothing
+// checking it at all.
+//
+// Reads the four cells BY NAME on the creator side, the way the RHJB reads
+// them, so a mis-mapped signal id cannot pass by writing the wrong cell.
+// ---------------------------------------------------------------------------
+TEST_CASE("Door-lock rocker contacts publish onto the wire through Tick",
+          "[wire_truth][attach_outcome][door_lock]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("dl_sw");
+    auto rhjb = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(rhjb != nullptr);
+
+    ScopedWiresName guard(seg.c_str());
+    ExternalSimConnector::Options opts;
+    opts.enabled = true;                 // as --external-sim does
+    ExternalSimConnector c(opts);
+
+    auto contact = [&](electricsim::io::WireId id) {
+        bool v = false;
+        REQUIRE(rhjb->read_bit(id, &v));
+        return v;
+    };
+
+    // First tick with every contact open: ev1sim is the only producer of these
+    // cells, so this is what gives the lock module a defined starting level to
+    // detect an edge against.
+    c.Tick(0.0);
+    REQUIRE(c.IsConnected());   // the attach is what marks it connected
+    CHECK_FALSE(contact(topo::kWireDOOR_LOCK_SW_LH_LOCK_OUT));
+    CHECK_FALSE(contact(topo::kWireDOOR_LOCK_SW_LH_UNLOCK_OUT));
+    CHECK_FALSE(contact(topo::kWireDOOR_LOCK_SW_RH_LOCK_OUT));
+    CHECK_FALSE(contact(topo::kWireDOOR_LOCK_SW_RH_UNLOCK_OUT));
+
+    // A LOCK press on the driver's rocker only — each contact must land on its
+    // own cell, so a cross-wire between the four is visible here.
+    c.SetDoorLockSwitchContacts(true, false, false, false);
+    c.Tick(0.1);
+    CHECK(contact(topo::kWireDOOR_LOCK_SW_LH_LOCK_OUT));
+    CHECK_FALSE(contact(topo::kWireDOOR_LOCK_SW_LH_UNLOCK_OUT));
+    CHECK_FALSE(contact(topo::kWireDOOR_LOCK_SW_RH_LOCK_OUT));
+    CHECK_FALSE(contact(topo::kWireDOOR_LOCK_SW_RH_UNLOCK_OUT));
+
+    // Released: the falling edge has to reach the wire too, or a one-shot
+    // controller can never be re-triggered.
+    c.SetDoorLockSwitchContacts(false, false, false, false);
+    c.Tick(0.2);
+    CHECK_FALSE(contact(topo::kWireDOOR_LOCK_SW_LH_LOCK_OUT));
+
+    // The other three, one at a time, each on its own cell.
+    c.SetDoorLockSwitchContacts(false, true, false, false);
+    c.Tick(0.3);
+    CHECK(contact(topo::kWireDOOR_LOCK_SW_LH_UNLOCK_OUT));
+    CHECK_FALSE(contact(topo::kWireDOOR_LOCK_SW_LH_LOCK_OUT));
+
+    c.SetDoorLockSwitchContacts(false, false, true, false);
+    c.Tick(0.4);
+    CHECK(contact(topo::kWireDOOR_LOCK_SW_RH_LOCK_OUT));
+    CHECK_FALSE(contact(topo::kWireDOOR_LOCK_SW_LH_UNLOCK_OUT));
+
+    c.SetDoorLockSwitchContacts(false, false, false, true);
+    c.Tick(0.5);
+    CHECK(contact(topo::kWireDOOR_LOCK_SW_RH_UNLOCK_OUT));
+    CHECK_FALSE(contact(topo::kWireDOOR_LOCK_SW_RH_LOCK_OUT));
 }

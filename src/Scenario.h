@@ -4,6 +4,7 @@
 #include <fstream>
 #include <functional>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -13,6 +14,8 @@
 class ExternalSimConnector;
 
 namespace ev1sim {
+
+class PhysicalWorld;
 
 // One scheduled scenario action. Fires when sim_time crosses at_time_s.
 //
@@ -38,6 +41,18 @@ namespace ev1sim {
 //       whole entry takes ~0.6 s — schedule any follow-on door_handle_driver
 //       at least 1 s later).
 //   door_handle_driver:  pull the driver door handle (momentary).
+//   door_lock_switch:  press a door-lock rocker once.  value != 0 is a LOCK
+//       press, value == 0 an UNLOCK press (the same 1=locked/0=unlocked
+//       encoding as the door_lock_cmd_* columns).  value2 picks the door:
+//       0 (default) = LH/driver, non-zero = RH/passenger.  The contact closes
+//       for a few hundred ms and opens again, because the junction block's
+//       lock module one-shots on the RISING edge and a held rocker never
+//       re-pulses.  Nothing about the lock state is asserted here: what the
+//       motors then do is the electronics' answer, read back on the
+//       door_lock_motor_* columns.
+//       Press ONE side per event.  The lock module ORs the two doors' inputs,
+//       so a single press is what commands both motors — pressing both at once
+//       would hide whether that OR works.
 //   set_horn:      value != 0 closes the driver horn contact (circuit 28) and
 //       holds it until a set_horn 0; the LHJB decides which tones sound.
 //   flash_to_pass: value != 0 holds the combination-switch flash-to-pass lever
@@ -106,6 +121,13 @@ public:
     // without the interactive UI.
     virtual void DoorLockAll()        = 0;
     virtual void DoorUnlockAll()      = 0;
+    // One momentary press of a door-lock rocker: lock=true closes that door's
+    // LOCK contact, lock=false its UNLOCK contact; driver_door=true is the
+    // LH/driver rocker, false the RH/passenger one.  Unlike DoorLockAll this
+    // does NOT set a lock state — it closes a switch contact and leaves the
+    // outcome to the junction block, so a scenario using it exercises the
+    // electronics instead of asserting the answer it wanted.
+    virtual void DoorLockSwitchPress(bool lock, bool driver_door) = 0;
     // RSA EXTERIOR keypad (the five buttons on the driver's door pillar) —
     // queues the factory 6-digit code "111111" as a timed button sequence,
     // exactly as the interactive `K` binding does. This is the physical way
@@ -153,12 +175,24 @@ public:
     void OpenStats();
 
     // Sample stats if the configured sample period has elapsed.
+    //
+    // `physical` is the body-peripheral plant: some columns report what an
+    // ev1sim actuator DID (a door-lock motor's winding state and stroke), which
+    // is not derivable from `state` or from `bus` alone.  It is a required
+    // argument rather than an optional one so a caller that forgot it is a
+    // compile error — the alternative silently writes a column of zeros, which
+    // is indistinguishable from a plant that never moved.
     void MaybeSampleStats(double sim_time, const VehicleState& state,
+                          const PhysicalWorld& physical,
                           const ExternalSimConnector& bus,
                           const DriverCommand& applied_cmd);
 
     // Flush + close the stats file.
     void Close();
+
+    // Names this writer did not recognise, in the order they were first seen.
+    // Empty on a scenario whose every stats field is implemented.
+    const std::set<std::string>& unknown_fields() const { return m_warned_fields; }
 
     bool IsDone(double sim_time) const {
         return m_max_time_s > 0.0 && sim_time >= m_max_time_s;
@@ -208,6 +242,14 @@ private:
 
     int                        m_passed_assertions = 0;
     int                        m_failed_assertions = 0;
+
+    // Stats field names this writer does not implement, so the warning fires
+    // once per name rather than once per sample row.
+    std::set<std::string>      m_warned_fields;
+
+    // Report an unrecognised stats field once. The cell stays blank; see the
+    // definition for why that is deliberate and what the warning adds.
+    void WarnUnknownField(const std::string& f);
 };
 
 }  // namespace ev1sim

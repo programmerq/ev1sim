@@ -401,7 +401,7 @@ constexpr int           kNumDoorLockPwSignals         = 4;  // 4084+4085+4086+40
 
 // Door lock STATE feedback (ev1sim → external sim, chassis segment).
 // The resulting per-door latched state of ev1sim::DoorLocks, after the
-// door_lock_motor (4092-4095) reaches end-of-travel or the RSA cmd (4084/4085)
+// door_lock_motor (4182-4185) reaches end-of-travel or the RSA cmd (4084/4085)
 // mirror is applied.  Closes the central-locking loop so RSA/IPC can confirm
 // the actuated state.
 // MOVED 4155-4157 → 4165-4167: the old block had been allocated ev1sim-side
@@ -454,17 +454,49 @@ constexpr std::uint32_t kSigTjbRrStopLamp = 4204U;
 // peripheral (ev1sim::DoorLockMotor ×2) consumes these and models the
 // mechanical lock stroke.  Wire-level mapping (cavity → chassis-bus signal),
 // authoritative for the external sim router — see docs/peripherals.md:
-//   4092  vehicle.body.door_lock_motor.lh_lock_drive    ckt 294A, RHJB J9.C5 → LH motor LOCK
-//   4093  vehicle.body.door_lock_motor.lh_unlock_drive  ckt 295A, RHJB J9.C6 → LH motor UNLOCK
-//   4094  vehicle.body.door_lock_motor.rh_lock_drive    ckt 294C, RHJB J3.A6 → RH motor LOCK
-//   4095  vehicle.body.door_lock_motor.rh_unlock_drive  ckt 295C, RHJB J3.A7 → RH motor UNLOCK
-// uint8/bool wire level: 1 = leg energised.  Allocated ev1sim-side first; see
-// the "pending external sim adoption" note in the drift-guard block below.
-constexpr std::uint32_t kSigDoorLockMotorLhLockDrive   = 4092U;
-constexpr std::uint32_t kSigDoorLockMotorLhUnlockDrive = 4093U;
-constexpr std::uint32_t kSigDoorLockMotorRhLockDrive   = 4094U;
-constexpr std::uint32_t kSigDoorLockMotorRhUnlockDrive = 4095U;
+//   4182  vehicle.body.door_lock_motor.lh_lock_drive    ckt 294A, RHJB J9.C5 → LH motor LOCK
+//   4183  vehicle.body.door_lock_motor.lh_unlock_drive  ckt 295A, RHJB J9.C6 → LH motor UNLOCK
+//   4184  vehicle.body.door_lock_motor.rh_lock_drive    ckt 294C, RHJB J3.A6 → RH motor LOCK
+//   4185  vehicle.body.door_lock_motor.rh_unlock_drive  ckt 295C, RHJB J3.A7 → RH motor UNLOCK
+// uint8/bool wire level: 1 = leg energised.
+//
+// MOVED 4092-4095 → 4182-4185.  The 4092-4095 block was allocated ev1sim-side
+// while the chassis contract had no DLM cells.  The contract then adopted the
+// same four wires as kSigChassisRhjbDlm* (4182-4185) — which is what
+// WireTruthChassis's consumer overlay maps CHASSIS_RHJB_DLM_* onto — but this
+// dispatch kept listening on the retired IDs.  Every leg the RHJB published
+// arrived under an ID nothing here handled and was dropped on the floor, so
+// GetDoorLockMotorDrive() answered its never-received default for the whole run
+// and the door_lock_motor plant behind it never moved.  (The blank columns in
+// the body acceptance case were a SECOND, independent gap — the field names its
+// criteria ask for did not exist in Scenario.cpp's writer at all, and an
+// unrecognised field is written as an empty cell.  Fixing only this mapping
+// would have turned those columns from blank into a flat zero.)  The
+// EV1SIM_CHASSIS_ID_MATCHES lines in the drift-guard block below now pin all
+// four to the contract's own constants, so a repeat divergence is a compile
+// error in the integrated build instead of a silently dead signal.
+constexpr std::uint32_t kSigDoorLockMotorLhLockDrive   = 4182U;
+constexpr std::uint32_t kSigDoorLockMotorLhUnlockDrive = 4183U;
+constexpr std::uint32_t kSigDoorLockMotorRhLockDrive   = 4184U;
+constexpr std::uint32_t kSigDoorLockMotorRhUnlockDrive = 4185U;
 constexpr int           kNumDoorLockMotorSignals       = 4;
+
+// Door-lock SWITCH contacts (ev1sim → the external RHJB, chassis segment).
+// The door-mounted rockers, modelled by ev1sim::DoorLockSwitch ×2.  Each is a
+// momentary contact to ground; the DLM ORs the LH and RH inputs per direction
+// and one-shots on the RISING edge.  Without a producer for these the DLM never
+// sees an edge and never drives a motor leg, so these four close the other half
+// of the loop the leg drives above report.
+//   4170  DOOR_LOCK_SW_LH_LOCK_OUT    ckt 780A, RHJB J9.C13
+//   4171  DOOR_LOCK_SW_LH_UNLOCK_OUT  ckt 781A, RHJB J9.D16
+//   4172  DOOR_LOCK_SW_RH_LOCK_OUT    ckt 780C, RHJB J3.A2
+//   4173  DOOR_LOCK_SW_RH_UNLOCK_OUT  ckt 781C, RHJB J3.A1
+// bool wire level: 1 = contact closed.
+constexpr std::uint32_t kSigDoorLockSwLhLockOut   = 4170U;
+constexpr std::uint32_t kSigDoorLockSwLhUnlockOut = 4171U;
+constexpr std::uint32_t kSigDoorLockSwRhLockOut   = 4172U;
+constexpr std::uint32_t kSigDoorLockSwRhUnlockOut = 4173U;
+constexpr int           kNumDoorLockSwitchSignals = 4;
 
 // Sounder / piezo drive (the external LHJB → ev1sim, chassis segment).
 //   4096  vehicle.body.sounder.piezo_drive   uint8 bool: 1 = piezo energised
@@ -771,7 +803,8 @@ constexpr int kNumEndpoints =
     kNumSteeringCmdSignals +
     kNumBrakeSignals + kNumWiperSignals + kNumHvacSignals +
     kNumAmbientSignals + kNumDoorLockPwSignals + kNumRsaShiftBlockedSignals +
-    kNumDoorLockMotorSignals + kNumSounderSignals + kNumSteeringPumpSignals +
+    kNumDoorLockMotorSignals + kNumDoorLockSwitchSignals +
+    kNumSounderSignals + kNumSteeringPumpSignals +
     kNumHvacControlSignals + kNumDoorLockStateSignals +
     kNumIpcTelltaleSignals + kNumIpcTripDistSignals + kNumIpcBtcmTelltaleSignals +
     kNumIpcExtraTelltaleSignals +
@@ -943,6 +976,20 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     out[i++] = {kSigDoorLockMotorRhUnlockDrive,
                 "vehicle.body.door_lock_motor.rh_unlock_drive",
                 "door_lock_motor_rh_unlock_drive", true};
+    // Door-lock switch contacts (ev1sim → RHJB, chassis segment, input_to_sim=false).
+    // The momentary rockers whose rising edge the DLM one-shots on.
+    out[i++] = {kSigDoorLockSwLhLockOut,
+                "vehicle.body.door_lock_switch.lh_lock_out",
+                "door_lock_switch_lh_lock", false};
+    out[i++] = {kSigDoorLockSwLhUnlockOut,
+                "vehicle.body.door_lock_switch.lh_unlock_out",
+                "door_lock_switch_lh_unlock", false};
+    out[i++] = {kSigDoorLockSwRhLockOut,
+                "vehicle.body.door_lock_switch.rh_lock_out",
+                "door_lock_switch_rh_lock", false};
+    out[i++] = {kSigDoorLockSwRhUnlockOut,
+                "vehicle.body.door_lock_switch.rh_unlock_out",
+                "door_lock_switch_rh_unlock", false};
     // Sounder / piezo drive (LHJB flasher → ev1sim, chassis segment, input_to_sim=true).
     out[i++] = {kSigSounderPiezoDrive,
                 "vehicle.body.sounder.piezo_drive",
@@ -1484,11 +1531,18 @@ struct ExternalSimConnector::State {
     bool          tjb_rr_stop_lamp        = false;
     bool          has_tjb_lamps           = false;
 
-    // Door-lock motor leg drives (IDs 4092-4095, chassis segment) — received from RHJB.
+    // Door-lock motor leg drives (IDs 4182-4185, chassis segment) — received from RHJB.
     // dual-H-bridge: [0]=LH lock, [1]=LH unlock, [2]=RH lock, [3]=RH unlock.
     // bool: true = leg energised.  Consumed by ev1sim::DoorLockMotor ×2.
     bool          door_lock_motor_drive[4]     = {};
     bool          has_door_lock_motor_drive[4] = {};
+
+    // Door-lock switch contacts (IDs 4170-4173, chassis segment) — published to
+    // RHJB.  Same index order as the legs: [0]=LH lock, [1]=LH unlock,
+    // [2]=RH lock, [3]=RH unlock.  Publish-on-change; the -1 sentinel forces the
+    // first publish so the DLM starts from a defined all-open state.
+    bool          door_lock_switch_contact[4]     = {};
+    std::int8_t   door_lock_switch_contact_pub[4] = {-1, -1, -1, -1};
 
     // Sounder / piezo drive (ID 4096, chassis segment) — received from LHJB flasher.
     // bool: true = piezo energised.  Consumed by ev1sim::Sounder.
@@ -1518,7 +1572,7 @@ struct ExternalSimConnector::State {
     std::int8_t   hvac_ac_request_pub      = -1;
     std::int8_t   hvac_defrost_request_pub = -1;
 
-    // Door lock STATE feedback (IDs 4155-4157, chassis segment) — published to external sim.
+    // Door lock STATE feedback (IDs 4165-4167, chassis segment) — published to external sim.
     // 0=unlocked, 1=locked.  Mirror of ev1sim::DoorLocks; publish-on-change.
     bool          door_lock_state_driver       = false;   // default UNLOCKED (DoorLocks default)
     bool          door_lock_state_passenger     = false;
@@ -1878,6 +1932,20 @@ bool ExternalSimConnector::GetDoorLockMotorDrive(int leg) const {
 bool ExternalSimConnector::HasReceivedDoorLockMotorDrive(int leg) const {
     if (leg < 0 || leg > 3) return false;
     return m_state->has_door_lock_motor_drive[leg];
+}
+
+void ExternalSimConnector::SetDoorLockSwitchContacts(bool lh_lock,
+                                                     bool lh_unlock,
+                                                     bool rh_lock,
+                                                     bool rh_unlock) {
+    m_state->door_lock_switch_contact[0] = lh_lock;
+    m_state->door_lock_switch_contact[1] = lh_unlock;
+    m_state->door_lock_switch_contact[2] = rh_lock;
+    m_state->door_lock_switch_contact[3] = rh_unlock;
+}
+bool ExternalSimConnector::GetDoorLockSwitchContact(int contact) const {
+    if (contact < 0 || contact > 3) return false;
+    return m_state->door_lock_switch_contact[contact];
 }
 
 bool ExternalSimConnector::GetSounderPiezoDrive() const {
@@ -2898,6 +2966,21 @@ EV1SIM_CHASSIS_ID_MATCHES(kWiperSwDelayOutId,        kSigWiperSw_DelayOut);
 EV1SIM_CHASSIS_ID_MATCHES(kWiperSwRequestOutId,      kSigWiperSw_RequestOut);
 EV1SIM_CHASSIS_ID_MATCHES(kWiperSwHiOutId,           kSigWiperSw_HiOut);
 EV1SIM_CHASSIS_ID_MATCHES(kWiperSwWasherSwitchOutId, kSigWiperSw_WasherSwitchOut);
+// Door-lock loop, both directions.  These four leg drives spent the wire-truth
+// migration listening on a retired ev1sim-only allocation (4092-4095) while
+// WireTruthChassis's consumer overlay delivered the contract's own IDs, so the
+// RHJB's motor drives were dropped and the acceptance columns read blank.  A
+// guard on each end of the loop is what turns a repeat of that into a compile
+// error: the leg drives ev1sim CONSUMES...
+EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockMotorLhLockDrive,   kSigChassisRhjbDlmLhLock);
+EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockMotorLhUnlockDrive, kSigChassisRhjbDlmLhUnlock);
+EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockMotorRhLockDrive,   kSigChassisRhjbDlmRhLock);
+EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockMotorRhUnlockDrive, kSigChassisRhjbDlmRhUnlock);
+// ...and the switch contacts it PRODUCES to make them move.
+EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockSwLhLockOut,   kSigDoorLockSw_LhLockOut);
+EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockSwLhUnlockOut, kSigDoorLockSw_LhUnlockOut);
+EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockSwRhLockOut,   kSigDoorLockSw_RhLockOut);
+EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockSwRhUnlockOut, kSigDoorLockSw_RhUnlockOut);
 // The 4100-range dynamics block publishes by literal offset from this base.
 EV1SIM_CHASSIS_ID_MATCHES(kDynamicsBase,                 kSigChassisSpeedMps);
 
@@ -2908,11 +2991,13 @@ EV1SIM_CHASSIS_ID_MATCHES(kDynamicsBase,                 kSigChassisSpeedMps);
 // NOT get an EV1SIM_CHASSIS_ID_MATCHES line — adding one now would break the
 // integrated (EV1SIM_HAVE_EXTERNAL_SIM) build until external sim catches up.
 // When external sim adds the canonical constants (suggested names below), move
-// each into the guard above so drift is caught from then on:
-//   kSigDoorLockMotorLhLockDrive   (4092) → kSigChassisDoorLockMotorLhLockDrive
-//   kSigDoorLockMotorLhUnlockDrive (4093) → kSigChassisDoorLockMotorLhUnlockDrive
-//   kSigDoorLockMotorRhLockDrive   (4094) → kSigChassisDoorLockMotorRhLockDrive
-//   kSigDoorLockMotorRhUnlockDrive (4095) → kSigChassisDoorLockMotorRhUnlockDrive
+// each into the guard above so drift is caught from then on.
+// Two groups left this list in the door-lock-producer change, and both left it
+// by being GUARDED above rather than by being deleted: the four motor legs
+// (re-pointed off the retired 4092-4095 allocation onto kSigChassisRhjbDlm*
+// 4182-4185) and the three door-lock STATE cells (adopted at 4165-4167 and
+// guarded since contract 1.3.0, but never struck from this list — a row here
+// for an ID that IS guarded is the same stale claim in the other direction).
 //   kSigSounderPiezoDrive          (4096) → kSigChassisSounderPiezoDrive
 //   kSigPscmPumpSpeedCmdQ8         (4097) → kSigChassisPscmPumpSpeedCmdQ8
 //   kSigPscmPumpInterlockClosed    (4098) → kSigChassisPscmPumpInterlockClosed
@@ -2921,9 +3006,6 @@ EV1SIM_CHASSIS_ID_MATCHES(kDynamicsBase,                 kSigChassisSpeedMps);
 //   kSigHvacModeRequest            (4126) → kSigChassisHvacModeRequest
 //   kSigHvacAcRequest              (4127) → kSigChassisHvacAcRequest
 //   kSigHvacDefrostRequest         (4128) → kSigChassisHvacDefrostRequest
-//   kSigDoorLockStateDriver        (4155) → kSigChassisDoorLockStateDriver
-//   kSigDoorLockStatePassenger     (4156) → kSigChassisDoorLockStatePassenger
-//   kSigDoorLockStateTrunk         (4157) → kSigChassisDoorLockStateTrunk
 //   kSigSteeringCmd                (4076) → kSigChassisSteeringCmd
 
 #undef EV1SIM_CHASSIS_ID_MATCHES
@@ -3321,6 +3403,25 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                    st.cruise_on_off_pub);
     }
 
+    // Door-lock switch contacts (IDs 4170-4173) — on change (sentinel -1 forces
+    // the first publish, so the DLM's edge detector seeds from a defined
+    // all-open state rather than from whatever the cell last held).  These are
+    // the only producer of these four cells; without them the RHJB DLM has no
+    // rising edge to one-shot on and never energises a motor leg.
+    {
+        static constexpr std::uint32_t kDoorLockSwIds[4] = {
+            kSigDoorLockSwLhLockOut, kSigDoorLockSwLhUnlockOut,
+            kSigDoorLockSwRhLockOut, kSigDoorLockSwRhUnlockOut};
+        for (int c = 0; c < 4; ++c) {
+            const std::int8_t v = st.door_lock_switch_contact[c] ? 1 : 0;
+            if (st.door_lock_switch_contact_pub[c] != v) {
+                outbound.push_back(MakeBoolDelta(kDoorLockSwIds[c],
+                                                 st.door_lock_switch_contact[c]));
+                st.door_lock_switch_contact_pub[c] = v;
+            }
+        }
+    }
+
     // Charge coupler presence (ID 4060) — publish delta on change.
     if (st.charge_coupler_present_pub < 0 ||
         static_cast<bool>(st.charge_coupler_present_pub) != st.charge_coupler_present) {
@@ -3371,7 +3472,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         pub_hvac_u8(kSigHvacDefrostRequest, st.hvac_defrost_request ? 1u : 0u, st.hvac_defrost_request_pub);
     }
 
-    // Door lock STATE feedback (IDs 4155-4157) — publish deltas on change.
+    // Door lock STATE feedback (IDs 4165-4167) — publish deltas on change.
     {
         auto pub_lock = [&](std::uint32_t id, bool val, std::int8_t& pub) {
             const std::int8_t v = val ? 1 : 0;

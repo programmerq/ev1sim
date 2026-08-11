@@ -45,6 +45,7 @@ public:
     void CruiseSpeedDown()   override;
     void DoorLockAll()       override;
     void DoorUnlockAll()     override;
+    void DoorLockSwitchPress(bool lock, bool driver_door) override;
     void ExteriorKeypadCode() override;
     void DoorHandleDriver()  override;
     void FlashToPass(bool held) override;
@@ -109,13 +110,17 @@ private:
     // external sim producer today — for closed-loop / physical-rig steering.
     void ApplyElectronicsSteering(DriverCommand& cmd);
 
-    // Consume the externally-driven body actuator peripherals each tick:
-    //   - power-steering pump motor (chassis 4097 in / 4098 out)
+    // Step the body peripherals that sit on the external electrical sim, both
+    // directions, each tick:
+    //   - power-steering pump motor   (chassis 4097 in / 4098 out)
     //   - sounder / piezo "click"     (chassis 4096 in)
-    //   - door-lock motors LH/RH      (chassis 4092-4095 in)
+    //   - door-lock motors LH/RH      (chassis 4182-4185 in)
+    //   - door-lock rockers LH/RH     (chassis 4170-4173 out)
     // Advances the PhysicalWorld plant models from the connector's latched
-    // inputs and mirrors door-lock end-of-travel into DoorLocks.  Safe to call
-    // when m_external_sim is null (no-op).  dt is the tick duration in seconds.
+    // inputs, mirrors door-lock end-of-travel into DoorLocks, and publishes the
+    // rocker contacts the RHJB's lock module edges on.  Both loops call this one
+    // function so the stimulus can never be live in one and dead in the other.
+    // Safe to call when m_external_sim is null (no-op).  dt is in seconds.
     void ConsumeBodyActuatorPeripherals(double dt);
 
     Config m_config;
@@ -263,9 +268,6 @@ private:
     // 0xFF = never received.
     std::uint8_t m_last_pw_motor_cmd[2]  = {0xFFu, 0xFFu};  // [0]=driver,[1]=passenger
 
-    // Last-applied door-lock motor stroke per door (cast of DoorLockMotor::Stroke;
-    // 0 == UNLOCKED, the motors' initial stroke).  Suppresses repeated DoorLocks
-    // writes / log lines, including a spurious "reached UNLOCKED" on the first
-    // tick after the motor-leg drives first appear.
-    int m_last_dlm_stroke[2] = {0, 0};                 // [0]=LH/driver, [1]=RH/passenger
+    // (Door-lock stroke edge-tracking moved into PhysicalWorld::StepDoorLockPlant
+    //  so the leg → stroke → latch chain is reachable from a unit test.)
 };
