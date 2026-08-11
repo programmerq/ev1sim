@@ -73,19 +73,59 @@ modern variant.
 
 | Parameter | Current | Real EV1 (Gen 2 AC induction) | Status |
 |---|---|---|---|
-| Peak torque | 150 N·m flat 0-6500 RPM | 149 N·m peak | ✅ within 1% |
-| Peak power (at 6500 RPM) | 102 kW | 102 kW (137 hp) | ✅ matches |
-| Max RPM | 13000 | ~12000-13000 | ✅ |
-| Map shape (full throttle) | flat torque to 6500, power-limited beyond | textbook 3-phase induction | ✅ |
-| Coast torque (zero throttle) | -5 to -25 N·m | EV1 used aggressive regen (~25 kW) | ⚠️  representative; not commanded regen |
+| Peak torque | 150 N·m flat 0-6500 RPM | **141 N·m at 7000 RPM** (prop p250) | ⚠️ corner disagrees — see below |
+| Peak power | 102 kW | **103 kW at 7000 RPM** (prop p250) | ✅ within 1% |
+| Drive speed ceiling | **16000 RPM** | **16000 RPM** (prop p328, DTC 007) | ✅ sourced |
+| Map shape (full throttle) | flat torque to 6500, constant power beyond, zero at 16000 | textbook 3-phase induction + a hard control ceiling | ✅ |
+| Coast torque (zero throttle) | -5 to -40 N·m | EV1 used aggressive regen (~25 kW) | ⚠️  representative; not commanded regen |
 | Motor type | "EngineSimpleMap" (Chrono ICE template) | 3-phase AC induction | ⚠️ template mismatch — works as a static map |
 
-The motor torque/power *map* matches the real EV1 closely.  What's missing:
+**The speed ceiling (2026-08-11).**  The map used to end at 13 000 RPM, and this
+table used to call that "✅".  It was neither correct nor a ceiling.
+
+It was not correct because 13 000 RPM is not a property of the motor — it is the
+~80 mph **software** top-speed calibration restated in RPM (80 mph ÷ 0.2915 m
+tire × 10.946 = 12 824 RPM).  @source:manual propulsion p250: "The PIM will
+limit vehicle speed in the forward direction to 129 km/h (80 mph)", enforced by
+decreasing the torque current.  That is the propulsion controller's calibration,
+not the drive's capability, and encoding it as physics made a software choice
+unmodifiable.  The drive's actual ceiling is **16 000 RPM** — @source:manual
+propulsion p328 (DTC 007): a speed/direction pulse rate above 34 000 Hz
+"corresponds to a shaft speed of 16,000 RPM", at which "the SERVICE NOW telltale
+is illuminated, the DTC is stored and propulsion is disabled".  That is ~100 mph
+at the road: above the software cap, not significantly beyond it.
+
+It was not a ceiling because Chrono's clamp on `Maximal Engine Speed RPM` bounds
+the torque **lookup**, not the shaft (`ChEngineSimpleMap.cpp:39`), and
+`ChFunctionInterp` holds the endpoint value outside the table
+(`ChFunctionInterp.cpp:49-52`, extrapolation off by default).  So the map's last
+torque was delivered at every higher speed forever: 74.9 N·m at any RPM, which
+at the ~45 500 RPM seen in a low-mu wheelspin is **357 kW from a 102 kW drive**.
+An unloaded wheel therefore accelerated without bound — measured at 451 rad/s
+(294 mph of tread speed) and still climbing linearly at 40 s.
+
+The fix extends the map to 16 000 RPM along the same constant-power hyperbola
+and pins the last point at **0 N·m**, so the endpoint hold now delivers nothing
+above the ceiling.  Every pre-existing map point is preserved verbatim, so
+nothing below 13 000 RPM (~81 mph) moves.  Guarded by
+[`tests/test_motor_speed_ceiling.cpp`](../tests/test_motor_speed_ceiling.cpp).
+
+**Corner-point disagreement (open).**  The 150 N·m / 6500 RPM corner in the map
+comes from secondary web figures; the primary service manual (propulsion p250)
+says **141 N·m and 103 kW, both at 7000 RPM**.  Correcting it is a ~6 % torque
+change and a ~7.7 % base-speed change, which moves every acceleration
+trajectory — deliberately not bundled with the ceiling fix.  See
+[TODO.md](TODO.md).
+
+What's also still missing:
 - Regen integrated with brake commands (today regen lives only in coast
   torque, which fires whenever throttle is released regardless of brake)
 - Speed-dependent peak — induction motors have a more complex torque
   envelope at low speeds (limited by inverter current) than a flat 150 N·m
   curve suggests.  Probably negligible for our use cases.
+- The ~80 mph software cap itself.  ev1sim has no top-speed limiter at all;
+  the cap belongs on the propulsion-controller side (electricsim PIM), which
+  is where the manual puts it.
 
 ## 4. Drivetrain
 

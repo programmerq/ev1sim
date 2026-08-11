@@ -123,6 +123,25 @@ private:
     // Safe to call when m_external_sim is null (no-op).  dt is in seconds.
     void ConsumeBodyActuatorPeripherals(double dt);
 
+    // Publish the motor operating point on the chassis bus: RPM (4070) and
+    // shaft torque (4071).  DC pack current (4072) is the external PIM's to
+    // derive from these — ev1sim publishes only the mechanical state.
+    //
+    // The RPM comes from the TRANSMISSION's output-motorshaft speed, not from
+    // ChEngine::GetMotorSpeed().  The engine's reported speed is clamped to
+    // "Maximal Engine Speed RPM" (ChEngineSimpleMap.cpp:39) because that clamp
+    // exists to keep the torque LOOKUP inside the map's domain — it does not
+    // limit the shaft.  Publishing it meant the bus saturated at the map's top
+    // RPM no matter how fast the shaft actually turned, so PIM's sourced
+    // over-speed fault (DTC 007 at 16 000 RPM, propulsion manual p328) could
+    // never see an over-speed: a check that cannot fail.  The transmission's
+    // GetOutputMotorshaftSpeed() is the unclamped shaft state.
+    //
+    // Both the rendered loop and the headless loop call this one function so
+    // the bus can never report one thing in one loop and another in the other.
+    // Safe to call when m_external_sim is null (no-op).
+    void PublishMotorState();
+
     Config m_config;
 
     std::unique_ptr<VehicleWorld>           m_world;

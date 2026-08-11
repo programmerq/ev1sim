@@ -33,6 +33,43 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   out) is currently a lumped-motor model; a per-phase BLDC model on `molex.A/B/C`
   is an optional future refinement.
 
+## Powertrain
+
+- [ ] **Motor corner point disagrees with the primary manual (forking —
+  land it before the next VAT baseline recapture, not after).**
+  `EV1_EngineSimpleMap.json` puts peak torque at **150 N·m flat to 6500 RPM**
+  with a 102 kW envelope.  Those came from secondary web figures.  The
+  propulsion service manual p250 states **141 N·m and 103 kW, both at 7000
+  RPM** — a 6 % lower peak torque and a 7.7 % higher base speed.
+  The manual is internally consistent (141 × 7000 × 2π/60 = 103.4 kW) and is
+  the primary document, so it should win.
+  **Why it was not bundled with the 2026-08-11 ceiling fix:** the corner sits
+  in the region every acceleration passes through, so changing it moves every
+  acceleration trajectory and therefore every VAT baseline.  The ceiling fix
+  deliberately touched nothing below 13 000 RPM so that it could land without
+  a recapture.  This one cannot.
+  Doing it means: re-cut the constant-torque plateau to 141 N·m, move the
+  corner to 7000 RPM, re-derive the constant-power hyperbola at 103 kW, update
+  the preserved-points regression list in `tests/test_motor_speed_ceiling.cpp`
+  (it exists precisely to make this edit deliberate), re-run coastdown +
+  accel scenarios, and recapture VAT baselines.
+
+- [ ] **No top-speed limiter anywhere (the ~80 mph software cap).**
+  ev1sim's plant has no speed limiter at all, and it should not have one —
+  @source:manual propulsion p250 puts the cap in the PIM: "The PIM will limit
+  vehicle speed in the forward direction to 129 km/h (80 mph)", enforced by
+  decreasing the torque current (48 km/h / 30 mph in reverse).  So the work is
+  on the **electricsim PIM** side, not here: a torque-command taper keyed on
+  **motor shaft speed**, which is what the real PCM watches (prop p326 — the
+  speed/direction sensor is "attached to the end of the rotor shaft"; p336 —
+  the PCM "uses and monitors the motor shaft speed signal … including vehicle
+  speed signal generation, torque control, and cruise control").  Not road
+  speed: the BTCM owns true road speed and reaches the PCM as a torque retard
+  request, not a speed feed.
+  ev1sim's side of that is already done — 4070 now publishes the unclamped
+  shaft speed (`SimApp::PublishMotorState`), so a PIM-side limiter has an
+  honest signal to act on.
+
 ## Door / lock state
 
 - [ ] **Slip-dynamics drag calibration (deferred).**  CdA still 6.5× spec
