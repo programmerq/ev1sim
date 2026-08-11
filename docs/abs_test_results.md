@@ -12,7 +12,7 @@ isolates the simavr edge-counting plumbing from the chassis side.
 | Test       | Surface                          | What it validates                              |
 |---|---|---|
 | `high_mu`  | uniform asphalt (μ ≈ 0.9)        | ABS shouldn't hurt on dry pavement             |
-| `low_mu`   | uniform ice (μ ≈ 0.10)           | ABS should keep wheels rolling on slippery     |
+| `low_mu`   | asphalt → packed snow (μ ≈ 0.20), brakes on the snow | ABS should keep wheels rolling on slippery |
 | `mu_jump`  | asphalt → ice transition         | algorithm must adapt as grip suddenly drops    |
 | `split_mu` | left = asphalt, right = ice      | per-wheel ABS keeps the car going straight    |
 

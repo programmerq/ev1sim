@@ -1,14 +1,14 @@
 {
-  "//": "Config wrapper for the low-mu (uniform-ice) ABS stop.  Friction 0.10",
-  "//1": "is intermediate between packed snow (0.15) and pure ice (0.05).",
+  "//": "Config wrapper for the low-mu (packed-snow) ABS stop.  Launches on",
+  "//1": "asphalt (level/flat_low_mu_transition.json), reaches entry speed",
+  "//2": "and crosses onto the snow patch (friction 0.20) before the brake",
+  "//3": "event -- see that level file and abs_low_mu_stop.json for the",
+  "//4": "transition margin and the friction-value citation.",
 
   "vehicle_model": "ev1",
   "terrain": {
-    "type": "rigid_plane",
-    "surface": "ice",
-    "friction": 0.10,
-    "length_m": 800.0,
-    "width_m":  200.0
+    "type": "level",
+    "level_file": "level/flat_low_mu_transition.json"
   },
   "simulation": {
     "step_size_s": 0.001,
