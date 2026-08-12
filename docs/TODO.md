@@ -82,9 +82,9 @@ future-UI input on one side, chassis-segment signal publishing on the other.
 - [x] **The three uniform-surface stops brake on the barrier tick.**
   Done 2026-08-12.  `abs_high_mu_stop`, `abs_hard_brake` and
   `abs_brake_and_steer` scheduled `set_brake` at 7.0 / 7.0 / 6.0 s, all behind
-  a `wait_for_speed` barrier releasing at 15.028 / 15.028 / 12.011 s, so full
+  a `wait_for_speed` barrier releasing at 15.028 / 15.028 / 12.053 s, so full
   brake landed on the exact tick the throttle dropped to zero.  Brakes moved to
-  18.0 / 18.0 / 15.0 s — a 2.97 / 2.97 / 2.99 s settle — with brake values, mu
+  18.0 / 18.0 / 15.0 s — a 2.97 / 2.97 / 2.96 s settle — with brake values, mu
   values, the 0.30 s brake-to-steer offset and the hold durations (18 / 18 / 19
   s) all unchanged; `max_time_s` extended to keep the same 5 s tail after brake
   release.  `scripts/scenario_runway_report.py` now covers all seven ABS

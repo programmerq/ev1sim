@@ -47,7 +47,7 @@ relative to a transition — they launch and brake on one surface — but the
 entry condition was a transient rather than a steady state, which is the
 same defect the transition four carried.  The brakes moved to 18.0 / 18.0
 / 15.0 s, past their measured barrier releases of 15.028 / 15.028 /
-12.011 s.  Brake values, mu values, the 0.30 s brake-to-steer offset and
+12.053 s.  Brake values, mu values, the 0.30 s brake-to-steer offset and
 the hold durations are unchanged; only the schedule moved.
 
 `scripts/scenario_runway_report.py` now covers all seven rather than the
@@ -63,6 +63,43 @@ hard-coded list of three.
 It had none, so neither `run_abs_compare.sh` nor the runway report could
 launch it — a scenario nobody can run is a scenario nobody can measure,
 which is part of how its zero settle survived.
+
+### What moved
+
+Measured with `scripts/scenario_runway_report.py`, no BTCM attached (front
+braking is straight hydraulic pass-through).  "before" is origin/main — the
+old brake schedule *and* the pre-correction coast map, since both change
+what the car is doing when the pedal goes down.
+
+| | high_mu | hard_brake | brake_and_steer |
+|---|---|---|---|
+| barrier releases | 15.028 s | 15.028 s | 12.053 s |
+| settle, before → after | 0.00 → **2.97 s** | 0.00 → **2.97 s** | 0.00 → **2.96 s** |
+| brake-on speed, before | 67.1 mph | 67.1 mph | 55.9 mph |
+| brake-on speed, after | **65.3 mph** | **65.3 mph** | **54.1 mph** |
+| stop distance, before | 108.69 m | 108.69 m | 64.91 m |
+| stop distance, after | **102.30 m** | **102.29 m** | **66.72 m** |
+| vs. ideal at μ 0.9 | 2.14 → 2.12 | 2.14 → 2.12 | 1.83 → **2.01** |
+
+Entry speed drops ~1.8 mph on all three, because the car now coasts ~3 s
+before the pedal goes down instead of braking on the tick the throttle
+released.
+
+**`brake_and_steer`'s stop got 1.81 m longer, and that is not a
+regression** — it is the measurement moving to the thing the scenario
+claims to test.  Two real effects: it brakes from 55.9 → 54.1 mph, only a
+small v² saving; and it brakes from just above the coast map's 52.1 mph
+knee, so it loses the extra (unsourced) coast drag the old map contributed
+right there.  Its ratio to an ideal μ-limited stop moves 1.83 → 2.01, into
+line with the other two, because the steering input at brake + 0.30 s now
+bites a settled car instead of one still shedding launch slip.  A
+brake-and-steer number taken during the launch transient was flattering.
+
+`abs_brake_and_steer`'s barrier release is **12.053 s**, not the 12.011 s
+that `docs/TODO.md` and the retired `[Runway]` case both carried.  That
+figure cited this report script, but the script could not run any of these
+three until 2026-08-12 — so it cannot have produced them.  Re-measured
+either side of this branch's changes: 12.053 both times.
 
 ## How to run
 

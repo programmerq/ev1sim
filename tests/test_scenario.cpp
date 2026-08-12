@@ -1100,7 +1100,15 @@ TEST_CASE("Scenario: the shipped transition scenarios brake after a settle, "
     // transition to mistime — measured_crossing_s is -1 for all three — but
     // the settle requirement is identical and was identically violated: their
     // brakes sat at 7.0 / 7.0 / 6.0 s behind barriers releasing at 15.028 /
-    // 15.028 / 12.011 s, so full brake landed on the tick the throttle dropped.
+    // 15.028 / 12.053 s, so full brake landed on the tick the throttle dropped.
+    //
+    // abs_brake_and_steer's release is 12.053, not the 12.011 that docs/TODO.md
+    // and the retired [Runway] case both carried.  That figure cited
+    // scripts/scenario_runway_report.py — but the report could not run any of
+    // these three until 2026-08-12: two needed support for boundary-less
+    // levels and abs_hard_brake had no config wrapper at all.  So the tool it
+    // cited cannot have produced it.  Re-measured on both sides of this
+    // branch's changes: 12.053 either way, so nothing here moved it.
     const BarrierCase settled[] = {
         {"config/scenarios/abs_mu_jump.json",         7.718, 2.0,   -1.0, 0.0},
         {"config/scenarios/abs_split_mu.json",        9.690, 2.0, 12.291, 2.0},
@@ -1108,7 +1116,7 @@ TEST_CASE("Scenario: the shipped transition scenarios brake after a settle, "
         {"config/scenarios/abs_low_mu_stop.json",     7.718, 2.0, 10.118, 1.0},
         {"config/scenarios/abs_high_mu_stop.json",   15.028, 2.0,   -1.0, 0.0},
         {"config/scenarios/abs_hard_brake.json",     15.028, 2.0,   -1.0, 0.0},
-        {"config/scenarios/abs_brake_and_steer.json", 12.011, 2.0,  -1.0, 0.0},
+        {"config/scenarios/abs_brake_and_steer.json", 12.053, 2.0,  -1.0, 0.0},
     };
 
     for (const auto& c : settled) {

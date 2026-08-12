@@ -317,9 +317,13 @@ def main(argv) -> int:
         all_ok &= report(key, binary)
         print()
     if not all_ok:
-        print("At least one scenario's launch is not finishing before its "
-              "surface under test. See the level/*.json headers for the budget "
-              "each one is supposed to hold.", file=sys.stderr)
+        print("At least one scenario is not braking from a settled entry: "
+              "either its launch is still finishing when the brake goes down, "
+              "or (transition levels only) it has not cleared its surface "
+              "boundary. See the level/*.json headers for the runway budget "
+              "each transition scenario holds, and the [Runway] cases in "
+              "tests/test_scenario.cpp for the settle each of the seven is "
+              "pinned to.", file=sys.stderr)
     return 0 if all_ok else 1
 
 
