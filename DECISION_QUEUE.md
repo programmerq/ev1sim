@@ -22,60 +22,79 @@ of the tree (no private-infrastructure identifiers).
 
 ## Open owner decisions
 
-### DQ-2026-08-11-residual-cosim-speed-spread-from-a-wall-paced-producer
+### DQ-2026-08-11-what-a-repeatable-capture-run-is-allowed-to-be
 
-**What's being decided.** After the sim-clock fix on this branch, armed
-17-module co-sim runs of `body_rhjb_door_lock` still land on one of exactly
-**two** vehicle-speed traces, differing by at most **7.6e-05 mph** on a car
-that never leaves 0.117 mph. ev1sim cannot close that on its own. The program
-has to say what a VAT capture run is allowed to be: byte-identical, or equal
-within a stated tolerance.
+**What's being decided.** What a VAT capture run has to satisfy to count as
+repeatable: byte-identical output, or output equal within a stated tolerance —
+and if a tolerance, calibrated on which case. The answer cannot be "byte
+identical" today, and a tolerance read off the quiet cases would be off by four
+orders of magnitude for the loud one.
 
 **Why now.** This is one of two named items the VAT baseline recapture is
-waiting on, so "capture runs must be byte-identical" is either a requirement
-the recapture can meet or one it cannot.
+waiting on. Recapture needs a pass/fail rule, and the measurements below say
+which rules are available.
 
-**Source.** PR #55 (run-determinism investigation), which fixed the *other*
-cause — freshness windows that aged on the host wall clock. 18 armed runs on
-an idle host: 16 produced one trace, 2 the other, and which one is decided
-entirely by a single tick.
+**Source.** PR #55 (<https://github.com/programmerq/ev1sim/pull/55>), which
+fixed the ev1sim-side cause: freshness windows that aged on the host wall
+clock, so a host stall zeroed the rear brakes for a tick. What is measured
+below is what remains after that, none of it ev1sim's.
 
-**The mechanism, stated exactly.** ev1sim's BTCM-liveness proxy is "the
-BTCM's GM-8192 TX bit count advanced" (`ExternalSimConnector.cpp`, the
-`btcm_tx_total_bits()` block). The external sim's BTCM paces bit production on
-its own **host wall clock**, not on sim time, even under an armed barrier —
-tracked there as external sim BL-0082, and gated on this same recapture. So
-how many bits exist after a given barrier tick is a wall-clock race, and the
-ev1sim tick that first sees a non-zero count landed on sim 1.258 s in 16 runs
-and 1.241 s in 2 — one tick apart. The rear brakes come alive one tick earlier
-in those two runs, and the speed trace differs from there. The correlation is
-exact: every run at 1.258 has one speed checksum, every run at 1.241 the other,
-no exceptions.
+**What two consecutive armed runs of the same case actually differ by.** All
+runs below have the tick barrier armed, 17 of 17 consumers acking, and **zero**
+BTCM-stale dropouts — so none of this is the cause PR #55 fixed.
+
+| case | what it does | runs | spread between runs |
+| --- | --- | --- | --- |
+| `body_rhjb_door_lock` | parked, brakes held | 18 | 2 distinct traces; **7.6e-05 mph** peak speed difference, against a 0.117 mph peak |
+| `abs_high_mu` | 67 mph hard stop, ABS cycling | 2 | **0.51 mph** speed, **1.2 deg** heading, 2.3 rad/s wheel speed — against a 1.9 deg total heading excursion |
+
+The two are different mechanisms and only the first is understood in detail:
+
+- **Parked case — the go-live tick.** ev1sim's BTCM-liveness proxy is "the
+  BTCM's GM-8192 TX bit count advanced". The external sim's BTCM paces bit
+  production on its own host clock even under an armed barrier, so the ev1sim
+  tick that first sees a non-zero count is a race: sim 1.258 s in 16 runs,
+  1.241 s in 2. The rear brakes come alive one tick earlier in those two and
+  the trace differs from there. The correlation is exact — the speed checksum
+  is a function of that tick, no exceptions in 18 runs.
+- **Braking case — the controller's own output.** Both runs saw the first
+  heartbeat on the same tick, so the above does not explain it. They diverge
+  from t = 17.2 s, which is ABS onset, and the `abs_phase_*` and `emb_cmd_*`
+  columns differ: the BTCM is issuing different commands, and the closed loop
+  amplifies the difference for the remaining 13 s of the stop. That is
+  upstream, and the external sim already tracks a sibling finding of the same
+  shape (a run-to-run yaw swing on `abs_split_mu` at a fixed commit).
 
 **Options.**
 
-- **A — Compare with a tolerance, capture now.** State a speed tolerance in
-  the capture criteria (1e-3 mph would sit ~13x above the observed spread and
-  still far below anything the criteria decide on). Recapture is unblocked
-  today; the residual spread stays visible rather than asserted away.
-- **B — Wait for the producer to be sim-paced.** Land external sim BL-0082
-  (feed sim time to the UART framers/serialisers) and recapture after. Gets
-  byte-identity, at the cost of blocking the recapture on a behaviour-changing
-  change in the other repo — which is itself recapture-gated, so this is a
-  cycle unless the owner breaks it deliberately.
-- **C — Make ev1sim's go-live depend on a sim-paced BTCM signal instead.**
-  Technically possible (the BTCM's chassis cells are written inside its barrier
-  tick), but it hides a producer-side wall-clock dependency behind a consumer-
-  side workaround, and the heartbeat proxy exists precisely because the
-  on-change chassis cells do not refresh in steady state. Not recommended.
+- **A — Tolerance per case, calibrated on the case.** Recapture now; each case
+  states its own band. Honest about the two regimes, but the ABS band would
+  have to be ~1.2 deg of heading, which is most of the manoeuvre — a band that
+  wide asserts almost nothing about the ABS cases it covers.
+- **B — Make the producer sim-paced first, then recapture.** The external sim
+  feeds its UART serialisers and framers the host clock; feeding them sim time
+  is the real fix and is tracked there. It is behaviour-changing and itself
+  recapture-gated, so choosing this means deliberately breaking that cycle.
+- **C — Recapture only the quiet cases now, hold the ABS cases for B.** Splits
+  the difference: the parked/body/lighting cases get a tight tolerance (1e-3
+  mph sits ~13x above their measured spread) and recapture immediately; the
+  cases whose closed loop amplifies upstream timing wait for B. Costs a
+  partial baseline and a list of which cases are in which state.
 
-**Recommendation: A**, and file B as the real fix rather than a blocker. The
-symptom is 7.6e-05 mph on a parked car; the thing byte-identity would be
-buying here is not fidelity, it is a stronger claim than the co-sim contract
-currently supports.
+**Recommendation: C.** A is available but the ABS band it would need is too
+wide to be worth asserting, and the cases where a tight band *is* meaningful
+are exactly the ones that can move today.
 
-**Default if silent:** A — capture proceeds with a stated tolerance, and this
-entry stays open until B lands.
+**Default if silent:** C — the quiet cases recapture with a stated tolerance,
+the ABS cases wait, and this entry stays open until B lands.
+
+**Not recommended, recorded so it is not re-proposed:** closing the parked-case
+gap inside ev1sim. It could be done — take first-liveness from a BTCM chassis
+cell, which is written inside the producer's barrier tick and so is sim-paced,
+and keep the heartbeat for steady-state liveness where those on-change cells
+do not refresh; or debounce the go-live edge by a tick. Both work, and both
+would put a consumer-side patch over a producer-side dependence on the host
+clock, leaving the braking-case divergence untouched and harder to see.
 
 Standing work items live in `docs/TODO.md`; they only enter this queue when
 they fork into a question the owner must rule on.
