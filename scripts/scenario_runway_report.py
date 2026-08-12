@@ -549,6 +549,15 @@ def main(argv) -> int:
                   "what this run measured; nothing rewritten.")
         return 0 if all_ok else 1
 
+    # A COMPLETION MARKER, printed only after every requested scenario has
+    # been re-derived.  This run takes ~18 minutes; if a CI timeout kills it
+    # partway, the log ends after some number of green per-scenario blocks and
+    # otherwise looks exactly like a clean run.  The exit code differs, but
+    # logs get read on their own.  So: no marker, no verdict.
+    print(f"[runway] re-derived {len(measured)} of {len(wanted)} scenarios "
+          f"against {TABLE_PATH.relative_to(ROOT)} — "
+          f"{'all agree' if all_ok else 'SOMETHING DISAGREES, see above'}")
+
     if not all_ok:
         print("Either a scenario is not braking from a settled entry (its launch "
               "is still finishing when the brake goes down, or — transition "

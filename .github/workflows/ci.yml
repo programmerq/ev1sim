@@ -4,13 +4,28 @@ on:
   push:
     branches: [main]
   pull_request:
+  # So the schedule-only work below can be run on demand.  Without this a red
+  # cron can only be re-checked by waiting up to three days for the next one,
+  # which is a poor property for a check whose whole job is to notice drift.
+  workflow_dispatch:
   schedule:
-    # Keep the Chrono build cache warm.  Only chrono-smoke runs on this cron —
-    # every other job is gated with `if: github.event_name != 'schedule'` so the
-    # warm-up doesn't burn runner time on the cheap jobs.  A cache restore (even
-    # a hit) resets GitHub's 7-day idle-eviction timer, and a miss rebuilds it
-    # off the PR critical path so contributors never wait on a cold (~20-40 min)
-    # Chrono build.
+    # Two jobs of work, both of which want a lane nobody waits on.
+    #
+    # 1. Keep the Chrono build cache warm.  Only chrono-smoke runs on this cron
+    #    — every other job is gated with `if: github.event_name != 'schedule'`
+    #    so the warm-up doesn't burn runner time on the cheap jobs.  A cache
+    #    restore (even a hit) resets GitHub's 7-day idle-eviction timer, and a
+    #    miss rebuilds it off the PR critical path so contributors never wait
+    #    on a cold (~20-40 min) Chrono build.
+    #
+    # 2. Re-derive the measured settle table (2026-08-12).  Seven headless
+    #    scenario runs, ~18 min measured locally and more on a runner.  It is
+    #    here rather than on the PR path deliberately: adding that to a lane
+    #    that gates every PR is the wrong direction for a repo that has been
+    #    finding lanes running at zero headroom, and on a Chrono cache miss it
+    #    could push the job past its ceiling — which would turn a correctness
+    #    check into a flaky one.  Nobody waits on this lane, so 18 minutes
+    #    costs nothing here.
     - cron: '17 6 */3 * *'
 
 jobs:
@@ -205,7 +220,13 @@ jobs:
   # `container:` here for zero cold-build variance — see scripts/build_chrono.sh.
   chrono-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 75          # absolute ceiling; covers a cold Chrono build
+    # Absolute ceiling.  Sized for the worst case this job can hit: a cold
+    # Chrono build (~20-40 min) plus, on the schedule event only, the settle
+    # table re-derivation (~18 min locally, budgeted 45 below).  Raised from 75
+    # on 2026-08-12 when that step was added.  It costs nothing on a PR run —
+    # a ceiling is not a reservation — and it exists so a slow cron cannot be
+    # killed halfway and leave a log that reads like a clean one.
+    timeout-minutes: 130
     steps:
       - uses: actions/checkout@v6
 
@@ -301,3 +322,82 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           cmake --build build-tests --target ev1sim_tests -j"$(nproc)"
           ctest --test-dir build-tests --output-on-failure
+
+      # ── Settle-table re-derivation (cron / manual only) ──────────────────
+      # config/scenarios/measured_settle.json records when each ABS scenario's
+      # wait_for_speed barrier actually releases.  tests/test_scenario.cpp's
+      # [Runway] cases check each brake against those numbers and CANNOT see
+      # the plant move under them: a barrier that starts releasing a second
+      # later leaves a brake still clearing release + settle on paper while the
+      # real settle has halved.  This re-derives every measured field from an
+      # actual run and fails when one has drifted past 0.05 s.
+      #
+      # NOT on the PR path, deliberately — see the comment on `schedule:` at
+      # the top of this file.  It needs only ./build/ev1sim, built above, and
+      # no electricsim.
+      #
+      # RUNTIME: seven headless scenarios, ~18 min measured locally (the
+      # slowest, abs_hard_brake, is ~2.5 min).  Budgeted 45 to leave room for a
+      # slower runner without the budget itself becoming the thing that fails.
+      # An explicit step timeout matters here beyond politeness: killed
+      # partway, the log ends after some number of green per-scenario blocks
+      # and otherwise reads like a clean run, so the script prints a
+      # completion marker and the step below refuses to pass without it.
+      - name: Re-derive the measured settle table
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        timeout-minutes: 45
+        run: |
+          set -o pipefail
+          rc=0
+          python3 scripts/scenario_runway_report.py --binary ./build/ev1sim \
+            2>&1 | tee runway.log || rc=$?
+
+          # Completion marker, not just the exit code: a timeout kill also
+          # gives a non-zero rc, and this distinguishes "ran and disagreed"
+          # from "was cut off".
+          if ! grep -q '^\[runway\] re-derived' runway.log; then
+            echo "::error title=Settle table re-derivation did not finish::No completion marker in the log — the run was cut off (timeout, crash, or OOM) rather than reaching a verdict. Nothing has been checked."
+            {
+              echo "## Settle table: **did not finish**"
+              echo
+              echo "The re-derivation was cut off before reaching a verdict, so"
+              echo "the table has *not* been checked this run."
+              echo
+              echo '```'
+              tail -30 runway.log
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          if [ "$rc" -ne 0 ]; then
+            echo "::error title=Measured settle table is stale::A re-derived barrier release or surface crossing disagrees with config/scenarios/measured_settle.json by more than the tolerance the table carries. Re-measure with 'scripts/scenario_runway_report.py --update' and commit what moved, saying why the plant moved."
+            {
+              echo "## Settle table: **stale**"
+              echo
+              echo "A re-derived value disagrees with"
+              echo "\`config/scenarios/measured_settle.json\`. Fix with:"
+              echo
+              echo '```sh'
+              echo 'scripts/scenario_runway_report.py --update   # then commit what moved'
+              echo '```'
+              echo
+              grep -E 'STALE TABLE|^=== ' runway.log || true
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit "$rc"
+          fi
+
+          {
+            echo "## Settle table: agrees"
+            echo
+            grep -E '^\[runway\] re-derived' runway.log
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the re-derivation log
+        if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+        uses: actions/upload-artifact@v4
+        with:
+          name: runway-report
+          path: runway.log
+          if-no-files-found: ignore
+          retention-days: 30

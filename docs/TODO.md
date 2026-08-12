@@ -122,12 +122,21 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   by design" (`abs_mu_jump`) — which the JSON now distinguishes, so the
   re-derivation can check the crossings that are entry conditions and skip the
   one that is the subject of its test.
-  **Still owner-side:** the real re-derivation is seven headless runs of a few
-  minutes each, so it is opt-in rather than in the default suite —
-  `make test-runway-table`, or `ctest -L slow` when configured
-  `-DEV1SIM_SLOW_TESTS=ON`.  Wiring it into the Chrono CI job is one step in
-  `.github/workflows/ci.yml`; the step is written out in the PR that landed
-  this, for the next workflow batch.
+  The real re-derivation is seven headless runs of a few minutes each (~18 min
+  measured), so it is opt-in locally — `make test-runway-table`, or
+  `ctest -L slow` when configured `-DEV1SIM_SLOW_TESTS=ON`.
+  **In CI it runs on the CRON lane**, not the PR path: the `schedule` /
+  `workflow_dispatch` branch of `chrono-smoke`, which already builds the
+  `ev1sim` binary it needs.  Adding 18+ minutes to a lane that gates every PR
+  is the wrong direction, and on a Chrono cache miss it could exceed the job
+  ceiling and turn a correctness check into a flaky one; nobody waits on the
+  cron.  A failure surfaces as a red scheduled run carrying an `::error::`
+  annotation that names the fix, a job-summary block, and GitHub's default mail
+  for a failed scheduled workflow; the report log is kept as an artifact for 30
+  days.  The script prints a completion marker and the step refuses to pass
+  without it, so a run killed by the timeout cannot leave a log that reads like
+  a clean one.  `workflow_dispatch` exists so a red cron can be re-checked
+  without waiting three days for the next.
 
 - [x] **The coast map exceeds the manual's stated regeneration bound above
   ~8400 RPM.**  Done 2026-08-12, and the framing above was wrong in the way
