@@ -157,19 +157,24 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   (The `Body aerodynamics` follow-up — "trim tire rolling/slip dissipation
   now that drag is no longer lumped into it" — is this same item.)
   **Updated 2026-08-12:** re-fit this against the corrected coast map, not the
-  old one, and fit it over the **whole coast** rather than through
-  `scripts/fit_coastdown.py`, whose 30 s window truncates the two runs at
-  different speeds and produces a spurious result (see §11.1).
+  old one, and run it as `./build/ev1sim --config config/coastdown.json`.
   The pre-2026-08-12 coast curve's torque rose with speed, and a two-parameter
   `F_rr + CdA·v²` fit has nowhere to put a rising term but CdA — so §11's "2×
-  on both terms" was partly an artefact of an unsourced curve.  Fitted properly
-  over `v ≥ 10 m/s`, bounding the coast map moves **CdA 0.880 → 0.571 m²**
-  (2.44× → 1.59× spec) and **F_rr 193.4 → 239.6 N**.  Below the knee, where the
-  two maps are identical, both fits agree to 0.3 N and 0.002 m² — use that
-  sub-knee control as the check that any future fit is measuring the plant and
+  on both terms" was partly an artefact of an unsourced curve.  Bounding the
+  coast map moves **CdA 0.914 → 0.621 m²** (2.54× → 1.72× spec) and **F_rr
+  188.9 → 231.7 N**.  Below the knee, where the two maps are identical, both
+  fits agree to 0.3 N and 0.003 m² — use that sub-knee control
+  (`--v-max 23.28`) as the check that any future fit is measuring the plant and
   not the window.  The excess is reduced, **not** explained away: CdA is still
-  1.6× spec, and an earlier version of this entry wrongly concluded the residual
-  was "not aero-shaped" on the strength of the truncated fit.
+  1.7× spec, and an earlier version of this entry wrongly concluded the residual
+  was "not aero-shaped" on the strength of a time-truncated fit.
+  `scripts/fit_coastdown.py` no longer has that 30 s cap: pass it both CSVs and
+  it fits them over the speed range they share, names it, and refuses when
+  there isn't one.  Its numbers also now carry a spread, and a window that
+  cannot separate F_rr from CdA says so instead of printing a confident value —
+  which is what makes "CdA is 1.7× spec" a claim worth acting on and the
+  retracted "0.09 m², a quarter of spec" one that never was (it was
+  0.088 ± 0.145 m²).
 - [ ] **EMB shoe-force integrator (refinement).**  Current model
   treats the BTCM cmd (-1 / 0 / +1) as a proportional force command.
   More faithful: integrate cmd × motor_speed × dt to track shoe

@@ -567,6 +567,19 @@ if(BUILD_TESTS)
              COMMAND bash ${CMAKE_SOURCE_DIR}/tests/check_diagonal_mu_level_generated.sh)
     set_tests_properties(diagonal_mu_level_generated PROPERTIES LABELS "guard" TIMEOUT 120)
 
+    # scripts/fit_coastdown.py reports F_rr and CdA, and until 2026-08-12 it
+    # windowed the fit in TIME, so two runs of different coast length were
+    # compared over different speeds and it reported an 8x CdA collapse that
+    # was the window rather than the plant. The guards that replace that cap
+    # (a common speed window, a refusal when there isn't one, and a spread on
+    # each coefficient) are only worth having if they have been watched FAIL,
+    # so --selftest plants a known drag law, reproduces the artefact on it,
+    # and walks the refusal threshold across its boundary. Pure Python on
+    # synthetic CSVs: no Chrono, no scenario run, milliseconds.
+    add_test(NAME coastdown_fit_selftest
+             COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/fit_coastdown.py --selftest)
+    set_tests_properties(coastdown_fit_selftest PROPERTIES LABELS "guard" TIMEOUT 120)
+
     # ── ABS integration gate (opt-in; needs a built electricsim) ─────────────
     # The brake-plant ABS behaviour can only be validated with ev1sim AND
     # electricsim running together over the shm bus — the unit suite above

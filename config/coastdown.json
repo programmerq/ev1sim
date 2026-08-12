@@ -1,0 +1,46 @@
+{
+  "//": "Config wrapper for the coastdown drag experiment.",
+  "//1": "Until 2026-08-12 there was no wrapper, so the run condition behind every",
+  "//2": "coastdown number in docs/ev1_chrono_audit.md sections 11 and 11.1 was",
+  "//3": "never committed and none of them could be re-derived.  Worse, the",
+  "//4": "invocation those sections documented — bare --scenario flags — falls",
+  "//5": "back to config/default.json's milford terrain, where the car leaves the",
+  "//6": "level partway through the launch and the solver diverges into",
+  "//7": "300 m/s garbage.  That is not what produced the recorded numbers (they",
+  "//8": "reproduce here to 0.1 mph), but it IS what the documented command does.",
+  "//9": "abs_hard_brake had the same hole, fixed the same day: the runs nobody",
+  "//10": "can repeat are the runs nobody wrote a wrapper for.",
+  "//11": "",
+  "//12": "A uniform rigid plane, long enough for the whole experiment: the launch",
+  "//13": "to 30 m/s takes ~380 m and the 75 s coast adds ~1400 m, so 6 km of",
+  "//14": "runway leaves the car on the surface for the entire run.  external_sim",
+  "//15": "is off — the coastdown is a plant measurement and needs no controllers,",
+  "//16": "which is also what makes it runnable from this repo alone.",
+  "//17": "",
+  "//18": "  ./build/ev1sim --config config/coastdown.json",
+  "//19": "  scripts/fit_coastdown.py scenario_coastdown.csv",
+  "//20": "",
+  "//21": "Comparing a before and an after: run it twice, keep both CSVs, and pass",
+  "//22": "BOTH to fit_coastdown.py.  It fits them over the speed range they share",
+  "//23": "and prints it; handing it one at a time and eyeballing the two outputs",
+  "//24": "is how the retracted CdA collapse happened.  See the script header.",
+
+  "vehicle_model": "ev1",
+  "terrain": {
+    "type": "rigid_plane",
+    "surface": "asphalt",
+    "friction": 0.9,
+    "length_m": 6000.0,
+    "width_m": 200.0
+  },
+  "simulation": {
+    "step_size_s": 0.001,
+    "render_fps": 60,
+    "realtime": false,
+    "headless": true
+  },
+  "telemetry": { "log_to_file": false, "show_hud": false },
+  "external_sim": { "enabled": false },
+  "vehicle_dynamics": { "start_propulsion_enabled": true },
+  "scenario": { "path": "config/scenarios/coastdown.json" }
+}
