@@ -7,25 +7,31 @@ on:
   # So the schedule-only work below can be run on demand.  Without this a red
   # cron can only be re-checked by waiting up to three days for the next one,
   # which is a poor property for a check whose whole job is to notice drift.
+  #
+  # Note this is workflow-level, so a manual dispatch also runs the four cheap
+  # jobs — they exclude `schedule`, not `workflow_dispatch`.  Left that way on
+  # purpose: someone firing a manual run usually wants the whole picture, and
+  # the four together are about a minute.  It does mean "nobody waits on this
+  # lane" is true of the cron and not of a dispatch you fired yourself.
   workflow_dispatch:
   schedule:
-    # Two jobs of work, both of which want a lane nobody waits on.
+    # TWO jobs run on this cron — chrono-smoke and settle-table.  Every other
+    # job is gated with `if: github.event_name != 'schedule'` so the cron does
+    # not burn runner time on the cheap ones.
     #
-    # 1. Keep the Chrono build cache warm.  Only chrono-smoke runs on this cron
-    #    — every other job is gated with `if: github.event_name != 'schedule'`
-    #    so the warm-up doesn't burn runner time on the cheap jobs.  A cache
-    #    restore (even a hit) resets GitHub's 7-day idle-eviction timer, and a
-    #    miss rebuilds it off the PR critical path so contributors never wait
-    #    on a cold (~20-40 min) Chrono build.
+    # 1. chrono-smoke keeps the Chrono build cache warm.  A cache restore (even
+    #    a hit) resets GitHub's 7-day idle-eviction timer, and a miss rebuilds
+    #    it off the PR critical path so contributors never wait on a cold
+    #    (~20-40 min) Chrono build.
     #
-    # 2. Re-derive the measured settle table (2026-08-12).  Seven headless
-    #    scenario runs, ~18 min measured locally and more on a runner.  It is
-    #    here rather than on the PR path deliberately: adding that to a lane
-    #    that gates every PR is the wrong direction for a repo that has been
-    #    finding lanes running at zero headroom, and on a Chrono cache miss it
-    #    could push the job past its ceiling — which would turn a correctness
-    #    check into a flaky one.  Nobody waits on this lane, so 18 minutes
-    #    costs nothing here.
+    # 2. settle-table re-derives the measured barrier releases (2026-08-12):
+    #    seven headless scenario runs, ~18 min locally and more on a runner.
+    #    It is here and not on the PR path deliberately.  Adding that to a lane
+    #    that gates every PR is the wrong direction for a repo that keeps
+    #    finding lanes run at zero headroom, and sharing a job with a cold
+    #    Chrono build could push past a ceiling and turn a correctness check
+    #    into a flaky one.  Nobody waits on this lane, so the time costs
+    #    nothing here.
     - cron: '17 6 */3 * *'
 
 jobs:
@@ -220,13 +226,7 @@ jobs:
   # `container:` here for zero cold-build variance — see scripts/build_chrono.sh.
   chrono-smoke:
     runs-on: ubuntu-latest
-    # Absolute ceiling.  Sized for the worst case this job can hit: a cold
-    # Chrono build (~20-40 min) plus, on the schedule event only, the settle
-    # table re-derivation (~18 min locally, budgeted 45 below).  Raised from 75
-    # on 2026-08-12 when that step was added.  It costs nothing on a PR run —
-    # a ceiling is not a reservation — and it exists so a slow cron cannot be
-    # killed halfway and leave a log that reads like a clean one.
-    timeout-minutes: 130
+    timeout-minutes: 75          # absolute ceiling; covers a cold Chrono build
     steps:
       - uses: actions/checkout@v6
 
@@ -323,29 +323,86 @@ jobs:
           cmake --build build-tests --target ev1sim_tests -j"$(nproc)"
           ctest --test-dir build-tests --output-on-failure
 
-      # ── Settle-table re-derivation (cron / manual only) ──────────────────
-      # config/scenarios/measured_settle.json records when each ABS scenario's
-      # wait_for_speed barrier actually releases.  tests/test_scenario.cpp's
-      # [Runway] cases check each brake against those numbers and CANNOT see
-      # the plant move under them: a barrier that starts releasing a second
-      # later leaves a brake still clearing release + settle on paper while the
-      # real settle has halved.  This re-derives every measured field from an
-      # actual run and fails when one has drifted past 0.05 s.
-      #
-      # NOT on the PR path, deliberately — see the comment on `schedule:` at
-      # the top of this file.  It needs only ./build/ev1sim, built above, and
-      # no electricsim.
-      #
-      # RUNTIME: seven headless scenarios, ~18 min measured locally (the
-      # slowest, abs_hard_brake, is ~2.5 min).  Budgeted 45 to leave room for a
-      # slower runner without the budget itself becoming the thing that fails.
-      # An explicit step timeout matters here beyond politeness: killed
-      # partway, the log ends after some number of green per-scenario blocks
-      # and otherwise reads like a clean run, so the script prints a
-      # completion marker and the step below refuses to pass without it.
+  # ── Settle-table re-derivation: the cron lane, and only the cron lane ──────
+  # config/scenarios/measured_settle.json records when each ABS scenario's
+  # wait_for_speed barrier actually releases.  tests/test_scenario.cpp's
+  # [Runway] cases check each brake against those numbers and CANNOT see the
+  # plant move under them: a barrier that starts releasing a second later
+  # leaves a brake still clearing release + settle on paper while the real
+  # settle has halved.  This re-derives every measured field from an actual run
+  # and fails when one has drifted past the 0.05 s the table itself carries.
+  #
+  # WHY ITS OWN JOB rather than a step in chrono-smoke.  It was a gated step
+  # there first, and that was defensible — the gate held, and the step was
+  # confirmed `skipped` on the PR run — but it still meant editing the job that
+  # gates every PR, including raising its timeout ceiling to cover a lane PRs
+  # never take.  A separate job leaves chrono-smoke untouched at its original
+  # 75-minute ceiling, and gives the failure its own name: a red here says
+  # "the settle table is stale", not "something in the Chrono smoke job".
+  #
+  # `needs: chrono-smoke` is for the Chrono cache, not ordering for its own
+  # sake: chrono-smoke populates it (building it on a miss), so by the time
+  # this runs the restore is a hit and this job never pays a cold build.
+  settle-table:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    needs: chrono-smoke
+    runs-on: ubuntu-latest
+    # Ceiling with headroom, stated rather than defaulted.  Budget: ev1sim
+    # build against a cached Chrono (~5 min with ccache) + seven headless
+    # scenarios.  The scenarios take ~18 min locally (slowest, abs_hard_brake,
+    # ~2.5 min); the runner figure is recorded in the PR that added this once
+    # measured, rather than guessed at here.  A default timeout is the wrong
+    # thing for this job specifically: killed partway it would leave a log that
+    # reads like a clean run, which is the exact failure the completion marker
+    # below exists to prevent.
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Chrono runtime deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq $(scripts/build_chrono.sh --print-deps)
+
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2.23
+        with:
+          key: ccache-chrono-smoke-${{ runner.os }}
+          max-size: 2G
+
+      # Restore-only: chrono-smoke owns saving this cache, and `needs:` above
+      # guarantees it has already run. A restore-only action also cannot race
+      # it on the save.
+      - name: Restore prebuilt Chrono install
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/chrono-install
+          key: chrono-${{ runner.os }}-release-9.0-${{ hashFiles('scripts/build_chrono.sh') }}
+          restore-keys: |
+            chrono-${{ runner.os }}-release-9.0-
+
+      # A miss here should be impossible given `needs:`, so say so loudly
+      # rather than failing later in a way that looks like a plant problem.
+      - name: Chrono install must be present
+        run: |
+          if [ ! -d "$HOME/chrono-install/lib/cmake/Chrono" ]; then
+            echo "::error title=Chrono cache miss in settle-table::chrono-smoke should have populated this cache before this job ran. Nothing about the settle table has been checked."
+            exit 1
+          fi
+
+      - name: Build the ev1sim executable
+        run: |
+          cmake -B build -S . \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DChrono_DIR="$HOME/chrono-install/lib/cmake/Chrono" \
+            -DEV1SIM_HAVE_WHEEL_IO=OFF \
+            -DBUILD_TESTS=OFF \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          cmake --build build --target ev1sim -j"$(nproc)"
+
       - name: Re-derive the measured settle table
-        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-        timeout-minutes: 45
+        timeout-minutes: 60
         run: |
           set -o pipefail
           rc=0
@@ -354,7 +411,7 @@ jobs:
 
           # Completion marker, not just the exit code: a timeout kill also
           # gives a non-zero rc, and this distinguishes "ran and disagreed"
-          # from "was cut off".
+          # from "was cut off". No marker, no verdict.
           if ! grep -q '^\[runway\] re-derived' runway.log; then
             echo "::error title=Settle table re-derivation did not finish::No completion marker in the log — the run was cut off (timeout, crash, or OOM) rather than reaching a verdict. Nothing has been checked."
             {
@@ -394,7 +451,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Keep the re-derivation log
-        if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: runway-report

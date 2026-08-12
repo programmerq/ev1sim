@@ -84,8 +84,29 @@ def boundary_x(level: dict, how: str) -> float:
     return p["center"][0] + p["size"][0] / 2.0
 
 
+def resolve_binary(arg: str) -> Path:
+    """Absolute path to the ev1sim binary, resolved against the CALLER's cwd.
+
+    Must happen before anything else: run_scenario below execs the binary with
+    cwd set to a throwaway directory, so a relative path like ./build/ev1sim
+    is correct when the user types it and meaningless by the time it is used.
+    That is not hypothetical — the first CI run of this step passed
+    `--binary ./build/ev1sim` and died on
+    `FileNotFoundError: 'build/ev1sim'` after the is_file() check had already
+    passed, because that check ran in the caller's directory and the exec did
+    not.
+    """
+    return Path(arg).expanduser().resolve()
+
+
 def run_scenario(cfg_rel: str, workdir: Path, binary: Path) -> tuple[list[dict], list[tuple[float, str, str]]]:
     """Run one scenario headless with the external sim off; return rows + events."""
+    # Cheap, and it fails at the top instead of inside subprocess: everything
+    # below runs with cwd=workdir, so a relative binary path cannot work here.
+    if not binary.is_absolute():
+        raise SystemExit(
+            f"internal error: run_scenario needs an absolute binary path, got "
+            f"{binary} — resolve it with resolve_binary() before the cwd moves")
     cfg = json.loads((ROOT / cfg_rel).read_text())
     scen_rel = cfg["scenario"]["path"]
     scen = json.loads((ROOT / scen_rel).read_text())
@@ -378,6 +399,21 @@ def report(case: dict, binary: Path, tol: dict) -> tuple[bool, dict]:
 
 # --- selftest -----------------------------------------------------------------
 
+def _rejects_relative_binary() -> bool:
+    """True when run_scenario refuses a relative binary path.
+
+    Calls the real function; it raises before touching the filesystem or
+    spawning anything, so this costs nothing and is not a mock.
+    """
+    try:
+        run_scenario("config/abs_mu_jump.json", Path("."), Path("build/ev1sim"))
+    except SystemExit:
+        return True
+    except Exception:
+        return False
+    return False
+
+
 def selftest() -> int:
     """Prove the staleness comparison can FAIL, without running a scenario.
 
@@ -448,6 +484,19 @@ def selftest() -> int:
               bool(msgs) if row["measured_crossing_s"] is None else True,
               msgs[0] if msgs else "accepted an unexpected crossing")
 
+    # 4b. A relative --binary has to survive the cwd change.  run_scenario
+    #     execs the sim with cwd set to a throwaway directory, so a path like
+    #     ./build/ev1sim is right when typed and gone by the time it is used.
+    #     CI's first run of this step died exactly there, AFTER the is_file()
+    #     check had passed in the caller's directory.
+    rel = resolve_binary("./build/ev1sim")
+    case_("a relative --binary is resolved before the cwd moves",
+          rel.is_absolute() and rel.name == "ev1sim",
+          f"./build/ev1sim -> {rel}")
+    case_("...and run_scenario refuses a relative one outright",
+          _rejects_relative_binary(),
+          "run_scenario(Path('build/ev1sim')) raises rather than exec'ing it")
+
     # 5. --update has to actually move the number it claims to move, and
     #    leave the rest of the file alone.
     text = TABLE_PATH.read_text()
@@ -508,7 +557,7 @@ def main(argv) -> int:
               "with a scenario list", file=sys.stderr)
         return 2
 
-    binary = Path(args.binary)
+    binary = resolve_binary(args.binary)
     if not binary.is_file():
         print(f"no ev1sim at {binary} — build it first "
               f"(cmake --build --preset default)", file=sys.stderr)

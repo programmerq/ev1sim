@@ -618,6 +618,26 @@ if(BUILD_TESTS)
              COMMAND bash ${CMAKE_SOURCE_DIR}/tests/check_json_no_duplicate_keys.sh)
     set_tests_properties(json_no_duplicate_keys PROPERTIES LABELS "guard" TIMEOUT 120)
 
+    # A path validated in one working directory and used in another. Twice in
+    # one PR (2026-08-12): ev1sim resolving config/default.json against
+    # whatever cwd it had — same command line, milford or rigid_plane, and
+    # nothing saying which — and scenario_runway_report.py accepting
+    # `--binary ./build/ev1sim`, confirming it with is_file() in the caller's
+    # directory, then exec'ing it with cwd set to a temp dir. CI caught the
+    # second; nothing would have caught a third. So: any scripts/*.py function
+    # that passes cwd= to a subprocess must also check is_absolute()/resolve().
+    # A heuristic on purpose — whether an arbitrary path expression is absolute
+    # is not decidable, but whether the author of a cwd-moving function thought
+    # about it is. Selftest included; it flags the real bug when reintroduced.
+    add_test(NAME cwd_relative_paths_selftest
+             COMMAND python3 ${CMAKE_SOURCE_DIR}/tests/check_cwd_relative_paths.py
+                     --selftest)
+    set_tests_properties(cwd_relative_paths_selftest
+                         PROPERTIES LABELS "guard" TIMEOUT 120)
+    add_test(NAME cwd_relative_paths
+             COMMAND python3 ${CMAKE_SOURCE_DIR}/tests/check_cwd_relative_paths.py)
+    set_tests_properties(cwd_relative_paths PROPERTIES LABELS "guard" TIMEOUT 120)
+
     # A --config path the user NAMED must be fatal when it cannot be opened,
     # rather than warning and silently running built-in defaults — the silent
     # substitution that hid the coastdown's run condition for four months.
