@@ -36,7 +36,16 @@ brake event already 3.4° off heading — on the one test whose verdict
 *is* the yaw.  The budgets live in the `level/*.json` headers, the
 geometry is pinned by `tests/test_level_file.cpp`, and the brake
 timing that produces the settle is pinned by the `[Runway]` cases in
-`tests/test_scenario.cpp`.
+`tests/test_scenario.cpp` against the measured barrier releases in
+`config/scenarios/measured_settle.json`.
+
+Those releases are measurements, so since 2026-08-12 they are **re-derived
+rather than trusted**: `scripts/scenario_runway_report.py` runs each scenario
+and fails when a derived release or crossing sits more than 0.05 s from the
+recorded one.  The C++ cases catch a brake moved backwards and need no Chrono;
+the script catches the plant moving forwards under a table that still says what
+it always said.  Neither can see the other's failure, which is why both exist.
+Re-measure with `--update` and commit what moved.
 
 **The three uniform-surface stops — `high_mu`, `hard_brake` and
 `brake_and_steer` — now have that settle too (2026-08-12).**  Their
@@ -66,6 +75,12 @@ three were *still* broken, and has been replaced by a guard requiring
 barrier to appear in the measured settle table.  A new scenario written
 with the same defect now fails on arrival instead of sailing past a
 hard-coded list of three.
+
+The report also could not be run the way its own docstring documented: with no
+scenario names it exited 2 without simulating anything, because `argparse`
+checks a `nargs="*"` list default against `choices` as a single value.  Fixed
+2026-08-12.  A re-derivation tool whose default invocation does not run is a
+fair part of why nobody re-derived anything.
 
 `abs_hard_brake` also gained a config wrapper (`config/abs_hard_brake.json`).
 It had none, so neither `run_abs_compare.sh` nor the runway report could

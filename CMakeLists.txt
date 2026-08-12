@@ -580,6 +580,49 @@ if(BUILD_TESTS)
              COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/fit_coastdown.py --selftest)
     set_tests_properties(coastdown_fit_selftest PROPERTIES LABELS "guard" TIMEOUT 120)
 
+    # config/scenarios/measured_settle.json records when each ABS scenario's
+    # wait_for_speed barrier actually releases. The [Runway] cases above check
+    # each brake against those numbers, which catches a brake moved backwards
+    # and CANNOT catch the plant moving forwards: a barrier that starts
+    # releasing 1 s later leaves a brake still clearing release + settle on
+    # paper while the real settle has halved. Closing that means re-deriving
+    # the numbers from a run, and only scenario_runway_report.py can do it.
+    #
+    # Two tests, because they cost three orders of magnitude apart:
+    #
+    #   runway_table_selftest  drives the comparison across its own tolerance
+    #                          with a known-good, a near-miss and a miss. Runs
+    #                          NO simulation, so it goes in the ordinary suite
+    #                          and the check is never merely asserted to work.
+    #   runway_table           the real re-derivation: seven headless scenario
+    #                          runs, several minutes each. Opt-in — the default
+    #                          suite must stay seconds, not half an hour.
+    add_test(NAME runway_table_selftest
+             COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/scenario_runway_report.py
+                     --selftest)
+    set_tests_properties(runway_table_selftest PROPERTIES LABELS "guard" TIMEOUT 120)
+
+    if(Chrono_FOUND)
+        add_custom_target(test-runway-table
+            COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/scenario_runway_report.py
+                    --binary $<TARGET_FILE:ev1sim>
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            USES_TERMINAL
+            COMMENT "Re-deriving the measured settle table (7 headless runs)")
+        add_dependencies(test-runway-table ev1sim)
+
+        option(EV1SIM_SLOW_TESTS
+               "Register the settle-table re-derivation as a CTest (label: slow)" OFF)
+        if(EV1SIM_SLOW_TESTS)
+            add_test(NAME runway_table
+                     COMMAND python3
+                             ${CMAKE_SOURCE_DIR}/scripts/scenario_runway_report.py
+                             --binary $<TARGET_FILE:ev1sim>
+                     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+            set_tests_properties(runway_table PROPERTIES LABELS "slow" TIMEOUT 3600)
+        endif()
+    endif()
+
     # ── ABS integration gate (opt-in; needs a built electricsim) ─────────────
     # The brake-plant ABS behaviour can only be validated with ev1sim AND
     # electricsim running together over the shm bus — the unit suite above

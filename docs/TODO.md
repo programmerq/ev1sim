@@ -102,18 +102,32 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   `config/abs_hard_brake.json` was added because `abs_hard_brake` had no config
   wrapper at all — which is part of why nobody had measured it.
 
-- [ ] **The settle table's barrier-release times are frozen measurements that
-  nothing re-derives.**  `tests/test_scenario.cpp`'s `[Runway]` cases compare
-  each scenario's `set_brake` time against a hard-coded measured release.  That
-  catches a brake moved backwards, but not the plant moving forwards: if a
-  barrier starts releasing at 17.5 s, an 18.0 s brake still clears
-  `15.028 + 2.0` while the real settle has shrunk to 0.5 s, and nothing goes
-  red.  This is exactly the staleness that produced the phantom 12.011 s.
-  `scripts/scenario_runway_report.py` re-derives the numbers and already exits
-  non-zero on a zero settle, but it is manual-run only — CI never invokes it,
-  though the Chrono job already builds the `ev1sim` binary it needs.  Doing it
-  means adding one step to that job and accepting ~7 headless scenario runs of
-  wall time (a few minutes each), or a nightly rather than per-push lane.
+- [x] **The settle table's barrier-release times are frozen measurements that
+  nothing re-derives.**  Done 2026-08-12.  The table moved out of
+  `tests/test_scenario.cpp` into `config/scenarios/measured_settle.json` — one
+  copy, read by the `[Runway]` cases, by the coverage guard, and by
+  `scripts/scenario_runway_report.py`, which now **re-derives**
+  `measured_release_s` and `measured_crossing_s` from a headless run and exits
+  non-zero when a derived value sits more than 0.05 s from the recorded one.
+  `--update` re-records what it measured, so a legitimate plant move is a
+  command rather than a hand-edit; `--selftest` drives the comparison across
+  its own tolerance (0.025 / 0.045 / 0.100 s against 0.050) and is registered
+  as the `runway_table_selftest` ctest, which runs no simulation.
+  Two things found while doing it.  The report **could not be run the way its
+  own docstring documented**: `scripts/scenario_runway_report.py` with no
+  scenario names exited 2 without simulating anything, because `argparse`
+  checks a `nargs="*"` list default against `choices` as a single value.  And
+  the table conflated two different reasons for a `-1` crossing — "no boundary
+  exists" (the three uniform stops) and "the crossing is inside the brake event
+  by design" (`abs_mu_jump`) — which the JSON now distinguishes, so the
+  re-derivation can check the crossings that are entry conditions and skip the
+  one that is the subject of its test.
+  **Still owner-side:** the real re-derivation is seven headless runs of a few
+  minutes each, so it is opt-in rather than in the default suite —
+  `make test-runway-table`, or `ctest -L slow` when configured
+  `-DEV1SIM_SLOW_TESTS=ON`.  Wiring it into the Chrono CI job is one step in
+  `.github/workflows/ci.yml`; the step is written out in the PR that landed
+  this, for the next workflow batch.
 
 - [x] **The coast map exceeds the manual's stated regeneration bound above
   ~8400 RPM.**  Done 2026-08-12, and the framing above was wrong in the way
