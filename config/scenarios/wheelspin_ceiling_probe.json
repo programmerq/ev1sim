@@ -1,0 +1,37 @@
+{
+  "//": "Drive-speed-ceiling probe.  Holds full throttle and lets the motor run",
+  "//1": "to whatever the powertrain map allows, so the shaft's terminal speed is",
+  "//2": "an observable rather than an assertion.  Pair with either config:",
+  "//3": "",
+  "//4": "  config/wheelspin_ceiling_probe_ice.json      mu 0.10",
+  "//5": "      Wheelspin case.  The wheels break away almost immediately and",
+  "//6": "      spin far faster than the car moves, so this is the drive's",
+  "//7": "      speed ceiling with essentially no load on it.",
+  "//8": "",
+  "//9": "  config/wheelspin_ceiling_probe_asphalt.json  mu 0.90",
+  "//10": "      Grip case.  No wheelspin; the car simply accelerates until",
+  "//11": "      something stops it.  ev1sim has no top-speed limiter, so before",
+  "//12": "      the ceiling landed this ran to 231 mph and was still",
+  "//13": "      accelerating.  This is the run that shows what the ceiling",
+  "//14": "      changes and where the change begins.",
+  "//15": "",
+  "//16": "Neither needs the external electronics sim.  Analyse the CSV with",
+  "//17": "scripts/motor_ceiling_report.py, which converts wheel speeds to shaft",
+  "//18": "RPM through the differential and the driveline ratio.",
+
+  "name": "wheelspin_ceiling_probe",
+  "requires_external_sim": false,
+  "driver_mode": "local",
+  "max_time_s": 120.0,
+  "events": [
+    {"at_time_s": 0.50, "action": "set_throttle", "value": 1.0}
+  ],
+  "stats": {
+    "output_csv": "scenario_wheelspin_ceiling_probe.csv",
+    "sample_period_s": 0.10,
+    "fields": [
+      "sim_time_s", "speed_mps", "applied_throttle",
+      "wheel_omega_fl", "wheel_omega_fr", "wheel_omega_rl", "wheel_omega_rr"
+    ]
+  }
+}

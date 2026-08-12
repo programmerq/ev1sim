@@ -1,0 +1,20 @@
+{
+  "//": "Drive-ceiling probe, WHEELSPIN case: uniform ice (mu 0.10), full",
+  "//1": "throttle.  The front wheels break away at once, so the shaft runs",
+  "//2": "nearly unloaded and settles at the drive's speed ceiling.",
+  "//3": "See config/scenarios/wheelspin_ceiling_probe.json.",
+
+  "vehicle_model": "ev1",
+  "terrain": {
+    "type": "rigid_plane",
+    "surface": "ice",
+    "friction": 0.10,
+    "length_m": 800.0,
+    "width_m":  200.0
+  },
+  "simulation": { "step_size_s": 0.001, "render_fps": 60, "realtime": false, "headless": true },
+  "telemetry": { "log_to_file": false, "show_hud": false },
+  "external_sim": { "enabled": false },
+  "vehicle_dynamics": { "start_propulsion_enabled": true },
+  "scenario": { "path": "config/scenarios/wheelspin_ceiling_probe.json" }
+}

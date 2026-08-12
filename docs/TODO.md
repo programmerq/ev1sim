@@ -66,9 +66,29 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   speed signal generation, torque control, and cruise control").  Not road
   speed: the BTCM owns true road speed and reaches the PCM as a torque retard
   request, not a speed feed.
-  ev1sim's side of that is already done — 4070 now publishes the unclamped
+  ev1sim's side of that is mostly done — 4070 now publishes the unclamped
   shaft speed (`SimApp::PublishMotorState`), so a PIM-side limiter has an
-  honest signal to act on.
+  honest signal to act on.  Still open on this side: 4070 can never go
+  negative, because the Chrono transmission is permanently in forward gear
+  (nothing calls `SetDriveMode`) and `ChAutomaticTransmissionSimpleMap` takes
+  `std::abs(driveshaft_speed)` anyway, while the chassis-signal contract
+  describes 4070 as signed with negative meaning reverse.  Reverse is not
+  modelled at all today, so nothing is wrong yet — but a reverse limiter
+  (30 mph, same p250 sentence) needs a signed 4070 first.
+
+- [ ] **Two contradictory drive ceilings across the two repos.**  This repo now
+  carries 16 000 RPM, sourced from propulsion p328, as the speed above which the
+  propulsion system makes no torque.  electricsim still carries 13 000 RPM in
+  `ev1/pim/pim_drive_plant.h` labelled "redline guard", with a header note that
+  "the vehicle's top speed is road-load-limited, not rev-limited".  Both halves
+  of that note are now contradicted: 13 000 RPM is the ~80 mph *software cap*
+  restated in RPM, not a redline, and top speed is set by that cap rather than
+  by road load.  The number wants reclassifying rather than deleting — it is a
+  reasonable stand-in for the software cap, just mislabelled.  Related:
+  `electricsim/docs/pim_hv_inverter_research_brief.md` records as an open
+  question that "'~13,000 rpm' is not confirmed by any authoritative source …
+  treat any >10,000 rpm redline as [EV1-INFER] unless a manual page says
+  otherwise" — propulsion p328 is that page, so the question can be closed.
 
 ## Door / lock state
 

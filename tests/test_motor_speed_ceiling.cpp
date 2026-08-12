@@ -27,22 +27,33 @@
 // out 74.9 N·m at 45 500 RPM — 357 kW from a ~102 kW drive.  Nothing bounded
 // the shaft, so an unloaded wheel accelerated without limit.
 //
-// The fix is structural, and this test pins the structure: the map's last point
-// must be ZERO torque, and "Maximal Engine Speed RPM" must land on that point.
-// Then the endpoint hold delivers nothing above the ceiling instead of a
-// fictitious constant.
+// The fix is structural, and this test pins the structure: the last point of
+// BOTH maps must be ZERO torque, and "Maximal Engine Speed RPM" must land on
+// them.  Then the endpoint hold delivers nothing above the ceiling instead of a
+// fictitious constant.  Both maps, because the coast map's endpoint is held
+// forever too — a residual -40 N·m is ~202 kW of phantom regen at the ~48 000
+// RPM the pre-fix model reached — and because a full-throttle-only sweep can
+// never see the coast map, which (1 - throttle) multiplies out to zero.
 //
 // TWO LIMITS, DELIBERATELY SEPARATE
 // ---------------------------------
-//   * The HARDWARE ceiling — 16 000 RPM — belongs here, in the drive's physics.
-//     @source:manual propulsion p328, DTC 007: "a pulse rate greater than
-//     34,000 Hz ... corresponds to a shaft speed of 16,000 RPM", at which
+//   * The DRIVE-SYSTEM ceiling — 16 000 RPM — belongs here, in the drive's
+//     physics.  @source:manual propulsion p328, DTC 007: "a pulse rate greater
+//     than 34,000 Hz ... corresponds to a shaft speed of 16,000 RPM", at which
 //     "the SERVICE NOW telltale is illuminated, the DTC is stored and
-//     propulsion is disabled".
+//     propulsion is disabled".  Deliberately not called a HARDWARE ceiling:
+//     the threshold is a pulse rate and the reaction is a PCM software action.
+//     The manual gives no rotor-burst or bearing speed anywhere.  What 16 000
+//     RPM is, exactly, is the speed above which the propulsion system makes no
+//     torque — which is all a torque map can represent, and enough.
 //   * The ~80 mph top speed is a SOFTWARE calibration and does NOT belong here.
 //     @source:manual propulsion p250: "The PIM will limit vehicle speed in the
-//     forward direction to 129 km/h (80 mph)", enforced by decreasing the
-//     torque current.  That is the propulsion controller's job.
+//     forward direction to 129 km/h (80 mph) and in the reverse direction to
+//     48 km/h (30 mph)", enforced by decreasing the torque current.  That is
+//     the propulsion controller's job.  (The same page also has the PIM
+//     decreasing torque current "to limit drive motor shaft speed" — so
+//     shaft-speed limiting is a PIM function on the real car.  This map is not
+//     that limiter; it is the envelope the limiter would act inside.)
 // So the ceiling asserted below must sit ABOVE the 80 mph equivalent — if it
 // ever equals it, the calibration has been baked back into the physics.
 //
@@ -152,6 +163,13 @@ double TireRadiusM() {
 // silently returns something harmless, and every check below would pass for
 // the wrong reason.
 // ---------------------------------------------------------------------------
+// What this self-test can and cannot do: it pins the helper against the two
+// Chrono rules as they read in 9.0.1, so the helper cannot silently drift into
+// something that no longer reproduces the defect.  It cannot catch CHRONO
+// drifting away from the helper — if a future Chrono turned endpoint
+// extrapolation on by default, this file would keep passing while the real
+// vehicle changed behaviour.  Guarding that needs a Chrono-linked test, which
+// this suite deliberately is not (Chrono is not in CI).
 TEST_CASE("Motor ceiling: the map-lookup helper matches Chrono's semantics",
           "[Motor][Ceiling][Selftest]") {
     const TorqueMap t{{1000.0, 100.0}, {2000.0, 50.0}};
@@ -175,35 +193,67 @@ TEST_CASE("Motor ceiling: the map-lookup helper matches Chrono's semantics",
 // ---------------------------------------------------------------------------
 // The structural fix.
 // ---------------------------------------------------------------------------
-TEST_CASE("Motor ceiling: the map ends at zero torque and the clamp lands there",
+TEST_CASE("Motor ceiling: BOTH maps end at zero torque and the clamp lands there",
           "[Motor][Ceiling]") {
     const auto engine = ReadJson(kEngine);
     const auto full   = ReadMap(engine, "Map Full Throttle");
+    const auto zero   = ReadMap(engine, "Map Zero Throttle");
     const double max_rpm = engine.at("Maximal Engine Speed RPM").get<double>();
 
-    // The last point must be zero torque.  Chrono holds this value at every
-    // higher speed, so a non-zero last point is not a ceiling — it is a
-    // constant torque applied to infinity, which is what the defect was.
+    // Both maps' last points must be zero torque.  Chrono holds each map's
+    // endpoint at every higher speed, so a non-zero last point is not a
+    // ceiling — it is a constant torque applied to infinity.  That applies to
+    // the COAST map just as much: a residual -40 N·m held forever is ~197 kW
+    // of phantom regen at the ~48 000 RPM the pre-fix model actually reached,
+    // from a drive rated ~102 kW.  Above the ceiling propulsion is disabled,
+    // so neither sign of torque survives.
     CHECK_THAT(full.rbegin()->second, WithinAbs(0.0, 1e-9));
+    CHECK_THAT(zero.rbegin()->second, WithinAbs(0.0, 1e-9));
 
-    // ...and the lookup clamp must land exactly on that zero point.  If
-    // max_rpm sat below it, the clamp would pin the lookup at a lower,
-    // non-zero torque and the zero point would be unreachable.
+    // ...and the lookup clamp must land exactly on those zero points.  If
+    // max_rpm sat below them, the clamp would pin each lookup at a lower,
+    // non-zero torque and the zero points would be unreachable.
     CHECK_THAT(max_rpm, WithinAbs(full.rbegin()->first, 1e-9));
+    CHECK_THAT(max_rpm, WithinAbs(zero.rbegin()->first, 1e-9));
 
     // Torque must be strictly positive right below the ceiling — the ramp to
-    // zero has to be a ramp, not the whole high-speed region zeroed out.
+    // zero has to be a ramp, not the whole high-speed region zeroed out...
     CHECK(InterpHoldingEndpoints(full, max_rpm - 1000.0) > 0.0);
+    // ...and coast drag must still be present there, for the same reason.
+    CHECK(InterpHoldingEndpoints(zero, max_rpm - 1000.0) < 0.0);
 }
 
-TEST_CASE("Motor ceiling: 16 000 RPM, and it is the HARDWARE limit not the 80 mph calibration",
+TEST_CASE("Motor ceiling: no torque above the ceiling at ANY throttle position",
+          "[Motor][Ceiling]") {
+    const auto engine = ReadJson(kEngine);
+    const auto full   = ReadMap(engine, "Map Full Throttle");
+    const auto zero   = ReadMap(engine, "Map Zero Throttle");
+    const double max_rpm = engine.at("Maximal Engine Speed RPM").get<double>();
+
+    // Sweeping only full throttle would leave the coast map unguarded: at
+    // throttle 1.0 it is multiplied by (1 - throttle) = 0, so ANY value could
+    // sit there — including a wildly wrong one — and a full-throttle-only
+    // check would stay green.  Sweep the pedal as well as the speed.
+    for (double throttle = 0.0; throttle <= 1.0 + 1e-9; throttle += 0.125) {
+        for (double rpm = max_rpm; rpm <= 200000.0; rpm += 10000.0) {
+            const double t = DeliveredTorqueNm(zero, full, max_rpm, rpm, throttle);
+            INFO("throttle = " << throttle << ", shaft RPM = " << rpm);
+            CHECK_THAT(t, WithinAbs(0.0, 1e-9));
+        }
+    }
+}
+
+TEST_CASE("Motor ceiling: 16 000 RPM, and it is not the 80 mph software calibration",
           "[Motor][Ceiling]") {
     const auto engine = ReadJson(kEngine);
     const double max_rpm = engine.at("Maximal Engine Speed RPM").get<double>();
 
     // @source:manual propulsion p328 (DTC 007): 34 000 Hz on the speed/direction
     // input "corresponds to a shaft speed of 16,000 RPM", above which propulsion
-    // is disabled.
+    // is disabled.  This is the speed at which the propulsion system stops
+    // making torque — NOT a rotor-burst or bearing speed, which the manual
+    // states nowhere.  The map represents torque, so that is the right ceiling
+    // for it, but the distinction is why nothing here says "hardware limit".
     CHECK_THAT(max_rpm, WithinAbs(16000.0, 1e-9));
 
     const double ratio  = ReductionRatio();
@@ -218,10 +268,14 @@ TEST_CASE("Motor ceiling: 16 000 RPM, and it is the HARDWARE limit not the 80 mp
 
     // ...but "capable of more than 80 mph, not significantly beyond".  The
     // sourced ceiling is ~1.25x the cap; anything past 1.6x would mean the
-    // hardware limit had drifted into fantasy.
+    // ceiling had drifted into fantasy.
     CHECK(max_rpm < cap_rpm * 1.60);
 
     // Sanity: state the ceiling as a road speed so the number is legible.
+    // NOTE this uses the UNLOADED tyre radius, as every road-speed figure in
+    // this file does; the loaded rolling radius is a few percent smaller, so
+    // these mph numbers run correspondingly optimistic.  That is fine for a
+    // bounds check and would not be fine for a calibration.
     const double ceiling_mph = MpsToMph(RpmToRadS(max_rpm) / ratio * radius);
     CHECK(ceiling_mph > 90.0);
     CHECK(ceiling_mph < 110.0);
@@ -339,6 +393,16 @@ TEST_CASE("Motor ceiling: constant torque then constant power, up to the ramp",
     // Constant-power region: torque falls as 1/omega, so power is flat.  This
     // now runs past the old 13 000 RPM end of the table — the extension
     // continues the same hyperbola rather than inventing a new shape.
+    //
+    // The sweep starts at 7500, not 7000, and that is a real exclusion rather
+    // than a tidy round number: the shipped 7000 RPM point is 143.0 N·m =
+    // 104.8 kW, 2.8 % above the envelope, so it would fail this 2 % band.  It
+    // is the corner rounding between the constant-torque plateau and the
+    // hyperbola, it predates this change, and it is inside the region left
+    // untouched deliberately.  It goes away with the corner-point correction
+    // tracked in docs/TODO.md; until then, excluding it is honest and
+    // narrowing the band to include it would just re-tune a number this
+    // change promised not to touch.
     for (double rpm = 7500.0; rpm <= 15500.0; rpm += 500.0) {
         const double p = InterpHoldingEndpoints(full, rpm) * RpmToRadS(rpm);
         INFO("constant-power region at " << rpm << " RPM: " << p << " W");
@@ -370,6 +434,11 @@ TEST_CASE("Motor ceiling: the transmission's shift ceiling agrees with the engin
 
     // Inert with one forward gear, but it is a second written copy of the
     // drive ceiling and copies drift.  Pin them together.
+    //
+    // This pin is correct ONLY while there is one forward gear.  Add a second
+    // ratio and it becomes actively wrong — an upshift point at the drive
+    // ceiling means the box would never upshift.  Whoever adds a second gear
+    // must delete this assertion, not satisfy it.
     CHECK_THAT(upshift_rpm, WithinAbs(max_rpm, 1e-9));
 
     // Single-speed: exactly one forward ratio, and it is direct.
