@@ -476,6 +476,7 @@ if(BUILD_TESTS)
         tests/test_slip_ratio.cpp
         tests/test_input_actions.cpp
         tests/test_hood.cpp
+        tests/test_host_clock_reads.cpp
         ${EV1SIM_WHEEL_IO_TEST_SRC}
         ${EV1SIM_WIRE_TRUTH_TEST_SRC}
         src/Config.cpp
