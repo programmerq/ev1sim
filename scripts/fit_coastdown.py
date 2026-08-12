@@ -441,9 +441,8 @@ def report_compare(runs: list[Run], v_lo: float, v_hi: float,
 
     results: list[tuple[Run, Fit]] = []
     for r in runs:
-        samples = r.window(v_lo, v_hi)
-        print(f"  === {r.name} ===  ({len(samples)} samples)")
-        fit = Fit(samples)
+        fit = Fit(r.window(v_lo, v_hi))
+        print(f"  === {r.name} ===  ({fit.n_samples} samples)")
         print_fit(fit, indent="      ")
         print()
         results.append((r, fit))
