@@ -31,8 +31,11 @@ set -euo pipefail
 
 TEST="${1:-high_mu}"
 case "$TEST" in
-    high_mu|low_mu|mu_jump|split_mu|brake_and_steer|diagonal_mu) ;;
-    *) echo "[abs] unknown test '$TEST' — use high_mu | low_mu | mu_jump | split_mu | brake_and_steer | diagonal_mu" >&2; exit 1 ;;
+    # hard_brake added 2026-08-12 alongside config/abs_hard_brake.json.  Before
+    # that this list rejected it before ever resolving a config path, so the
+    # scenario could not be launched through this script at all.
+    high_mu|low_mu|mu_jump|split_mu|brake_and_steer|diagonal_mu|hard_brake) ;;
+    *) echo "[abs] unknown test '$TEST' — use high_mu | low_mu | mu_jump | split_mu | brake_and_steer | diagonal_mu | hard_brake" >&2; exit 1 ;;
 esac
 
 EV1SIM_DIR="$(cd "$(dirname "$0")/.." && pwd)"

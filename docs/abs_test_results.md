@@ -48,7 +48,15 @@ entry condition was a transient rather than a steady state, which is the
 same defect the transition four carried.  The brakes moved to 18.0 / 18.0
 / 15.0 s, past their measured barrier releases of 15.028 / 15.028 /
 12.053 s.  Brake values, mu values, the 0.30 s brake-to-steer offset and
-the hold durations are unchanged; only the schedule moved.
+the hold durations in the files are unchanged; only the schedule moved.
+
+One precision about "hold durations unchanged": that is true of the
+numbers in the scenario files (18 / 18 / 19 s), not of what the car did.
+Because the old brake fired late — on the barrier release, not at its own
+`at_time_s` — while brake-off stayed at 25.0 s, the *realized* hold was
+~10.0 / 10.0 / 12.9 s.  It is now the full 18 / 18 / 19 s.  That changes
+no measurement here: the car reaches standstill in 5–7 s, well inside
+either hold.
 
 `scripts/scenario_runway_report.py` now covers all seven rather than the
 four transition scenarios, and so do the `[Runway]` cases in

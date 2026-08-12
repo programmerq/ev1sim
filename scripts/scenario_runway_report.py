@@ -73,6 +73,13 @@ SCENARIOS = {
 
 # A gap shorter than this between throttle release and brake-on is the
 # zero-settle defect, not a deliberately short coast.
+#
+# Raised from 0.5 to 2.0 on 2026-08-12, which tightens the check for the four
+# transition scenarios as well as the three added that day.  0.5 s only ever
+# separated "fired on the release tick" from "did not"; 2.0 s is the settle the
+# [Runway] cases in tests/test_scenario.cpp actually require.  All seven clear
+# it with margin — the tightest is 2.96 s — so nothing was retimed to satisfy
+# the new threshold.
 MIN_SETTLE_S = 2.0
 
 

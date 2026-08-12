@@ -294,16 +294,21 @@ manual bounds regeneration at ~11 kW.  It declined to act on it, on the
 grounds that the map was mechanical drag and "mechanical drag is not bounded
 by an electrical limit."  That escape hatch does not survive reading p57.
 
-**What the print says.** Read off the `.jpg` scans, not the OCR sidecars —
-which matters more than usual here.  The p57 sidecar drops two fragments from
-the exact sentences this section turns on: "With the PRND in D (drive) and the
-accelerator pedal released, the EV1 will coast freely **like an automatic
-transmission** in neutral" comes out as "With the accelerator pedal released,
-the EV1 will coast freely in neutral", and "shaft speed/direction sensor rate,
-**accelerator position**, and coast down drag" loses the middle term.  The
-first inverts the meaning: off the sidecar the page appears to say the car
-free-wheels in neutral — i.e. that there is no commanded coast regen to bound
-at all.  The printed page says the opposite.  The pages:
+**What the print says.** Quoted from the `.jpg` scans, not the OCR sidecars.
+The p57 sidecar drops three fragments: "With the PRND in D (drive) and" and
+"*like an automatic transmission*" from the coast-freely sentence, and
+"*accelerator position*," from the list of PCM inputs.  Those matter for
+precision — the PRND-in-D qualifier is what says *when* coast down applies, and
+accelerator position is one of the three inputs the curve is a function of.
+
+**They do not change this section's conclusion, and an earlier draft of this
+paragraph claimed they did.**  The load-bearing sentence — "The coast down
+feature uses a calibrated amount of regenerative braking to gradually slow down
+the vehicle" — is present verbatim in the sidecar.  §3.1 would have survived
+reading the sidecar alone.  The `.jpg` gives the accurate transcription and is
+where the quotes below come from; it did not rescue the argument, and saying it
+did was the same hedge-loses-its-qualifier failure the drops themselves are an
+example of.  The pages:
 
 - **p57, "COAST DOWN FUNCTION"** (folio `PROPULSION 57`): "With the PRND in D
   (drive) and the accelerator pedal released, the EV1 will coast freely like an
@@ -348,10 +353,16 @@ everything the pages condition the limit on:
 | Shaft-to-pack efficiency η | — | not stated anywhere; see above |
 | Mechanical drag, which genuinely is *not* electrically bounded | — | not separated out; the cap binds the sum, which is the conservative order |
 
-**What changed.**  Nothing at or below 8000 RPM (49.9 mph) — the whole region
-the 2026-04-30 coastdown calibration fitted is untouched.  The old curve
+**What changed.**  Nothing at or below 8000 RPM (49.9 mph).  The old curve
 crossed the ceiling at 8349 RPM (52.1 mph) and then ran away; above a knee at
 8350 RPM the curve is now constant power at the printed 10 950 W.
+
+An earlier draft of this section, and of the JSON header, said that left "the
+whole region the 2026-04-30 coastdown calibration fitted" untouched.  **That is
+false.**  Coastdown runs 30 → 10 m/s, i.e. **3586–10 758 RPM**, so 34 % of its
+fitted span sits above the knee and moved.  §11.1 measures the consequence —
+the fit's CdA moves 8× — instead of asserting there wasn't one.  What is true
+is the narrower claim: no *breakpoint* at or below 8000 RPM changed value.
 
 | RPM | mph | old N·m | old kW | new N·m | new kW |
 |---|---|---|---|---|---|
@@ -375,9 +386,12 @@ passes a map that exceeds the cap by 9 W at 11 437 RPM, which is why 11000
 reads −9.4 and not the exact −9.5.  Dense max over the interpolant: 10 947 W.
 
 `tests/test_motor_speed_ceiling.cpp` pins this with the two printed numbers
-(365 V, 30 A) rather than a derived wattage, samples the interpolant every 1
-RPM, and separately requires the curve to *track* the ceiling above the knee —
-without that second half an all-zero coast map would pass perfectly.
+(365 V, 30 A) rather than a derived wattage, sweeps the interpolant at 10 RPM,
+and separately requires the curve to *track* the ceiling above the knee —
+without that second half an all-zero coast map would pass perfectly.  (10 RPM,
+not 1: the chord excess spans a whole 1000 RPM segment so it cannot hide
+between samples, and the lookup helper carries a `REQUIRE` per call, which at
+1 RPM put 16 000 assertions into the suite total from this one case.)
 
 What's also still missing:
 - Regen integrated with brake commands (today regen lives only in coast

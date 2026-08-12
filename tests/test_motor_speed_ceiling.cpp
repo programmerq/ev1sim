@@ -559,8 +559,10 @@ TEST_CASE("Motor coast: the coast map stays under the manual's regen ceiling",
     CHECK(constant_power_points >= 8);
 
     // (3) The knee is where it is: below 8000 RPM the curve is drag, well under
-    // the cap, so the correction cannot have crept down into the region the
-    // 2026-04-30 coastdown calibration fitted.
+    // the cap, so the correction cannot have crept down into the BREAKPOINTS
+    // the 2026-04-30 coastdown calibration fitted.  That pins the breakpoints,
+    // not the calibration — coastdown spans 3586-10 758 RPM, so a third of its
+    // fitted range sits above the knee and did move; see audit 11.1.
     for (double rpm = 0.0; rpm <= 8000.0; rpm += 100.0) {
         const double p = std::abs(InterpHoldingEndpoints(zero, rpm)) * RpmToRadS(rpm);
         INFO("drag region at " << rpm << " RPM: " << p << " W");

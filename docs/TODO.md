@@ -102,6 +102,19 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   `config/abs_hard_brake.json` was added because `abs_hard_brake` had no config
   wrapper at all — which is part of why nobody had measured it.
 
+- [ ] **The settle table's barrier-release times are frozen measurements that
+  nothing re-derives.**  `tests/test_scenario.cpp`'s `[Runway]` cases compare
+  each scenario's `set_brake` time against a hard-coded measured release.  That
+  catches a brake moved backwards, but not the plant moving forwards: if a
+  barrier starts releasing at 17.5 s, an 18.0 s brake still clears
+  `15.028 + 2.0` while the real settle has shrunk to 0.5 s, and nothing goes
+  red.  This is exactly the staleness that produced the phantom 12.011 s.
+  `scripts/scenario_runway_report.py` re-derives the numbers and already exits
+  non-zero on a zero settle, but it is manual-run only — CI never invokes it,
+  though the Chrono job already builds the `ev1sim` binary it needs.  Doing it
+  means adding one step to that job and accepting ~7 headless scenario runs of
+  wall time (a few minutes each), or a nightly rather than per-push lane.
+
 - [x] **The coast map exceeds the manual's stated regeneration bound above
   ~8400 RPM.**  Done 2026-08-12, and the framing above was wrong in the way
   that mattered.  It is not a category error that the bound is electrical and
@@ -112,10 +125,12 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   as a function of drive motor shaft speed/direction sensor rate"), so the
   printed limit on p60/p209 applies to it directly and the curve was in
   straight violation — 5.5× the ceiling at its worst, not merely implausible.
-  Curve re-cut as constant power above an 8350 RPM knee; nothing at or below
-  8000 RPM moved, so the 2026-04-30 calibration region is untouched.  Details,
-  the conditions the map still does not represent, and the coastdown effect are
-  in `docs/ev1_chrono_audit.md` §3.1 and §11.1.
+  Curve re-cut as constant power above an 8350 RPM knee; no breakpoint at or
+  below 8000 RPM changed value.  That is **not** the same as leaving the
+  2026-04-30 calibration alone — coastdown spans 3586–10 758 RPM, so 34 % of
+  its fitted range moved and the fit's CdA shifted 8×.  Details, the conditions
+  the map still does not represent, and the coastdown effect are in
+  `docs/ev1_chrono_audit.md` §3.1 and §11.1.
 
 ## ABS scenario integration artefacts (need a built electricsim)
 
@@ -181,6 +196,15 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   `abs_hard_brake.json` brake event.  The
   `scripts/run_abs_compare.sh + compare_abs_runs.py` output now
   shows clear differences between BTCM-on and BTCM-off:
+  **Provenance flag (2026-08-12):** this entry credits
+  `run_abs_compare.sh` with running `abs_hard_brake`, but until this date
+  that script's whitelist rejected `hard_brake` and `config/abs_hard_brake.json`
+  did not exist — so whatever produced these numbers, it was not the invocation
+  named here.  The stopping distances below (19.16 / 19.29 m) are also an order
+  of magnitude off this branch's measured ~102 m for the same scenario, which
+  says they came from a different scenario, a different plant, or both.  Left
+  as the historical record rather than rewritten; do not treat these figures as
+  current.
     - BTCM-on rear EMB peak slip ≈ 0.66 vs free-rolling 0.43 (rear
       brakes engage and contribute to deceleration)
     - Stopping distance BTCM-on 19.16 m vs BTCM-off 19.29 m
