@@ -602,6 +602,36 @@ if(BUILD_TESTS)
                      --selftest)
     set_tests_properties(runway_table_selftest PROPERTIES LABELS "guard" TIMEOUT 120)
 
+    # No committed JSON may repeat a key inside one object. Every parser here
+    # keeps the last one, so an earlier duplicate is committed text nothing
+    # reads — and CI's validate-configs job cannot see it, because parsing is
+    # exactly the step that swallows it. This repo's config and data files
+    # carry their rationale in numbered "//" keys, which is a shape that makes
+    # the mistake easy; it happened twice while writing config/coastdown.json.
+    # Selftest included, on the same pattern as the other second-copy guards.
+    add_test(NAME json_no_duplicate_keys_selftest
+             COMMAND bash ${CMAKE_SOURCE_DIR}/tests/check_json_no_duplicate_keys.sh
+                     --selftest)
+    set_tests_properties(json_no_duplicate_keys_selftest
+                         PROPERTIES LABELS "guard" TIMEOUT 120)
+    add_test(NAME json_no_duplicate_keys
+             COMMAND bash ${CMAKE_SOURCE_DIR}/tests/check_json_no_duplicate_keys.sh)
+    set_tests_properties(json_no_duplicate_keys PROPERTIES LABELS "guard" TIMEOUT 120)
+
+    # A --config path the user NAMED must be fatal when it cannot be opened,
+    # rather than warning and silently running built-in defaults — the silent
+    # substitution that hid the coastdown's run condition for four months.
+    # Needs the app binary, so it is Chrono-gated, but it costs ~3 s: the fatal
+    # path exits before SimApp is constructed, and the positive control is
+    # headless_smoke, which self-terminates. The script says why it carries no
+    # separate selftest (its two assertions are each other's control).
+    if(Chrono_FOUND)
+        add_test(NAME named_config_is_fatal
+                 COMMAND bash ${CMAKE_SOURCE_DIR}/tests/check_named_config_is_fatal.sh
+                         $<TARGET_FILE:ev1sim>)
+        set_tests_properties(named_config_is_fatal PROPERTIES LABELS "guard" TIMEOUT 120)
+    endif()
+
     if(Chrono_FOUND)
         add_custom_target(test-runway-table
             COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/scenario_runway_report.py

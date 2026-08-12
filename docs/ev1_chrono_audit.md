@@ -739,15 +739,39 @@ What the difference is *not* is the plant.  The mean-deceleration table further
 down needs no fit at all, and it reproduces the committed one to four decimals,
 so the CSVs behind both sets of figures are the same data.  What it looks like
 is the estimator: an **unweighted** least-squares fit on the same speed bins
-gives 195.2 → 246.2 N and 0.891 → 0.574 m², within about 1 % of the retired
+gives 195.2 → 246.2 N and 0.891 → 0.574 m², within a few percent of the retired
 figures, where the shipped fit weights each bin by its sample count
-(inverse-variance for a bin mean).  That is an inference from a match, not a
-recovered script — the fit that made them was never committed, which is the
+(inverse-variance for a bin mean).  Term by term against the retired numbers:
+F_rr +0.93 % (old) and **+2.75 %** (new), CdA +1.25 % and +0.53 % — so three of
+the four are inside 1.3 % and one is not, and "within about 1 %" (an earlier
+wording here) was wrong about F_rr new.  That is an inference from a match, not
+a recovered script — the fit that made them was never committed, which is the
 whole problem.
 
 Both runs come from `config/coastdown.json` — also new on 2026-08-12, because
 until then no config wrapper existed and the run condition behind every number
-in §11 and §11.1 was unrecorded.  Reproduce with:
+in §11 and §11.1 was unrecorded.
+
+**Why "unrecorded" and not just "undocumented".** The invocation these sections
+*did* document (`--headless --start-propulsion-enabled --scenario …`, no
+`--config`) runs one of two different experiments depending on the working
+directory, and says nothing about which:
+
+| run from | what loads | result |
+|---|---|---|
+| a directory where `config/default.json` resolves | the **milford** level | car leaves the level mid-launch; peak **370.78 m/s** (829 mph), 562 samples above 60 m/s, 254 above 200 m/s |
+| anywhere else | `[Config] Cannot open config/default.json — using built-in defaults` → **rigid_plane** | a perfectly ordinary coastdown, peak **30.15 m/s** |
+
+The second is the dangerous one. A fallback that produces garbage gets noticed;
+one that produces *plausible* results does not, and the only signal separating
+them is a single line on stderr that any `> log` redirect hides. That is the
+best available explanation for how these figures went four months without
+anyone being able to say what they were measured on.  `src/main.cpp` now makes
+a **named** `--config` that cannot be opened fatal (exit 2) rather than
+substituting defaults, pinned by the `named_config_is_fatal` test; the implicit
+default still falls back, which is documented behaviour.
+
+Reproduce the numbers in this section with:
 
 ```sh
 ./build/ev1sim --config config/coastdown.json
@@ -777,6 +801,32 @@ all, and it is the number the retracted claim never carried: the CdA that was
 reported as 0.090 m², "a quarter of spec", is **0.088 ± 0.145 m² over the
 window it was fitted on**.  Consistent with no aero term at all, which is not a
 measurement of one.  `fit_coastdown.py` now says so and exits non-zero.
+
+**That verdict depends on a constant, and the constant is `BIN_WIDTH_MPS`.**
+There is no window-*width* term in it — the test is `|CdA| > σ` — but the bin
+width sets how many bins a window is cut into, hence the degrees of freedom
+behind σ.  Over the 19.31–29.78 m/s window that produced the 0.088:
+
+| bin width | bins | dof | CdA | σ | verdict |
+|---|---|---|---|---|---|
+| 2.0 m/s | 6 | 4 | 0.097 | 0.089 | IDENTIFIED |
+| 2.5 m/s | 5 | 3 | 0.097 | 0.098 | not identified |
+| 4.0 m/s | 4 | 2 | 0.086 | 0.099 | not identified |
+| **5.0 m/s (shipped)** | 3 | 1 | 0.086 | 0.144 | **not identified** |
+| 6.0 m/s | 2 | 0 | 0.092 | — | no dof |
+
+Recorded rather than tuned away, because a verdict resting on an undeclared
+constant is the same defect as a fit resting on an undeclared window.  Three
+things about it.  The shipped 5.0 gave the **widest** σ of the widths tried —
+the cautious end, the one that reaches "not identified" soonest — though that
+is observed on these fits, not proved in general.  The substantive reading
+survives the flip: 0.097 ± 0.089 is a ratio of 1.09, no more a measurement of
+an aero term than 0.086 ± 0.144 is.  And **the published coefficients in the
+table above are far steadier than the verdict** — over the whole coast CdA
+holds 0.610–0.621 m² (new map) and 0.908–0.914 m² (old) across those same bin
+widths, so the headline does not turn on this constant even though the verdict
+does.  The tool prints the bin width and the dof beside every number, so the
+knob is visible wherever a number is quoted from.
 
 **The bottom two rows are the control, and they are the reason to believe the
 top two.**  Below the knee the two maps are byte-identical, and the fit agrees

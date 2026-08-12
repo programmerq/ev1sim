@@ -308,6 +308,34 @@ class Fit:
         |CdA| <= sigma the window is consistent with there being no aero term
         at all, so quoting a CdA off it — "a quarter of spec", say — is
         quoting noise.  None when there are no degrees of freedom to judge on.
+
+        IT IS NOT THRESHOLD-FREE, and saying so plainly matters, because a
+        verdict resting on a constant nobody declared is the defect this tool
+        exists to fix.  There is no window-WIDTH term — but BIN_WIDTH_MPS
+        decides how many bins a window is cut into, hence the degrees of
+        freedom, and sigma moves with those.  On the 19.31-29.78 m/s window of
+        docs/ev1_chrono_audit.md 11.1 the verdict flips:
+
+            bin width  bins  dof     CdA   sigma  verdict
+                  2.0     6    4   0.097   0.089  IDENTIFIED
+                  2.5     5    3   0.097   0.098  NOT IDENTIFIED
+                  4.0     4    2   0.086   0.099  NOT IDENTIFIED
+                  5.0     3    1   0.086   0.144  NOT IDENTIFIED  <- shipped
+                  6.0     2    0   0.092    None  no dof
+
+        So the caller has to be able to see the knob: the fit line prints the
+        bin width and the dof beside every number, and the NOT IDENTIFIED
+        block names the constant.
+
+        Two things about the shipped 5.0, both OBSERVED on those fits rather
+        than proved in general.  It gave the widest spread of the widths
+        tried, i.e. the cautious end, the one that reaches NOT IDENTIFIED
+        soonest.  And the substantive reading survives the flip anyway:
+        0.097 +/- 0.089 is a ratio of 1.09, no more a measurement of an aero
+        term than 0.086 +/- 0.144 is.  The COEFFICIENTS are far steadier than
+        the verdict — over the whole coast CdA holds 0.610-0.621 (new map) and
+        0.908-0.914 (old) across those same widths, so what section 11.1
+        publishes does not turn on this constant even though the verdict does.
         """
         if self.cd_a_sigma is None:
             return None
@@ -338,8 +366,12 @@ def bin_summary(samples: list[tuple[float, float]], indent: str = "  ") -> str:
 def print_fit(fit: Fit, indent: str = "  ") -> None:
     f_sig = fit.f_rr_sigma
     c_sig = fit.cd_a_sigma
+    # The bin width is printed, not just the bin count, because it is the
+    # constant the spread and the identifiability verdict below actually turn
+    # on — see Fit.identified.  A reader who can see the knob can judge the
+    # number; one who cannot will read the verdict as absolute.
     print(f"{indent}decel(v) = {fit.a:.6f} + {fit.b:.8f} * v^2   "
-          f"({fit.n_bins} bins, {fit.dof} dof)")
+          f"({fit.n_bins} bins of {BIN_WIDTH_MPS:.1f} m/s, {fit.dof} dof)")
     if f_sig is None:
         print(f"{indent}F_rr     = {fit.f_rr:7.1f} N          "
               f"(real EV1 spec ~{SPEC_F_RR_N:.0f} N, ratio {fit.f_rr / SPEC_F_RR_N:.2f}x)")
@@ -357,6 +389,10 @@ def print_fit(fit: Fit, indent: str = "  ") -> None:
               f"|{fit.cd_a:.3f}| <= {c_sig:.3f}.")
         print(f"{indent}    The bins here are consistent with no aero term at all, so this "
               f"CdA is\n{indent}    not a measurement of one. Widen the window before quoting it.")
+        print(f"{indent}    This verdict depends on BIN_WIDTH_MPS = {BIN_WIDTH_MPS:.1f}, which "
+              f"sets the {fit.dof} dof\n{indent}    behind that spread; narrower bins buy dof and "
+              f"can flip it. 5.0 is the\n{indent}    cautious end of the widths tried — see "
+              f"Fit.identified for the sweep.")
 
 
 # --- the common-window rule ---------------------------------------------------
@@ -530,6 +566,20 @@ def selftest() -> int:
         ok &= passed
         print(f"  [{'ok  ' if passed else 'FAIL'}] {name}: {detail}")
 
+    def guarded(name: str, thunk):
+        """Run thunk(); a raised FitError becomes a reported FAIL, not a crash.
+
+        A mutation that breaks an early case must not stop the later cases
+        from reporting — a selftest that dies partway tells you something is
+        wrong without telling you what, which is most of the value gone.
+        (Setting MIN_SPAN_MPS to 25.0 used to end this run in a traceback.)
+        """
+        try:
+            return thunk()
+        except FitError as e:
+            case(name, False, f"raised instead of returning — {e.args[0].splitlines()[0]}")
+            return None
+
     with tempfile.TemporaryDirectory() as td:
         d = Path(td)
         TRUE_F_RR, TRUE_CD_A = 200.0, 0.600
@@ -539,13 +589,15 @@ def selftest() -> int:
         long_a = d / "long_a.csv"
         _synth_csv(long_a, TRUE_F_RR, TRUE_CD_A, 30.0, 200.0)
         run = Run(long_a)
-        f = Fit(run.window(*common_window([run], None, None)))
-        case("recovers planted drag",
-             abs(f.f_rr - TRUE_F_RR) < 2.0 and abs(f.cd_a - TRUE_CD_A) < 0.01,
-             f"F_rr {f.f_rr:.1f} +/- {f.f_rr_sigma:.1f} N (planted {TRUE_F_RR:.0f}), "
-             f"CdA {f.cd_a:.3f} +/- {f.cd_a_sigma:.3f} m^2 (planted {TRUE_CD_A:.3f})")
-        case("...and calls that CdA identified", f.identified is True,
-             f"|{f.cd_a:.3f}| vs spread {f.cd_a_sigma:.3f}")
+        f = guarded("recovers planted drag",
+                    lambda: Fit(run.window(*common_window([run], None, None))))
+        if f is not None:
+            case("recovers planted drag",
+                 abs(f.f_rr - TRUE_F_RR) < 2.0 and abs(f.cd_a - TRUE_CD_A) < 0.01,
+                 f"F_rr {f.f_rr:.1f} +/- {f.f_rr_sigma:.1f} N (planted {TRUE_F_RR:.0f}), "
+                 f"CdA {f.cd_a:.3f} +/- {f.cd_a_sigma:.3f} m^2 (planted {TRUE_CD_A:.3f})")
+            case("...and calls that CdA identified", f.identified is True,
+                 f"|{f.cd_a:.3f}| vs spread {f.cd_a_sigma:.3f}")
 
         # 2. THE ARTEFACT, in miniature.  ONE car -- a car with a knee, i.e.
         #    any real plant -- sampled over two coasts of different length.
@@ -560,39 +612,80 @@ def selftest() -> int:
         _synth_csv(knee_short, TRUE_F_RR, TRUE_CD_A, 30.0, 60.0, KNEE_V, KNEE_N)
         ra, rb = Run(knee_long), Run(knee_short)
 
-        own_a = Fit(ra.window(ra.v_lo, ra.v_hi))
-        own_b = Fit(rb.window(rb.v_lo, rb.v_hi))
-        case("unlike windows DISagree on one car (the defect, reproduced)",
+        own_a = guarded("unlike windows DISagree on one car",
+                        lambda: Fit(ra.window(ra.v_lo, ra.v_hi)))
+        own_b = guarded("unlike windows DISagree on one car",
+                        lambda: Fit(rb.window(rb.v_lo, rb.v_hi)))
+        if own_a is not None and own_b is not None:
+          case("unlike windows DISagree on one car (the defect, reproduced)",
              abs(own_a.f_rr - own_b.f_rr) > 5.0 or abs(own_a.cd_a - own_b.cd_a) > 0.02,
              f"own ranges {ra.v_lo:.1f}-{ra.v_hi:.1f} vs {rb.v_lo:.1f}-{rb.v_hi:.1f} m/s: "
              f"F_rr {own_a.f_rr:.1f} vs {own_b.f_rr:.1f} N, "
              f"CdA {own_a.cd_a:.3f} vs {own_b.cd_a:.3f} m^2")
 
-        lo, hi = common_window([ra, rb], None, None)
-        fa, fb = Fit(ra.window(lo, hi)), Fit(rb.window(lo, hi))
-        case("...and the common window puts them back together",
-             abs(fa.f_rr - fb.f_rr) < 1.0 and abs(fa.cd_a - fb.cd_a) < 0.005,
-             f"common {lo:.1f}-{hi:.1f} m/s: F_rr {fa.f_rr:.1f} vs {fb.f_rr:.1f} N, "
-             f"CdA {fa.cd_a:.3f} vs {fb.cd_a:.3f} m^2")
+        def _together():
+            lo, hi = common_window([ra, rb], None, None)
+            fa, fb = Fit(ra.window(lo, hi)), Fit(rb.window(lo, hi))
+            return lo, hi, fa, fb
+        got = guarded("...and the common window puts them back together", _together)
+        if got is not None:
+            lo, hi, fa, fb = got
+            case("...and the common window puts them back together",
+                 abs(fa.f_rr - fb.f_rr) < 1.0 and abs(fa.cd_a - fb.cd_a) < 0.005,
+                 f"common {lo:.1f}-{hi:.1f} m/s: F_rr {fa.f_rr:.1f} vs {fb.f_rr:.1f} N, "
+                 f"CdA {fa.cd_a:.3f} vs {fb.cd_a:.3f} m^2")
 
-        # 3. Three values around the refusal threshold, so the verdict is seen
-        #    to change.  Each run starts high enough that its coverage is
-        #    [start, 10 m/s]; pairing it with the long run makes the overlap
-        #    exactly [10, start].
-        for start, want_refuse in ((10.0 + MIN_SPAN_MPS + 2.0, False),
-                                   (10.0 + MIN_SPAN_MPS + 0.5, False),
-                                   (10.0 + MIN_SPAN_MPS - 1.0, True)):
-            p = d / f"narrow_{start:.1f}.csv"
-            _synth_csv(p, TRUE_F_RR, TRUE_CD_A, start, 400.0)
+        # 3. The refusal threshold.  Each probe run starts high enough that
+        #    its coverage is [10 m/s, start]; pairing it with the long run
+        #    makes the overlap exactly `start - 10` wide.
+        def overlap_case(width: float, want_refuse: bool, why_pinned: str) -> None:
+            p = d / f"overlap_{width:.1f}.csv"
+            _synth_csv(p, TRUE_F_RR, TRUE_CD_A, 10.0 + width, 400.0)
             rn = Run(p)
             try:
                 lo, hi = common_window([ra, rn], None, None)
-                refused, why = False, f"accepted {lo:.2f}-{hi:.2f} m/s"
+                refused, detail = False, f"accepted {lo:.2f}-{hi:.2f} m/s"
             except FitError as e:
-                refused, why = True, str(e).splitlines()[0]
+                refused, detail = True, str(e).splitlines()[0]
             case(f"overlap {rn.v_hi - 10.0:.2f} m/s wide -> "
-                 f"{'refuse' if want_refuse else 'accept'}",
-                 refused == want_refuse, why)
+                 f"{'refuse' if want_refuse else 'accept'} ({why_pinned})",
+                 refused == want_refuse, detail)
+
+        # 3a. TWO PINNED PROBES, and they are the ones that matter.  The three
+        #     below walk the threshold, but they are written as offsets FROM
+        #     MIN_SPAN_MPS, so they move when it moves: they prove the
+        #     comparison is the right way round and the arithmetic is right,
+        #     and they cannot notice the constant itself being changed.
+        #     Moving MIN_SPAN_MPS 10.0 -> 8.0 leaves all three green.
+        #
+        #     These two are literals on purpose, so the guard can be TUNED but
+        #     not DEFUSED, and each literal is pinned to something real rather
+        #     than to the constant under test:
+        #       5.0  = one BIN_WIDTH_MPS bin.  Two parameters fitted across a
+        #              single bin is not a measurement at any threshold, so
+        #              this must refuse however MIN_SPAN_MPS is set.
+        #       19.0 = inside the 19.77 m/s-wide window (10.01-29.78 m/s) that
+        #              docs/ev1_chrono_audit.md 11.1 publishes its numbers
+        #              over.  A guard grown wide enough to refuse this would
+        #              refuse the fit the audit rests on, so it must accept.
+        #              (Realised overlap prints as ~18.6 m/s: the synthetic
+        #              run's top sample sits just under its start speed.)
+        #
+        #     Checked by mutation, and this is the property being bought:
+        #       MIN_SPAN_MPS 10.0 -> 8.0   slips through — a mild loosening
+        #                                   that still refuses one-bin windows
+        #                                   and still accepts the audit's
+        #       MIN_SPAN_MPS 10.0 -> 4.0   CAUGHT by the 5.0 probe (defused)
+        #       MIN_SPAN_MPS 10.0 -> 25.0  CAUGHT by the 19.0 probe (would
+        #                                   refuse the published fit)
+        overlap_case(5.0, True, "one bin wide; a fit over it is not a measurement")
+        overlap_case(19.0, False, "narrower than the window audit 11.1 publishes")
+
+        # 3b. ...and the walk across the current threshold, for the boundary
+        #     arithmetic.  Offsets from MIN_SPAN_MPS by design — see 3a.
+        for delta, want_refuse in ((2.0, False), (0.5, False), (-1.0, True)):
+            overlap_case(MIN_SPAN_MPS + delta, want_refuse,
+                         f"MIN_SPAN_MPS{delta:+.1f}")
 
         # 4. Runs that overlap in speed but are far apart: no common range at
         #    all.  The tool must name both ranges, not fit them separately.
