@@ -729,24 +729,38 @@ happening rather than at a description of one.
 #### The numbers below are the ones the shipped tool produces (2026-08-12, second pass)
 
 An earlier version of this table read F_rr 193.4 → 239.6 N and CdA 0.880 →
-0.571 m².  Those came from a **one-off unweighted fit written for that
-session** and never committed — `fit_coastdown.py` still had its 30 s cap at
-the time, so it could not have produced them.  A number in an audit that the
-repo's own tool cannot reproduce is the defect this section exists to fix,
-one level up.  Re-derived here with the shipped tool over a committed run
-condition, and the difference is the estimator, not the plant: the shipped fit
-weights each speed bin by its sample count (inverse-variance for a bin mean),
-the ad-hoc one did not.  Same CSVs, ±4 %.
+0.571 m².  **No tool in this repo produces those numbers**, then or now:
+`fit_coastdown.py` still had its 30 s cap when they were written, so it cannot
+have made them, and the uncapped tool makes the numbers below instead.  A
+figure in an audit that the repo cannot reproduce is the defect this section
+exists to fix, one level up.
+
+What the difference is *not* is the plant.  The mean-deceleration table further
+down needs no fit at all, and it reproduces the committed one to four decimals,
+so the CSVs behind both sets of figures are the same data.  What it looks like
+is the estimator: an **unweighted** least-squares fit on the same speed bins
+gives 195.2 → 246.2 N and 0.891 → 0.574 m², within about 1 % of the retired
+figures, where the shipped fit weights each bin by its sample count
+(inverse-variance for a bin mean).  That is an inference from a match, not a
+recovered script — the fit that made them was never committed, which is the
+whole problem.
 
 Both runs come from `config/coastdown.json` — also new on 2026-08-12, because
 until then no config wrapper existed and the run condition behind every number
 in §11 and §11.1 was unrecorded.  Reproduce with:
 
 ```sh
-./build/ev1sim --config config/coastdown.json        # keep scenario_coastdown.csv
-git stash / swap the coast map, re-run, keep the second CSV
-scripts/fit_coastdown.py old.csv new.csv             # whole coast
-scripts/fit_coastdown.py --v-max 23.28 old.csv new.csv   # the control
+./build/ev1sim --config config/coastdown.json
+mv scenario_coastdown.csv new.csv
+# put the pre-3.1 coast map back, re-run, and restore it afterwards:
+git show 792d062^:data/vehicle/ev1/powertrain/EV1_EngineSimpleMap.json \
+    > data/vehicle/ev1/powertrain/EV1_EngineSimpleMap.json
+./build/ev1sim --config config/coastdown.json
+mv scenario_coastdown.csv old.csv
+git checkout data/vehicle/ev1/powertrain/EV1_EngineSimpleMap.json
+
+scripts/fit_coastdown.py old.csv new.csv                 # whole coast
+scripts/fit_coastdown.py --v-max 23.28 old.csv new.csv   # the sub-knee control
 ```
 
 | fit window | | old coast map | new coast map |
