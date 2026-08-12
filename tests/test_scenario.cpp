@@ -1129,18 +1129,25 @@ std::vector<BarrierCase> LoadSettleTable() {
         bc.path = c.at("scenario").get<std::string>();
         bc.measured_release_s = c.at("measured_release_s").get<double>();
         bc.min_settle_s = c.at("min_settle_s").get<double>();
-        // min_on_surface_s null means "no requirement after the crossing",
-        // which is the same condition under which the crossing itself is not
-        // recorded.  Reading them as a pair keeps the two consistent.
-        if (!c.at("min_on_surface_s").is_null()) {
-            REQUIRE_FALSE(c.at("measured_crossing_s").is_null());
+        // min_on_surface_s and measured_crossing_s are null together or set
+        // together, and both directions are enforced.  Half a pair is how a
+        // recorded crossing quietly stops being checked (min null, crossing
+        // set) or a requirement gets checked against nothing (the reverse).
+        const bool want = !c.at("min_on_surface_s").is_null();
+        const bool have = !c.at("measured_crossing_s").is_null();
+        REQUIRE(want == have);
+        if (want) {
             bc.has_crossing = true;
             bc.measured_crossing_s = c.at("measured_crossing_s").get<double>();
             bc.min_on_surface_s = c.at("min_on_surface_s").get<double>();
         }
         out.push_back(std::move(bc));
     }
-    REQUIRE(out.size() >= 7);
+    // Non-vacuous, but the COUNT is not asserted here: the coverage guard
+    // below enumerates config/scenarios/ and fails for every barrier-gated
+    // scenario missing from this table, which is the same check without a
+    // second hard-coded 7 to fall out of date.
+    REQUIRE_FALSE(out.empty());
     return out;
 }
 
