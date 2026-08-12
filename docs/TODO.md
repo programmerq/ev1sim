@@ -76,6 +76,16 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   the two repos' drives now disagree about peak torque by 6 % as well as about
   the speed ceiling.  Both halves are one reclassification pass on that one
   header; recorded here rather than reached across repos.
+  **Third number (2026-08-12):** that clamp is **symmetric** —
+  `cmd_torque_mnm` is clamped to `±PIM_DP_MOTOR_MAX_TORQUE_MNM` in `_tick`, so
+  the *regen* side is bounded at 150 N·m and by no power limit at all.  At
+  10 000 RPM that permits ~157 kW of regeneration against the 10 950 W
+  propulsion p60/p209 states ("The maximum allowed regeneration is 365 volts
+  DC and 30 amps DC") — ~14×, and on the repo that models the PIM, which is
+  the module the manual attributes the limit to.  It is the same defect §3.1
+  fixes here, one repo over and larger.  Note the ev1sim fix does not
+  propagate: this file is electricsim's own plant.  Still recorded rather than
+  reached across.
 
 ## ABS scenarios
 
