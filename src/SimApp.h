@@ -232,7 +232,6 @@ private:
     /// sim instant.  One implementation for both run loops.
     void PublishAmbient(double sim_time_s);
 
-
     // Freshness window for BTCM liveness signal (kSigBtcmUartFrame
     // heartbeat).  See ExternalSimConnector::GetAbsPhaseFront for the
     // architecture: liveness comes from the BTCM's 5 Hz
