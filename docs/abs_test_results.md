@@ -13,12 +13,25 @@ isolates the simavr edge-counting plumbing from the chassis side.
 |---|---|---|
 | `high_mu`  | uniform asphalt (μ ≈ 0.9)        | ABS shouldn't hurt on dry pavement             |
 | `low_mu`   | asphalt → packed snow (μ ≈ 0.20), brakes on the snow | ABS should keep wheels rolling on slippery |
-| `mu_jump`  | asphalt → ice transition         | algorithm must adapt as grip suddenly drops    |
-| `split_mu` | left = asphalt, right = ice      | per-wheel ABS keeps the car going straight    |
+| `mu_jump`  | asphalt → ice transition, brakes on asphalt then crosses under braking | algorithm must adapt as grip suddenly drops    |
+| `split_mu` | left = asphalt, right = ice, brakes on the split | per-wheel ABS keeps the car going straight    |
 
 Industry calls these "high-mu stop", "low-mu stop", "split-friction
 stop", and "mu-jump" / "transition" stop.  μ ("mu") is the friction
 coefficient between tire and road.
+
+**Every one of these launches on grip and settles before its subject
+happens.**  That is a property of the level geometry, not of good
+intentions: each transition level's runway is sized to hold the whole
+pre-brake half of its scenario — reach entry speed, then coast off the
+throttle — so the car arrives at the surface under test straight,
+settled and at speed.  When a runway is too short the scenario stops
+testing what its name says without failing anything: `mu_jump` used to
+cross onto the ice at full throttle and brake 34 m past the boundary,
+so no mu-jump happened at all, and `split_mu` used to straddle the seam
+under power and reach its brake event already 3.4° off heading — on the
+one test whose verdict *is* the yaw.  The runway budgets live in the
+`level/*.json` headers and are pinned by `tests/test_level_file.cpp`.
 
 ## How to run
 

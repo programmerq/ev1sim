@@ -6,6 +6,18 @@
 #                                 the BTCM/PIM/RSA version — that is why this is
 #                                 pinned.  Re-capture if you bump electricsim.)
 # ev1sim: tau_dump = 0.030 s (src/SimApp.cpp), captured 2026-05-21
+#
+# STALE as of 2026-08-11 — do not read these numbers as current.  Two changes
+# since the capture move the trajectories these were measured on, and neither
+# is a regression:
+#   1. the motor torque map's corner point moved to the propulsion p250 rating
+#      (141 N.m at 7000 RPM), which slows every launch ~3 % and so shifts every
+#      scenario's entry-speed time;
+#   2. abs_mu_jump / abs_split_mu / abs_diagonal_mu runways were lengthened so
+#      the launch finishes before the surface under test, which moves their
+#      brake-on position and stop distance by design.
+# Re-capture with a built electricsim at the pinned commit before treating any
+# comparison against this file as meaningful.
 # capture method: single-pass 6-scenario BTCM-on/off sweep, controllers rebuilt
 #                 at HEAD.  Margins are wide enough that run-to-run timing jitter
 #                 does not flip any rule; bump to a 3x median if that changes.
