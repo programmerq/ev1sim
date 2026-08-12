@@ -1569,6 +1569,12 @@ int SimApp::RunWithVisualization() {
             for (int i = 0; i < steps_per_frame; ++i) {
                 double t = m_world->GetSimTime();
                 m_world->Synchronize(t);
+                // Hand the connector this sub-step's sim time before reading
+                // any freshness-gated value below: the BTCM-liveness windows
+                // age on sim time, so they are only as current as the last
+                // SetSimTime.  Skipped while paused along with the rest of the
+                // loop, which is the point — a paused sim ages nothing.
+                m_external_sim->SetSimTime(t);
                 // Per-wheel BTCM ABS modulation (front axle).
                 // Must follow Synchronize() (which calls ApplyBrakes internally)
                 // so we can override the symmetric front pressure when BTCM is live.
@@ -2166,6 +2172,9 @@ int SimApp::RunHeadless() {
         for (int i = 0; i < steps_per_tick; ++i) {
             const double t = m_world->GetSimTime();
             m_world->Synchronize(t);
+            // This sub-step's sim time is what the BTCM-liveness windows age
+            // against — see ExternalSimConnector::SetSimTime.
+            m_external_sim->SetSimTime(t);
             // Per-wheel BTCM ABS modulation (front axle).
             // Must follow Synchronize() so we override the symmetric front
             // pressure when BTCM is live.

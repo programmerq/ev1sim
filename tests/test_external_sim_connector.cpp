@@ -1188,8 +1188,9 @@ TEST_CASE("GetAbsPhaseFront stays fresh through HOLD↔DUMP cycling",
     c.DebugInjectDelta(5012, true);
 
     // Refresh the heartbeat and toggle dump (HOLD → DUMP).  Iso's
-    // per-pin timestamp does not refresh; the heartbeat does.
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    // per-pin timestamp does not refresh; the heartbeat does.  50 ms of
+    // *sim* time, since that is the clock the ages are kept on.
+    c.SetSimTime(0.050);
     c.DebugInjectDelta(5050, true);   // refresh heartbeat.
     c.DebugInjectDelta(5011, true);
     c.DebugInjectDelta(5013, true);
@@ -1200,6 +1201,140 @@ TEST_CASE("GetAbsPhaseFront stays fresh through HOLD↔DUMP cycling",
     CHECK(phase.fr_fresh);
     CHECK(phase.fl == Phase::DUMP);
     CHECK(phase.fr == Phase::DUMP);
+}
+
+// ---------------------------------------------------------------------------
+// Which clock the freshness windows age on.
+//
+// These are the regression tests for the run-to-run divergence found in the
+// armed 17-module co-sim: identical scenario, identical tick sequence, three
+// different vehicle-speed traces.  The freshness windows used to age on
+// std::chrono::steady_clock, so a host stall longer than the window — under
+// the tick barrier, ev1sim's own wait for 17 consumers to ack — read as "the
+// BTCM has gone quiet".  ApplyRearEmbBrake then zeroed the rear brakes for
+// that tick (rear EMB has no hydraulic fallback) and ApplyAbsFrontBrake
+// dropped per-wheel modulation, so a host scheduling event became a force on
+// the car.  See ExternalSimConnector::SetSimTime.
+//
+// Each case is a three-value receipt.  The middle value — wall time passing
+// while sim time stands still — is the one whose verdict flips, and it is the
+// one that fails on the wall clock.
+// ---------------------------------------------------------------------------
+
+namespace {
+/// Burn wall-clock time without touching the sim clock: what a barrier wait,
+/// a page-fault storm or a descheduled process does to the host.
+void BurnWallTime(std::chrono::milliseconds d) {
+    std::this_thread::sleep_for(d);
+}
+constexpr std::chrono::milliseconds kShortWindow{120};
+constexpr std::chrono::milliseconds kWallStall{200};   // > kShortWindow
+}  // namespace
+
+TEST_CASE("BTCM liveness ages on sim time, not on the host's wall clock",
+          "[ExternalSim][ABS][determinism]") {
+    ExternalSimConnector c;
+    c.SetSimTime(1.0);
+    c.DebugInjectDelta(5050, true);   // heartbeat arrives at sim t = 1.0 s
+    c.DebugInjectDelta(5010, true);   // FL iso/dump ever-seen
+    c.DebugInjectDelta(5011, false);
+    c.DebugInjectDelta(5012, true);
+    c.DebugInjectDelta(5013, false);
+
+    // 1. Read at the same sim instant: alive.
+    CHECK(c.GetAbsPhaseFront(kShortWindow).fl_fresh);
+
+    // 2. The host stalls for longer than the window while the vehicle clock
+    //    stands still.  Nothing happened to the car, so the BTCM is still
+    //    alive.  (On the wall clock this read declared it dead.)
+    BurnWallTime(kWallStall);
+    CHECK(c.GetAbsPhaseFront(kShortWindow).fl_fresh);
+    CHECK(c.GetAbsPhaseFront(kShortWindow).fr_fresh);
+
+    // 3. Sim time passes the window with no new heartbeat: genuinely dead,
+    //    and both wheels fall back to the hydraulic path (APPLY).
+    c.SetSimTime(1.0 + 0.121);
+    const auto dead = c.GetAbsPhaseFront(kShortWindow);
+    CHECK_FALSE(dead.fl_fresh);
+    CHECK_FALSE(dead.fr_fresh);
+    CHECK(dead.fl == ExternalSimConnector::AbsPhaseFront::Phase::APPLY);
+}
+
+TEST_CASE("Rear EMB liveness ages on sim time, not on the host's wall clock",
+          "[ExternalSim][ABS][determinism]") {
+    // The rear axle is the one that bites: it is purely electromechanical, so
+    // a stale BTCM means zero rear brake force, not a fallback to hydraulics.
+    ExternalSimConnector c;
+    c.SetSimTime(2.0);
+    c.DebugInjectDelta(5050, true);      // heartbeat
+    c.DebugInjectFloat(5014, 0.75f);     // rear motor LR
+    c.DebugInjectFloat(5015, 0.75f);     // rear motor RR
+
+    CHECK(c.GetRearEmbCmd(kShortWindow).lr_fresh);
+
+    BurnWallTime(kWallStall);
+    const auto stalled = c.GetRearEmbCmd(kShortWindow);
+    CHECK(stalled.lr_fresh);
+    CHECK(stalled.rr_fresh);
+    CHECK_THAT(static_cast<double>(stalled.lr), WithinAbs(0.75, 1e-6));
+
+    c.SetSimTime(2.0 + 0.121);
+    const auto aged = c.GetRearEmbCmd(kShortWindow);
+    CHECK_FALSE(aged.lr_fresh);
+    CHECK_FALSE(aged.rr_fresh);
+}
+
+TEST_CASE("Throttle/steering freshness ages on sim time, not the wall clock",
+          "[ExternalSim][determinism]") {
+    ExternalSimConnector c;
+    c.SetSimTime(0.5);
+    c.DebugInjectU8(4073, 200);          // PIM throttle command
+    c.DebugInjectFloat(4076, -0.25f);    // steering command
+
+    CHECK(c.GetThrottleCmd(kShortWindow).fresh);
+    CHECK(c.GetSteeringCmd(kShortWindow).fresh);
+
+    BurnWallTime(kWallStall);
+    CHECK(c.GetThrottleCmd(kShortWindow).fresh);
+    CHECK(c.GetSteeringCmd(kShortWindow).fresh);
+
+    c.SetSimTime(0.5 + 0.121);
+    CHECK_FALSE(c.GetThrottleCmd(kShortWindow).fresh);
+    CHECK_FALSE(c.GetSteeringCmd(kShortWindow).fresh);
+}
+
+TEST_CASE("A signal arriving on the very first tick is not read as never-seen",
+          "[ExternalSim][determinism]") {
+    // The sim clock starts at 0, and every *_ns field reads 0 as "never
+    // seen" — so the sim-time stamp is biased by +1 ns.  Without the bias a
+    // heartbeat delivered at sim t = 0 would stamp 0 and the BTCM would look
+    // as though it had never spoken.
+    ExternalSimConnector c;
+    CHECK_FALSE(c.GetAbsPhaseFront(kShortWindow).fl_fresh);   // genuinely none
+
+    c.SetSimTime(0.0);
+    c.DebugInjectDelta(5050, true);
+    c.DebugInjectDelta(5010, true);
+    c.DebugInjectDelta(5011, false);
+    CHECK(c.GetAbsPhaseFront(kShortWindow).fl_fresh);
+}
+
+TEST_CASE("The sim clock never runs backwards", "[ExternalSim][determinism]") {
+    // Ages are unsigned differences; a rewound clock would make every stamp
+    // look like it came from the future and wedge the guard.  The setter
+    // holds the high-water mark so callers cannot do that.
+    ExternalSimConnector c;
+    c.SetSimTime(5.0);
+    c.DebugInjectDelta(5050, true);
+    c.DebugInjectDelta(5010, true);
+    c.DebugInjectDelta(5011, false);
+    CHECK(c.GetAbsPhaseFront(kShortWindow).fl_fresh);
+
+    c.SetSimTime(1.0);                       // ignored
+    CHECK(c.GetAbsPhaseFront(kShortWindow).fl_fresh);
+
+    c.SetSimTime(5.2);                       // 200 ms on from the stamp
+    CHECK_FALSE(c.GetAbsPhaseFront(kShortWindow).fl_fresh);
 }
 
 TEST_CASE("GetAbsPhaseFront can mix fresh and stale per wheel",

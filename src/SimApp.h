@@ -240,6 +240,11 @@ private:
     // of the EV1 electrical service manual): a shorter window would
     // trip abs-phase-stale before that peer tolerance elapses, a
     // longer one would keep reporting a lost BTCM as live.
+    //
+    // 3 s of SIM time, not of host wall time — the manual's tolerance is a
+    // property of the car.  ExternalSimConnector::SetSimTime carries the
+    // reasoning and the run-to-run divergence that measuring it on the wall
+    // clock caused.
     static constexpr std::chrono::milliseconds kAbsFreshnessWindow{3000};
 
     // Rear EMB drum brake state (BTCM rear-motor integration).

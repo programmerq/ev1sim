@@ -1208,14 +1208,6 @@ const std::array<ExternalSimConnector::Endpoint, kNumEndpoints>& EndpointTable()
     return table;
 }
 
-// NowNs() is used both in the full Tick() path and in GetAbsPhaseFront(), so
-// it lives outside the EV1SIM_HAVE_EXTERNAL_SIM guard.
-std::uint64_t NowNs() {
-    return static_cast<std::uint64_t>(
-        std::chrono::duration_cast<std::chrono::nanoseconds>(
-            std::chrono::steady_clock::now().time_since_epoch()).count());
-}
-
 } // namespace
 
 // ---------------------------------------------------------------------------
@@ -1224,6 +1216,21 @@ std::uint64_t NowNs() {
 // ---------------------------------------------------------------------------
 struct ExternalSimConnector::State {
     Status status = Status::Disabled;
+
+    // ── The sim clock every freshness window is measured on ─────────────────
+    // Advanced by SetSimTime() (which Tick() calls).  See the header for why
+    // this is sim time and not the wall clock.
+    double sim_time_s = 0.0;
+
+    /// Arrival stamp / "now" for every `*_ns` field below, in sim-time
+    /// nanoseconds.  Biased by +1 ns so a stamp is never 0: every consumer of
+    /// these fields reads 0 as "never seen", and sim time legitimately starts
+    /// at 0, so an unbiased clock would make a signal that arrived on the very
+    /// first tick indistinguishable from one that never arrived.
+    std::uint64_t now_ns() const {
+        const double t = sim_time_s > 0.0 ? sim_time_s : 0.0;
+        return 1ULL + static_cast<std::uint64_t>(t * 1.0e9);
+    }
 
     // Latched commands from the electric sim.
     bool bulb[NUM_LIGHTS]  = {};
@@ -1608,7 +1615,7 @@ struct ExternalSimConnector::State {
     bool          sol_fl_dmp             = false;
     bool          sol_fr_iso              = false;
     bool          sol_fr_dmp             = false;
-    std::uint64_t sol_fl_iso_ns          = 0;  // monotonic ns of last update
+    std::uint64_t sol_fl_iso_ns          = 0;  // sim-time ns of last update
     std::uint64_t sol_fl_dmp_ns          = 0;
     std::uint64_t sol_fr_iso_ns          = 0;
     std::uint64_t sol_fr_dmp_ns          = 0;
@@ -1798,6 +1805,19 @@ ExternalSimConnector::FindEndpoint(std::uint32_t signal_id) {
 }
 
 // ---------------------------------------------------------------------------
+// Sim clock
+//
+// Defined outside the EV1SIM_HAVE_EXTERNAL_SIM guard: the freshness-gated
+// accessors are compiled into the stub build too, so the clock that drives
+// them has to be there as well.  Monotonic by contract — the caller owns sim
+// time and never rewinds it, and a paused sim simply stops calling this, which
+// freezes every age (a paused sim must not invent a lost peer).
+// ---------------------------------------------------------------------------
+void ExternalSimConnector::SetSimTime(double sim_time_s) {
+    if (sim_time_s > m_state->sim_time_s) m_state->sim_time_s = sim_time_s;
+}
+
+// ---------------------------------------------------------------------------
 // State accessors
 // ---------------------------------------------------------------------------
 bool ExternalSimConnector::GetBulbCmd(LightID id) const {
@@ -1822,13 +1842,11 @@ ExternalSimConnector::ThrottleCmd ExternalSimConnector::GetThrottleCmd(
         r.fresh = false;
         return r;
     }
-    const auto now_ns = static_cast<std::uint64_t>(
-        std::chrono::duration_cast<std::chrono::nanoseconds>(
-            std::chrono::steady_clock::now().time_since_epoch()).count());
+    const auto now_ns = m_state->now_ns();
     const auto window_ns = static_cast<std::uint64_t>(
         std::chrono::duration_cast<std::chrono::nanoseconds>(freshness_window).count());
-    // Strict '<' so a zero-length window is always stale (deterministic even
-    // when the read lands in the same steady_clock tick as the last update).
+    // Strict '<' so a zero-length window is always stale (the sim clock can
+    // be read at the same instant the value was written).
     r.fresh = (now_ns - m_state->throttle_cmd_ns) < window_ns;
     return r;
 }
@@ -1842,13 +1860,11 @@ ExternalSimConnector::SteeringCmd ExternalSimConnector::GetSteeringCmd(
         r.fresh = false;
         return r;
     }
-    const auto now_ns = static_cast<std::uint64_t>(
-        std::chrono::duration_cast<std::chrono::nanoseconds>(
-            std::chrono::steady_clock::now().time_since_epoch()).count());
+    const auto now_ns = m_state->now_ns();
     const auto window_ns = static_cast<std::uint64_t>(
         std::chrono::duration_cast<std::chrono::nanoseconds>(freshness_window).count());
-    // Strict '<' so a zero-length window is always stale (deterministic even
-    // when the read lands in the same steady_clock tick as the last update).
+    // Strict '<' so a zero-length window is always stale (the sim clock can
+    // be read at the same instant the value was written).
     r.fresh = (now_ns - m_state->steering_cmd_ns) < window_ns;
     return r;
 }
@@ -2404,9 +2420,7 @@ ExternalSimConnector::AbsPhaseFront ExternalSimConnector::GetAbsPhaseFront(
     const std::uint64_t window_ns =
         static_cast<std::uint64_t>(freshness_window.count()) * 1'000'000ULL;
 
-    // NowNs() is always available (defined outside the EV1SIM_HAVE_EXTERNAL_SIM
-    // guard) so freshness works correctly in both real and stub builds.
-    const std::uint64_t now_ns = NowNs();
+    const std::uint64_t now_ns = st.now_ns();
 
     // Freshness model — the full rationale is inline below.
     //
@@ -2438,9 +2452,12 @@ ExternalSimConnector::AbsPhaseFront ExternalSimConnector::GetAbsPhaseFront(
     // IPC DTC 015, the tightest spec in the corpus).  After 3 s of
     // no UART frame, the chassis declares BTCM dead and falls back
     // to local hydraulic (the manual's hydraulic-backup behavior).
+    // Those 3 s are 3 s **of sim time** — the manual is describing a
+    // car, not a host.  See SetSimTime for why that distinction is a
+    // determinism property and not just pedantry.
     const bool btcm_alive = [&]() -> bool {
         if (st.btcm_uart_frame_ns == 0) return false;
-        if (now_ns < st.btcm_uart_frame_ns) return false;  // clock-wrap guard
+        if (now_ns < st.btcm_uart_frame_ns) return false;  // rewind guard
         return (now_ns - st.btcm_uart_frame_ns) < window_ns;
     }();
 
@@ -2506,7 +2523,7 @@ ExternalSimConnector::RearEmbCmd ExternalSimConnector::GetRearEmbCmd(
     const auto& st = *m_state;
     const std::uint64_t window_ns =
         static_cast<std::uint64_t>(freshness_window.count()) * 1'000'000ULL;
-    const std::uint64_t now_ns = NowNs();
+    const std::uint64_t now_ns = st.now_ns();
 
     // Heartbeat-based liveness — same pattern as GetAbsPhaseFront.
     // kSigRearMotorLR/RR publish on-change only and a steady-state
@@ -2524,7 +2541,7 @@ ExternalSimConnector::RearEmbCmd ExternalSimConnector::GetRearEmbCmd(
     // breaking older producers.
     const bool btcm_alive = [&]() -> bool {
         if (st.btcm_uart_frame_ns == 0) return false;
-        if (now_ns < st.btcm_uart_frame_ns) return false;  // clock-wrap guard
+        if (now_ns < st.btcm_uart_frame_ns) return false;  // rewind guard
         return (now_ns - st.btcm_uart_frame_ns) < window_ns;
     }();
 
@@ -2549,7 +2566,7 @@ ExternalSimConnector::GetFrontWheelCylinderPressuresKpa(
     const auto& st = *m_state;
     const std::uint64_t window_ns =
         static_cast<std::uint64_t>(freshness_window.count()) * 1'000'000ULL;
-    const std::uint64_t now_ns = NowNs();
+    const std::uint64_t now_ns = st.now_ns();
 
     // Liveness via the BTCM heartbeat — cylinder pressure (4153/4154)
     // is published on-change with an epsilon gate just like the
@@ -2557,7 +2574,7 @@ ExternalSimConnector::GetFrontWheelCylinderPressuresKpa(
     // a sustained-pressure regime.
     const bool btcm_alive = [&]() -> bool {
         if (st.btcm_uart_frame_ns == 0) return false;
-        if (now_ns < st.btcm_uart_frame_ns) return false;  // clock-wrap guard
+        if (now_ns < st.btcm_uart_frame_ns) return false;  // rewind guard
         return (now_ns - st.btcm_uart_frame_ns) < window_ns;
     }();
 
@@ -2585,24 +2602,16 @@ void ExternalSimConnector::DebugInjectDelta(std::uint32_t signal_id, bool value)
         m_state->has_washer_pump_cmd = true;
     } else if (signal_id == kSigSolFL_ISO) {
         m_state->sol_fl_iso    = value;
-        m_state->sol_fl_iso_ns = static_cast<std::uint64_t>(
-            std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::steady_clock::now().time_since_epoch()).count());
+        m_state->sol_fl_iso_ns = m_state->now_ns();
     } else if (signal_id == kSigSolFL_DMP) {
         m_state->sol_fl_dmp    = value;
-        m_state->sol_fl_dmp_ns = static_cast<std::uint64_t>(
-            std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::steady_clock::now().time_since_epoch()).count());
+        m_state->sol_fl_dmp_ns = m_state->now_ns();
     } else if (signal_id == kSigSolFR_ISO) {
         m_state->sol_fr_iso    = value;
-        m_state->sol_fr_iso_ns = static_cast<std::uint64_t>(
-            std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::steady_clock::now().time_since_epoch()).count());
+        m_state->sol_fr_iso_ns = m_state->now_ns();
     } else if (signal_id == kSigSolFR_DMP) {
         m_state->sol_fr_dmp    = value;
-        m_state->sol_fr_dmp_ns = static_cast<std::uint64_t>(
-            std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::steady_clock::now().time_since_epoch()).count());
+        m_state->sol_fr_dmp_ns = m_state->now_ns();
     } else if (signal_id == kSigBtcmUartFrame) {
         // Test helper: simulate a BTCM canonical-frame heartbeat arrival.
         // The bool argument is ignored — the heartbeat is purely a
@@ -2610,9 +2619,7 @@ void ExternalSimConnector::DebugInjectDelta(std::uint32_t signal_id, bool value)
         // bool-per-signal so we accept it.  In production this is set
         // in DrainInbound when the heartbeat frame arrives.
         (void)value;
-        m_state->btcm_uart_frame_ns = static_cast<std::uint64_t>(
-            std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::steady_clock::now().time_since_epoch()).count());
+        m_state->btcm_uart_frame_ns = m_state->now_ns();
     } else if (signal_id == kSigChassisBtcmIsoCloseFL ||
                signal_id == kSigChassisBtcmIsoCloseFR ||
                signal_id == kSigChassisBtcmDumpOpenFL ||
@@ -2620,9 +2627,7 @@ void ExternalSimConnector::DebugInjectDelta(std::uint32_t signal_id, bool value)
         // Chassis-bus mirror of the BTCM iso/dump solenoid state.
         // See struct State and GetAbsPhaseFront for the per-wheel
         // source-preference rule.
-        const std::uint64_t now_ns = static_cast<std::uint64_t>(
-            std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::steady_clock::now().time_since_epoch()).count());
+        const std::uint64_t now_ns = m_state->now_ns();
         switch (signal_id) {
             case kSigChassisBtcmIsoCloseFL:
                 m_state->chassis_btcm_iso_close_fl    = value;
@@ -2670,9 +2675,7 @@ void ExternalSimConnector::DebugInjectDelta(std::uint32_t signal_id, bool value)
 }
 
 void ExternalSimConnector::DebugInjectFloat(std::uint32_t signal_id, float value) {
-    const std::uint64_t now_ns = static_cast<std::uint64_t>(
-        std::chrono::duration_cast<std::chrono::nanoseconds>(
-            std::chrono::steady_clock::now().time_since_epoch()).count());
+    const std::uint64_t now_ns = m_state->now_ns();
     if (signal_id == kSigRearMotorLR) {
         m_state->rear_motor_lr    = value;
         m_state->rear_motor_lr_ns = now_ns;
@@ -2710,9 +2713,7 @@ void ExternalSimConnector::DebugInjectU8(std::uint32_t signal_id,
     if (signal_id == kSigThrottleCmdQ8) {
         m_state->throttle_cmd_q8 = value;
         m_state->has_throttle_cmd = true;
-        m_state->throttle_cmd_ns = static_cast<std::uint64_t>(
-            std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::steady_clock::now().time_since_epoch()).count());
+        m_state->throttle_cmd_ns = m_state->now_ns();
     } else if (signal_id == kSigWiperMotorCommand) {
         m_state->wiper_motor_cmd     = value;
         m_state->has_wiper_motor_cmd = true;
@@ -3053,6 +3054,7 @@ static_assert(EV1_CHASSIS_CONTRACT_VERSION_IMPLEMENTED_MINOR
 } // namespace
 
 void ExternalSimConnector::Tick(double sim_time_s) {
+    SetSimTime(sim_time_s);
     if (!m_opts.enabled) return;
     auto& st = *m_state;
 
@@ -3284,7 +3286,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         if (auto total = st.wire->btcm_tx_total_bits()) {
             if (*total != st.btcm_tx_bits_last) {
                 st.btcm_tx_bits_last  = *total;
-                st.btcm_uart_frame_ns = NowNs();
+                st.btcm_uart_frame_ns = st.now_ns();
             }
         }
 
@@ -3911,7 +3913,10 @@ bool ExternalSimConnector::BusesUp() const {
 #else   // EV1SIM_HAVE_EXTERNAL_SIM
 bool ExternalSimConnector::BusesUp() const { return false; }
 
-void ExternalSimConnector::Tick(double /*sim_time_s*/) {
-    // Built without external sim — nothing to do.
+void ExternalSimConnector::Tick(double sim_time_s) {
+    // Built without external sim — no wires to drain, but the sim clock still
+    // has to advance: the freshness-gated accessors are compiled in either way
+    // and they age on it.
+    SetSimTime(sim_time_s);
 }
 #endif  // EV1SIM_HAVE_EXTERNAL_SIM

@@ -937,12 +937,17 @@ TEST_CASE("Scenario: abs-phase / rear-EMB stats columns stay live across a "
     // Regression: the stats-CSV observer used to read the BTCM-sourced ABS
     // phase (and rear-EMB command) with a 200 ms freshness window while the
     // control path used 3000 ms.  Liveness is gated on the BTCM's ~5 Hz
-    // canonical-frame heartbeat, which is paced in sim time; under wall-clock
-    // pacing on long, low-friction stops the inter-heartbeat gap can stretch
-    // past 200 ms.  With the old 200 ms window the observer then declared the
-    // BTCM dead and wrote the -1 no-data sentinel for a phase that was still
-    // live.  The observer now uses the same 3000 ms window as the control path,
-    // so a gap between 200 ms and 3000 ms must still read the live phase.
+    // canonical-frame heartbeat, so an inter-heartbeat gap between 200 ms and
+    // 3000 ms made the observer declare the BTCM dead and write the -1
+    // no-data sentinel for a phase that was still live.  The observer now
+    // uses the same 3000 ms window as the control path, so a gap in that band
+    // must still read the live phase.
+    //
+    // The gap is now made in sim time.  It used to be made with sleep_for,
+    // because the windows aged on the wall clock — the same coupling that
+    // later turned a host stall into a change in vehicle speed and was fixed
+    // by moving every window onto the sim clock (SetSimTime).  The seam this
+    // case documents is unchanged; only the clock the gap is measured on is.
     using ev1sim::Scenario;
     using ev1sim::ScenarioStats;
 
@@ -969,10 +974,9 @@ TEST_CASE("Scenario: abs-phase / rear-EMB stats columns stay live across a "
     bus.DebugInjectDelta(5011, false);  // FL_DMP = 0  -> HOLD
     bus.DebugInjectFloat(5014, 1.0f);   // rear motor LR command = full apply
 
-    // Advance the heartbeat gap to ~260 ms: past the old 200 ms window, well
-    // within the corrected 3000 ms window.  sleep_for guarantees at least the
-    // requested duration, so the gap is reliably > 200 ms and << 3000 ms.
-    std::this_thread::sleep_for(std::chrono::milliseconds(260));
+    // Advance the heartbeat gap to exactly 260 ms of sim time: past the old
+    // 200 ms window, well within the corrected 3000 ms window.
+    bus.SetSimTime(0.260);
 
     // Document the seam directly on the production symbol: at this gap the old
     // 200 ms window reads stale, the corrected 3000 ms window reads live.
