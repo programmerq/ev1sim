@@ -760,14 +760,8 @@ bool RsaExteriorKeypad::sequence_in_progress() const {
 // AmbientTempSensor
 // ---------------------------------------------------------------------------
 
-double AmbientTempSensor::hour_of_day(const std::string& preset,
-                                      double sim_time_s) {
-    // The hour each lighting preset stands for — noon, just before sunset,
-    // the small hours — which is where that preset's own light colours sit.
-    double start_h = 12.0;
-    if      (preset == "dusk")  start_h = 18.0;
-    else if (preset == "night") start_h = 1.0;
-    const double h = start_h + sim_time_s / 3600.0;
+double AmbientTempSensor::hour_of_day(double start_hour_h, double sim_time_s) {
+    const double h = start_hour_h + sim_time_s / 3600.0;
     return h - 24.0 * std::floor(h / 24.0);
 }
 

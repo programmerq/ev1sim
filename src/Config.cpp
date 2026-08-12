@@ -154,16 +154,19 @@ Config Config::LoadFromFile(const std::string& path) {
             cfg.environment.time_of_day = e["time_of_day"].get<std::string>();
             const std::string& tod = cfg.environment.time_of_day;
             if (tod == "day") {
+                cfg.environment.time_of_day_start_h = 12.0;
                 cfg.environment.ambient_r = 0.8;
                 cfg.environment.ambient_g = 0.8;
                 cfg.environment.ambient_b = 0.8;
                 cfg.environment.sun_elevation_deg = 60.0;
             } else if (tod == "dusk") {
+                cfg.environment.time_of_day_start_h = 18.0;
                 cfg.environment.ambient_r = 0.5;
                 cfg.environment.ambient_g = 0.35;
                 cfg.environment.ambient_b = 0.3;
                 cfg.environment.sun_elevation_deg = 15.0;
             } else if (tod == "night") {
+                cfg.environment.time_of_day_start_h = 1.0;
                 cfg.environment.ambient_r = 0.1;
                 cfg.environment.ambient_g = 0.1;
                 cfg.environment.ambient_b = 0.15;

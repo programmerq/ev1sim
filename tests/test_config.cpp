@@ -238,6 +238,36 @@ TEST_CASE("Config environment defaults to day preset values", "[Config][Env]") {
     CHECK_THAT(cfg.environment.ambient_b, WithinAbs(0.8, 1e-9));
     CHECK_THAT(cfg.environment.sun_elevation_deg, WithinAbs(60.0, 1e-9));
     CHECK_THAT(cfg.environment.ambient_temp_c,    WithinAbs(20.0, 1e-9));
+    CHECK_THAT(cfg.environment.time_of_day_start_h, WithinAbs(12.0, 1e-9));
+}
+
+// -----------------------------------------------------------------------
+TEST_CASE("Config environment preset sets the hour with the light colours",
+          "[Config][Env][determinism]") {
+    // One preset, one branch, every field it decides.  The starting hour drives
+    // the ambient temperature published on the chassis bus and the colours
+    // drive the scene, so a preset that set one and defaulted the other would
+    // put the car under a night sky at a noon temperature.  Every preset the
+    // parser accepts is listed here; adding one to Config.cpp without a row
+    // here leaves it untested, and adding one that forgets the hour fails.
+    struct Row { const char* preset; double hour; double max_sun_deg; };
+    for (const Row& r : {Row{"day",   12.0,  90.0},
+                         Row{"dusk",  18.0,  30.0},
+                         Row{"night",  1.0,   0.0}}) {
+        auto path = WriteTempJson(std::string(R"({"environment":{"time_of_day":")")
+                                  + r.preset + R"("}})");
+        Config cfg = Config::LoadFromFile(path);
+        INFO("preset " << r.preset);
+        CHECK(cfg.environment.time_of_day == r.preset);
+        CHECK_THAT(cfg.environment.time_of_day_start_h, WithinAbs(r.hour, 1e-9));
+        CHECK(cfg.environment.sun_elevation_deg < r.max_sun_deg);
+    }
+
+    // An unrecognised preset keeps every default together, hour included.
+    auto path = WriteTempJson(R"({"environment":{"time_of_day":"eclipse"}})");
+    Config cfg = Config::LoadFromFile(path);
+    CHECK_THAT(cfg.environment.time_of_day_start_h, WithinAbs(12.0, 1e-9));
+    CHECK_THAT(cfg.environment.sun_elevation_deg,   WithinAbs(60.0, 1e-9));
 }
 
 // -----------------------------------------------------------------------
