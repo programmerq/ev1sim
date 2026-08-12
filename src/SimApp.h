@@ -228,6 +228,10 @@ private:
     /// as a side effect.  Safe to call when m_external_sim is null.
     void PushExtContractDriverInputs(const struct DriverCommand& cmd);
 
+    /// Publish ambient temperature + humidity (chassis bus 4090-4091) for this
+    /// sim instant.  One implementation for both run loops.
+    void PublishAmbient(double sim_time_s);
+
     // Freshness window for BTCM liveness signal (kSigBtcmUartFrame
     // heartbeat).  See ExternalSimConnector::GetAbsPhaseFront for the
     // architecture: liveness comes from the BTCM's 5 Hz
@@ -240,6 +244,11 @@ private:
     // of the EV1 electrical service manual): a shorter window would
     // trip abs-phase-stale before that peer tolerance elapses, a
     // longer one would keep reporting a lost BTCM as live.
+    //
+    // 3 s of SIM time, not of host wall time — the manual's tolerance is a
+    // property of the car.  ExternalSimConnector::SetSimTime carries the
+    // reasoning and the run-to-run divergence that measuring it on the wall
+    // clock caused.
     static constexpr std::chrono::milliseconds kAbsFreshnessWindow{3000};
 
     // Rear EMB drum brake state (BTCM rear-motor integration).

@@ -85,8 +85,30 @@ public:
 
     /// Overlay incoming wire cells onto local state and mirror outgoing state
     /// onto the WireTable.  Call once per render frame; sim_time_s drives the
-    /// brake-state heartbeat re-publish.
+    /// brake-state heartbeat re-publish.  Also advances the connector's sim
+    /// clock (see SetSimTime).
     void Tick(double sim_time_s);
+
+    /// Advance the connector's **sim clock** — the only clock any freshness
+    /// window in this class is measured on.
+    ///
+    /// Every `freshness_window` argument below (BTCM liveness, throttle,
+    /// steering) is an age limit in *vehicle* time: "3 s without a BTCM frame
+    /// means the BTCM is gone" is a statement about the car, not about the
+    /// host that is simulating it.  Measuring those ages on the wall clock
+    /// made them depend on how fast the host happened to run, which under the
+    /// co-sim tick barrier is decided by 17 other processes — so a plain
+    /// scheduling hiccup could age out a peer that had, in sim terms, just
+    /// spoken.  That is a physics input, because the ABS/EMB brake path
+    /// consumes these gates every sub-step (SimApp::ApplyAbsFrontBrake /
+    /// ApplyRearEmbBrake), so the same scenario produced different vehicle
+    /// speeds run to run.  @design 2026-08-11.
+    ///
+    /// Call it whenever sim time advances and before reading a freshness-gated
+    /// accessor; `Tick()` calls it for you.  Monotonic, never rewound, and
+    /// frozen while the sim is paused — a paused sim must not manufacture a
+    /// lost-peer fault.
+    void SetSimTime(double sim_time_s);
 
     /// Release the WireTable handle; further Tick() calls become no-ops until Start().
     void Stop();

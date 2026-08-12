@@ -760,6 +760,11 @@ bool RsaExteriorKeypad::sequence_in_progress() const {
 // AmbientTempSensor
 // ---------------------------------------------------------------------------
 
+double AmbientTempSensor::hour_of_day(double start_hour_h, double sim_time_s) {
+    const double h = start_hour_h + sim_time_s / 3600.0;
+    return h - 24.0 * std::floor(h / 24.0);
+}
+
 void AmbientTempSensor::update(double time_of_day_hours) {
     // Diurnal sinusoid — peak at phase_offset_hours, trough 12 h earlier/later.
     // sin argument: 2π * (hour - peak_hour) / 24

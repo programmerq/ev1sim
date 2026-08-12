@@ -84,6 +84,12 @@ struct Config {
     // hooks — no consumer reads it yet.
     struct Environment {
         std::string time_of_day      = "day";   // "day" | "dusk" | "night"
+        // Hour of day the preset stands for, resolved once in Config.cpp
+        // alongside the light colours so a new preset cannot set one and
+        // silently keep the other's default.  Drives the ambient temperature
+        // + humidity published on the chassis bus (see
+        // AmbientTempSensor::hour_of_day) — sim time advances it from here.
+        double      time_of_day_start_h = 12.0;
         double      ambient_r        = 0.8;
         double      ambient_g        = 0.8;
         double      ambient_b        = 0.8;

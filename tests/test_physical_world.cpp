@@ -572,6 +572,34 @@ TEST_CASE("DoorLocks: toggle_trunk leaves other doors unaffected", "[PhysicalWor
 // AmbientTempSensor — diurnal sinusoid model
 // ---------------------------------------------------------------------------
 
+TEST_CASE("test_ambient_hour_of_day_comes_from_the_scenario_not_the_host",
+          "[PhysicalWorld][AmbientTemp][determinism]") {
+    using Catch::Matchers::WithinAbs;
+    // The hour is the scenario's starting hour advanced by sim time, so the
+    // same scenario publishes the same ambient temperature whenever it runs and
+    // on whatever machine.  It used to be localtime_r(system_clock::now()),
+    // which made the value a property of the host's clock and timezone.
+    CHECK_THAT(AmbientTempSensor::hour_of_day(12.0, 0.0), WithinAbs(12.0, 1e-9));
+
+    // Sim time advances it: an hour of sim time is an hour of the day.
+    CHECK_THAT(AmbientTempSensor::hour_of_day(12.0, 3600.0), WithinAbs(13.0, 1e-9));
+
+    // And it wraps rather than walking off the end of the diurnal model.
+    CHECK_THAT(AmbientTempSensor::hour_of_day(1.0, 24.0 * 3600.0),
+               WithinAbs(1.0, 1e-6));
+    const double wrapped = AmbientTempSensor::hour_of_day(18.0, 10.0 * 3600.0);
+    CHECK(wrapped >= 0.0);
+    CHECK(wrapped < 24.0);
+    CHECK_THAT(wrapped, WithinAbs(4.0, 1e-6));   // 18:00 + 10 h -> 04:00
+
+    // Same scenario inputs, same published values.
+    AmbientTempSensor a, b;
+    a.update(AmbientTempSensor::hour_of_day(12.0, 7.5));
+    b.update(AmbientTempSensor::hour_of_day(12.0, 7.5));
+    CHECK(a.temp_c() == b.temp_c());
+    CHECK(a.humidity_pct() == b.humidity_pct());
+}
+
 TEST_CASE("test_ambient_temp_default_config", "[PhysicalWorld][AmbientTemp]") {
     using Catch::Matchers::WithinAbs;
     AmbientTempSensor sensor;

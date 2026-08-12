@@ -718,6 +718,27 @@ public:
     /// @param time_of_day_hours  Local time expressed in hours [0..24).
     void update(double time_of_day_hours);
 
+    /// Hour-of-day to evaluate the diurnal model at: the scenario's starting
+    /// hour advanced by sim time and wrapped into [0, 24).
+    ///
+    /// This used to be the host's local clock (system_clock::now() ->
+    /// localtime_r), which made the published ambient temperature a property
+    /// of when and where the run happened: the same scenario reported a
+    /// different temperature every time, and CI artifacts carried the build
+    /// machine's timezone.  Sim time is also the better model — the scenario
+    /// already declares what time of day the car is out in, so a "day" run no
+    /// longer reports an 03:00 temperature because 03:00 is when the job
+    /// started.  @design 2026-08-11.
+    ///
+    /// The starting hour comes from `Config::Environment::time_of_day_start_h`,
+    /// which the `environment.time_of_day` preset resolves in the same branch
+    /// that resolves the light colours — one table, so a new preset cannot set
+    /// the scene to dusk and leave the thermometer at noon.
+    ///
+    /// @param start_hour_h  hour of day the run begins at, [0, 24)
+    /// @param sim_time_s    seconds of simulated time since the run began
+    static double hour_of_day(double start_hour_h, double sim_time_s);
+
     double temp_c()       const { return m_temp_c; }
     double humidity_pct() const { return m_humidity_pct; }
 
