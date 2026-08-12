@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <string>
 
 // Forward declaration — avoid pulling Irrlicht into every translation unit
 // that includes PhysicalWorld.h.
@@ -717,6 +718,24 @@ public:
     /// Recompute temp + humidity from the current time of day.
     /// @param time_of_day_hours  Local time expressed in hours [0..24).
     void update(double time_of_day_hours);
+
+    /// Hour-of-day to evaluate the diurnal model at, from the scenario's
+    /// `environment.time_of_day` preset advanced by sim time and wrapped into
+    /// [0, 24).
+    ///
+    /// This used to be the host's local clock (system_clock::now() ->
+    /// localtime_r), which made the published ambient temperature a property
+    /// of when and where the run happened: the same scenario reported a
+    /// different temperature every time, and CI artifacts carried the build
+    /// machine's timezone.  Sim time is also the better model — the scenario
+    /// already declares what time of day the car is out in, and the lighting
+    /// preset reads that same field, so a "day" run no longer reports an
+    /// 03:00 temperature because 03:00 is when the job started.
+    /// @design 2026-08-11.
+    ///
+    /// @param preset      "day" | "dusk" | "night" (anything else reads as day)
+    /// @param sim_time_s  seconds of simulated time since the run began
+    static double hour_of_day(const std::string& preset, double sim_time_s);
 
     double temp_c()       const { return m_temp_c; }
     double humidity_pct() const { return m_humidity_pct; }

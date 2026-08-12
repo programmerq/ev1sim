@@ -1098,6 +1098,21 @@ void SimApp::ApplyAbsFrontBrake(double time, double dt_s,
 }
 
 // ---------------------------------------------------------------------------
+// Ambient temperature + humidity (chassis bus 4090-4091), for both run loops.
+// The hour the diurnal model is evaluated at comes from the scenario's
+// environment preset and sim time, not from the host's clock — see
+// AmbientTempSensor::hour_of_day.
+void SimApp::PublishAmbient(double sim_time_s) {
+    if (!m_external_sim) return;
+    auto& sensor = m_physical->ambient_temp_sensor();
+    sensor.update(ev1sim::AmbientTempSensor::hour_of_day(
+        m_config.environment.time_of_day, sim_time_s));
+    m_external_sim->SetAmbientTempC(static_cast<float>(sensor.temp_c()));
+    m_external_sim->SetAmbientHumidityPct(
+        static_cast<float>(sensor.humidity_pct()));
+}
+
+// ---------------------------------------------------------------------------
 void SimApp::ApplyRearEmbBrake(double time, double /*local_rear_brake*/) {
     // BTCM-failure model: real EV1 rear brakes are PURELY electromechanical.
     // There's no hydraulic backup line from the master cylinder, unlike the
@@ -1793,25 +1808,7 @@ int SimApp::RunWithVisualization() {
             PushExtContractDriverInputs(cmd);
         }
         // Ambient temp + humidity (chassis bus 4090-4091).
-        // Time-of-day from system clock → local time → fractional hours.
-        {
-            const auto now_wall = std::chrono::system_clock::now();
-            const std::time_t now_t = std::chrono::system_clock::to_time_t(now_wall);
-            std::tm local_tm{};
-#if defined(_WIN32)
-            localtime_s(&local_tm, &now_t);
-#else
-            localtime_r(&now_t, &local_tm);
-#endif
-            const double tod_hours = local_tm.tm_hour
-                                   + local_tm.tm_min  / 60.0
-                                   + local_tm.tm_sec  / 3600.0;
-            m_physical->ambient_temp_sensor().update(tod_hours);
-            m_external_sim->SetAmbientTempC(
-                static_cast<float>(m_physical->ambient_temp_sensor().temp_c()));
-            m_external_sim->SetAmbientHumidityPct(
-                static_cast<float>(m_physical->ambient_temp_sensor().humidity_pct()));
-        }
+        PublishAmbient(t);
         PublishMotorState();
         m_external_sim->Tick(t);
 
@@ -2358,24 +2355,7 @@ int SimApp::RunHeadless() {
             PushExtContractDriverInputs(cmd);
         }
         // Ambient temp + humidity (chassis bus 4090-4091).
-        {
-            const auto now_wall = std::chrono::system_clock::now();
-            const std::time_t now_t = std::chrono::system_clock::to_time_t(now_wall);
-            std::tm local_tm{};
-#if defined(_WIN32)
-            localtime_s(&local_tm, &now_t);
-#else
-            localtime_r(&now_t, &local_tm);
-#endif
-            const double tod_hours = local_tm.tm_hour
-                                   + local_tm.tm_min  / 60.0
-                                   + local_tm.tm_sec  / 3600.0;
-            m_physical->ambient_temp_sensor().update(tod_hours);
-            m_external_sim->SetAmbientTempC(
-                static_cast<float>(m_physical->ambient_temp_sensor().temp_c()));
-            m_external_sim->SetAmbientHumidityPct(
-                static_cast<float>(m_physical->ambient_temp_sensor().humidity_pct()));
-        }
+        PublishAmbient(t);
         PublishMotorState();
         m_external_sim->Tick(t);
 

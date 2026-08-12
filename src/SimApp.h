@@ -228,6 +228,11 @@ private:
     /// as a side effect.  Safe to call when m_external_sim is null.
     void PushExtContractDriverInputs(const struct DriverCommand& cmd);
 
+    /// Publish ambient temperature + humidity (chassis bus 4090-4091) for this
+    /// sim instant.  One implementation for both run loops.
+    void PublishAmbient(double sim_time_s);
+
+
     // Freshness window for BTCM liveness signal (kSigBtcmUartFrame
     // heartbeat).  See ExternalSimConnector::GetAbsPhaseFront for the
     // architecture: liveness comes from the BTCM's 5 Hz
