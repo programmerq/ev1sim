@@ -49,6 +49,12 @@ BTCM-stale dropouts — so none of this is the cause PR #55 fixed.
 | `body_rhjb_door_lock` | parked, brakes held | 18 | 2 distinct traces; **7.6e-05 mph** peak speed difference, against a 0.117 mph peak |
 | `abs_high_mu`, BTCM on | 67 mph hard stop, ABS cycling | 4 | **0.51 mph** speed, **1.2 deg** heading, 2.3 rad/s wheel speed — against a 1.9 deg total heading excursion |
 
+It also moves a rule that decides the case. `fl_phases` counts ABS phase
+transitions and is scored against a captured 101 with a ±40% band; four runs of
+the same binary read 84, 90, 89, 89 on the front left and 78, 90, 87, 76 on the
+front right. A 14-transition run-to-run swing is about a third of the band's
+half-width, spent on nothing but which run it was.
+
 The first row bounds where the problem is not: with no controller in the loop
 the plant repeats byte for byte over a 30-second stop, so nothing inside ev1sim
 needs a tolerance. Everything below is about the co-sim.
@@ -62,13 +68,46 @@ The two are different mechanisms and only the first is understood in detail:
   1.241 s in 2. The rear brakes come alive one tick earlier in those two and
   the trace differs from there. The correlation is exact — the speed checksum
   is a function of that tick, no exceptions in 18 runs.
-- **Braking case — the controller's own output.** Both runs saw the first
-  heartbeat on the same tick, so the above does not explain it. They diverge
-  from t = 17.2 s, which is ABS onset, and the `abs_phase_*` and `emb_cmd_*`
-  columns differ: the BTCM is issuing different commands, and the closed loop
-  amplifies the difference for the remaining 13 s of the stop. That is
-  upstream, and the external sim already tracks a sibling finding of the same
-  shape (a run-to-run yaw swing on `abs_split_mu` at a fixed commit).
+- **Braking case — the controller is fed different numbers.** Both runs saw
+  the first heartbeat on the same tick, so the go-live race does not explain
+  this one. The BTCM logs its own per-tick inputs and outputs, and anchored on
+  the brake-pedal edge (identical tick in both runs) its **inputs diverge 13
+  barrier ticks before its outputs do**: `longit_accel_mps2` first, then
+  `vehicle_speed_mps` and the wheel speeds, and only then `phase_fr`. So the
+  controller is not deciding differently from the same picture — it is being
+  handed a different picture, and the closed loop amplifies that over the
+  remaining 13 s of the stop.
+
+  Where the different picture comes from was then measured, by sampling the
+  plant every tick instead of every 20 ms so both logs carry one row per
+  barrier tick. Calibrating the two against each other over 200 ticks either
+  side of the brake edge gives a stable transport lag: **ev1sim reads the
+  BTCM's front-axle phase exactly 2 ticks after the BTCM computed it, on 99.6%
+  of ticks.** The run's first divergence sits on one of the other 0.4%.
+
+  At that tick — the first difference anywhere in the run — the BTCM's raw
+  inputs are identical in both runs, and the BTCM's own logged phase is
+  identical in both runs (`1`), **and ev1sim decodes `0` in one run and `1` in
+  the other.** One run's sample caught the write; the other missed it. ev1sim's
+  plant diverges on the next tick, and the BTCM's raw inputs two ticks after
+  that — both downstream of a read that differed while nothing being read had.
+
+  That is the co-sim's intra-tick ordering: the barrier synchronises tick
+  boundaries, not the producer/solver/conductor/consumer chain inside one tick,
+  so whether a sample catches a write is a race. It matches, from this end, the
+  leading hypothesis of the external sim's barrier lane — which reached it from
+  the other end by instrumenting its door-lock module and exonerating it across
+  nine byte-identical captures. The external sim also tracks a sibling finding
+  of the same shape (a run-to-run yaw swing on `abs_split_mu` at a fixed
+  commit).
+
+  **What is not established**: this is one divergence event in one pair of
+  runs, and it rests on the BTCM's logged phase enum tracking the solenoid
+  cells it writes, which the 99.6% fit supports but does not prove. The
+  measurement that would close it belongs to the module: log the solenoid
+  **cell write** and its generation counter, not only the internal enum, and
+  compare against ev1sim's decoded read tick by tick. If the write is identical
+  across runs where the read differs, this is settled.
 
 **Options.**
 
