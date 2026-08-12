@@ -309,3 +309,52 @@ TEST_CASE("Config CLI --config flag is skipped by ApplyCliOverrides", "[Config]"
     // --config should be silently consumed, vehicle override still applies.
     CHECK(cfg.vehicle_model == "hmmwv");
 }
+
+// -----------------------------------------------------------------------
+// A NAMED --config that cannot be opened must be fatal; the implicit default
+// must still fall back.
+// -----------------------------------------------------------------------
+// Config::LoadFromFile warns and returns built-in defaults for any unreadable
+// path.  For the implicit config/default.json that is documented behaviour.
+// For a path the user named it is a silent substitution of a different
+// experiment, and those hide because the run still succeeds — see the header
+// on NamedConfigFault for the coastdown case that cost four months of
+// unattributable numbers.
+//
+// These live in the UNIT suite, not only in the end-to-end shell check, for a
+// reason this branch learned the hard way: that check execs the built ev1sim,
+// and the chrono-smoke job's second build tree compiles only ev1sim_tests, so
+// the app binary is absent there and the check exited 127.  A guard that
+// cannot run in a lane is worse than one that fails in it, so the RULE is
+// pinned here where every lane compiles it, and the shell check is left to
+// pin the exit code and the wording where the binary exists.
+TEST_CASE("Config: a named --config that cannot be opened is fatal", "[Config]") {
+    const std::string missing = "definitely/not/a/config/" + std::to_string(
+#ifdef _WIN32
+        _getpid()
+#else
+        getpid()
+#endif
+    ) + ".json";
+
+    SECTION("named + missing -> fault, and it says which path") {
+        const std::string fault = Config::NamedConfigFault(missing, true);
+        CHECK_FALSE(fault.empty());
+        CHECK(fault.find(missing) != std::string::npos);
+        // The message has to say what it is refusing to do, or a reader hits
+        // an exit code with no idea that a fallback was the alternative.
+        CHECK(fault.find("Refusing to fall back") != std::string::npos);
+    }
+
+    SECTION("NOT named + missing -> no fault (the documented fallback)") {
+        CHECK(Config::NamedConfigFault(missing, false).empty());
+    }
+
+    SECTION("named + present -> no fault, or the guard fires on everything") {
+        // Without this the case above passes for a NamedConfigFault that
+        // always returns a fault, which would reject every real run.
+        const std::string path = WriteTempJson(R"({"vehicle_model": "ev1"})");
+        CHECK(Config::NamedConfigFault(path, true).empty());
+        std::filesystem::remove(path);
+    }
+}

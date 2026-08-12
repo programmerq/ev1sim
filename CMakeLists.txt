@@ -621,15 +621,37 @@ if(BUILD_TESTS)
     # A --config path the user NAMED must be fatal when it cannot be opened,
     # rather than warning and silently running built-in defaults — the silent
     # substitution that hid the coastdown's run condition for four months.
-    # Needs the app binary, so it is Chrono-gated, but it costs ~3 s: the fatal
-    # path exits before SimApp is constructed, and the positive control is
-    # headless_smoke, which self-terminates. The script says why it carries no
-    # separate selftest (its two assertions are each other's control).
+    #
+    # THE RULE is Config::NamedConfigFault, pinned by [Config] cases in
+    # tests/test_config.cpp, which every lane compiles including the
+    # Chrono-free one. The script below only adds that the app exits 2 and
+    # prints why, and for that it must exec the built binary.
+    #
+    # That is why it is opt-in rather than gated on Chrono_FOUND, which is what
+    # it was first written as. $<TARGET_FILE:ev1sim> resolved correctly, but
+    # the chrono-smoke job's second build tree builds only the ev1sim_tests
+    # target, so the app was never produced there and ctest ran a path that did
+    # not exist (exit 127). A test whose input a lane does not build has to be
+    # asked for, not assumed.
     if(Chrono_FOUND)
-        add_test(NAME named_config_is_fatal
-                 COMMAND bash ${CMAKE_SOURCE_DIR}/tests/check_named_config_is_fatal.sh
-                         $<TARGET_FILE:ev1sim>)
-        set_tests_properties(named_config_is_fatal PROPERTIES LABELS "guard" TIMEOUT 120)
+        add_custom_target(test-config-guard
+            COMMAND bash ${CMAKE_SOURCE_DIR}/tests/check_named_config_is_fatal.sh
+                    $<TARGET_FILE:ev1sim>
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            USES_TERMINAL
+            COMMENT "Checking that a named --config that cannot be opened is fatal")
+        add_dependencies(test-config-guard ev1sim)
+
+        option(EV1SIM_APP_TESTS
+               "Register CTests that exec the built ev1sim binary (label: app)" OFF)
+        if(EV1SIM_APP_TESTS)
+            add_test(NAME named_config_is_fatal
+                     COMMAND bash
+                             ${CMAKE_SOURCE_DIR}/tests/check_named_config_is_fatal.sh
+                             $<TARGET_FILE:ev1sim>)
+            set_tests_properties(named_config_is_fatal PROPERTIES
+                LABELS "app" TIMEOUT 120)
+        endif()
     endif()
 
     if(Chrono_FOUND)

@@ -74,6 +74,19 @@ void parse_ffb_config(const json& f, ev1sim::FfbConfig& out) {
 }  // namespace
 
 // ---------------------------------------------------------------------------
+std::string Config::NamedConfigFault(const std::string& path, bool was_named) {
+    if (!was_named)
+        return {};   // an absent implicit default is allowed to fall back
+    std::ifstream probe(path);
+    if (probe.is_open())
+        return {};
+    return "--config " + path + " cannot be opened.\n"
+           "        Refusing to fall back to built-in defaults: you asked for "
+           "a specific\n"
+           "        experiment and this would silently run a different one.";
+}
+
+// ---------------------------------------------------------------------------
 Config Config::LoadFromFile(const std::string& path) {
     Config cfg;
 
