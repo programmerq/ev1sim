@@ -24,7 +24,7 @@
 //
 // Together those mean the map's LAST TORQUE VALUE is delivered at every higher
 // speed, forever.  The map ended at 13 000 RPM / 74.9 N·m, so the model handed
-// out 74.9 N·m at 45 500 RPM — 357 kW from a ~102 kW drive.  Nothing bounded
+// out 74.9 N·m at 45 500 RPM — 357 kW from a 103 kW drive.  Nothing bounded
 // the shaft, so an unloaded wheel accelerated without limit.
 //
 // The fix is structural, and this test pins the structure: the last point of
@@ -57,6 +57,18 @@
 // So the ceiling asserted below must sit ABOVE the 80 mph equivalent — if it
 // ever equals it, the calibration has been baked back into the physics.
 //
+// THE CORNER POINT, ALSO OFF THE PRINT
+// ------------------------------------
+// The same p250 states the other end of the envelope: "The drive motor has a
+// peak torque rating 141 N·m (104 ft−lb) at 7000 RPM.  The peak power rating is
+// 103 kw (138 Hp) at 7000 RPM."  Both ratings name the SAME speed, which makes
+// 7000 RPM the corner: torque-limited below it, power-limited above.  The page
+// is arithmetically self-consistent — 141 × 7000 × 2π/60 = 103.4 kW — so the
+// two sentences pin one point rather than forking, and this file asserts the
+// shipped map reproduces it.  The map used to carry 150 N·m at 6500 RPM from
+// secondary web figures; that is what these assertions now exist to keep from
+// coming back.
+//
 // Chrono-free by design (Chrono is not in CI): this reads the same JSON the
 // Chrono vehicle loads and re-implements the two lookup rules quoted above.
 
@@ -86,14 +98,25 @@ constexpr const char* kTire   = "data/vehicle/ev1/tire/EV1_TMeasyTire.json";
 
 constexpr double kPi = 3.14159265358979323846;
 
+constexpr double RpmToRadS(double rpm) { return rpm * 2.0 * kPi / 60.0; }
+
 // The operating point the owner observed, straight off the VAT run.
 constexpr double kObservedSpinWheelRadS = 435.0;
 
-// The drive's rated peak power.  The shipped map is a ~102 kW envelope; the
-// service manual (propulsion p250) states 103 kW.  120 kW is a deliberately
-// slack bound — the point is to catch "hundreds of kW", not to re-pin the
-// rating, which is a separate calibration question (see docs/TODO.md).
-constexpr double kDriveRatedPowerW  = 102000.0;
+// The corner of the envelope, @source:manual propulsion p250 — peak torque
+// rating and peak power rating, both stated AT 7000 RPM.  Written as the two
+// numbers the page states, so a reader can check them against the scan without
+// arithmetic; the power the envelope holds above the corner is DERIVED from
+// them rather than re-typed, so the plateau and the hyperbola in this file
+// cannot drift apart.
+constexpr double kRatedCornerTorqueNm = 141.0;
+constexpr double kRatedCornerRpm      = 7000.0;
+constexpr double kRatedPowerStatedW   = 103000.0;  // "103 kw (138 Hp)", p250
+constexpr double kRatedEnvelopePowerW =
+    kRatedCornerTorqueNm * RpmToRadS(kRatedCornerRpm);  // 103 358 W
+
+// 120 kW is a deliberately slack bound — the point is to catch "hundreds of
+// kW", not to re-pin the rating.
 constexpr double kPowerSanityBoundW = 120000.0;
 
 json ReadJson(const std::string& relative_path) {
@@ -139,7 +162,6 @@ double DeliveredTorqueNm(const TorqueMap& zero_throttle,
     return t_zero * (1.0 - throttle) + t_full * throttle;
 }
 
-double RpmToRadS(double rpm) { return rpm * 2.0 * kPi / 60.0; }
 double RadSToRpm(double w)   { return w * 60.0 / (2.0 * kPi); }
 double MpsToMph(double v)    { return v * 2.2369362920544; }
 
@@ -302,7 +324,7 @@ TEST_CASE("Motor ceiling: the observed spinning wheel cannot draw unbounded powe
     // 1. Inside the calibrated envelope: real power, near the rating.
     const double t_mid = DeliveredTorqueNm(zero, full, max_rpm, 9000.0, 1.0);
     const double p_mid = t_mid * RpmToRadS(9000.0);
-    CHECK(p_mid > 0.90 * kDriveRatedPowerW);
+    CHECK(p_mid > 0.90 * kRatedEnvelopePowerW);
     CHECK(p_mid < kPowerSanityBoundW);
 
     // 2. At the ceiling: no propulsion torque at all.
@@ -344,35 +366,80 @@ TEST_CASE("Motor ceiling: full throttle delivers no torque above the ceiling, at
 // ---------------------------------------------------------------------------
 // Regression guard: normal driving must not move.
 // ---------------------------------------------------------------------------
-TEST_CASE("Motor ceiling: the calibrated envelope below 13 000 RPM is untouched",
+TEST_CASE("Motor corner: the shipped map states the manual's two p250 ratings",
+          "[Motor][Corner]") {
+    const auto engine = ReadJson(kEngine);
+    const auto full   = ReadMap(engine, "Map Full Throttle");
+
+    // Peak torque, as a number a reader can find on the scan.
+    REQUIRE(full.count(kRatedCornerRpm) == 1);
+    CHECK_THAT(full.at(kRatedCornerRpm),
+               WithinAbs(kRatedCornerTorqueNm, 1e-9));
+
+    // Peak power, at the same speed, to the manual's own rounding.  This is
+    // the check that catches a plateau edited without moving the corner (or a
+    // corner moved without re-cutting the plateau): 150 N·m at 7000 RPM is
+    // 110 kW, and 141 N·m at 6500 RPM is 96 kW — both miss this band.
+    const double corner_power_w =
+        full.at(kRatedCornerRpm) * RpmToRadS(kRatedCornerRpm);
+    CHECK_THAT(corner_power_w, WithinAbs(kRatedPowerStatedW, 500.0));
+
+    // ...and it really is the PEAK power: nowhere in the map does the envelope
+    // exceed the corner's power.  Without this, "peak" would be a label rather
+    // than a property, and a taller point elsewhere in the table would pass
+    // every other assertion in this file.
+    for (double rpm = 250.0; rpm <= 16000.0; rpm += 250.0) {
+        const double p = InterpHoldingEndpoints(full, rpm) * RpmToRadS(rpm);
+        INFO("power at " << rpm << " RPM: " << p << " W");
+        CHECK(p <= kRatedEnvelopePowerW * 1.005);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Regression guard: the envelope is a deliberate, sourced list.
+// ---------------------------------------------------------------------------
+TEST_CASE("Motor ceiling: the full-throttle envelope is the manual's, point by point",
           "[Motor][Ceiling][Regression]") {
     const auto engine = ReadJson(kEngine);
     const auto full   = ReadMap(engine, "Map Full Throttle");
     const auto zero   = ReadMap(engine, "Map Zero Throttle");
 
-    // Every point of the pre-fix map, verbatim.  The ceiling was added by
-    // EXTENDING the table, never by editing it, so acceleration and coastdown
-    // trajectories below 13 000 RPM (~81 mph) are identical by construction —
-    // no VAT baseline moves.  A future edit that retunes the envelope has to
-    // come here and say so.
-    const TorqueMap kFullBefore{
-        {-100.0, 150.0}, {0.0, 150.0}, {1000.0, 150.0}, {2000.0, 150.0},
-        {3000.0, 150.0}, {4000.0, 150.0}, {5000.0, 150.0}, {6000.0, 150.0},
-        {6500.0, 150.0}, {7000.0, 143.0}, {7500.0, 130.0}, {8000.0, 121.7},
-        {9000.0, 108.2}, {10000.0, 97.4}, {11000.0, 88.5}, {12000.0, 81.1},
-        {13000.0, 74.9}};
-    const TorqueMap kZeroBefore{
+    // Every point of the shipped full-throttle map, verbatim, so that no edit
+    // to the envelope can land without someone changing this list and saying
+    // why.  It is not a "nothing moved" guard any more: the 2026-08-11 corner
+    // correction moved all of it, from a 150 N·m / 6500 RPM / ~102 kW corner
+    // taken from secondary web figures to the p250 ratings.  Below the corner
+    // every value is the stated 141.0; above it every value is
+    // 141 × 7000 / RPM rounded to 0.1 N·m; 15500 → 16000 is the @inferred
+    // ramp to the ceiling.
+    const TorqueMap kFullExpected{
+        {-100.0, 141.0}, {0.0, 141.0}, {1000.0, 141.0}, {2000.0, 141.0},
+        {3000.0, 141.0}, {4000.0, 141.0}, {5000.0, 141.0}, {6000.0, 141.0},
+        {6500.0, 141.0}, {7000.0, 141.0}, {7500.0, 131.6}, {8000.0, 123.4},
+        {9000.0, 109.7}, {10000.0, 98.7}, {11000.0, 89.7}, {12000.0, 82.3},
+        {13000.0, 75.9}, {14000.0, 70.5}, {15000.0, 65.8}, {15500.0, 63.7},
+        {16000.0, 0.0}};
+
+    // The coast map is untouched by the corner correction, and this list says
+    // so: the manual states no coast-torque figure at any speed, so there was
+    // nothing to reconcile it against.  It stays the coastdown-calibrated,
+    // explicitly representative curve it already was.
+    const TorqueMap kZeroExpected{
         {-100.0, 0.0}, {0.0, 0.0}, {1000.0, -5.0}, {2000.0, -5.0},
         {3000.0, -5.0}, {4000.0, -5.0}, {5000.0, -5.0}, {6000.0, -8.0},
         {7000.0, -10.0}, {8000.0, -12.0}, {10000.0, -15.0}, {12000.0, -20.0},
-        {13000.0, -25.0}};
+        {13000.0, -25.0}, {14000.0, -30.0}, {15000.0, -35.0}, {15500.0, -37.0},
+        {16000.0, 0.0}};
 
-    for (const auto& [rpm, torque] : kFullBefore) {
+    CHECK(full.size() == kFullExpected.size());
+    CHECK(zero.size() == kZeroExpected.size());
+
+    for (const auto& [rpm, torque] : kFullExpected) {
         INFO("full-throttle map at " << rpm << " RPM");
         REQUIRE(full.count(rpm) == 1);
         CHECK_THAT(full.at(rpm), WithinAbs(torque, 1e-9));
     }
-    for (const auto& [rpm, torque] : kZeroBefore) {
+    for (const auto& [rpm, torque] : kZeroExpected) {
         INFO("zero-throttle map at " << rpm << " RPM");
         REQUIRE(zero.count(rpm) == 1);
         CHECK_THAT(zero.at(rpm), WithinAbs(torque, 1e-9));
@@ -384,35 +451,30 @@ TEST_CASE("Motor ceiling: constant torque then constant power, up to the ramp",
     const auto engine = ReadJson(kEngine);
     const auto full   = ReadMap(engine, "Map Full Throttle");
 
-    // Constant-torque region: flat to the 6500 RPM corner.
-    for (double rpm = 0.0; rpm <= 6500.0; rpm += 500.0) {
+    // Constant-torque region: flat at the rated peak torque, all the way to
+    // the 7000 RPM corner.
+    for (double rpm = 0.0; rpm <= kRatedCornerRpm; rpm += 250.0) {
         INFO("constant-torque region at " << rpm << " RPM");
-        CHECK_THAT(InterpHoldingEndpoints(full, rpm), WithinAbs(150.0, 1e-9));
+        CHECK_THAT(InterpHoldingEndpoints(full, rpm),
+                   WithinAbs(kRatedCornerTorqueNm, 1e-9));
     }
 
-    // Constant-power region: torque falls as 1/omega, so power is flat.  This
-    // now runs past the old 13 000 RPM end of the table — the extension
-    // continues the same hyperbola rather than inventing a new shape.
-    //
-    // The sweep starts at 7500, not 7000, and that is a real exclusion rather
-    // than a tidy round number: the shipped 7000 RPM point is 143.0 N·m =
-    // 104.8 kW, 2.8 % above the envelope, so it would fail this 2 % band.  It
-    // is the corner rounding between the constant-torque plateau and the
-    // hyperbola, it predates this change, and it is inside the region left
-    // untouched deliberately.  It goes away with the corner-point correction
-    // tracked in docs/TODO.md; until then, excluding it is honest and
-    // narrowing the band to include it would just re-tune a number this
-    // change promised not to touch.
-    for (double rpm = 7500.0; rpm <= 15500.0; rpm += 500.0) {
+    // Constant-power region: torque falls as 1/omega, so power is flat.  The
+    // sweep now STARTS at the corner and needs no exclusions.  It used to have
+    // to skip 7000 RPM, because the old map's 143.0 N·m there was 104.8 kW —
+    // 2.8 % above its own 102 kW envelope, the rounding artefact of a corner
+    // that sat at 6500.  With the corner where the print puts it, the plateau
+    // ends exactly on the hyperbola and the seam disappears.
+    for (double rpm = kRatedCornerRpm; rpm <= 15500.0; rpm += 250.0) {
         const double p = InterpHoldingEndpoints(full, rpm) * RpmToRadS(rpm);
         INFO("constant-power region at " << rpm << " RPM: " << p << " W");
-        CHECK_THAT(p, WithinRel(kDriveRatedPowerW, 0.02));
+        CHECK_THAT(p, WithinRel(kRatedEnvelopePowerW, 0.01));
     }
 
     // Torque must fall monotonically across the whole speed range.  A drive
     // whose torque rises with speed anywhere is not an induction machine.
-    double prev = InterpHoldingEndpoints(full, 6500.0);
-    for (double rpm = 6500.0; rpm <= 16000.0; rpm += 250.0) {
+    double prev = InterpHoldingEndpoints(full, kRatedCornerRpm);
+    for (double rpm = kRatedCornerRpm; rpm <= 16000.0; rpm += 250.0) {
         const double t = InterpHoldingEndpoints(full, rpm);
         INFO("monotonic falloff at " << rpm << " RPM");
         CHECK(t <= prev + 1e-9);
