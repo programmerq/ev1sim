@@ -73,19 +73,154 @@ modern variant.
 
 | Parameter | Current | Real EV1 (Gen 2 AC induction) | Status |
 |---|---|---|---|
-| Peak torque | 150 N·m flat 0-6500 RPM | 149 N·m peak | ✅ within 1% |
-| Peak power (at 6500 RPM) | 102 kW | 102 kW (137 hp) | ✅ matches |
-| Max RPM | 13000 | ~12000-13000 | ✅ |
-| Map shape (full throttle) | flat torque to 6500, power-limited beyond | textbook 3-phase induction | ✅ |
-| Coast torque (zero throttle) | -5 to -25 N·m | EV1 used aggressive regen (~25 kW) | ⚠️  representative; not commanded regen |
+| Peak torque | 150 N·m flat 0-6500 RPM | **141 N·m at 7000 RPM** (prop p250) | ⚠️ corner disagrees — see below |
+| Peak power | 102 kW | **103 kW at 7000 RPM** (prop p250) | ✅ within 1% |
+| Drive speed ceiling | **16000 RPM** | propulsion disabled above **16000 RPM** (prop p328, DTC 007) | ✅ sourced — but see the labelling note |
+| Map shape, 0-13000 RPM | flat torque to 6500, constant power beyond | textbook 3-phase induction | ✅ |
+| Map shape, 13000-16000 RPM | constant power to 15500, ramp to zero at 16000 | not stated anywhere | ⚠️ @inferred — continuation of the region below, plus a chosen ramp width |
+| Coast torque (zero throttle) | -5 to -37 N·m, zero at 16000 | EV1 used aggressive regen (~25 kW) | ⚠️  representative; not commanded regen |
 | Motor type | "EngineSimpleMap" (Chrono ICE template) | 3-phase AC induction | ⚠️ template mismatch — works as a static map |
 
-The motor torque/power *map* matches the real EV1 closely.  What's missing:
+**The speed ceiling (2026-08-11).**  The map used to end at 13 000 RPM, and this
+table used to call that "✅".  It was neither correct nor a ceiling.
+
+It was not correct because 13 000 RPM is not a property of the motor — it is the
+~80 mph **software** top-speed calibration restated in RPM (80 mph ÷ 0.2915 m
+tire × 10.946 = 12 824 RPM).  @source:manual propulsion p250: "The PIM will
+limit vehicle speed in the forward direction to 129 km/h (80 mph)", enforced by
+decreasing the torque current.  That is the propulsion controller's calibration,
+not the drive's capability, and encoding it as physics made a software choice
+unmodifiable.  The drive's actual ceiling is **16 000 RPM** — @source:manual
+propulsion p328 (DTC 007): a speed/direction pulse rate above 34 000 Hz
+"corresponds to a shaft speed of 16,000 RPM", at which "the SERVICE NOW telltale
+is illuminated, the DTC is stored and propulsion is disabled".  That is ~100 mph
+at the road: above the software cap, not significantly beyond it.
+
+It was not a ceiling because Chrono's clamp on `Maximal Engine Speed RPM` bounds
+the torque **lookup**, not the shaft (`ChEngineSimpleMap.cpp:39`), and
+`ChFunctionInterp` holds the endpoint value outside the table
+(`ChFunctionInterp.cpp:49-52`, extrapolation off by default).  So the map's last
+torque was delivered at every higher speed forever: 74.9 N·m at any RPM, which
+at the 45 500 RPM implied by the reported observation is **357 kW from a 102 kW
+drive**.  An unloaded wheel therefore accelerated without bound.  Reproduced on
+ice at full throttle: at 40 s the shaft was at **48 145 RPM** (front wheels
+451.6 and 469.6 rad/s — the faster one making **306 mph** of tread speed, 378 kW
+delivered) and still climbing linearly, with the car itself doing 34.7 mph.
+
+Wheel speeds are quoted per wheel and shaft speed from the **average** of the
+two, because the differential is open and the wheels straddle the shaft: taking
+either wheel alone misstates the shaft by several percent in each direction.
+`scripts/motor_ceiling_report.py` does that conversion and prints both.
+
+The fix extends the map to 16 000 RPM along the same constant-power hyperbola
+and pins the last point of **both** maps at **0 N·m**, so the endpoint hold
+delivers nothing above the ceiling at any pedal position.  Every pre-existing
+map point is preserved verbatim.  Guarded by
+[`tests/test_motor_speed_ceiling.cpp`](../tests/test_motor_speed_ceiling.cpp).
+
+**What "16 000 RPM" is, precisely.**  The DTC is titled *"VEHICLE SPEED INPUT
+PULSE RATE TOO HIGH"*, the threshold is a **pulse rate** (34 000 Hz), and the
+reaction is a **PCM software action**.  16 000 RPM is GM restating that rate as
+shaft speed.  The manual states no rotor-burst speed, no bearing speed and no
+inverter frequency limit anywhere, so this is **not** a mechanical redline and
+nothing here calls it one — it is the speed above which the propulsion system
+stops producing torque, which is exactly what a torque map can represent.
+Note also that the same p250 says the PIM decreases torque current *"to limit
+drive motor shaft speed"*: shaft-speed limiting is a PIM function on the real
+car.  This map is not that limiter; it is the envelope the limiter acts inside.
+
+**What moves, measured — not "nothing".**  Preserving the points means
+trajectories are identical *while the shaft is below 13 000 RPM*, which is
+**78.7 mph** — not "in normal driving".  Because ev1sim has no top-speed
+limiter at all, any run holding full throttle long enough crosses it.  Measured,
+full throttle held 120 s on dry asphalt (µ 0.90):
+
+| | before | after |
+|---|---|---|
+| speed at 120 s | 103.46 m/s = **231.4 mph** | 43.42 m/s = **97.1 mph** |
+| shaft at 120 s | 38 760 RPM, still accelerating | 15 880 RPM, settled |
+| first divergence | — | t = 17.15 s, at **78.7 mph** / 13 064 RPM |
+
+A 231 mph EV1 was the defect, so the direction is right — but it is a change,
+and the scenarios were enumerated rather than assumed.  All ten in
+`config/scenarios/` are bounded below 78.7 mph by their own throttle-release
+events: the seven ABS scenarios plus `cruise_demo_electronics` and `coastdown`
+release at or below 30 m/s (67.1 mph, 10 760 RPM), and `accel_brake_local`
+holds 0.7 throttle for 7.5 s and never approaches it.
+
+**Wheel speed is bounded only through the differential.**  The shaft is capped,
+but the open differential still lets one front wheel run above the mean while
+the other runs below.  On µ 0.02 a single wheel reaches ~204 rad/s (59 m/s of
+tread) with the shaft pinned at 15 881 RPM.  That is what an open diff does, and
+it is a far cry from the unbounded 451 rad/s — but "the wheel cannot spin fast"
+would be the wrong claim; the correct one is that the *drive* can no longer feed
+it.
+
+**Why nothing else stopped it.**  The runaway needed only the missing ceiling,
+but it is worth recording what else was checked and found not to be the cause:
+
+* **No current or power limit exists in the torque path.**  ev1sim's plant has
+  no inverter current limit, no pack power limit and no torque-command clamp —
+  the engine map is a static torque lookup with nothing downstream of it.
+  Limits *do* exist in the sibling PIM (`ev1/pim/pim_drive_plant.h`: a 400 A bus
+  ceiling `@source:manual p.56`, a 150 N·m torque clamp, and a 13 000 RPM rail),
+  but `pim_drive_plant` is a **controller-side plant that integrates its own
+  motor speed and never feeds Chrono**.  It is a parallel model, not a limiter
+  in this torque path, so its limits could not have bound the wheel even had
+  the controller been running.
+* **The controller was not running.**  `config/scenarios/abs_low_mu_stop.json`
+  sets `driver_mode: "local"`, and `SimApp::ApplyElectronicsThrottle` returns
+  immediately unless the mode is `"electronics"`, so PIM's throttle path — and
+  its traction-control derate — was bypassed entirely.
+* **The tyre is not a contributor.**  TMeasy behaves correctly: at µ 0.10 with
+  ~4 kN on the wheel it resists roughly 0.10 × 4 kN × 0.2915 m ≈ 117 N·m, while
+  the held 74.9 N·m through the 10.946:1 reduction delivers roughly 410 N·m
+  *per front wheel*.  The tyre saturates at the friction limit, which is what it
+  should do; it simply cannot remove drive torque.  Nothing in the slip-force
+  computation keeps torque applied — the torque was applied by the engine map.
+
+**So: which speed does the limiter watch — motor or road?**  In the model, the
+question does not arise, because **there is no limiter of any kind in the torque
+path.**  Stating that as the three-way answer it is:
+* *No limiter at all* — **true**, for the plant that actually integrates the
+  wheel.
+* *A limiter that watches road speed, which wheelspin escapes* — **does not
+  apply.**  The only road-speed-referenced limits in the program are PIM's
+  cruise ceilings (`PIM_CRUISE_MAX_SETPOINT_MPS` 35.76 m/s and
+  `PIM_CRUISE_OVERSPEED_MPS` 38.0 m/s), which act only in cruise and are not a
+  top-speed limiter.
+* *A limiter that watches motor speed but is bypassed or mis-scaled* — **does
+  not apply either.**  The motor-speed-referenced limits that exist (PIM's
+  DTC 007 at 16 000 RPM, the drive-plant's 13 000 RPM rail) sit outside the
+  torque path — and DTC 007 additionally could not fire, because ev1sim was
+  publishing the *clamped* speed on 4070.
+
+On the **real car** the answer is motor shaft speed, and it is sourced: the
+speed/direction sensor is "attached to the end of the rotor shaft" and the PCM
+calculates shaft speed from it (prop p326); the PCM "uses and monitors the motor
+shaft speed signal … including vehicle speed signal generation, torque control,
+and cruise control" (prop p336).  True road speed lives in the BTCM and reaches
+the PCM as a torque *retard request*, not a speed feed; wheel speed arrives only
+as a dead-sensor plausibility check (DTC 078).  This matters for the future
+PIM-side limiter: a motor-referenced limiter reads the **spinning** wheels
+during wheelspin, so it engages sooner rather than being escaped.
+
+**Corner-point disagreement (open).**  The 150 N·m / 6500 RPM corner in the map
+comes from secondary web figures; the primary service manual (propulsion p250)
+says **141 N·m and 103 kW, both at 7000 RPM**.  Correcting it is a ~6 % torque
+change and a ~7.7 % base-speed change, which moves every acceleration
+trajectory — deliberately not bundled with the ceiling fix.  See
+[TODO.md](TODO.md).
+
+What's also still missing:
 - Regen integrated with brake commands (today regen lives only in coast
   torque, which fires whenever throttle is released regardless of brake)
 - Speed-dependent peak — induction motors have a more complex torque
   envelope at low speeds (limited by inverter current) than a flat 150 N·m
   curve suggests.  Probably negligible for our use cases.
+- The ~80 mph software cap itself.  ev1sim has no top-speed limiter at all;
+  the cap belongs on the propulsion-controller side (electricsim PIM), which
+  is where the manual puts it.
 
 ## 4. Drivetrain
 

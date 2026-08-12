@@ -3,6 +3,7 @@
 #include "MacOSPlatform.h"
 
 #include "chrono_vehicle/ChEngine.h"
+#include "chrono_vehicle/ChTransmission.h"
 
 #include <algorithm>
 #include <atomic>
@@ -1203,6 +1204,45 @@ void SimApp::ApplyElectronicsSteering(DriverCommand& cmd) {
 }
 
 // ---------------------------------------------------------------------------
+// Publish the motor operating point on the chassis bus (4070 RPM, 4071 torque).
+//
+// The RPM source matters.  ChEngine::GetMotorSpeed() returns the speed AFTER
+// ChEngineSimpleMap::Synchronize clamps it to "Maximal Engine Speed RPM":
+//
+//     m_motor_speed = ChClamp(motorshaft_speed, 0.0, GetMaxEngineSpeed());
+//
+// That clamp exists so the torque lookup stays inside the map's domain; it does
+// not restrain the shaft.  Publishing the clamped value meant 4070 saturated at
+// the map's top RPM however fast the shaft really turned, so PIM's over-speed
+// fault (DTC 007 above 16 000 RPM — propulsion manual p328, "SERVICE NOW … and
+// propulsion is disabled") was structurally unable to observe an over-speed.
+// The transmission's output-motorshaft speed is the honest, unclamped shaft
+// state, so publish that and let the electronics decide what is a fault.
+void SimApp::PublishMotorState() {
+    if (!m_external_sim) return;
+
+    float motor_rpm    = 0.0f;
+    float motor_torque = 0.0f;
+
+    // Speed: unclamped shaft state from the transmission output.
+    if (auto transmission = m_world->GetVehicle().GetTransmission()) {
+        // GetOutputMotorshaftSpeed() returns rad/s; convert to RPM.
+        const double omega = transmission->GetOutputMotorshaftSpeed();
+        motor_rpm = static_cast<float>(omega * 60.0 / (2.0 * 3.14159265358979323846));
+    }
+
+    // Torque: what the drive is actually delivering to the shaft.  Above the
+    // drive ceiling the engine map holds its last point, which the powertrain
+    // JSON pins at 0 N·m, so this reads zero rather than a fictitious constant.
+    if (auto* engine = m_world->GetVehicle().GetEngine().get()) {
+        motor_torque = static_cast<float>(engine->GetOutputMotorshaftTorque());
+    }
+
+    m_external_sim->SetMotorRpm(motor_rpm);
+    m_external_sim->SetMotorTorqueNm(motor_torque);
+}
+
+// ---------------------------------------------------------------------------
 // Step the externally-driven body peripherals (the door-lock-motor / sounder /
 // power-steering-pump round, plus the door-lock rockers).  Advances the
 // PhysicalWorld plant models from the connector's latched chassis-bus inputs
@@ -1766,23 +1806,7 @@ int SimApp::RunWithVisualization() {
             m_external_sim->SetAmbientHumidityPct(
                 static_cast<float>(m_physical->ambient_temp_sensor().humidity_pct()));
         }
-        // Motor RPM + torque (chassis bus 4070-4071). DC pack current (4072) is
-        // the external PIM's to derive from these — ev1sim publishes only the
-        // mechanical operating point.
-        {
-            auto* engine = m_world->GetVehicle().GetEngine().get();
-            float motor_rpm = 0.0f;
-            float motor_torque = 0.0f;
-            if (engine) {
-                // GetMotorSpeed() returns rad/s; convert to RPM.
-                const double omega  = engine->GetMotorSpeed();
-                const double torque = engine->GetOutputMotorshaftTorque();
-                motor_rpm     = static_cast<float>(omega * 60.0 / (2.0 * 3.14159265358979323846));
-                motor_torque  = static_cast<float>(torque);
-            }
-            m_external_sim->SetMotorRpm(motor_rpm);
-            m_external_sim->SetMotorTorqueNm(motor_torque);
-        }
+        PublishMotorState();
         m_external_sim->Tick(t);
 
         // Subscribe to RSA run-mode broadcast and update propulsion gate.
@@ -2343,22 +2367,7 @@ int SimApp::RunHeadless() {
             m_external_sim->SetAmbientHumidityPct(
                 static_cast<float>(m_physical->ambient_temp_sensor().humidity_pct()));
         }
-        // Motor RPM + torque (chassis bus 4070-4071). DC pack current (4072) is
-        // the external PIM's to derive from these — ev1sim publishes only the
-        // mechanical operating point.
-        {
-            auto* engine = m_world->GetVehicle().GetEngine().get();
-            float motor_rpm = 0.0f;
-            float motor_torque = 0.0f;
-            if (engine) {
-                const double omega  = engine->GetMotorSpeed();
-                const double torque = engine->GetOutputMotorshaftTorque();
-                motor_rpm     = static_cast<float>(omega * 60.0 / (2.0 * 3.14159265358979323846));
-                motor_torque  = static_cast<float>(torque);
-            }
-            m_external_sim->SetMotorRpm(motor_rpm);
-            m_external_sim->SetMotorTorqueNm(motor_torque);
-        }
+        PublishMotorState();
         m_external_sim->Tick(t);
 
         // Subscribe to RSA run-mode broadcast and update propulsion gate.

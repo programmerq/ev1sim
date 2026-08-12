@@ -1,0 +1,21 @@
+{
+  "//": "Drive-ceiling probe, GRIP case: dry asphalt (mu 0.90), 120 s of full",
+  "//1": "throttle.  No wheelspin — the car just accelerates until the drive",
+  "//2": "runs out of speed.  This is the run that shows what the ceiling",
+  "//3": "changes in ordinary driving and where the change begins.",
+  "//4": "See config/scenarios/wheelspin_ceiling_probe.json.",
+
+  "vehicle_model": "ev1",
+  "terrain": {
+    "type": "rigid_plane",
+    "surface": "asphalt",
+    "friction": 0.90,
+    "length_m": 8000.0,
+    "width_m":  200.0
+  },
+  "simulation": { "step_size_s": 0.001, "render_fps": 60, "realtime": false, "headless": true },
+  "telemetry": { "log_to_file": false, "show_hud": false },
+  "external_sim": { "enabled": false },
+  "vehicle_dynamics": { "start_propulsion_enabled": true },
+  "scenario": { "path": "config/scenarios/wheelspin_ceiling_probe.json" }
+}

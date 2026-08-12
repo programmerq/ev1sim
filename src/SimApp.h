@@ -123,6 +123,37 @@ private:
     // Safe to call when m_external_sim is null (no-op).  dt is in seconds.
     void ConsumeBodyActuatorPeripherals(double dt);
 
+    // Publish the motor operating point on the chassis bus: RPM (4070) and
+    // shaft torque (4071).  DC pack current (4072) is the external PIM's to
+    // derive from these — ev1sim publishes only the mechanical state.
+    //
+    // The RPM comes from the TRANSMISSION's output-motorshaft speed, not from
+    // ChEngine::GetMotorSpeed().  The engine's reported speed is clamped to
+    // "Maximal Engine Speed RPM" (ChEngineSimpleMap.cpp:39) because that clamp
+    // exists to keep the torque LOOKUP inside the map's domain — it does not
+    // limit the shaft.  Publishing it meant the bus saturated at the map's top
+    // RPM no matter how fast the shaft actually turned, so PIM's sourced
+    // over-speed fault (DTC 007 at 16 000 RPM, propulsion manual p328) could
+    // never see an over-speed: a check that cannot fail.  The transmission's
+    // GetOutputMotorshaftSpeed() is the unclamped shaft state.
+    //
+    // This is NOT a no-op below the ceiling, and the trade is deliberate.
+    // ChPowertrainAssembly::Synchronize hands the engine the transmission's
+    // speed from the PREVIOUS substep, so the engine's reported speed lags one
+    // step behind.  Reading the transmission directly publishes the CURRENT
+    // one, which shifts 4070 by one 1 ms step (~0.3-0.5 RPM under hard
+    // acceleration, above the 0.01 publish epsilon, so bus traffic changes)
+    // and leaves 4070 and 4071 describing instants one step apart.  PIM
+    // derives DC pack current as torque x omega / (V_pack x eta) from that
+    // pair, so the derived current inherits the same ~0.005 % skew — far below
+    // anything it decides on.  The alternative is a speed channel that cannot
+    // report the over-speed it exists to report.
+    //
+    // Both the rendered loop and the headless loop call this one function so
+    // the bus can never report one thing in one loop and another in the other.
+    // Safe to call when m_external_sim is null (no-op).
+    void PublishMotorState();
+
     Config m_config;
 
     std::unique_ptr<VehicleWorld>           m_world;

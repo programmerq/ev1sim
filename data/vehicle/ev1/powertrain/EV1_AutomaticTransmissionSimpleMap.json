@@ -3,11 +3,20 @@
   "Type": "Transmission",
   "Template": "AutomaticTransmissionSimpleMap",
 
+  "//": "The EV1 has one forward gear, so the shift map below is INERT:",
+  "//1": "ChAutomaticTransmissionSimpleMap only calls SetShiftPoints() when",
+  "//2": "there is more than one forward ratio, and its Synchronize() shift",
+  "//3": "test is guarded by (current_gear < max_gear), which is never true",
+  "//4": "with a single gear.  It is kept in step with the engine map's",
+  "//5": "Maximal Engine Speed RPM anyway so the drive ceiling appears as one",
+  "//6": "number across the powertrain files rather than two that can drift",
+  "//7": "apart; tests/test_motor_speed_ceiling.cpp asserts they agree.",
+
   "Gear Box": {
     "Reverse Gear Ratio": -1.0,
     "Forward Gear Ratios": [1.0],
     "Shift Points Map RPM": [
-      [0, 13000]
+      [0, 16000]
     ]
   }
 }
