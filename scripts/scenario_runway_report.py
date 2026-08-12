@@ -235,7 +235,12 @@ def update_table(text: str, key: str, field: str, value: float | None) -> str:
 # --- reporting ----------------------------------------------------------------
 
 def report(case: dict, binary: Path, tol: dict) -> tuple[bool, dict]:
-    """Print one scenario's budget; return (ok, the values it re-derived)."""
+    """Print one scenario's budget; return (ok, the values it re-derived).
+
+    Every early exit below goes through _finish(), so the table comparison
+    runs even on a scenario that failed for some other reason.  Skipping it on
+    the way out of a failure is how a stale number survives a red run.
+    """
     key = case["key"]
     cfg = json.loads((ROOT / case["config"]).read_text())
     how = case["boundary"]
@@ -266,10 +271,27 @@ def report(case: dict, binary: Path, tol: dict) -> tuple[bool, dict]:
         print(f"=== {key}   (boundary at x={xb:g} m, onto {surface})")
         print(f"    spawn x={spawn_x:.2f} m   spawn-to-boundary {xb - spawn_x:.2f} m")
 
+    def _finish(ok: bool) -> tuple[bool, dict]:
+        complaints = compare_to_table(case, derived, tol)
+        if complaints:
+            for msg in complaints:
+                print(f"    *** STALE TABLE: {msg}")
+            return False, derived
+        rec = case["measured_release_s"]
+        got = derived["measured_release_s"]
+        line = f"    table        release {rec:.3f} s recorded"
+        line += (f", {got:.3f} s re-derived ({got - rec:+.3f} s)"
+                 if got is not None else ", nothing re-derived")
+        if derived["measured_crossing_s"] is not None:
+            rc, dc = case["measured_crossing_s"], derived["measured_crossing_s"]
+            line += f"; crossing {rc:.3f} -> {dc:.3f} ({dc - rc:+.3f} s)"
+        print(line + "  — agrees")
+        return ok, derived
+
     ok = True
     if entry_t is None:
         print("    NEVER REACHED ENTRY SPEED — the runway or max_time_s is too short")
-        return False, derived
+        return _finish(False)
 
     e = sample_at_time(rows, entry_t)
     print(f"    launch       {e['pos_x'] - spawn_x:7.2f} m   entry speed "
@@ -280,7 +302,7 @@ def report(case: dict, binary: Path, tol: dict) -> tuple[bool, dict]:
         c = sample_at_x(rows, xb)
         if c is None:
             print("    never reaches the boundary")
-            return False, derived
+            return _finish(False)
         # The crossing is a measurement only where the table asks for one.
         # mu_jump crosses under braking BY DESIGN, and a crossing inside the
         # brake event is not an entry condition, so its row records null.
@@ -298,8 +320,10 @@ def report(case: dict, binary: Path, tol: dict) -> tuple[bool, dict]:
                   f"{c['speed_mps']:.3f} m/s ({c['speed_mps'] * MPS_TO_MPH:.1f} mph)")
 
     if brake_t is None:
-        print("    no brake event fired")
-        return ok, derived
+        # Not "ok".  A barrier-gated scenario with no brake is a scenario that
+        # tests nothing, and returning True here would let it stay that way.
+        print("    *** no brake event fired — this scenario brakes nothing")
+        return _finish(False)
 
     b = sample_at_time(rows, brake_t)
     settle_s = brake_t - entry_t
@@ -349,21 +373,7 @@ def report(case: dict, binary: Path, tol: dict) -> tuple[bool, dict]:
         line += f"   yaw carried in {b['yaw_deg']:+.3f} deg"
     print(line)
 
-    complaints = compare_to_table(case, derived, tol)
-    if complaints:
-        for c_msg in complaints:
-            print(f"    *** STALE TABLE: {c_msg}")
-        ok = False
-    else:
-        rec = case["measured_release_s"]
-        print(f"    table        release {rec:.3f} s recorded, {entry_t:.3f} s "
-              f"re-derived ({entry_t - rec:+.3f} s)", end="")
-        if derived["measured_crossing_s"] is not None:
-            rc = case["measured_crossing_s"]
-            dc = derived["measured_crossing_s"]
-            print(f"; crossing {rc:.3f} -> {dc:.3f} ({dc - rc:+.3f} s)", end="")
-        print("  — agrees")
-    return ok, derived
+    return _finish(ok)
 
 
 # --- selftest -----------------------------------------------------------------
