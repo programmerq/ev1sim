@@ -13,12 +13,40 @@ isolates the simavr edge-counting plumbing from the chassis side.
 |---|---|---|
 | `high_mu`  | uniform asphalt (μ ≈ 0.9)        | ABS shouldn't hurt on dry pavement             |
 | `low_mu`   | asphalt → packed snow (μ ≈ 0.20), brakes on the snow | ABS should keep wheels rolling on slippery |
-| `mu_jump`  | asphalt → ice transition         | algorithm must adapt as grip suddenly drops    |
-| `split_mu` | left = asphalt, right = ice      | per-wheel ABS keeps the car going straight    |
+| `mu_jump`  | asphalt → ice transition, brakes on asphalt then crosses under braking | algorithm must adapt as grip suddenly drops    |
+| `split_mu` | left = asphalt, right = ice, brakes on the split | per-wheel ABS keeps the car going straight    |
 
 Industry calls these "high-mu stop", "low-mu stop", "split-friction
 stop", and "mu-jump" / "transition" stop.  μ ("mu") is the friction
 coefficient between tire and road.
+
+**The four scenarios that change surface — `low_mu`, `mu_jump`,
+`split_mu` and `diagonal_mu` — finish their launch on grip and settle
+before they reach the surface under test.**  That is a property of the
+level geometry, and it is measured rather than intended: each
+transition level's runway is sized to hold the whole pre-brake half of
+its scenario, and `scripts/scenario_runway_report.py` re-derives that
+budget from a headless run.
+
+When a runway is too short the scenario stops testing what its name
+says without failing anything.  `mu_jump` used to cross onto the ice at
+full throttle and brake 34 m past the boundary, so no mu-jump happened
+at all; `split_mu` used to straddle the seam under power and reach its
+brake event already 3.4° off heading — on the one test whose verdict
+*is* the yaw.  The budgets live in the `level/*.json` headers, the
+geometry is pinned by `tests/test_level_file.cpp`, and the brake
+timing that produces the settle is pinned by the `[Runway]` cases in
+`tests/test_scenario.cpp`.
+
+The three uniform-surface stops — `high_mu`, `hard_brake` and
+`brake_and_steer` — do **not** have that settle.  Their `set_brake` sits
+behind the `wait_for_speed` barrier, so it applies full brake on the
+tick the throttle releases.  They launch and brake on one surface, so
+nothing is mistimed relative to a transition, but the brake event still
+begins with launch slip in the tyres.  Recorded in
+[`docs/TODO.md`](TODO.md); the `[Runway]` cases assert they are still in
+that state, so fixing one turns the check red and asks for the record
+to be updated.
 
 ## How to run
 

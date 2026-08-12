@@ -73,13 +73,86 @@ modern variant.
 
 | Parameter | Current | Real EV1 (Gen 2 AC induction) | Status |
 |---|---|---|---|
-| Peak torque | 150 N·m flat 0-6500 RPM | **141 N·m at 7000 RPM** (prop p250) | ⚠️ corner disagrees — see below |
-| Peak power | 102 kW | **103 kW at 7000 RPM** (prop p250) | ✅ within 1% |
+| Peak torque | **141 N·m at 7000 RPM**, held flat below it | **141 N·m at 7000 RPM** (prop p250) | ✅ the rating is sourced; the flat plateau below it is ⚠️ @inferred |
+| Peak power | **103.4 kW at 7000 RPM** | **103 kW (138 Hp) at 7000 RPM** (prop p250) | ✅ sourced — the map's value is the stated torque × the stated speed |
 | Drive speed ceiling | **16000 RPM** | propulsion disabled above **16000 RPM** (prop p328, DTC 007) | ✅ sourced — but see the labelling note |
-| Map shape, 0-13000 RPM | flat torque to 6500, constant power beyond | textbook 3-phase induction | ✅ |
+| Map shape, 0-16000 RPM | flat torque to 7000, constant power beyond | textbook 3-phase induction | ✅ corner sourced; the shape either side of it is @inferred |
 | Map shape, 13000-16000 RPM | constant power to 15500, ramp to zero at 16000 | not stated anywhere | ⚠️ @inferred — continuation of the region below, plus a chosen ramp width |
-| Coast torque (zero throttle) | -5 to -37 N·m, zero at 16000 | EV1 used aggressive regen (~25 kW) | ⚠️  representative; not commanded regen |
+| Coast torque (zero throttle) | -5 to -37 N·m, zero at 16000 | commanded regen bounded at 365 V × 30 A ≈ **11 kW** (prop p60) | ⚠️ representative drag, not commanded regen — but it passes 11 kW above ~8400 RPM; see TODO.md |
 | Motor type | "EngineSimpleMap" (Chrono ICE template) | 3-phase AC induction | ⚠️ template mismatch — works as a static map |
+
+**The corner point (2026-08-11).**  The first three rows of that table used to
+read 150 N·m flat to 6500 RPM on a ~102 kW envelope, from secondary web
+figures, with the primary document disagreeing in the next column.  It now
+reads off the print.
+
+@source:manual propulsion p250, "DRIVE MOTOR PERFORMANCE": *"The drive motor has
+a peak torque rating 141 N·m (104 ft−lb) at 7000 RPM.  The peak power rating is
+103 kw (138 Hp) at 7000 RPM."*  Read off the `.jpg` scan; the page's own folio
+reads `250 PROPULSION`.
+
+Those two sentences are one operating point, not two competing ones, and the
+page is arithmetically self-consistent about it:
+
+| printed | check |
+|---|---|
+| 141 N·m at 7000 RPM | 141 × 7000 × 2π/60 = **103.36 kW** |
+| 103 kW at 7000 RPM | 103 kW ÷ 745.7 = **138.1 hp** ✓ printed 138 Hp |
+| 104 ft−lb | 141 ÷ 1.35582 = **104.0 ft−lb** ✓ |
+
+Peak torque and peak power coinciding at one speed *is* the corner of an
+induction drive's envelope — torque-limited below, power-limited above.  The
+map now carries 141.0 N·m at every full-throttle point at or below 7000 RPM and
+141 × 7000 ÷ RPM above it.  Peak torque falls 6.0 %; base speed rises 7.7 %.
+
+**Exactly one full-throttle point in that table is sourced: 7000 RPM, 141.0
+N·m.**  p250 prints a *rating*, not a curve — it says nothing about torque at
+1000 or 5000 RPM.  What the coincidence of the two ratings buys is the *shape*
+to anchor on that point, and the shape is the textbook one: a real induction
+machine rolls off near zero speed against its inverter current limit, and its
+field-weakening region is not an exact hyperbola.  Neither is modelled, and
+`EV1_EngineSimpleMap.json` labels the plateau and the hyperbola `@inferred`
+accordingly.
+
+What that did to the drive, by road speed (10.946:1, 0.2915 m tyre):
+
+| shaft RPM | ≈ mph | torque before | torque after | Δ |
+|---|---|---|---|---|
+| 0–6500 | 0–40.5 | 150.0 | 141.0 | **−6.0 %** |
+| 7000 | 43.7 | 143.0 | 141.0 | −1.4 % |
+| 7500–15500 | 46.8–96.7 | 130.0 → 62.8 | 131.6 → 63.7 | **+1.3 to +1.4 %** |
+
+The envelope *gains* torque above ~47 mph, because the constant-power region
+now holds the printed 103.4 kW instead of the old ~102 kW.  The old map's 7000
+RPM point was also 104.8 kW — 2.8 % above its own envelope, the rounding
+artefact of a corner sitting at 6500 — so the pre-change map's true peak power
+was neither of the two numbers anyone had written down.
+
+Measured, full throttle on dry asphalt (µ 0.90), from `abs_high_mu_stop`, no
+BTCM attached:
+
+| | before | after | Δ |
+|---|---|---|---|
+| 0–30 mph | 6.768 s | 7.083 s | +0.315 s (+4.7 %) |
+| 0–60 mph | 12.676 s | 13.062 s | +0.386 s (+3.0 %) |
+| 0–67.1 mph (30 m/s) | 14.664 s | 15.022 s | +0.358 s (+2.4 %) |
+
+The percentage shrinks with speed because the loss is confined to the
+constant-torque region; above ~47 mph the car is pulling slightly *harder* than
+before.
+
+Two things that do **not** move, measured rather than assumed:
+
+* **Coastdown.**  The coast map was not edited and `coastdown` still releases at
+  30 m/s, so speed as a function of time-since-release is the same curve: worst
+  |Δv| = **0.0028 m/s over 74 s of coast** (0.010 % at 27.8 m/s), which is the
+  0.8 mm/s difference in speed at the instant the barrier released, propagated.
+  Only the time to *reach* release speed moves, by the same ~0.36 s.  The drag
+  calibration in section 11 is unaffected.
+* **The drive ceiling.**  `wheelspin_ceiling_probe` on dry asphalt, 60 s of full
+  throttle: terminal speed **43.423 → 43.428 m/s (97.13 → 97.14 mph)**.  Up
+  there the envelope is on the shared 15 500 → 16 000 RPM ramp to zero, so where
+  it crosses road load barely moves.
 
 **The speed ceiling (2026-08-11).**  The map used to end at 13 000 RPM, and this
 table used to call that "✅".  It was neither correct nor a ceiling.
@@ -101,7 +174,7 @@ the torque **lookup**, not the shaft (`ChEngineSimpleMap.cpp:39`), and
 `ChFunctionInterp` holds the endpoint value outside the table
 (`ChFunctionInterp.cpp:49-52`, extrapolation off by default).  So the map's last
 torque was delivered at every higher speed forever: 74.9 N·m at any RPM, which
-at the 45 500 RPM implied by the reported observation is **357 kW from a 102 kW
+at the 45 500 RPM implied by the reported observation is **357 kW from a 103 kW
 drive**.  An unloaded wheel therefore accelerated without bound.  Reproduced on
 ice at full throttle: at 40 s the shaft was at **48 145 RPM** (front wheels
 451.6 and 469.6 rad/s — the faster one making **306 mph** of tread speed, 378 kW
@@ -205,19 +278,23 @@ as a dead-sensor plausibility check (DTC 078).  This matters for the future
 PIM-side limiter: a motor-referenced limiter reads the **spinning** wheels
 during wheelspin, so it engages sooner rather than being escaped.
 
-**Corner-point disagreement (open).**  The 150 N·m / 6500 RPM corner in the map
-comes from secondary web figures; the primary service manual (propulsion p250)
-says **141 N·m and 103 kW, both at 7000 RPM**.  Correcting it is a ~6 % torque
-change and a ~7.7 % base-speed change, which moves every acceleration
-trajectory — deliberately not bundled with the ceiling fix.  See
-[TODO.md](TODO.md).
+**Corner-point disagreement (closed 2026-08-11).**  The map's 150 N·m /
+6500 RPM corner came from secondary web figures and has been replaced by the
+141 N·m / 7000 RPM / 103 kW corner the primary service manual states on
+propulsion p250 — see "The corner point" in section 3 above for the citation,
+the arithmetic that shows the page is self-consistent, and the measured
+before/after.  It is a ~6 % peak-torque change and a ~7.7 % base-speed change,
+so unlike the ceiling fix it does move every acceleration trajectory, and it
+landed before the next VAT baseline recapture rather than after.
 
 What's also still missing:
 - Regen integrated with brake commands (today regen lives only in coast
   torque, which fires whenever throttle is released regardless of brake)
 - Speed-dependent peak — induction motors have a more complex torque
-  envelope at low speeds (limited by inverter current) than a flat 150 N·m
-  curve suggests.  Probably negligible for our use cases.
+  envelope at low speeds (limited by inverter current) than the flat 141 N·m
+  plateau suggests.  p250 states the *rating*, not the curve below it, so this
+  stays @inferred whatever the plateau's height.  Probably negligible for our
+  use cases.
 - The ~80 mph software cap itself.  ev1sim has no top-speed limiter at all;
   the cap belongs on the propulsion-controller side (electricsim PIM), which
   is where the manual puts it.

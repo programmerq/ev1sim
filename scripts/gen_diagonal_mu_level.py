@@ -36,7 +36,14 @@ from pathlib import Path
 WHEELBASE_M    = 2.512
 ROAD_WIDTH_M   = 30.0           # full road width (y-range)
 HALF_LANE_M    = ROAD_WIDTH_M / 2
-RUNWAY_START_X = -80.0
+# The runway has to hold the WHOLE pre-brake half of abs_diagonal_mu.json:
+# the ramped launch to 18 m/s AND a settle off the throttle, both finished
+# before the stripes start.  Measured on this vehicle, the launch alone needs
+# ~63.5 m; the runway used to be 70 m with a 5 m spawn inset, so entry speed
+# landed 1.5 m short of the boundary and the brake fired on the same tick the
+# wait_for_speed barrier released — zero settle.  112.5 m covers the launch
+# plus a ~2.5 s / ~44 m coasting settle before the stripes begin.
+RUNWAY_START_X = -122.5
 RUNWAY_END_X   = -10.0          # diagonal zone starts here
 DIAGONAL_LEN_M = 250.0          # diagonal zone length
 DIAGONAL_END_X = RUNWAY_END_X + DIAGONAL_LEN_M

@@ -208,6 +208,11 @@ public:
     bool                 has_stats()   const { return !m_stats.output_csv.empty(); }
     const ScenarioStats& stats() const { return m_stats; }
     std::size_t          event_count() const { return m_events.size(); }
+    // The parsed event list, in fire order.  Exposed so tests can reason about
+    // the SCHEDULE — in particular where a set_brake sits relative to a
+    // wait_for_speed barrier, which decides whether the car gets any settle
+    // before the brake or is braked on the tick the throttle releases.
+    const std::vector<ScenarioEvent>& events() const { return m_events; }
 
     // Test-only setters.
     void set_events(std::vector<ScenarioEvent> e) { m_events = std::move(e); }

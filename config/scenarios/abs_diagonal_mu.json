@@ -14,13 +14,15 @@
   "//12": "BTCM-on vs BTCM-off, plus yaw drift from the alternating split.",
   "//13": "",
   "//14": "Pair with config/abs_diagonal_mu.json (loads",
-  "//15": "level/flat_diagonal_mu.json: 70 m asphalt runway, then 250 m of",
-  "//16": "alternating-diagonal stripes with 2.512 m period).",
+  "//15": "level/flat_diagonal_mu.json: 112.5 m asphalt runway, then 250 m of",
+  "//16": "alternating-diagonal stripes with 2.512 m period).  The runway is",
+  "//17": "sized in scripts/gen_diagonal_mu_level.py, which generates that",
+  "//18": "level file; edit the constant there and regenerate, never the JSON.",
 
   "name": "abs_diagonal_mu",
   "requires_external_sim": true,
   "driver_mode": "local",
-  "max_time_s": 30.0,
+  "max_time_s": 36.5,
   "events": [
     {"at_time_s":  0.30, "action": "key_on_cycle"},
     {"at_time_s":  0.60, "action": "key_on_cycle"},
@@ -37,8 +39,13 @@
     {"at_time_s":  2.25, "action": "set_throttle",   "value": 1.00},
     {"at_time_s":  5.00, "action": "wait_for_speed", "value": 18.0},
     {"at_time_s":  5.00, "action": "set_throttle",   "value": 0.0},
-    {"at_time_s":  6.00, "action": "set_brake",      "value": 1.0},
-    {"at_time_s": 25.00, "action": "set_brake",      "value": 0.0}
+    {"//": "Settle off the throttle on asphalt, coast onto the stripes, then",
+     "//1": "brake -- the +6.5 s shift on both brake events (same 1.0, same 19 s",
+     "//2": "hold) is what buys that settle.  A 6.00 s brake sat BEHIND the",
+     "//3": "wait_for_speed barrier above, so it fired on the same tick the",
+     "//4": "barrier released: full brake at the instant of throttle release."},
+    {"at_time_s": 12.50, "action": "set_brake",      "value": 1.0},
+    {"at_time_s": 31.50, "action": "set_brake",      "value": 0.0}
   ],
   "stats": {
     "output_csv": "scenario_abs_diagonal_mu.csv",

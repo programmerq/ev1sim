@@ -553,6 +553,19 @@ if(BUILD_TESTS)
              COMMAND bash ${CMAKE_SOURCE_DIR}/tests/check_conductor_discipline.sh)
     set_tests_properties(conductor_discipline PROPERTIES LABELS "guard" TIMEOUT 120)
 
+    # level/flat_diagonal_mu.json is 202 generated patches — a second copy of
+    # scripts/gen_diagonal_mu_level.py's output, and second copies drift. Same
+    # shape as stub_sync above, selftest included, because a comparison that
+    # cannot fail is worse than no comparison at all.
+    add_test(NAME diagonal_mu_level_generated_selftest
+             COMMAND bash ${CMAKE_SOURCE_DIR}/tests/check_diagonal_mu_level_generated.sh
+                     --selftest)
+    set_tests_properties(diagonal_mu_level_generated_selftest
+                         PROPERTIES LABELS "guard" TIMEOUT 120)
+    add_test(NAME diagonal_mu_level_generated
+             COMMAND bash ${CMAKE_SOURCE_DIR}/tests/check_diagonal_mu_level_generated.sh)
+    set_tests_properties(diagonal_mu_level_generated PROPERTIES LABELS "guard" TIMEOUT 120)
+
     # ── ABS integration gate (opt-in; needs a built electricsim) ─────────────
     # The brake-plant ABS behaviour can only be validated with ev1sim AND
     # electricsim running together over the shm bus — the unit suite above
