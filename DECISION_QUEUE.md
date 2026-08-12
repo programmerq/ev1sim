@@ -45,8 +45,13 @@ BTCM-stale dropouts — so none of this is the cause PR #55 fixed.
 
 | case | what it does | runs | spread between runs |
 | --- | --- | --- | --- |
+| `abs_high_mu`, BTCM **off** | same stop, controller out of the loop | 4 | **byte-identical**, across both binaries |
 | `body_rhjb_door_lock` | parked, brakes held | 18 | 2 distinct traces; **7.6e-05 mph** peak speed difference, against a 0.117 mph peak |
-| `abs_high_mu` | 67 mph hard stop, ABS cycling | 2 | **0.51 mph** speed, **1.2 deg** heading, 2.3 rad/s wheel speed — against a 1.9 deg total heading excursion |
+| `abs_high_mu`, BTCM on | 67 mph hard stop, ABS cycling | 4 | **0.51 mph** speed, **1.2 deg** heading, 2.3 rad/s wheel speed — against a 1.9 deg total heading excursion |
+
+The first row bounds where the problem is not: with no controller in the loop
+the plant repeats byte for byte over a 30-second stop, so nothing inside ev1sim
+needs a tolerance. Everything below is about the co-sim.
 
 The two are different mechanisms and only the first is understood in detail:
 
