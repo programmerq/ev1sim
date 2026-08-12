@@ -652,11 +652,19 @@ scenario, only `Map Zero Throttle` differing, and differing only above 8350 RPM
 **The headline of §11 was substantially an artefact of an unsourced curve.**
 The old coast map's torque *rose* with speed, roughly linearly; the fit has
 only a constant and a v² basis, so that ramp loaded onto CdA and produced the
-tidy "2× on both terms" result.  Remove it and the simulator's residual drag
-between 15 and 30 m/s is very nearly **speed-independent** (0.330 / 0.371 /
-0.372 m/s²), which a real aerodynamic term cannot be.  The two-parameter model
-no longer describes the plant: CdA collapses to a quarter of spec and F_rr
-absorbs everything.
+tidy "2× on both terms" result.  Remove it and the speed dependence largely
+goes with it: decel across the top two bins is **flat** (0.3708 → 0.3720 m/s²
+from 22.5 to 27.5 m/s) where it used to climb 22 % (0.3785 → 0.4606).  An
+aerodynamic term cannot be flat over that span, so the fit has nothing left to
+put in CdA — it collapses to a quarter of spec while F_rr absorbs the rest.
+
+Two caveats on that comparison, neither of which changes the direction.  The
+maps are identical below 23.3 m/s, so the 15–20 m/s bin should agree and
+roughly does (0.3208 vs 0.3298); it differs a little because the two runs
+sample that band at different times with different sample counts (106 vs 45).
+And a two-parameter fit over a 20 m/s window was never going to separate the
+terms cleanly — which is rather the point: it separated them *confidently* and
+wrongly for three months.
 
 So the correct reading is not "drag got worse."  Total drag force actually
 *fell* where the map changed (590.1 → 476.5 N at ~27.4 m/s) and is unchanged

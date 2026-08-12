@@ -524,12 +524,18 @@ TEST_CASE("Motor coast: the coast map stays under the manual's regen ceiling",
     constexpr double kKneeRpm = 8350.0;
 
     // (1) Nowhere above the ceiling — sampled through the INTERPOLANT, not just
-    // at the breakpoints.  This is the assertion that has to be dense: 1/omega
-    // is convex, so the chord Chrono actually evaluates between two exact
+    // at the breakpoints.  This is the assertion that has to sweep: 1/omega is
+    // convex, so the chord Chrono actually evaluates between two exact
     // constant-power points sits ABOVE the curve.  A breakpoint-only check
     // passes a map that exceeds the cap by 9 W at 11 437 RPM.
+    //
+    // 10 RPM steps, not 1: the chord excess is a smooth bulge spanning a whole
+    // 1000 RPM segment, so it cannot hide between samples — and the lookup
+    // helper carries a REQUIRE per call, so at 1 RPM this single case
+    // contributed 16 000 assertions and drowned out every other count in the
+    // suite total.  Verified: the 11 437 RPM mutation still goes red at 10.
     double worst_w = 0.0, worst_rpm = 0.0;
-    for (double rpm = 0.0; rpm <= ceiling_rpm; rpm += 1.0) {
+    for (double rpm = 0.0; rpm <= ceiling_rpm; rpm += 10.0) {
         const double p = std::abs(InterpHoldingEndpoints(zero, rpm)) * RpmToRadS(rpm);
         if (p > worst_w) { worst_w = p; worst_rpm = rpm; }
     }
