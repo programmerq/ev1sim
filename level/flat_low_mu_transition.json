@@ -1,0 +1,44 @@
+{
+    "//": "Runway for abs_low_mu_stop.json: asphalt long enough for a normal",
+    "//1": "ramped launch to reach 15 m/s and settle onto it BEFORE the",
+    "//2": "vehicle reaches the packed-snow patch, so the brake event (and the",
+    "//3": "whole slip/ABS story it's testing) happens entirely on the",
+    "//4": "slippery surface -- not mid-launch on asphalt.  Spawn to boundary",
+    "//5": "is 80 m; a ramped launch (see abs_high_mu_stop.json's ramp) reaches",
+    "//6": "15 m/s in ~41 m, leaving ~39 m / ~2.6 s of settled coasting on",
+    "//7": "asphalt before the crossing.",
+
+    "spawn": {
+        "x": -80.0,
+        "y": 0.0,
+        "z": 0.5,
+        "yaw_deg": 0.0
+    },
+    "patches": [
+        {
+            "type": "plane",
+            "surface": "asphalt",
+            "friction": 0.9,
+            "center": [-100.0, 0.0, 0.0],
+            "size":   [200.0, 60.0],
+            "texture": "road.jpg",
+            "texture_scale": 5.0
+        },
+        {
+            "//": "0.20 = hard-packed snow (peak), not polished ice: J.Y. Wong,",
+            "//1": "Theory of Ground Vehicles, 2nd ed. (1993), p. 26 -- tire",
+            "//2": "friction coefficient table gives hard-packed snow 0.20 peak /",
+            "//3": "0.15 sliding, vs. ice 0.10 peak / 0.07 sliding.  The other ABS",
+            "//4": "scenarios' 0.08 ice patches (flat_ice_transition.json,",
+            "//5": "flat_split_mu.json, flat_diagonal_mu.json) are a separate,",
+            "//6": "slicker surface for a different test and are untouched.",
+            "type": "plane",
+            "surface": "snow",
+            "friction": 0.20,
+            "center": [250.0, 0.0, 0.0],
+            "size":   [500.0, 60.0],
+            "texture": "chrono:textures/bluewhite.png",
+            "texture_scale": 10.0
+        }
+    ]
+}

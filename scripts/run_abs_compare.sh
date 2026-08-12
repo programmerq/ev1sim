@@ -7,7 +7,7 @@
 #
 # Where [test] is one of:
 #   high_mu     — straight stop on dry asphalt        (default)
-#   low_mu      — straight stop on uniformly slippery surface (ice)
+#   low_mu      — accelerate on asphalt, brake on packed snow (mu 0.20)
 #   mu_jump     — accelerate on asphalt, brake into ice transition
 #   split_mu    — left wheels on asphalt, right wheels on ice
 #

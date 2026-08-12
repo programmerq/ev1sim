@@ -69,6 +69,62 @@ TEST_CASE("flat_ice_transition level has asphalt then ice patches", "[Level]") {
 }
 
 // -----------------------------------------------------------------------
+TEST_CASE("flat_low_mu_transition level has asphalt then packed-snow patches",
+          "[Level]") {
+    auto j = ReadLevel("level/flat_low_mu_transition.json");
+
+    REQUIRE(j.contains("spawn"));
+    CHECK_THAT(j["spawn"]["y"].get<double>(), WithinAbs(0.0, 1e-9));
+    CHECK_THAT(j["spawn"]["yaw_deg"].get<double>(), WithinAbs(0.0, 1e-9));
+    // Spawn must sit on the asphalt side, with real room to reach entry
+    // speed and settle before the snow crossing (abs_low_mu_stop.json
+    // needs ~41 m to reach 15 m/s; the spawn-to-boundary distance below
+    // gives it ~80 m).
+    const double spawn_x = j["spawn"]["x"].get<double>();
+    CHECK(spawn_x < 0.0);
+    CHECK(spawn_x <= -60.0);
+
+    REQUIRE(j.contains("patches"));
+    const auto& patches = j["patches"];
+    REQUIRE(patches.size() == 2);
+
+    // Asphalt patch comes first, sits on the -X side, high friction.
+    const auto& asphalt = patches[0];
+    CHECK(asphalt["type"]    == "plane");
+    CHECK(asphalt["surface"] == "asphalt");
+    CHECK_THAT(asphalt["friction"].get<double>(), WithinAbs(0.9, 1e-9));
+    CHECK(asphalt["center"][0].get<double>() < 0.0);
+    CHECK(asphalt["size"][0].get<double>() >= 100.0);
+    CHECK(asphalt["size"][1].get<double>() >= 40.0);
+
+    // Snow patch sits on the +X side.  Friction is hard-packed snow
+    // (J.Y. Wong, Theory of Ground Vehicles, 2nd ed. 1993, p. 26: 0.20
+    // peak), not the 0.08 "ice" used by the other transition scenarios
+    // (flat_ice_transition.json, flat_split_mu.json, flat_diagonal_mu.json)
+    // — deliberately a different, less slick surface for a different test.
+    const auto& snow = patches[1];
+    CHECK(snow["type"]    == "plane");
+    CHECK(snow["surface"] == "snow");
+    CHECK_THAT(snow["friction"].get<double>(), WithinAbs(0.20, 1e-9));
+    CHECK(snow["center"][0].get<double>() > 0.0);
+    CHECK(snow["size"][0].get<double>() >= 400.0);
+    CHECK(snow["size"][1].get<double>() >= 40.0);
+
+    // Spawn sits on the asphalt patch (x inside [center-L/2, center+L/2]).
+    const double ax  = asphalt["center"][0].get<double>();
+    const double al  = asphalt["size"][0].get<double>();
+    CHECK(spawn_x >= ax - al / 2.0);
+    CHECK(spawn_x <= ax + al / 2.0);
+
+    // Boundary (x=0) must sit inside the snow patch too, with the asphalt
+    // patch's +X edge reaching it (no gap at the transition).
+    CHECK(ax + al / 2.0 >= 0.0);
+    const double sx = snow["center"][0].get<double>();
+    const double sl = snow["size"][0].get<double>();
+    CHECK(sx - sl / 2.0 <= 0.0);
+}
+
+// -----------------------------------------------------------------------
 TEST_CASE("flat_split_mu level splits friction along Y axis", "[Level]") {
     auto j = ReadLevel("level/flat_split_mu.json");
 
