@@ -102,18 +102,46 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   `config/abs_hard_brake.json` was added because `abs_hard_brake` had no config
   wrapper at all — which is part of why nobody had measured it.
 
-- [ ] **The settle table's barrier-release times are frozen measurements that
-  nothing re-derives.**  `tests/test_scenario.cpp`'s `[Runway]` cases compare
-  each scenario's `set_brake` time against a hard-coded measured release.  That
-  catches a brake moved backwards, but not the plant moving forwards: if a
-  barrier starts releasing at 17.5 s, an 18.0 s brake still clears
-  `15.028 + 2.0` while the real settle has shrunk to 0.5 s, and nothing goes
-  red.  This is exactly the staleness that produced the phantom 12.011 s.
-  `scripts/scenario_runway_report.py` re-derives the numbers and already exits
-  non-zero on a zero settle, but it is manual-run only — CI never invokes it,
-  though the Chrono job already builds the `ev1sim` binary it needs.  Doing it
-  means adding one step to that job and accepting ~7 headless scenario runs of
-  wall time (a few minutes each), or a nightly rather than per-push lane.
+- [x] **The settle table's barrier-release times are frozen measurements that
+  nothing re-derives.**  Done 2026-08-12.  The table moved out of
+  `tests/test_scenario.cpp` into `config/scenarios/measured_settle.json` — one
+  copy, read by the `[Runway]` cases, by the coverage guard, and by
+  `scripts/scenario_runway_report.py`, which now **re-derives**
+  `measured_release_s` and `measured_crossing_s` from a headless run and exits
+  non-zero when a derived value sits more than 0.05 s from the recorded one.
+  `--update` re-records what it measured, so a legitimate plant move is a
+  command rather than a hand-edit; `--selftest` drives the comparison across
+  its own tolerance (0.025 / 0.045 / 0.100 s against 0.050) and is registered
+  as the `runway_table_selftest` ctest, which runs no simulation.
+  Two things found while doing it.  The report **could not be run the way its
+  own docstring documented**: `scripts/scenario_runway_report.py` with no
+  scenario names exited 2 without simulating anything, because `argparse`
+  checks a `nargs="*"` list default against `choices` as a single value.  And
+  the table conflated two different reasons for a `-1` crossing — "no boundary
+  exists" (the three uniform stops) and "the crossing is inside the brake event
+  by design" (`abs_mu_jump`) — which the JSON now distinguishes, so the
+  re-derivation can check the crossings that are entry conditions and skip the
+  one that is the subject of its test.
+  The real re-derivation is seven headless scenario runs, so it is opt-in
+  locally — `make test-runway-table`, or `ctest -L slow` when configured
+  `-DEV1SIM_SLOW_TESTS=ON`.  Timing, measured both places: **3 min 02 s** on a
+  GitHub runner with a warm cache, ~18 min on the developer machine it was
+  first timed on.
+  **In CI it is its own `settle-table` job on the CRON lane**, not the PR path
+  (`if: schedule || workflow_dispatch`, `needs: chrono-smoke` for the warm
+  Chrono cache).  Adding it to a lane that gates every PR is the wrong
+  direction, and sharing a job with a cold Chrono build could exceed a ceiling
+  and turn a correctness check into a flaky one; nobody waits on the cron.  Its
+  own job also means a red names what broke rather than reddening the smoke
+  job.  A failure surfaces as a red scheduled run carrying an `::error::`
+  annotation that names the fix, a job-summary block, and GitHub's default mail
+  for a failed scheduled workflow; `runway.log` is kept as an artifact for 30
+  days.  The script prints a completion marker and the step refuses to pass
+  without it, so a run killed by the timeout cannot leave a log that reads like
+  a clean one — which is not hypothetical: the first dispatch crashed on a
+  relative `--binary` path and the step correctly reported that nothing had
+  been checked rather than a verdict.  `workflow_dispatch` exists so a red cron
+  can be re-checked without waiting three days for the next.
 
 - [x] **The coast map exceeds the manual's stated regeneration bound above
   ~8400 RPM.**  Done 2026-08-12, and the framing above was wrong in the way
@@ -157,19 +185,24 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   (The `Body aerodynamics` follow-up — "trim tire rolling/slip dissipation
   now that drag is no longer lumped into it" — is this same item.)
   **Updated 2026-08-12:** re-fit this against the corrected coast map, not the
-  old one, and fit it over the **whole coast** rather than through
-  `scripts/fit_coastdown.py`, whose 30 s window truncates the two runs at
-  different speeds and produces a spurious result (see §11.1).
+  old one, and run it as `./build/ev1sim --config config/coastdown.json`.
   The pre-2026-08-12 coast curve's torque rose with speed, and a two-parameter
   `F_rr + CdA·v²` fit has nowhere to put a rising term but CdA — so §11's "2×
-  on both terms" was partly an artefact of an unsourced curve.  Fitted properly
-  over `v ≥ 10 m/s`, bounding the coast map moves **CdA 0.880 → 0.571 m²**
-  (2.44× → 1.59× spec) and **F_rr 193.4 → 239.6 N**.  Below the knee, where the
-  two maps are identical, both fits agree to 0.3 N and 0.002 m² — use that
-  sub-knee control as the check that any future fit is measuring the plant and
+  on both terms" was partly an artefact of an unsourced curve.  Bounding the
+  coast map moves **CdA 0.914 → 0.621 m²** (2.54× → 1.72× spec) and **F_rr
+  188.9 → 231.7 N**.  Below the knee, where the two maps are identical, both
+  fits agree to 0.3 N and 0.003 m² — use that sub-knee control
+  (`--v-max 23.28`) as the check that any future fit is measuring the plant and
   not the window.  The excess is reduced, **not** explained away: CdA is still
-  1.6× spec, and an earlier version of this entry wrongly concluded the residual
-  was "not aero-shaped" on the strength of the truncated fit.
+  1.7× spec, and an earlier version of this entry wrongly concluded the residual
+  was "not aero-shaped" on the strength of a time-truncated fit.
+  `scripts/fit_coastdown.py` no longer has that 30 s cap: pass it both CSVs and
+  it fits them over the speed range they share, names it, and refuses when
+  there isn't one.  Its numbers also now carry a spread, and a window that
+  cannot separate F_rr from CdA says so instead of printing a confident value —
+  which is what makes "CdA is 1.7× spec" a claim worth acting on and the
+  retracted "0.09 m², a quarter of spec" one that never was (it was
+  0.088 ± 0.145 m²).
 - [ ] **EMB shoe-force integrator (refinement).**  Current model
   treats the BTCM cmd (-1 / 0 / +1) as a proportional force command.
   More faithful: integrate cmd × motor_speed × dt to track shoe

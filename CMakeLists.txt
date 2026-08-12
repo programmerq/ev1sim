@@ -567,6 +567,134 @@ if(BUILD_TESTS)
              COMMAND bash ${CMAKE_SOURCE_DIR}/tests/check_diagonal_mu_level_generated.sh)
     set_tests_properties(diagonal_mu_level_generated PROPERTIES LABELS "guard" TIMEOUT 120)
 
+    # scripts/fit_coastdown.py reports F_rr and CdA, and until 2026-08-12 it
+    # windowed the fit in TIME, so two runs of different coast length were
+    # compared over different speeds and it reported an 8x CdA collapse that
+    # was the window rather than the plant. The guards that replace that cap
+    # (a common speed window, a refusal when there isn't one, and a spread on
+    # each coefficient) are only worth having if they have been watched FAIL,
+    # so --selftest plants a known drag law, reproduces the artefact on it,
+    # and walks the refusal threshold across its boundary. Pure Python on
+    # synthetic CSVs: no Chrono, no scenario run, milliseconds.
+    add_test(NAME coastdown_fit_selftest
+             COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/fit_coastdown.py --selftest)
+    set_tests_properties(coastdown_fit_selftest PROPERTIES LABELS "guard" TIMEOUT 120)
+
+    # config/scenarios/measured_settle.json records when each ABS scenario's
+    # wait_for_speed barrier actually releases. The [Runway] cases above check
+    # each brake against those numbers, which catches a brake moved backwards
+    # and CANNOT catch the plant moving forwards: a barrier that starts
+    # releasing 1 s later leaves a brake still clearing release + settle on
+    # paper while the real settle has halved. Closing that means re-deriving
+    # the numbers from a run, and only scenario_runway_report.py can do it.
+    #
+    # Two tests, because they cost three orders of magnitude apart:
+    #
+    #   runway_table_selftest  drives the comparison across its own tolerance
+    #                          with a known-good, a near-miss and a miss. Runs
+    #                          NO simulation, so it goes in the ordinary suite
+    #                          and the check is never merely asserted to work.
+    #   runway_table           the real re-derivation: seven headless scenario
+    #                          runs, several minutes each. Opt-in — the default
+    #                          suite must stay seconds, not half an hour.
+    add_test(NAME runway_table_selftest
+             COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/scenario_runway_report.py
+                     --selftest)
+    set_tests_properties(runway_table_selftest PROPERTIES LABELS "guard" TIMEOUT 120)
+
+    # No committed JSON may repeat a key inside one object. Every parser here
+    # keeps the last one, so an earlier duplicate is committed text nothing
+    # reads — and CI's validate-configs job cannot see it, because parsing is
+    # exactly the step that swallows it. This repo's config and data files
+    # carry their rationale in numbered "//" keys, which is a shape that makes
+    # the mistake easy; it happened twice while writing config/coastdown.json.
+    # Selftest included, on the same pattern as the other second-copy guards.
+    add_test(NAME json_no_duplicate_keys_selftest
+             COMMAND bash ${CMAKE_SOURCE_DIR}/tests/check_json_no_duplicate_keys.sh
+                     --selftest)
+    set_tests_properties(json_no_duplicate_keys_selftest
+                         PROPERTIES LABELS "guard" TIMEOUT 120)
+    add_test(NAME json_no_duplicate_keys
+             COMMAND bash ${CMAKE_SOURCE_DIR}/tests/check_json_no_duplicate_keys.sh)
+    set_tests_properties(json_no_duplicate_keys PROPERTIES LABELS "guard" TIMEOUT 120)
+
+    # A path validated in one working directory and used in another. Twice in
+    # one PR (2026-08-12): ev1sim resolving config/default.json against
+    # whatever cwd it had — same command line, milford or rigid_plane, and
+    # nothing saying which — and scenario_runway_report.py accepting
+    # `--binary ./build/ev1sim`, confirming it with is_file() in the caller's
+    # directory, then exec'ing it with cwd set to a temp dir. CI caught the
+    # second; nothing would have caught a third. So: any scripts/*.py function
+    # that passes cwd= to a subprocess must also check is_absolute()/resolve().
+    # A heuristic on purpose — whether an arbitrary path expression is absolute
+    # is not decidable, but whether the author of a cwd-moving function thought
+    # about it is. Selftest included; it flags the real bug when reintroduced.
+    add_test(NAME cwd_relative_paths_selftest
+             COMMAND python3 ${CMAKE_SOURCE_DIR}/tests/check_cwd_relative_paths.py
+                     --selftest)
+    set_tests_properties(cwd_relative_paths_selftest
+                         PROPERTIES LABELS "guard" TIMEOUT 120)
+    add_test(NAME cwd_relative_paths
+             COMMAND python3 ${CMAKE_SOURCE_DIR}/tests/check_cwd_relative_paths.py)
+    set_tests_properties(cwd_relative_paths PROPERTIES LABELS "guard" TIMEOUT 120)
+
+    # A --config path the user NAMED must be fatal when it cannot be opened,
+    # rather than warning and silently running built-in defaults — the silent
+    # substitution that hid the coastdown's run condition for four months.
+    #
+    # THE RULE is Config::NamedConfigFault, pinned by [Config] cases in
+    # tests/test_config.cpp, which every lane compiles including the
+    # Chrono-free one. The script below only adds that the app exits 2 and
+    # prints why, and for that it must exec the built binary.
+    #
+    # That is why it is opt-in rather than gated on Chrono_FOUND, which is what
+    # it was first written as. $<TARGET_FILE:ev1sim> resolved correctly, but
+    # the chrono-smoke job's second build tree builds only the ev1sim_tests
+    # target, so the app was never produced there and ctest ran a path that did
+    # not exist (exit 127). A test whose input a lane does not build has to be
+    # asked for, not assumed.
+    if(Chrono_FOUND)
+        add_custom_target(test-config-guard
+            COMMAND bash ${CMAKE_SOURCE_DIR}/tests/check_named_config_is_fatal.sh
+                    $<TARGET_FILE:ev1sim>
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            USES_TERMINAL
+            COMMENT "Checking that a named --config that cannot be opened is fatal")
+        add_dependencies(test-config-guard ev1sim)
+
+        option(EV1SIM_APP_TESTS
+               "Register CTests that exec the built ev1sim binary (label: app)" OFF)
+        if(EV1SIM_APP_TESTS)
+            add_test(NAME named_config_is_fatal
+                     COMMAND bash
+                             ${CMAKE_SOURCE_DIR}/tests/check_named_config_is_fatal.sh
+                             $<TARGET_FILE:ev1sim>)
+            set_tests_properties(named_config_is_fatal PROPERTIES
+                LABELS "app" TIMEOUT 120)
+        endif()
+    endif()
+
+    if(Chrono_FOUND)
+        add_custom_target(test-runway-table
+            COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/scenario_runway_report.py
+                    --binary $<TARGET_FILE:ev1sim>
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            USES_TERMINAL
+            COMMENT "Re-deriving the measured settle table (7 headless runs)")
+        add_dependencies(test-runway-table ev1sim)
+
+        option(EV1SIM_SLOW_TESTS
+               "Register the settle-table re-derivation as a CTest (label: slow)" OFF)
+        if(EV1SIM_SLOW_TESTS)
+            add_test(NAME runway_table
+                     COMMAND python3
+                             ${CMAKE_SOURCE_DIR}/scripts/scenario_runway_report.py
+                             --binary $<TARGET_FILE:ev1sim>
+                     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+            set_tests_properties(runway_table PROPERTIES LABELS "slow" TIMEOUT 3600)
+        endif()
+    endif()
+
     # ── ABS integration gate (opt-in; needs a built electricsim) ─────────────
     # The brake-plant ABS behaviour can only be validated with ev1sim AND
     # electricsim running together over the shm bus — the unit suite above

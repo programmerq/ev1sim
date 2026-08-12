@@ -166,7 +166,31 @@ struct Config {
     bool start_paused = false;
 
     // Load from JSON file.  Missing keys keep their defaults.
+    //
+    // NOTE an unreadable path is NOT an error here: it warns and returns
+    // built-in defaults.  That is deliberate for the implicit
+    // config/default.json and wrong for a path the user named — see
+    // NamedConfigFault below, which callers consult first.
     static Config LoadFromFile(const std::string& path);
+
+    // Empty when `path` may be loaded; otherwise the reason it must not be,
+    // ready to print.
+    //
+    // `was_named` is whether the user passed --config, and the asymmetry is
+    // the whole point.  An absent implicit default falling back to built-ins
+    // is documented behaviour that has to keep working from any directory.  A
+    // NAMED path that cannot be opened is a silent substitution of a
+    // different experiment, and those hide precisely because the run still
+    // succeeds: on 2026-08-12 the coastdown turned out to load the milford
+    // level from directories where config/default.json resolved (car off the
+    // level, solver to 370 m/s) and a rigid_plane fallback everywhere else (a
+    // perfectly ordinary-looking coastdown) — one command line, either
+    // outcome, only a stderr line to tell them apart.  Four months of numbers
+    // came off a run condition nobody could identify afterwards.
+    //
+    // Lives here rather than in main.cpp so the unit suite pins it in every
+    // build lane, including the ones that never link the app target.
+    static std::string NamedConfigFault(const std::string& path, bool was_named);
 
     // Merge CLI arguments on top of current values.
     // Recognised flags: --config, --vehicle, --surface, --step-size, --realtime,

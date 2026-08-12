@@ -713,44 +713,146 @@ release differs by **0.003 mph**.
 **Read the earlier version of this section with suspicion.** It reported
 F_rr 250.5 → 438.1 N and CdA 0.747 → 0.090 m², and concluded the residual drag
 had become "speed-independent" and therefore "not aero-shaped".  Those figures
-came from `scripts/fit_coastdown.py`, which caps its window at 30 s after
+came from `scripts/fit_coastdown.py`, which capped its window at 30 s after
 release (`MAX_DURATION_AFTER_RELEASE_S`).  The corrected car coasts further, so
-the cap truncates the two runs at different speeds — 18.27 m/s against
-19.25 m/s — and the low-speed bins were being compared over different windows.
-The 8× CdA collapse was substantially that artefact.
+the cap truncated the two runs at different speeds — 18.26 m/s (40.8 mph)
+against 19.24 m/s (43.0 mph) — and the low-speed bins were being compared over
+different windows.  The 8× CdA collapse was substantially that artefact.
 
-Re-fitted over the whole coast with no time cap, `v ≥ 10 m/s`:
+The retraction is reproducible, and was re-run on 2026-08-12 before the tool
+was changed: the pre-change `fit_coastdown.py`, on the two CSVs from
+`config/coastdown.json`, prints F_rr 251.0 → 438.2 N and CdA 0.748 →
+0.091 m².  That is the artefact, to three figures, from a committed run
+condition — so the fix below is aimed at a defect that has been watched
+happening rather than at a description of one.
+
+#### The numbers below are the ones the shipped tool produces (2026-08-12, second pass)
+
+An earlier version of this table read F_rr 193.4 → 239.6 N and CdA 0.880 →
+0.571 m².  **No tool in this repo produces those numbers**, then or now:
+`fit_coastdown.py` still had its 30 s cap when they were written, so it cannot
+have made them, and the uncapped tool makes the numbers below instead.  A
+figure in an audit that the repo cannot reproduce is the defect this section
+exists to fix, one level up.
+
+What the difference is *not* is the plant.  The mean-deceleration table further
+down needs no fit at all, and it reproduces the committed one to four decimals,
+so the CSVs behind both sets of figures are the same data.  What it looks like
+is the estimator: an **unweighted** least-squares fit on the same speed bins
+gives 195.2 → 246.2 N and 0.891 → 0.574 m², within a few percent of the retired
+figures, where the shipped fit weights each bin by its sample count
+(inverse-variance for a bin mean).  Term by term against the retired numbers:
+F_rr +0.93 % (old) and **+2.75 %** (new), CdA +1.25 % and +0.53 % — so three of
+the four are inside 1.3 % and one is not, and "within about 1 %" (an earlier
+wording here) was wrong about F_rr new.  That is an inference from a match, not
+a recovered script — the fit that made them was never committed, which is the
+whole problem.
+
+Both runs come from `config/coastdown.json` — also new on 2026-08-12, because
+until then no config wrapper existed and the run condition behind every number
+in §11 and §11.1 was unrecorded.
+
+**Why "unrecorded" and not just "undocumented".** The invocation these sections
+*did* document (`--headless --start-propulsion-enabled --scenario …`, no
+`--config`) runs one of two different experiments depending on the working
+directory, and says nothing about which:
+
+| run from | what loads | result |
+|---|---|---|
+| a directory where `config/default.json` resolves | the **milford** level | car leaves the level mid-launch; peak **370.78 m/s** (829 mph), 562 samples above 60 m/s, 254 above 200 m/s |
+| anywhere else | `[Config] Cannot open config/default.json — using built-in defaults` → **rigid_plane** | a perfectly ordinary coastdown, peak **30.15 m/s** |
+
+The second is the dangerous one. A fallback that produces garbage gets noticed;
+one that produces *plausible* results does not, and the only signal separating
+them is a single line on stderr that any `> log` redirect hides. That is the
+best available explanation for how these figures went four months without
+anyone being able to say what they were measured on.  `src/main.cpp` now makes
+a **named** `--config` that cannot be opened fatal (exit 2) rather than
+substituting defaults, pinned by the `named_config_is_fatal` test; the implicit
+default still falls back, which is documented behaviour.
+
+Reproduce the numbers in this section with:
+
+```sh
+./build/ev1sim --config config/coastdown.json
+mv scenario_coastdown.csv new.csv
+# put the pre-3.1 coast map back, re-run, and restore it afterwards:
+git show 792d062^:data/vehicle/ev1/powertrain/EV1_EngineSimpleMap.json \
+    > data/vehicle/ev1/powertrain/EV1_EngineSimpleMap.json
+./build/ev1sim --config config/coastdown.json
+mv scenario_coastdown.csv old.csv
+git checkout data/vehicle/ev1/powertrain/EV1_EngineSimpleMap.json
+
+scripts/fit_coastdown.py old.csv new.csv                 # whole coast
+scripts/fit_coastdown.py --v-max 23.28 old.csv new.csv   # the sub-knee control
+```
 
 | fit window | | old coast map | new coast map |
 |---|---|---|---|
-| whole coast | F_rr | 193.4 N (1.93× spec) | 239.6 N (2.40× spec) |
-| whole coast | CdA | 0.880 m² (2.44× spec) | **0.571 m² (1.59× spec)** |
-| below the knee only (v ≤ 23.28 m/s) | F_rr | 167.4 N | 167.7 N |
-| below the knee only | CdA | 1.055 m² | 1.053 m² |
+| whole coast (10.01–29.78 m/s) | F_rr | 188.9 ± 17.6 N (1.89× spec) | 231.7 ± 48.2 N (2.32× spec) |
+| whole coast | CdA | 0.914 ± 0.069 m² (2.54× spec) | **0.621 ± 0.181 m² (1.72× spec)** |
+| below the knee only (v ≤ 23.28 m/s) | F_rr | 165.8 ± 8.8 N | 166.1 ± 9.2 N |
+| below the knee only | CdA | 1.075 ± 0.051 m² | 1.072 ± 0.053 m² |
+
+The ± is the scatter of the speed bins about the fitted line (n−2 degrees of
+freedom) — model error, not sampling error, since each bin averages hundreds of
+samples.  It is what says whether a two-parameter law describes the window at
+all, and it is the number the retracted claim never carried: the CdA that was
+reported as 0.090 m², "a quarter of spec", is **0.088 ± 0.145 m² over the
+window it was fitted on**.  Consistent with no aero term at all, which is not a
+measurement of one.  `fit_coastdown.py` now says so and exits non-zero.
+
+**That verdict depends on a constant, and the constant is `BIN_WIDTH_MPS`.**
+There is no window-*width* term in it — the test is `|CdA| > σ` — but the bin
+width sets how many bins a window is cut into, hence the degrees of freedom
+behind σ.  Over the 19.31–29.78 m/s window that produced the 0.088:
+
+| bin width | bins | dof | CdA | σ | verdict |
+|---|---|---|---|---|---|
+| 2.0 m/s | 6 | 4 | 0.097 | 0.089 | IDENTIFIED |
+| 2.5 m/s | 5 | 3 | 0.097 | 0.098 | not identified |
+| 4.0 m/s | 4 | 2 | 0.086 | 0.099 | not identified |
+| **5.0 m/s (shipped)** | 3 | 1 | 0.086 | 0.144 | **not identified** |
+| 6.0 m/s | 2 | 0 | 0.092 | — | no dof |
+
+Recorded rather than tuned away, because a verdict resting on an undeclared
+constant is the same defect as a fit resting on an undeclared window.  Three
+things about it.  The shipped 5.0 gave the **widest** σ of the widths tried —
+the cautious end, the one that reaches "not identified" soonest — though that
+is observed on these fits, not proved in general.  The substantive reading
+survives the flip: 0.097 ± 0.089 is a ratio of 1.09, no more a measurement of
+an aero term than 0.086 ± 0.144 is.  And **the published coefficients in the
+table above are far steadier than the verdict** — over the whole coast CdA
+holds 0.610–0.621 m² (new map) and 0.908–0.914 m² (old) across those same bin
+widths, so the headline does not turn on this constant even though the verdict
+does.  The tool prints the bin width and the dof beside every number, so the
+knob is visible wherever a number is quoted from.
 
 **The bottom two rows are the control, and they are the reason to believe the
 top two.**  Below the knee the two maps are byte-identical, and the fit agrees
-to 0.3 N and 0.002 m². Mean deceleration per band, computed off the raw CSVs
-with no window cap, says the same thing more directly:
+to 0.3 N and 0.003 m² — well inside the ± above. Mean deceleration per band,
+computed off the raw CSVs with no window cap, says the same thing more
+directly:
 
 | band | old | new |
 |---|---|---|
-| 25–30 m/s | 0.4623 m/s² | **0.3719 m/s²** |
-| 20–25 m/s | 0.3785 m/s² | 0.3709 m/s² |
-| 15–20 m/s | 0.2877 m/s² | 0.2877 m/s² |
-| 10–15 m/s | 0.2072 m/s² | 0.2072 m/s² |
+| 25–30 m/s (56–67 mph) | 0.4610 m/s² | **0.3724 m/s²** |
+| 20–25 m/s (45–56 mph) | 0.3788 m/s² | 0.3713 m/s² |
+| 15–20 m/s (34–45 mph) | 0.2880 m/s² | 0.2881 m/s² |
+| 10–15 m/s (22–34 mph) | 0.2076 m/s² | 0.2076 m/s² |
 
 The two bands below the knee are identical to four decimals; 20–25 straddles it
-and moves 2 %; 25–30 sits wholly above it and moves 20 %.  That is exactly the
-footprint the §3.1 edit should have, and nothing else moved.
+and moves 2 %; 25–30 sits wholly above it and moves 19 %.  That is exactly the
+footprint the §3.1 edit should have, and nothing else moved.  This table needs
+no fit at all, which is why it is the check on the one above.
 
 **What this does and does not say.**  The old coast curve's torque rose with
 speed, and a two-parameter `F_rr + CdA·v²` fit has nowhere to put a rising
 term but CdA — so it was inflating the apparent aero coefficient, and removing
-it cuts CdA by 35 % (2.44× → 1.59× spec).  §11's headline was therefore
+it cuts CdA by 32 % (2.54× → 1.72× spec).  §11's headline was therefore
 *partly* an artefact of an unsourced curve.  It was not wholly one: CdA is
-still 1.6× spec and F_rr is still 2.4×, deceleration still rises with speed
-across the range (0.207 → 0.288 → 0.371 m/s²), and the excess is still there.
+still 1.7× spec and F_rr is still 2.3×, deceleration still rises with speed
+across the range (0.208 → 0.288 → 0.372 m/s²), and the excess is still there.
 An earlier draft of this section claimed the residual was "not aero-shaped" and
 pointed the drag work away from the aero term; that was wrong, and it was wrong
 because it rested on the window-truncated fit.
@@ -761,18 +863,21 @@ above the knee, converging again below 52 mph where the maps agree:
 | s after release | old mph | new mph | Δ mph |
 |---|---|---|---|
 | 0 | 67.3 | 67.3 | +0.00 |
-| 5 | 62.3 | 63.6 | +1.39 |
-| 10 | 57.3 | 59.5 | +2.24 |
+| 5 | 62.2 | 63.6 | +1.39 |
+| 10 | 57.2 | 59.5 | +2.24 |
 | 15 | 52.6 | 55.3 | **+2.64** |
 | 20 | 48.4 | 51.0 | +2.62 |
-| 30 | 40.9 | 43.1 | +2.19 |
-| 50 | 29.7 | 31.1 | +1.45 |
+| 30 | 40.9 | 43.0 | +2.19 |
+| 50 | 29.6 | 31.1 | +1.44 |
+| 70 | 20.6 | 22.0 | +1.38 |
 
 Re-fitting the drag calibration is still open and is still the item in
 `docs/TODO.md` — but it should be fitted against a coast map bounded by the
-print, over the whole coast rather than `fit_coastdown.py`'s 30 s window, and
-with the sub-knee control above as the check that the fit is measuring the
-plant rather than the window.
+print, over the speed range both runs reach rather than a fixed slice of time,
+and with the sub-knee control above as the check that the fit is measuring the
+plant rather than the window.  `fit_coastdown.py` now enforces the first two of
+those: it takes both CSVs at once, states the window it fitted, and refuses
+when there isn't a shared one.
 
 
 ## 12. Calibration attempt — what didn't work
@@ -820,9 +925,17 @@ Pacejka-style with rolling-resistance map), or (c) we accept the 3×
 factor as a known plant limitation and tune the controller around it.
 
 **What the tooling enables for future work**:
-- `config/scenarios/coastdown.json` is the standardized validation run.
-- `scripts/fit_coastdown.py scenario_coastdown.csv` reports F_rr and CdA.
+- `./build/ev1sim --config config/coastdown.json` is the standardized
+  validation run — one command, committed terrain, no external sim.
+- `scripts/fit_coastdown.py scenario_coastdown.csv` reports F_rr and CdA with
+  the speed window it fitted and a spread on each.  Comparing a before and an
+  after means passing **both** CSVs in one invocation, not eyeballing two runs.
 - Both should converge toward 100 N and 0.36 m² as the plant model improves.
+
+The table above is from 2026-04-30 and predates all of that: its numbers were
+measured on an unrecorded terrain with the old time-capped fit, so treat them
+as the shape of the result (which knob moves which way) and not as figures to
+compare against anything measured since.
 
 ## 13. TMeasy full-parameterization migration (2026-04-30)
 

@@ -18,6 +18,9 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <vector>
+
+#include <nlohmann/json.hpp>
 
 #include "Scenario.h"
 #include "ExternalSimConnector.h"
@@ -1072,69 +1075,88 @@ TEST_CASE("Scenario: fail_throttle_input dispatches with fail/restore value",
 // there notices if the brake is moved back on top of the barrier, which would
 // undo the settle while every level assertion stayed green.
 //
-// The barrier release times below are MEASUREMENTS, not reads of the JSON.
-// Re-derive them with scripts/scenario_runway_report.py, which runs each
-// scenario headless with the external sim off and prints the release time
-// alongside the settle it produces.  They move when the powertrain, the tyre,
-// the mass or the throttle ramp moves — the motor corner point correction on
-// the same date shifted every one of them later by ~3 %.
+// The barrier release times are MEASUREMENTS, not reads of the JSON.  They
+// move when the powertrain, the tyre, the mass or the throttle ramp moves —
+// the motor corner point correction on 2026-08-11 shifted every one of them
+// later by ~3 %.
+//
+// THE TABLE IS NO LONGER HERE.  It lives in
+// config/scenarios/measured_settle.json, and this file reads it.  Until
+// 2026-08-12 it was a C++ array, so nothing outside the test binary could see
+// it: re-deriving the numbers meant a human running
+// scripts/scenario_runway_report.py and eyeballing seven pairs, which is not a
+// thing that happens on a schedule, and the array carried a phantom 12.011 s
+// for abs_brake_and_steer that no tool had ever produced.  Moving it to a data
+// file lets that script RE-DERIVE the measured fields from a run and fail on
+// disagreement — the check these cases could never be.  A copy of the table in
+// the script would have been the same defect one file over, so there is
+// exactly one copy and both sides read it.
+//
+// What these cases still do, and it is not nothing: the C++ suite needs no
+// Chrono, no built app and no minutes of scenario runs, so a brake moved back
+// on top of its barrier goes red on the cheap job.  What they cannot see is
+// the plant moving under a table that still says what it always said.  That is
+// scenario_runway_report.py's half, and it is why the two halves exist.
 namespace {
 
 struct BarrierCase {
-    const char* path;
+    std::string path;
     double      measured_release_s;   // when wait_for_speed actually releases
     double      min_settle_s;         // required gap before the brake applies
-    // When the car crosses onto the surface under test, or < 0 if it crosses
-    // UNDER braking (abs_mu_jump, by design — the transition is the subject of
-    // that test, so it belongs inside the brake event).
-    double      measured_crossing_s;
-    double      min_on_surface_s;      // required settle AFTER that crossing
+    // When the car crosses onto the surface under test.  Absent when there is
+    // no boundary (the three uniform-surface stops) or when the crossing
+    // happens UNDER braking by design — abs_mu_jump, where the transition is
+    // the subject of the test and so belongs inside the brake event.
+    bool        has_crossing = false;
+    double      measured_crossing_s = -1.0;
+    double      min_on_surface_s = 0.0;  // required settle AFTER that crossing
 };
 
-// THE measured settle table — one copy, read by both [Runway] cases below.
-// It lives at namespace scope precisely so the coverage guard can derive its
-// expected set from it instead of keeping a second hand-maintained list; a
-// second list would let a scenario be "covered" while nothing had measured it.
-//
-// Measured with scripts/scenario_runway_report.py: the transition four on
-// 2026-08-11, the uniform three on 2026-08-12 when they were fixed.
-//
-// The uniform-surface stops joined on 2026-08-12.  They have no transition to
-// mistime — measured_crossing_s is -1 for all three — but the settle
-// requirement is identical and was identically violated: their brakes sat at
-// 7.0 / 7.0 / 6.0 s behind barriers releasing at 15.028 / 15.028 / 12.053 s,
-// so full brake landed on the tick the throttle dropped.
-//
-// abs_brake_and_steer's release is 12.053, not the 12.011 that docs/TODO.md
-// and the retired [Runway] case both carried.  That figure cited
-// scripts/scenario_runway_report.py — but the report could not run any of
-// these three until 2026-08-12: two needed support for boundary-less levels
-// and abs_hard_brake had no config wrapper at all.  So the tool it cited
-// cannot have produced it.  Re-measured on both sides of this branch's
-// changes: 12.053 either way, so nothing here moved it.
-//
-// KNOWN LIMIT: these release times are frozen measurements.  If the plant
-// moves and a barrier starts releasing later, a brake that still clears
-// release + settle by these numbers can have a much smaller real settle, and
-// nothing here would notice — the same staleness that produced the phantom
-// 12.011.  Closing it means running scenario_runway_report.py in the Chrono CI
-// job; see docs/TODO.md.
-const BarrierCase kSettled[] = {
-    {"config/scenarios/abs_mu_jump.json",         7.718, 2.0,   -1.0, 0.0},
-    {"config/scenarios/abs_split_mu.json",        9.690, 2.0, 12.291, 2.0},
-    {"config/scenarios/abs_diagonal_mu.json",     8.891, 2.0, 11.373, 1.0},
-    {"config/scenarios/abs_low_mu_stop.json",     7.718, 2.0, 10.118, 1.0},
-    {"config/scenarios/abs_high_mu_stop.json",   15.028, 2.0,   -1.0, 0.0},
-    {"config/scenarios/abs_hard_brake.json",     15.028, 2.0,   -1.0, 0.0},
-    {"config/scenarios/abs_brake_and_steer.json", 12.053, 2.0,  -1.0, 0.0},
-};
+// Read the one copy.  A parse failure or an empty table is a hard REQUIRE:
+// a [Runway] case that silently checks nothing is the failure mode this whole
+// area keeps producing.
+std::vector<BarrierCase> LoadSettleTable() {
+    const std::filesystem::path source_root(EV1SIM_SOURCE_DIR);
+    const auto path = source_root / "config" / "scenarios" / "measured_settle.json";
+    std::ifstream f(path);
+    REQUIRE(f.is_open());
+    nlohmann::json j = nlohmann::json::parse(f);
+
+    std::vector<BarrierCase> out;
+    REQUIRE(j.contains("cases"));
+    for (const auto& c : j["cases"]) {
+        BarrierCase bc;
+        bc.path = c.at("scenario").get<std::string>();
+        bc.measured_release_s = c.at("measured_release_s").get<double>();
+        bc.min_settle_s = c.at("min_settle_s").get<double>();
+        // min_on_surface_s and measured_crossing_s are null together or set
+        // together, and both directions are enforced.  Half a pair is how a
+        // recorded crossing quietly stops being checked (min null, crossing
+        // set) or a requirement gets checked against nothing (the reverse).
+        const bool want = !c.at("min_on_surface_s").is_null();
+        const bool have = !c.at("measured_crossing_s").is_null();
+        REQUIRE(want == have);
+        if (want) {
+            bc.has_crossing = true;
+            bc.measured_crossing_s = c.at("measured_crossing_s").get<double>();
+            bc.min_on_surface_s = c.at("min_on_surface_s").get<double>();
+        }
+        out.push_back(std::move(bc));
+    }
+    // Non-vacuous, but the COUNT is not asserted here: the coverage guard
+    // below enumerates config/scenarios/ and fails for every barrier-gated
+    // scenario missing from this table, which is the same check without a
+    // second hard-coded 7 to fall out of date.
+    REQUIRE_FALSE(out.empty());
+    return out;
+}
 
 }  // namespace
 
 TEST_CASE("Scenario: the shipped transition scenarios brake after a settle, "
           "not on the wait_for_speed barrier", "[Scenario][Runway]") {
     const std::filesystem::path source_root(EV1SIM_SOURCE_DIR);
-    const auto& settled = kSettled;
+    const auto settled = LoadSettleTable();
 
     for (const auto& c : settled) {
         INFO("scenario " << c.path);
@@ -1166,7 +1188,7 @@ TEST_CASE("Scenario: the shipped transition scenarios brake after a settle, "
         // abs_split_mu is why both are here: its pre-2026-08-11 brake at 12.0 s
         // cleared the barrier by 2.3 s and would satisfy the check above, while
         // arriving 0.3 s before the car even reached the split.
-        if (c.measured_crossing_s >= 0.0)
+        if (c.has_crossing)
             CHECK(brake_at >= c.measured_crossing_s + c.min_on_surface_s);
     }
 }
@@ -1192,14 +1214,15 @@ TEST_CASE("Scenario: every shipped ABS scenario with a barrier is covered by "
     // abs_*.json that gates a brake behind a wait_for_speed barrier has to be
     // in it, because its at_time_s alone cannot tell you when the brake fires.
     //
-    // DERIVED from kSettled, never re-typed: a second hand-kept list would let
-    // somebody add a name here and satisfy this guard while nothing had
+    // DERIVED from the table, never re-typed: a second hand-kept list would
+    // let somebody add a name here and satisfy this guard while nothing had
     // actually measured that scenario's release — which is the same
     // second-copy failure the 12.011 came from.
+    const auto settled = LoadSettleTable();
     std::set<std::string> covered;
-    for (const auto& c : kSettled)
+    for (const auto& c : settled)
         covered.insert(std::filesystem::path(c.path).filename().string());
-    REQUIRE(covered.size() == std::size(kSettled));
+    REQUIRE(covered.size() == settled.size());
 
     int barrier_scenarios = 0;
     for (const auto& entry : std::filesystem::directory_iterator(dir)) {
@@ -1220,8 +1243,9 @@ TEST_CASE("Scenario: every shipped ABS scenario with a barrier is covered by "
         ++barrier_scenarios;
         INFO("scenario " << name << " gates a brake behind a wait_for_speed "
              "barrier, so its brake time is only meaningful against the "
-             "MEASURED release time — add it to the settled[] table above "
-             "(re-derive with scripts/scenario_runway_report.py)");
+             "MEASURED release time — add it to "
+             "config/scenarios/measured_settle.json (measure it with "
+             "scripts/scenario_runway_report.py --update)");
         CHECK(covered.count(name) == 1);
     }
 
