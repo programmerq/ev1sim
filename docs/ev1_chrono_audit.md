@@ -294,7 +294,16 @@ manual bounds regeneration at ~11 kW.  It declined to act on it, on the
 grounds that the map was mechanical drag and "mechanical drag is not bounded
 by an electrical limit."  That escape hatch does not survive reading p57.
 
-**What the print says.** Three pages, all read off the `.jpg` scans:
+**What the print says.** Read off the `.jpg` scans, not the OCR sidecars —
+which matters more than usual here.  The p57 sidecar drops two fragments from
+the exact sentences this section turns on: "With the PRND in D (drive) and the
+accelerator pedal released, the EV1 will coast freely **like an automatic
+transmission** in neutral" comes out as "With the accelerator pedal released,
+the EV1 will coast freely in neutral", and "shaft speed/direction sensor rate,
+**accelerator position**, and coast down drag" loses the middle term.  The
+first inverts the meaning: off the sidecar the page appears to say the car
+free-wheels in neutral — i.e. that there is no commanded coast regen to bound
+at all.  The printed page says the opposite.  The pages:
 
 - **p57, "COAST DOWN FUNCTION"** (folio `PROPULSION 57`): "With the PRND in D
   (drive) and the accelerator pedal released, the EV1 will coast freely like an
