@@ -114,8 +114,11 @@ either side of this branch's changes: 12.053 both times.
 ### Automated test sweep (headless)
 
 ```sh
-# All four scenarios, BTCM-on vs BTCM-off comparison:
-for t in high_mu low_mu mu_jump split_mu; do
+# All seven scenarios, BTCM-on vs BTCM-off comparison.  hard_brake and
+# diagonal_mu were absent from this loop; hard_brake could not be run at all
+# before 2026-08-12 (no config wrapper, and two name lists in
+# run_abs_compare.sh that did not know it).
+for t in high_mu low_mu mu_jump split_mu diagonal_mu brake_and_steer hard_brake; do
     ./scripts/run_abs_compare.sh "$t"
 done
 
@@ -138,7 +141,7 @@ done
 ### Manual scenario run (with window, for visual debugging)
 
 To watch a scenario with the Chrono visualization open, start the
-controllers in separate terminals.  All four ABS configs are set up
+controllers in separate terminals.  All seven ABS configs are set up
 for `realtime: true` so BTCM has wall-clock time to engage; flip
 `headless: false` in the config you're running to get a window.
 

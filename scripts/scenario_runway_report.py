@@ -160,7 +160,13 @@ def stop_distance(rows, brake_t):
     """Ground distance covered from brake-on to standstill, or None."""
     b = sample_at_time(rows, brake_t)
     if b is None:
-        return None, None
+        return None, None, False
+    # pos_y is per-scenario opt-in in the stats block.  Falling back to 0.0
+    # would silently turn path length into |dx| for any scenario that omits it
+    # -- abs_hard_brake does -- so say which one is being reported instead.
+    # (The two are within 1 cm on a straight stop, which is exactly why a
+    # silent fallback would never be noticed.)
+    has_y = "pos_y" in rows[0]
     prev = None
     dist = 0.0
     for r in rows:
@@ -168,12 +174,12 @@ def stop_distance(rows, brake_t):
             continue
         if prev is not None:
             dx = r["pos_x"] - prev["pos_x"]
-            dy = r.get("pos_y", 0.0) - prev.get("pos_y", 0.0)
+            dy = (r["pos_y"] - prev["pos_y"]) if has_y else 0.0
             dist += (dx * dx + dy * dy) ** 0.5
         if r["speed_mps"] <= 0.1:
-            return dist, r["sim_time_s"] - brake_t
+            return dist, r["sim_time_s"] - brake_t, has_y
         prev = r
-    return None, None
+    return None, None, has_y
 
 
 def report(key: str, binary: Path) -> bool:
@@ -228,15 +234,16 @@ def report(key: str, binary: Path) -> bool:
                   f"the throttle released — a set_brake scheduled behind the "
                   f"wait_for_speed barrier fires on the release tick")
             ok = False
-        d, dt = stop_distance(rows, brake_t)
+        d, dt, has_y = stop_distance(rows, brake_t)
         if d is None:
             print("    never reaches standstill inside max_time_s")
             ok = False
         else:
             ideal = b["speed_mps"] ** 2 / (2.0 * mu_runway * G)
+            kind = "path" if has_y else "along-X (scenario logs no pos_y)"
             print(f"    stop         {d:7.2f} m in {dt:.2f} s   "
                   f"(ideal at mu {mu_runway:g}: {ideal:.2f} m, "
-                  f"ratio {d / ideal:.2f})")
+                  f"ratio {d / ideal:.2f}; {kind})")
         peak_slip = max(abs(r[k]) for r in rows if r["sim_time_s"] <= brake_t
                         for k in ("slip_ratio_fl", "slip_ratio_fr",
                                   "slip_ratio_rl", "slip_ratio_rr")

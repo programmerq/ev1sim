@@ -157,14 +157,19 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   (The `Body aerodynamics` follow-up — "trim tire rolling/slip dissipation
   now that drag is no longer lumped into it" — is this same item.)
   **Updated 2026-08-12:** re-fit this against the corrected coast map, not the
-  old one.  The pre-2026-08-12 coast curve's torque rose with speed, and a
-  two-parameter `F_rr + CdA·v²` fit loaded that ramp onto CdA — which is where
-  the tidy "2× on both terms" reading in audit §11 came from.  With the coast
-  map bounded by the print, measured decel between 15 and 30 m/s is nearly
-  speed-independent (0.330 / 0.371 / 0.372 m/s²), CdA collapses to 0.25× spec
-  and F_rr absorbs everything.  The excess is therefore **not aero-shaped**,
-  which points at suspicions 1 and 2 in §11 (TMeasy slip dissipation, driveline
-  solver) rather than at the aero term.  See §11.1 for the measured comparison.
+  old one, and fit it over the **whole coast** rather than through
+  `scripts/fit_coastdown.py`, whose 30 s window truncates the two runs at
+  different speeds and produces a spurious result (see §11.1).
+  The pre-2026-08-12 coast curve's torque rose with speed, and a two-parameter
+  `F_rr + CdA·v²` fit has nowhere to put a rising term but CdA — so §11's "2×
+  on both terms" was partly an artefact of an unsourced curve.  Fitted properly
+  over `v ≥ 10 m/s`, bounding the coast map moves **CdA 0.880 → 0.571 m²**
+  (2.44× → 1.59× spec) and **F_rr 193.4 → 239.6 N**.  Below the knee, where the
+  two maps are identical, both fits agree to 0.3 N and 0.002 m² — use that
+  sub-knee control as the check that any future fit is measuring the plant and
+  not the window.  The excess is reduced, **not** explained away: CdA is still
+  1.6× spec, and an earlier version of this entry wrongly concluded the residual
+  was "not aero-shaped" on the strength of the truncated fit.
 - [ ] **EMB shoe-force integrator (refinement).**  Current model
   treats the BTCM cmd (-1 / 0 / +1) as a proportional force command.
   More faithful: integrate cmd × motor_speed × dt to track shoe

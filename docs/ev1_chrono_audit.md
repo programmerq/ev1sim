@@ -78,7 +78,7 @@ modern variant.
 | Drive speed ceiling | **16000 RPM** | propulsion disabled above **16000 RPM** (prop p328, DTC 007) | ✅ sourced — but see the labelling note |
 | Map shape, 0-16000 RPM | flat torque to 7000, constant power beyond | textbook 3-phase induction | ✅ corner sourced; the shape either side of it is @inferred |
 | Map shape, 13000-16000 RPM | constant power to 15500, ramp to zero at 16000 | not stated anywhere | ⚠️ @inferred — continuation of the region below, plus a chosen ramp width |
-| Coast torque (zero throttle) | -5 to -37 N·m, zero at 16000 | commanded regen bounded at 365 V × 30 A ≈ **11 kW** (prop p60) | ⚠️ representative drag, not commanded regen — but it passes 11 kW above ~8400 RPM; see TODO.md |
+| Coast torque (zero throttle) | **-5 to -12.5 N·m**, constant power above 8350 RPM, zero at 16000 | zero-pedal negative torque *is* commanded regen (prop p57), bounded at 365 V × 30 A = **10 950 W** (prop p60, p209) | ✅ bounded by the print since 2026-08-12 — see §3.1; the sub-8000 RPM ramp is still ⚠️ @inferred |
 | Motor type | "EngineSimpleMap" (Chrono ICE template) | 3-phase AC induction | ⚠️ template mismatch — works as a static map |
 
 **The corner point (2026-08-11).**  The first three rows of that table used to
@@ -143,12 +143,17 @@ before.
 
 Two things that do **not** move, measured rather than assumed:
 
-* **Coastdown.**  The coast map was not edited and `coastdown` still releases at
-  30 m/s, so speed as a function of time-since-release is the same curve: worst
-  |Δv| = **0.0028 m/s over 74 s of coast** (0.010 % at 27.8 m/s), which is the
-  0.8 mm/s difference in speed at the instant the barrier released, propagated.
-  Only the time to *reach* release speed moves, by the same ~0.36 s.  The drag
-  calibration in section 11 is unaffected.
+* **Coastdown.**  The coast map was not edited *by this corner-point change* and
+  `coastdown` still releases at 30 m/s, so speed as a function of
+  time-since-release is the same curve: worst |Δv| = **0.0028 m/s over 74 s of
+  coast** (0.010 % at 27.8 m/s), which is the 0.8 mm/s difference in speed at
+  the instant the barrier released, propagated.  Only the time to *reach*
+  release speed moves, by the same ~0.36 s.
+  **Superseded 2026-08-12 as to the coast map:** §3.1 did edit it, above
+  8350 RPM, and the clause that used to close this bullet — "the drag
+  calibration in section 11 is unaffected" — no longer holds.  §11.1 has the
+  measured effect (CdA 0.880 → 0.571 m²).  Everything above remains true of the
+  p250 corner-point change this section is about.
 * **The drive ceiling.**  `wheelspin_ceiling_probe` on dry asphalt, 60 s of full
   throttle: terminal speed **43.423 → 43.428 m/s (97.13 → 97.14 mph)**.  Up
   there the envelope is on the shared 15 500 → 16 000 RPM ramp to zero, so where
@@ -321,21 +326,55 @@ example of.  The pages:
   BRAKING"** (folio `PROPULSION 209`), the same sentence verbatim on both:
   "The maximum allowed regeneration is 365 volts DC and 30 amps DC."
 
-p57 settles what `Map Zero Throttle` *is*.  Negative torque commanded as a
-function of shaft speed with the pedal released is exactly a zero-throttle
-torque-vs-RPM table, so the slot holds **commanded regen**, not bearing
-friction and windage — which is what the JSON header had claimed since it was
-written.  Regen is bounded, so the map is bounded.
+p57 is what makes the limit apply.  Negative torque commanded as a function of
+shaft speed with the pedal released is exactly a zero-throttle torque-vs-RPM
+table, so the slot holds **commanded regen** — not the bearing friction and
+windage the JSON header had claimed since it was written.  Regen is bounded, so
+the map is bounded.
+
+Being precise about how far p57 goes: it describes **two** states, a base one
+where the car "will coast freely like an automatic transmission in neutral",
+and the coast-down feature that adds calibrated regen on top — and p204 shows
+coast down is a driver-selectable button, so both are real operating modes.
+p57 does not say which one a single-curve model should represent.  This map is
+the **coast-down-enabled** case, which is a modelling choice, recorded again in
+the conditions table below.  What p57 does settle is that the enabled case is
+commanded regen rather than mechanical drag, and that is the claim §3.1 needs:
+the curve was sitting at 5.5× a limit that its own header had argued did not
+apply to it.
+
+One consequence of the re-labelling that the model does not distinguish:
+Chrono blends the two maps by throttle, so this curve also contributes at
+*partial* throttle, where the real PCM would be summing pedal torque against a
+retard request rather than applying a coast-down calibration.  Unmodelled, and
+unchanged by this correction.
 
 **What the number means, precisely.**  365 × 30 = 10 950 W, and it is
 **pack-side DC**: both pages place the sentence immediately after describing
 the motor and PIM acting "as a generator feeding current back to the battery
 pack for storage."  The map is **shaft** torque, on the other side of the
-inverter.  The manual prints no efficiency, so the exact shaft ceiling
-(10 950 / η) is not sourceable.  Capping the *shaft* at the printed pack number
-is the one choice that cannot violate the print for any η ≤ 1, since
-pack = shaft × η ≤ shaft.  It is the tightest reading the page supports and it
-invents nothing; the true shaft ceiling is ≥ this by an unstated margin.
+inverter.
+
+Capping shaft power at the printed pack number is **sufficient** to guarantee
+the print is never violated: pack power is at most the electromagnetic part of
+shaft power times an efficiency η ≤ 1, and both are at most total shaft power,
+so shaft ≤ 10 950 W ⟹ pack ≤ 10 950 W whatever η is, with no efficiency
+invented.
+
+It is **not necessary**, and an earlier draft of this section called it "the
+one choice that cannot violate the print" and "the tightest reading the page
+supports", which overstates it in two ways.  The print bounds only what reaches
+the pack.  This map is *total* zero-pedal shaft torque, and its mechanical
+component — bearings, windage — never reaches the pack at all, so the page on
+its own permits total shaft power above 10 950 W by however much mechanical
+drag contributes.  Splitting the two needs a drag curve the manual does not
+print, so the cap here binds the sum.
+
+Note which way that errs.  Because the cap binds the sum, the model gives the
+car *less* coast drag than a real one carrying both regen and mechanical
+losses; §11.1 measures exactly that — total drag force fell and the car coasts
+further.  So this is conservative about **regen**, not about drag, and it is
+the reason the correction makes the sim coast further rather than less far.
 
 It is a ceiling, not a continuous rating: no duty cycle, no time limit and no
 temperature condition is printed with it, and p60 uses the same "maximum"
@@ -597,7 +636,9 @@ These probably explain the cruise-hold steady-state error:
    FWD car with a 50/50 spring-rate split given the front-bias mass.
 3. **No drivetrain parasitic torque.**  Real motor + inverter has ~5-15%
    loss across the operating range; currently this only shows up in the
-   coast-torque map (-5 to -25 N·m) which only fires at zero throttle.
+   coast-torque map, which only fires at zero throttle.  (That map read
+   -5 to -25 N·m when this was written; since 2026-08-12 it is -5 to -12.5
+   N·m — see §3.1.)
 
 Plan: add a `ChForce` to the chassis representing constant
 drivetrain-loss torque, calibrated to a coastdown test from real EV1
@@ -637,10 +678,12 @@ component.  Likely culprits, in order of suspicion:
    `ChShaftsDriveline2WD` solver.  The 0.5 + 0.6 kg·m² shaft inertias
    combined with stiff joints may produce numerical viscosity.
 3. **Powertrain coast torque firing during coastdown** — the engine
-   `Map Zero Throttle` (-5 to -25 N·m) fires at zero throttle.  At our
-   coastdown speeds (rpm range 4000-7000), that's a -10 to -15 N·m
-   continuous load.  Through the 10.946:1 reduction that's a tire-side
-   force of ~38 to 56 N — 20-30 % of the excess F_rr we measured.
+   `Map Zero Throttle` fires at zero throttle.  As written this said the map
+   was "-5 to -25 N·m", that coastdown covered "rpm range 4000-7000", and that
+   the load there was "-10 to -15 N·m".  All three were wrong: coastdown spans
+   3586-10 758 RPM and the map reached -16.9 N·m over it.  §11.1 has the
+   corrected figures and the result of actually running the experiment below;
+   the shipped map is now -5 to -12.5 N·m.
 
 **Concrete next experiment when we want to chase this down**: drop the
 zero-throttle map to ~half its current values, re-run coastdown, and
@@ -656,63 +699,81 @@ follow-up task.
 ### 11.1 That experiment has now been run (2026-08-12)
 
 Suspicion 3 above is the one §3.1 acted on, and two of its numbers were wrong
-in the direction that made it look small.  Coastdown runs from 30 m/s down to
-10 m/s, which is **3586–10 758 RPM**, not "4000-7000"; the old map's load over
-that span reached −16.9 N·m, not "−10 to −15".
+in the direction that made it look small.  Coastdown runs from 30 m/s down, so
+it spans **3586–10 758 RPM**, not "4000-7000"; the old map's load over that
+span reached −16.9 N·m, not "−10 to −15".
 
-Re-running the coastdown either side of the §3.1 correction — same binary, same
+The coastdown was re-run either side of the §3.1 correction — same binary, same
 scenario, only `Map Zero Throttle` differing, and differing only above 8350 RPM
-(52.1 mph) — gives this:
+(52.1 mph).  Both runs are identical until throttle release, as they must be:
+the launch is at full throttle, where Chrono's blend `T_zero·(1−throttle) +
+T_full·throttle` multiplies the coast map out entirely.  Measured speed at
+release differs by **0.003 mph**.
 
-| | old coast map | new coast map |
+**Read the earlier version of this section with suspicion.** It reported
+F_rr 250.5 → 438.1 N and CdA 0.747 → 0.090 m², and concluded the residual drag
+had become "speed-independent" and therefore "not aero-shaped".  Those figures
+came from `scripts/fit_coastdown.py`, which caps its window at 30 s after
+release (`MAX_DURATION_AFTER_RELEASE_S`).  The corrected car coasts further, so
+the cap truncates the two runs at different speeds — 18.27 m/s against
+19.25 m/s — and the low-speed bins were being compared over different windows.
+The 8× CdA collapse was substantially that artefact.
+
+Re-fitted over the whole coast with no time cap, `v ≥ 10 m/s`:
+
+| fit window | | old coast map | new coast map |
+|---|---|---|---|
+| whole coast | F_rr | 193.4 N (1.93× spec) | 239.6 N (2.40× spec) |
+| whole coast | CdA | 0.880 m² (2.44× spec) | **0.571 m² (1.59× spec)** |
+| below the knee only (v ≤ 23.28 m/s) | F_rr | 167.4 N | 167.7 N |
+| below the knee only | CdA | 1.055 m² | 1.053 m² |
+
+**The bottom two rows are the control, and they are the reason to believe the
+top two.**  Below the knee the two maps are byte-identical, and the fit agrees
+to 0.3 N and 0.002 m². Mean deceleration per band, computed off the raw CSVs
+with no window cap, says the same thing more directly:
+
+| band | old | new |
 |---|---|---|
-| mean decel, 15–20 m/s | 0.3208 m/s² | 0.3298 m/s² |
-| mean decel, 20–25 m/s | 0.3785 m/s² | 0.3708 m/s² |
-| mean decel, 25–30 m/s | **0.4606 m/s²** | **0.3720 m/s²** |
-| fitted F_rr | 250.5 N (2.5× spec) | 438.1 N (4.4× spec) |
-| fitted CdA | 0.747 m² (2.1× spec) | 0.090 m² (0.25× spec) |
+| 25–30 m/s | 0.4623 m/s² | **0.3719 m/s²** |
+| 20–25 m/s | 0.3785 m/s² | 0.3709 m/s² |
+| 15–20 m/s | 0.2877 m/s² | 0.2877 m/s² |
+| 10–15 m/s | 0.2072 m/s² | 0.2072 m/s² |
 
-**The headline of §11 was substantially an artefact of an unsourced curve.**
-The old coast map's torque *rose* with speed, roughly linearly; the fit has
-only a constant and a v² basis, so that ramp loaded onto CdA and produced the
-tidy "2× on both terms" result.  Remove it and the speed dependence largely
-goes with it: decel across the top two bins is **flat** (0.3708 → 0.3720 m/s²
-from 22.5 to 27.5 m/s) where it used to climb 22 % (0.3785 → 0.4606).  An
-aerodynamic term cannot be flat over that span, so the fit has nothing left to
-put in CdA — it collapses to a quarter of spec while F_rr absorbs the rest.
+The two bands below the knee are identical to four decimals; 20–25 straddles it
+and moves 2 %; 25–30 sits wholly above it and moves 20 %.  That is exactly the
+footprint the §3.1 edit should have, and nothing else moved.
 
-Two caveats on that comparison, neither of which changes the direction.  The
-maps are identical below 23.3 m/s, so the 15–20 m/s bin should agree and
-roughly does (0.3208 vs 0.3298); it differs a little because the two runs
-sample that band at different times with different sample counts (106 vs 45).
-And a two-parameter fit over a 20 m/s window was never going to separate the
-terms cleanly — which is rather the point: it separated them *confidently* and
-wrongly for three months.
+**What this does and does not say.**  The old coast curve's torque rose with
+speed, and a two-parameter `F_rr + CdA·v²` fit has nowhere to put a rising
+term but CdA — so it was inflating the apparent aero coefficient, and removing
+it cuts CdA by 35 % (2.44× → 1.59× spec).  §11's headline was therefore
+*partly* an artefact of an unsourced curve.  It was not wholly one: CdA is
+still 1.6× spec and F_rr is still 2.4×, deceleration still rises with speed
+across the range (0.207 → 0.288 → 0.371 m/s²), and the excess is still there.
+An earlier draft of this section claimed the residual was "not aero-shaped" and
+pointed the drag work away from the aero term; that was wrong, and it was wrong
+because it rested on the window-truncated fit.
 
-So the correct reading is not "drag got worse."  Total drag force actually
-*fell* where the map changed (590.1 → 476.5 N at ~27.4 m/s) and is unchanged
-below the knee.  What changed is that the decomposition stopped being
-believable, and that is the more useful state to be in: the excess is now
-visibly **not** aero-shaped, which points at the TMeasy slip dissipation and
-the driveline solver — suspicions 1 and 2 — rather than leaving a plausible
-CdA number sitting there absorbing the error.
-
-Coasting from 30 m/s (67.4 mph), the car now holds more speed for as long as it
-is above the knee, peaking at **+2.65 mph at 15 s after release** (52.5 →
-55.1 mph) and converging again below 52 mph where the two maps are identical:
+Coasting from 30.07 m/s (67.3 mph), the corrected car holds more speed while
+above the knee, converging again below 52 mph where the maps agree:
 
 | s after release | old mph | new mph | Δ mph |
 |---|---|---|---|
-| 0 | 67.4 | 67.5 | +0.05 |
-| 5 | 62.0 | 63.5 | +1.43 |
-| 10 | 57.1 | 59.3 | +2.26 |
-| 15 | 52.5 | 55.1 | **+2.65** |
-| 30 | 40.7 | 42.9 | +2.18 |
-| 50 | 29.6 | 31.0 | +1.44 |
+| 0 | 67.3 | 67.3 | +0.00 |
+| 5 | 62.3 | 63.6 | +1.39 |
+| 10 | 57.3 | 59.5 | +2.24 |
+| 15 | 52.6 | 55.3 | **+2.64** |
+| 20 | 48.4 | 51.0 | +2.62 |
+| 30 | 40.9 | 43.1 | +2.19 |
+| 50 | 29.7 | 31.1 | +1.45 |
 
-Re-fitting the drag calibration is still open, and is still the item in
-`docs/TODO.md` — but it should now be fitted against a coast map that is
-bounded by the print, not against one that was quietly supplying the v² term.
+Re-fitting the drag calibration is still open and is still the item in
+`docs/TODO.md` — but it should be fitted against a coast map bounded by the
+print, over the whole coast rather than `fit_coastdown.py`'s 30 s window, and
+with the sub-knee control above as the check that the fit is measuring the
+plant rather than the window.
+
 
 ## 12. Calibration attempt — what didn't work
 

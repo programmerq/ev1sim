@@ -523,25 +523,56 @@ TEST_CASE("Motor coast: the coast map stays under the manual's regen ceiling",
     // the coastdown-fitted drag ramp; above it, constant power.
     constexpr double kKneeRpm = 8350.0;
 
-    // (1) Nowhere above the ceiling — sampled through the INTERPOLANT, not just
-    // at the breakpoints.  This is the assertion that has to sweep: 1/omega is
-    // convex, so the chord Chrono actually evaluates between two exact
-    // constant-power points sits ABOVE the curve.  A breakpoint-only check
-    // passes a map that exceeds the cap by 9 W at 11 437 RPM.
+    // (1) Nowhere above the ceiling — EXACTLY, not by sampling.  This has to
+    // see between the breakpoints: 1/omega is convex, so the chord Chrono
+    // evaluates between two exact constant-power points sits ABOVE the curve,
+    // and a breakpoint-only check passes a map exceeding the cap by 9 W at
+    // 11 437 RPM.
     //
-    // 10 RPM steps, not 1: the chord excess is a smooth bulge spanning a whole
-    // 1000 RPM segment, so it cannot hide between samples — and the lookup
-    // helper carries a REQUIRE per call, so at 1 RPM this single case
-    // contributed 16 000 assertions and drowned out every other count in the
-    // suite total.  Verified: the 11 437 RPM mutation still goes red at 10.
+    // Sampling is the wrong instrument for that and this case used to use it.
+    // At a 10 RPM step a -40 N.m spike between 8101 and 8109 RPM — 34 kW, 3.1x
+    // the ceiling, the exact magnitude of the defect this file exists to
+    // catch — sat entirely between two samples and the case passed.  Any
+    // fixed step has that hole; a finer one just needs a narrower spike.
+    //
+    // So: closed form.  T is linear on each segment, so q(n) = T(n)*n is a
+    // quadratic, and |q| attains its maximum on a closed interval at an
+    // endpoint or at the vertex.  Checking those three points per segment is
+    // exact for every n in the domain, at ~20 evaluations for the whole map.
     double worst_w = 0.0, worst_rpm = 0.0;
-    for (double rpm = 0.0; rpm <= ceiling_rpm; rpm += 10.0) {
-        const double p = std::abs(InterpHoldingEndpoints(zero, rpm)) * RpmToRadS(rpm);
-        if (p > worst_w) { worst_w = p; worst_rpm = rpm; }
+    for (auto it = zero.begin(); std::next(it) != zero.end(); ++it) {
+        const auto [n1, t1] = *it;
+        const auto [n2, t2] = *std::next(it);
+        const double m = (n2 == n1) ? 0.0 : (t2 - t1) / (n2 - n1);
+        const auto q = [&](double n) { return (t1 + m * (n - n1)) * n; };
+
+        double cand[3] = {n1, n2, n1};
+        int ncand = 2;
+        if (m != 0.0) {
+            const double vertex = -(t1 - m * n1) / (2.0 * m);
+            if (vertex > n1 && vertex < n2) cand[ncand++] = vertex;
+        }
+        for (int i = 0; i < ncand; ++i) {
+            const double p = std::abs(q(cand[i])) * (2.0 * kPi / 60.0);
+            if (p > worst_w) { worst_w = p; worst_rpm = cand[i]; }
+        }
     }
     INFO("peak coast power " << worst_w << " W at " << worst_rpm
          << " RPM, ceiling " << kRegenCapW << " W");
     CHECK(worst_w <= kRegenCapW);
+
+    // Smoke-test the algebra against a sweep: the closed form claims to be an
+    // upper bound over the whole domain, so it must be >= every sampled point.
+    // This does not re-establish the guarantee (a sweep cannot — that is the
+    // whole point above); it only catches the closed form being wrong in the
+    // direction that silently under-reports.  20 RPM keeps the helper's
+    // per-call REQUIRE from adding 16 000 assertions to the suite total.
+    double swept = 0.0;
+    for (double rpm = 0.0; rpm <= ceiling_rpm; rpm += 20.0)
+        swept = std::max(swept,
+                         std::abs(InterpHoldingEndpoints(zero, rpm)) * RpmToRadS(rpm));
+    INFO("closed form " << worst_w << " W vs 20 RPM sweep " << swept << " W");
+    CHECK(worst_w >= swept - 1e-6);
 
     // (2) ...and the ceiling is actually BINDING, not vacuously satisfied.
     // Without this, an all-zero coast map — or the -5 N.m ramp with its top
