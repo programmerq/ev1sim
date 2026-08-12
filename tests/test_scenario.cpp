@@ -1048,3 +1048,126 @@ TEST_CASE("Scenario: fail_throttle_input dispatches with fail/restore value",
     CHECK(hooks.restore_throttle == 1);
 }
 
+
+// ---------------------------------------------------------------------------
+// The brake has to fire AFTER the car has settled, not on the barrier tick.
+// ---------------------------------------------------------------------------
+// wait_for_speed is a barrier (src/Scenario.cpp:106-120): it does not advance
+// the event index, so every later event whose at_time_s has already passed
+// fires on the tick the barrier releases.  A set_brake scheduled at 6.0 s
+// behind a barrier that releases at 7.7 s therefore does not brake at 6.0 s —
+// it applies full brake at the exact instant the throttle drops to zero, with
+// the drivetrain still loaded and launch slip still in the tyres.  That is the
+// difference between testing a brake event and testing a brake-after-a-launch,
+// and it is invisible in the scenario file: 6.0 < 7.7 is the whole defect.
+//
+// This is the half of the 2026-08-11 runway fix that geometry assertions
+// cannot see.  tests/test_level_file.cpp pins how far the runway is; nothing
+// there notices if the brake is moved back on top of the barrier, which would
+// undo the settle while every level assertion stayed green.
+//
+// The barrier release times below are MEASUREMENTS, not reads of the JSON.
+// Re-derive them with scripts/scenario_runway_report.py, which runs each
+// scenario headless with the external sim off and prints the release time
+// alongside the settle it produces.  They move when the powertrain, the tyre,
+// the mass or the throttle ramp moves — the motor corner point correction on
+// the same date shifted every one of them later by ~3 %.
+namespace {
+
+struct BarrierCase {
+    const char* path;
+    double      measured_release_s;   // when wait_for_speed actually releases
+    double      min_settle_s;         // required gap before the brake applies
+    // When the car crosses onto the surface under test, or < 0 if it crosses
+    // UNDER braking (abs_mu_jump, by design — the transition is the subject of
+    // that test, so it belongs inside the brake event).
+    double      measured_crossing_s;
+    double      min_on_surface_s;      // required settle AFTER that crossing
+};
+
+}  // namespace
+
+TEST_CASE("Scenario: the shipped transition scenarios brake after a settle, "
+          "not on the wait_for_speed barrier", "[Scenario][Runway]") {
+    const std::filesystem::path source_root(EV1SIM_SOURCE_DIR);
+
+    // Measured 2026-08-11 with scripts/scenario_runway_report.py.
+    const BarrierCase settled[] = {
+        {"config/scenarios/abs_mu_jump.json",     7.718, 2.0,   -1.0, 0.0},
+        {"config/scenarios/abs_split_mu.json",    9.690, 2.0, 12.291, 2.0},
+        {"config/scenarios/abs_diagonal_mu.json", 8.891, 2.0, 11.373, 1.0},
+        {"config/scenarios/abs_low_mu_stop.json", 7.718, 2.0, 10.118, 1.0},
+    };
+
+    for (const auto& c : settled) {
+        INFO("scenario " << c.path);
+        auto loaded = ev1sim::Scenario::LoadFromFile((source_root / c.path).string());
+        REQUIRE(loaded.has_value());
+
+        double barrier_at = -1.0;
+        double brake_at   = -1.0;
+        for (const auto& e : loaded->events()) {
+            if (e.action == "wait_for_speed" && barrier_at < 0.0)
+                barrier_at = e.at_time_s;
+            if (e.action == "set_brake" && e.value > 0.0 && brake_at < 0.0)
+                brake_at = e.at_time_s;
+        }
+        // A barrier must exist, or "measured release time" means nothing.
+        REQUIRE(barrier_at >= 0.0);
+        REQUIRE(brake_at   >= 0.0);
+
+        // The brake must be scheduled past the barrier's real release, by the
+        // settle.  Scheduling it before the release is the defect: it fires on
+        // the release tick however large its at_time_s looks next to the
+        // barrier's own at_time_s.
+        CHECK(brake_at >= c.measured_release_s + c.min_settle_s);
+
+        // ...and for the three that cross onto their surface BEFORE braking,
+        // the brake must also clear the crossing, or the car is still finding
+        // the new surface when the pedal goes down.  Settling before the
+        // crossing and settling after it are different requirements, and
+        // abs_split_mu is why both are here: its pre-2026-08-11 brake at 12.0 s
+        // cleared the barrier by 2.3 s and would satisfy the check above, while
+        // arriving 0.3 s before the car even reached the split.
+        if (c.measured_crossing_s >= 0.0)
+            CHECK(brake_at >= c.measured_crossing_s + c.min_on_surface_s);
+    }
+}
+
+TEST_CASE("Scenario: the uniform-surface stops still brake on the barrier tick "
+          "(known, recorded)", "[Scenario][Runway]") {
+    const std::filesystem::path source_root(EV1SIM_SOURCE_DIR);
+
+    // These three launch and brake on ONE surface, so no mixed-grip transition
+    // is mistimed and the brake event is on the intended surface by
+    // construction — but their brakes still sit behind the barrier and fire on
+    // its release tick, with zero settle.  Same defect class as the four above,
+    // different blast radius, and fixing them moves three more baselines; it is
+    // recorded in docs/TODO.md rather than bundled here.
+    //
+    // Asserted rather than left silent, and asserted in the direction that
+    // FAILS when somebody fixes one: if you retime a brake here, this case goes
+    // red and tells you to move that row into the settled table above.
+    const BarrierCase unsettled[] = {
+        {"config/scenarios/abs_high_mu_stop.json",    15.028, 0.0, -1.0, 0.0},
+        {"config/scenarios/abs_hard_brake.json",      15.028, 0.0, -1.0, 0.0},
+        {"config/scenarios/abs_brake_and_steer.json", 12.011, 0.0, -1.0, 0.0},
+    };
+
+    for (const auto& c : unsettled) {
+        INFO("scenario " << c.path);
+        auto loaded = ev1sim::Scenario::LoadFromFile((source_root / c.path).string());
+        REQUIRE(loaded.has_value());
+
+        double brake_at = -1.0;
+        bool   has_barrier = false;
+        for (const auto& e : loaded->events()) {
+            if (e.action == "wait_for_speed") has_barrier = true;
+            if (e.action == "set_brake" && e.value > 0.0 && brake_at < 0.0)
+                brake_at = e.at_time_s;
+        }
+        REQUIRE(has_barrier);
+        REQUIRE(brake_at >= 0.0);
+        CHECK(brake_at < c.measured_release_s);
+    }
+}

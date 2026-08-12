@@ -69,6 +69,13 @@
 // secondary web figures; that is what these assertions now exist to keep from
 // coming back.
 //
+// Precisely ONE full-throttle point is sourced — 7000 RPM, 141.0 N·m.  The
+// plateau below it and the hyperbola above it are the textbook induction-drive
+// shape anchored on that point, not printed curves, and the map file labels
+// them @inferred.  The sweeps below therefore assert that the shipped map is
+// the shape this repo CHOSE, consistently; only the corner assertions carry the
+// manual's authority.
+//
 // Chrono-free by design (Chrono is not in CI): this reads the same JSON the
 // Chrono vehicle loads and re-implements the two lookup rules quoted above.
 
@@ -227,7 +234,7 @@ TEST_CASE("Motor ceiling: BOTH maps end at zero torque and the clamp lands there
     // ceiling — it is a constant torque applied to infinity.  That applies to
     // the COAST map just as much: a residual -40 N·m held forever is ~197 kW
     // of phantom regen at the ~48 000 RPM the pre-fix model actually reached,
-    // from a drive rated ~102 kW.  Above the ceiling propulsion is disabled,
+    // from a drive rated 103 kW.  Above the ceiling propulsion is disabled,
     // so neither sign of torque survives.
     CHECK_THAT(full.rbegin()->second, WithinAbs(0.0, 1e-9));
     CHECK_THAT(zero.rbegin()->second, WithinAbs(0.0, 1e-9));

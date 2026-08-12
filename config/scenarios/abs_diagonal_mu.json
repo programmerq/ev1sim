@@ -22,7 +22,7 @@
   "name": "abs_diagonal_mu",
   "requires_external_sim": true,
   "driver_mode": "local",
-  "max_time_s": 36.0,
+  "max_time_s": 36.5,
   "events": [
     {"at_time_s":  0.30, "action": "key_on_cycle"},
     {"at_time_s":  0.60, "action": "key_on_cycle"},

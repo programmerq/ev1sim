@@ -77,6 +77,40 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   the speed ceiling.  Both halves are one reclassification pass on that one
   header; recorded here rather than reached across repos.
 
+## ABS scenarios
+
+- [ ] **The three uniform-surface stops brake on the barrier tick.**
+  `abs_high_mu_stop`, `abs_hard_brake` and `abs_brake_and_steer` schedule
+  `set_brake` at 7.0 / 7.0 / 6.0 s, all of which sit **behind** their
+  `wait_for_speed` barrier — which releases at 15.03 / 15.03 / 12.01 s
+  (measured, `scripts/scenario_runway_report.py`).  A barrier does not advance
+  the event index (`src/Scenario.cpp:106-120`), so full brake is applied on the
+  exact tick the throttle drops to zero: no settle, drivetrain still loaded,
+  launch slip still in the tyres.  Same defect class the 2026-08-11 runway work
+  fixed for the four transition scenarios.
+  **Why it was not bundled there:** these three launch and brake on ONE
+  surface, so nothing is mistimed relative to a transition and the brake event
+  is on the intended surface by construction — and retiming them moves three
+  more headline stop distances on top of the three that change already.
+  Doing it means: move each brake pair past its measured release by ~2-3 s,
+  extend `max_time_s` to match, move the row from the "unsettled" table to the
+  "settled" table in `tests/test_scenario.cpp`'s `[Runway]` cases (which fail
+  today if you retime without doing so), and re-measure the stop distances.
+
+- [ ] **The coast map exceeds the manual's stated regeneration bound above
+  ~8400 RPM.**  `EV1_EngineSimpleMap.json`'s Map Zero Throttle is
+  representative drag (bearing friction + windage), fitted by the 2026-04-30
+  coastdown calibration and never sourced.  @source:manual propulsion p60,
+  "REGENERATION": the PIM function "allows the drive motor to supply negative
+  shaft torque", and "The maximum allowed regeneration is 365 volts DC and 30
+  amps DC" — ~11 kW.  The shipped coast curve passes 11 kW at roughly 8400 RPM
+  (~52 mph) and reaches ~34 kW at 13 000 RPM.  Mechanical drag is not bounded
+  by an electrical limit, so this is not a straight contradiction — but ~34 kW
+  of bearing-and-windage drag is not credible either, and the file's own header
+  says engine coast is < 10 % of total drag at typical speeds.  Re-cutting the
+  curve moves the coastdown fit, so it belongs with the drag calibration item
+  below rather than with a torque-map correction.
+
 ## ABS scenario integration artefacts (need a built electricsim)
 
 - [ ] **Re-run the BTCM-on/off sweep and regenerate the engineering report.**

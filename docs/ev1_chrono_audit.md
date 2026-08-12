@@ -73,12 +73,12 @@ modern variant.
 
 | Parameter | Current | Real EV1 (Gen 2 AC induction) | Status |
 |---|---|---|---|
-| Peak torque | **141 N·m flat 0-7000 RPM** | **141 N·m at 7000 RPM** (prop p250) | ✅ sourced |
+| Peak torque | **141 N·m at 7000 RPM**, held flat below it | **141 N·m at 7000 RPM** (prop p250) | ✅ the rating is sourced; the flat plateau below it is ⚠️ @inferred |
 | Peak power | **103.4 kW at 7000 RPM** | **103 kW (138 Hp) at 7000 RPM** (prop p250) | ✅ sourced — the map's value is the stated torque × the stated speed |
 | Drive speed ceiling | **16000 RPM** | propulsion disabled above **16000 RPM** (prop p328, DTC 007) | ✅ sourced — but see the labelling note |
 | Map shape, 0-16000 RPM | flat torque to 7000, constant power beyond | textbook 3-phase induction | ✅ corner sourced; the shape either side of it is @inferred |
 | Map shape, 13000-16000 RPM | constant power to 15500, ramp to zero at 16000 | not stated anywhere | ⚠️ @inferred — continuation of the region below, plus a chosen ramp width |
-| Coast torque (zero throttle) | -5 to -37 N·m, zero at 16000 | EV1 used aggressive regen (~25 kW) | ⚠️  representative; not commanded regen |
+| Coast torque (zero throttle) | -5 to -37 N·m, zero at 16000 | commanded regen bounded at 365 V × 30 A ≈ **11 kW** (prop p60) | ⚠️ representative drag, not commanded regen — but it passes 11 kW above ~8400 RPM; see TODO.md |
 | Motor type | "EngineSimpleMap" (Chrono ICE template) | 3-phase AC induction | ⚠️ template mismatch — works as a static map |
 
 **The corner point (2026-08-11).**  The first three rows of that table used to
@@ -101,11 +101,18 @@ page is arithmetically self-consistent about it:
 | 104 ft−lb | 141 ÷ 1.35582 = **104.0 ft−lb** ✓ |
 
 Peak torque and peak power coinciding at one speed *is* the corner of an
-induction drive's envelope — torque-limited below, power-limited above — so
-p250 does not merely disagree with the old corner on a number, it states the
-whole envelope shape.  The map now carries 141.0 N·m at every full-throttle
-point at or below 7000 RPM and 141 × 7000 ÷ RPM above it.  Peak torque falls
-6.0 %; base speed rises 7.7 %.
+induction drive's envelope — torque-limited below, power-limited above.  The
+map now carries 141.0 N·m at every full-throttle point at or below 7000 RPM and
+141 × 7000 ÷ RPM above it.  Peak torque falls 6.0 %; base speed rises 7.7 %.
+
+**Exactly one full-throttle point in that table is sourced: 7000 RPM, 141.0
+N·m.**  p250 prints a *rating*, not a curve — it says nothing about torque at
+1000 or 5000 RPM.  What the coincidence of the two ratings buys is the *shape*
+to anchor on that point, and the shape is the textbook one: a real induction
+machine rolls off near zero speed against its inverter current limit, and its
+field-weakening region is not an exact hyperbola.  Neither is modelled, and
+`EV1_EngineSimpleMap.json` labels the plateau and the hyperbola `@inferred`
+accordingly.
 
 What that did to the drive, by road speed (10.946:1, 0.2915 m tyre):
 

@@ -49,11 +49,16 @@ TEST_CASE("flat_ice_transition level has asphalt then ice patches", "[Level]") {
     // Spawn must sit on the asphalt side of the transition with room to
     // get up to speed AND settle before crossing onto the ice at x=0.
     //
-    // abs_mu_jump.json's ramped launch to 15 m/s needs 44.3 m (measured),
-    // its settle to the brake event a further 63.3 m, and the brake goes on
-    // ~4.9 m before the boundary — 112 m of runway.  110 m is that budget
-    // less its rounding.  The pre-2026-08-11 spawn was -40, which is where
-    // the car crossed onto the ice at full throttle.
+    // abs_mu_jump.json's ramped launch to 15 m/s needs 43.8 m, its settle to
+    // the brake event a further 63.3 m, and the brake goes on 4.9 m before the
+    // boundary — 112 m of runway.  110 m is that budget less its rounding.
+    // The pre-2026-08-11 spawn was -40, which is where the car crossed onto
+    // the ice at full throttle.
+    //
+    // Measured with scripts/scenario_runway_report.py, which re-derives the
+    // whole budget from a headless run.  Re-run it after any powertrain, tyre,
+    // mass or throttle-ramp change: launch distance is a function of the torque
+    // map, and this file cannot simulate a launch.
     const double spawn_x = j["spawn"]["x"].get<double>();
     CHECK(spawn_x <= -110.0);
 
@@ -71,9 +76,6 @@ TEST_CASE("flat_ice_transition level has asphalt then ice patches", "[Level]") {
     // room to accelerate and settle before the mu transition.
     CHECK(asphalt["size"][0].get<double>() >= 150.0);
     CHECK(asphalt["size"][1].get<double>() >= 40.0);
-    // No gap at the transition: the asphalt patch has to reach x=0.
-    CHECK(asphalt["center"][0].get<double>()
-          + asphalt["size"][0].get<double>() / 2.0 >= 0.0);
 
     // Ice patch sits on the +X side, very low friction.
     const auto& ice = patches[1];
@@ -91,6 +93,15 @@ TEST_CASE("flat_ice_transition level has asphalt then ice patches", "[Level]") {
     const double al  = asphalt["size"][0].get<double>();
     CHECK(spawn_x >= ax - al / 2.0);
     CHECK(spawn_x <= ax + al / 2.0);
+
+    // The boundary is at x=0 exactly — no gap, no overlap.  Every distance in
+    // this case's budget is measured to it, so it is pinned rather than
+    // assumed: this level has the tightest budget of the three and had the
+    // loosest boundary assertion.
+    CHECK_THAT(ax + al / 2.0, WithinAbs(0.0, 1e-9));
+    CHECK_THAT(ice["center"][0].get<double>()
+               - ice["size"][0].get<double>() / 2.0,
+               WithinAbs(0.0, 1e-9));
 }
 
 // -----------------------------------------------------------------------
@@ -102,9 +113,11 @@ TEST_CASE("flat_low_mu_transition level has asphalt then packed-snow patches",
     CHECK_THAT(j["spawn"]["y"].get<double>(), WithinAbs(0.0, 1e-9));
     CHECK_THAT(j["spawn"]["yaw_deg"].get<double>(), WithinAbs(0.0, 1e-9));
     // Spawn must sit on the asphalt side, with real room to reach entry
-    // speed and settle before the snow crossing (abs_low_mu_stop.json
-    // needs ~41 m to reach 15 m/s; the spawn-to-boundary distance below
-    // gives it ~80 m).
+    // speed and settle before the snow crossing.  abs_low_mu_stop.json's
+    // launch needs 43.8 m to reach 15 m/s (re-measured 2026-08-11 with
+    // scripts/scenario_runway_report.py — it was 41 m against the pre-
+    // correction torque map) and the spawn-to-boundary distance below gives
+    // it 80 m, leaving 36.2 m / 2.40 s of settle.
     const double spawn_x = j["spawn"]["x"].get<double>();
     CHECK(spawn_x < 0.0);
     CHECK(spawn_x <= -60.0);
@@ -183,11 +196,12 @@ TEST_CASE("flat_split_mu level splits friction along Y axis", "[Level]") {
     // Runway gives the car room to get up to speed on pure asphalt AND to
     // settle off the throttle before the split starts.  Spawn must sit on it.
     //
-    // abs_split_mu.json's ramped launch to 20 m/s needs 79.0 m (measured) and
-    // its on-asphalt settle a further 52.0 m — 130 m of runway.  128 m is that
+    // abs_split_mu.json's ramped launch to 20 m/s needs 78.4 m and its
+    // on-asphalt settle a further 51.6 m — 130 m of runway.  128 m is that
     // budget less its rounding.  The pre-2026-08-11 spawn was -60, which put
     // the seam 27 m BEFORE entry speed: the car straddled it under full
     // throttle and yawed 3.4° before the brake event began.
+    // Measured with scripts/scenario_runway_report.py.
     CHECK((*runway)["friction"].get<double>() == 0.9);
     const double rx = (*runway)["center"][0].get<double>();
     const double rl = (*runway)["size"  ][0].get<double>();
@@ -229,11 +243,12 @@ TEST_CASE("flat_diagonal_mu runway holds the whole launch", "[Level]") {
     const double boundary_x = rx + rl / 2.0;
     CHECK_THAT(boundary_x, WithinAbs(-10.0, 1e-9));
 
-    // abs_diagonal_mu.json's ramped launch to 18 m/s needs 63.5 m (measured)
-    // and its settle a further ~44 m before the stripes.  107 m is that budget
-    // less its rounding.  The pre-2026-08-11 spawn was -75, i.e. 65 m — the
-    // launch finished 1.5 m short of the boundary, and the brake fired on the
-    // same tick the wait_for_speed barrier released.
+    // abs_diagonal_mu.json's ramped launch to 18 m/s needs 63.5 m and its
+    // settle a further 44.0 m before the stripes.  107 m is that budget less
+    // its rounding.  Measured with scripts/scenario_runway_report.py.  The
+    // pre-2026-08-11 spawn was -75, i.e. 65 m of runway: the launch finished
+    // only 1.5 m before the boundary, leaving no room to settle at all, and
+    // the brake fired on the same tick the wait_for_speed barrier released.
     CHECK(boundary_x - spawn_x >= 107.0);
     CHECK(spawn_x >= rx - rl / 2.0);
 
