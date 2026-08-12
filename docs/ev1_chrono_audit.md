@@ -287,6 +287,89 @@ before/after.  It is a ~6 % peak-torque change and a ~7.7 % base-speed change,
 so unlike the ceiling fix it does move every acceleration trajectory, and it
 landed before the next VAT baseline recapture rather than after.
 
+### 3.1 The coast map against the printed regeneration limit (2026-08-12)
+
+PR #54 filed an unresolved exceedance: the coast map reached ~34 kW where the
+manual bounds regeneration at ~11 kW.  It declined to act on it, on the
+grounds that the map was mechanical drag and "mechanical drag is not bounded
+by an electrical limit."  That escape hatch does not survive reading p57.
+
+**What the print says.** Three pages, all read off the `.jpg` scans:
+
+- **p57, "COAST DOWN FUNCTION"** (folio `PROPULSION 57`): "With the PRND in D
+  (drive) and the accelerator pedal released, the EV1 will coast freely like an
+  automatic transmission in neutral.  The coast down feature uses a calibrated
+  amount of regenerative braking to gradually slow down the vehicle. ... The
+  PCM controls coast down by providing a negative torque current as a function
+  of drive motor shaft speed/direction sensor rate, accelerator position, and
+  coast down drag."
+- **p60, "REGENERATION"** (folio `60 PROPULSION`) and **p209, "REGENERATIVE
+  BRAKING"** (folio `PROPULSION 209`), the same sentence verbatim on both:
+  "The maximum allowed regeneration is 365 volts DC and 30 amps DC."
+
+p57 settles what `Map Zero Throttle` *is*.  Negative torque commanded as a
+function of shaft speed with the pedal released is exactly a zero-throttle
+torque-vs-RPM table, so the slot holds **commanded regen**, not bearing
+friction and windage — which is what the JSON header had claimed since it was
+written.  Regen is bounded, so the map is bounded.
+
+**What the number means, precisely.**  365 × 30 = 10 950 W, and it is
+**pack-side DC**: both pages place the sentence immediately after describing
+the motor and PIM acting "as a generator feeding current back to the battery
+pack for storage."  The map is **shaft** torque, on the other side of the
+inverter.  The manual prints no efficiency, so the exact shaft ceiling
+(10 950 / η) is not sourceable.  Capping the *shaft* at the printed pack number
+is the one choice that cannot violate the print for any η ≤ 1, since
+pack = shaft × η ≤ shaft.  It is the tightest reading the page supports and it
+invents nothing; the true shaft ceiling is ≥ this by an unstated margin.
+
+It is a ceiling, not a continuous rating: no duty cycle, no time limit and no
+temperature condition is printed with it, and p60 uses the same "maximum"
+idiom for the APM (22 amps) and PSCM (five amps) feeds.  No page states a peak
+above it.
+
+**Conditions recorded rather than clamped.**  The map does not represent
+everything the pages condition the limit on:
+
+| condition | page | modelled? |
+|---|---|---|
+| Coast down is a driver-selectable button; default with RSA data lost is "Coast down request = No Coast Down" | p204, DTC 028 | no — the map is the coast-down-**enabled** case |
+| Regen amount is a function of PSOC; inhibited outright at PSOC 100 % | p209 | no — no pack model, so this is the **maximum**-regen case, which is what the ceiling bounds |
+| Regen disabled below ~10 km/h (6 mph) | p209 | not as a cutoff; the −5 N·m breakpoint happens to sit at 6.2 mph |
+| Shaft-to-pack efficiency η | — | not stated anywhere; see above |
+| Mechanical drag, which genuinely is *not* electrically bounded | — | not separated out; the cap binds the sum, which is the conservative order |
+
+**What changed.**  Nothing at or below 8000 RPM (49.9 mph) — the whole region
+the 2026-04-30 coastdown calibration fitted is untouched.  The old curve
+crossed the ceiling at 8349 RPM (52.1 mph) and then ran away; above a knee at
+8350 RPM the curve is now constant power at the printed 10 950 W.
+
+| RPM | mph | old N·m | old kW | new N·m | new kW |
+|---|---|---|---|---|---|
+| 8000 | 49.9 | −12.0 | 10.1 | −12.0 | 10.1 |
+| 8350 | 52.1 | −12.5 | 10.9 | −12.5 | 10.9 |
+| 10000 | 62.4 | −15.0 | **15.7** | −10.4 | 10.9 |
+| 12000 | 74.9 | −20.0 | **25.1** | −8.7 | 10.9 |
+| 13000 | 81.1 | −25.0 | **34.0** | −8.0 | 10.9 |
+| 15500 | 96.7 | −37.0 | **60.1** | −6.7 | 10.9 |
+
+The old peak was 5.5× the printed ceiling, from a drive whose peak *motoring*
+power is 103 kW.  Torque now falls with speed above the knee, which is the
+correct shape for a regen-limited drive — the old monotonic ramp was wrong in
+shape as well as in magnitude.
+
+Values are rounded to 0.1 N·m **toward zero**, and chosen as the largest 0.1
+N·m step at each breakpoint that keeps the *piecewise-linear* map under the
+ceiling.  1/ω is convex, so the chord Chrono actually evaluates between two
+exact constant-power points sits above the curve: a breakpoint-only check
+passes a map that exceeds the cap by 9 W at 11 437 RPM, which is why 11000
+reads −9.4 and not the exact −9.5.  Dense max over the interpolant: 10 947 W.
+
+`tests/test_motor_speed_ceiling.cpp` pins this with the two printed numbers
+(365 V, 30 A) rather than a derived wattage, samples the interpolant every 1
+RPM, and separately requires the curve to *track* the ceiling above the knee —
+without that second half an all-zero coast map would pass perfectly.
+
 What's also still missing:
 - Regen integrated with brake commands (today regen lives only in coast
   torque, which fires whenever throttle is released regardless of brake)
@@ -546,6 +629,59 @@ known plant-fidelity limitation captured here.  Cruise-control gain
 tuning should still wait until F_rr is closer to spec — otherwise we'd
 be tuning around the wrong plant.  See [docs/TODO.md](TODO.md) for the
 follow-up task.
+
+### 11.1 That experiment has now been run (2026-08-12)
+
+Suspicion 3 above is the one §3.1 acted on, and two of its numbers were wrong
+in the direction that made it look small.  Coastdown runs from 30 m/s down to
+10 m/s, which is **3586–10 758 RPM**, not "4000-7000"; the old map's load over
+that span reached −16.9 N·m, not "−10 to −15".
+
+Re-running the coastdown either side of the §3.1 correction — same binary, same
+scenario, only `Map Zero Throttle` differing, and differing only above 8350 RPM
+(52.1 mph) — gives this:
+
+| | old coast map | new coast map |
+|---|---|---|
+| mean decel, 15–20 m/s | 0.3208 m/s² | 0.3298 m/s² |
+| mean decel, 20–25 m/s | 0.3785 m/s² | 0.3708 m/s² |
+| mean decel, 25–30 m/s | **0.4606 m/s²** | **0.3720 m/s²** |
+| fitted F_rr | 250.5 N (2.5× spec) | 438.1 N (4.4× spec) |
+| fitted CdA | 0.747 m² (2.1× spec) | 0.090 m² (0.25× spec) |
+
+**The headline of §11 was substantially an artefact of an unsourced curve.**
+The old coast map's torque *rose* with speed, roughly linearly; the fit has
+only a constant and a v² basis, so that ramp loaded onto CdA and produced the
+tidy "2× on both terms" result.  Remove it and the simulator's residual drag
+between 15 and 30 m/s is very nearly **speed-independent** (0.330 / 0.371 /
+0.372 m/s²), which a real aerodynamic term cannot be.  The two-parameter model
+no longer describes the plant: CdA collapses to a quarter of spec and F_rr
+absorbs everything.
+
+So the correct reading is not "drag got worse."  Total drag force actually
+*fell* where the map changed (590.1 → 476.5 N at ~27.4 m/s) and is unchanged
+below the knee.  What changed is that the decomposition stopped being
+believable, and that is the more useful state to be in: the excess is now
+visibly **not** aero-shaped, which points at the TMeasy slip dissipation and
+the driveline solver — suspicions 1 and 2 — rather than leaving a plausible
+CdA number sitting there absorbing the error.
+
+Coasting from 30 m/s (67.4 mph), the car now holds more speed for as long as it
+is above the knee, peaking at **+2.65 mph at 15 s after release** (52.5 →
+55.1 mph) and converging again below 52 mph where the two maps are identical:
+
+| s after release | old mph | new mph | Δ mph |
+|---|---|---|---|
+| 0 | 67.4 | 67.5 | +0.05 |
+| 5 | 62.0 | 63.5 | +1.43 |
+| 10 | 57.1 | 59.3 | +2.26 |
+| 15 | 52.5 | 55.1 | **+2.65** |
+| 30 | 40.7 | 42.9 | +2.18 |
+| 50 | 29.6 | 31.0 | +1.44 |
+
+Re-fitting the drag calibration is still open, and is still the item in
+`docs/TODO.md` — but it should now be fitted against a coast map that is
+bounded by the print, not against one that was quietly supplying the v² term.
 
 ## 12. Calibration attempt — what didn't work
 

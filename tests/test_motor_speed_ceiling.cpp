@@ -427,16 +427,23 @@ TEST_CASE("Motor ceiling: the full-throttle envelope is the manual's, point by p
         {13000.0, 75.9}, {14000.0, 70.5}, {15000.0, 65.8}, {15500.0, 63.7},
         {16000.0, 0.0}};
 
-    // The coast map is untouched by the corner correction, and this list says
-    // so: the manual states no coast-torque figure at any speed, so there was
-    // nothing to reconcile it against.  It stays the coastdown-calibrated,
-    // explicitly representative curve it already was.
+    // The coast map, every point.  This list used to carry the line "the
+    // manual states no coast-torque figure at any speed, so there was nothing
+    // to reconcile it against" — which was wrong twice over, and is corrected
+    // here rather than quietly dropped.  p57 "COAST DOWN FUNCTION" says the
+    // zero-pedal negative torque IS commanded regenerative braking, and p60 /
+    // p209 bound regeneration at 365 V x 30 A.  So there was something to
+    // reconcile against, and the old curve missed it by 3.1x at 13 000 RPM.
+    //
+    // Below 8000 RPM these are the 2026-04-30 coastdown-calibrated values,
+    // unchanged.  From the 8350 RPM knee up they are the printed ceiling held
+    // as constant power, rounded toward zero — see the JSON's //regen block.
     const TorqueMap kZeroExpected{
         {-100.0, 0.0}, {0.0, 0.0}, {1000.0, -5.0}, {2000.0, -5.0},
         {3000.0, -5.0}, {4000.0, -5.0}, {5000.0, -5.0}, {6000.0, -8.0},
-        {7000.0, -10.0}, {8000.0, -12.0}, {10000.0, -15.0}, {12000.0, -20.0},
-        {13000.0, -25.0}, {14000.0, -30.0}, {15000.0, -35.0}, {15500.0, -37.0},
-        {16000.0, 0.0}};
+        {7000.0, -10.0}, {8000.0, -12.0}, {8350.0, -12.5}, {9000.0, -11.6},
+        {10000.0, -10.4}, {11000.0, -9.4}, {12000.0, -8.7}, {13000.0, -8.0},
+        {14000.0, -7.4}, {15000.0, -6.9}, {15500.0, -6.7}, {16000.0, 0.0}};
 
     CHECK(full.size() == kFullExpected.size());
     CHECK(zero.size() == kZeroExpected.size());
@@ -487,6 +494,80 @@ TEST_CASE("Motor ceiling: constant torque then constant power, up to the ramp",
         CHECK(t <= prev + 1e-9);
         prev = t;
     }
+}
+
+// ---------------------------------------------------------------------------
+// The coast map against the manual's printed regeneration ceiling.
+// ---------------------------------------------------------------------------
+// @source:manual propulsion p60 "REGENERATION", repeated verbatim on p209:
+// "The maximum allowed regeneration is 365 volts DC and 30 amps DC."  Written
+// as the two numbers the page prints so a reader can check them against the
+// scan; the power is derived, never re-typed.
+//
+// The limit is PACK-SIDE electrical and this map is SHAFT torque, so capping
+// the shaft at the pack number is the tight reading: pack = shaft x eta and
+// eta <= 1, so a shaft under the cap cannot put more than the cap into the
+// pack, whatever the (unstated) efficiency is.  See the JSON header's //regen
+// block for the conditions this deliberately does NOT model.
+TEST_CASE("Motor coast: the coast map stays under the manual's regen ceiling",
+          "[Motor][Ceiling][Regen]") {
+    constexpr double kRegenVoltsDC = 365.0;   // p60 / p209
+    constexpr double kRegenAmpsDC  = 30.0;    // p60 / p209
+    constexpr double kRegenCapW    = kRegenVoltsDC * kRegenAmpsDC;  // 10 950 W
+
+    const auto engine = ReadJson(kEngine);
+    const auto zero   = ReadMap(engine, "Map Zero Throttle");
+    const double ceiling_rpm = engine.at("Maximal Engine Speed RPM").get<double>();
+
+    // The knee: where the printed limit starts to bind.  Below it the curve is
+    // the coastdown-fitted drag ramp; above it, constant power.
+    constexpr double kKneeRpm = 8350.0;
+
+    // (1) Nowhere above the ceiling — sampled through the INTERPOLANT, not just
+    // at the breakpoints.  This is the assertion that has to be dense: 1/omega
+    // is convex, so the chord Chrono actually evaluates between two exact
+    // constant-power points sits ABOVE the curve.  A breakpoint-only check
+    // passes a map that exceeds the cap by 9 W at 11 437 RPM.
+    double worst_w = 0.0, worst_rpm = 0.0;
+    for (double rpm = 0.0; rpm <= ceiling_rpm; rpm += 1.0) {
+        const double p = std::abs(InterpHoldingEndpoints(zero, rpm)) * RpmToRadS(rpm);
+        if (p > worst_w) { worst_w = p; worst_rpm = rpm; }
+    }
+    INFO("peak coast power " << worst_w << " W at " << worst_rpm
+         << " RPM, ceiling " << kRegenCapW << " W");
+    CHECK(worst_w <= kRegenCapW);
+
+    // (2) ...and the ceiling is actually BINDING, not vacuously satisfied.
+    // Without this, an all-zero coast map — or the -5 N.m ramp with its top
+    // half deleted — passes (1) perfectly.  Above the knee every breakpoint
+    // must sit within 2 % BELOW the cap, i.e. the curve tracks the limit.
+    int constant_power_points = 0;
+    for (const auto& [rpm, tq] : zero) {
+        if (rpm < kKneeRpm || rpm >= ceiling_rpm) continue;
+        const double p = std::abs(tq) * RpmToRadS(rpm);
+        INFO("constant-power coast point at " << rpm << " RPM: " << p << " W");
+        CHECK(p <= kRegenCapW);
+        CHECK(p >= 0.98 * kRegenCapW);
+        ++constant_power_points;
+    }
+    CHECK(constant_power_points >= 8);
+
+    // (3) The knee is where it is: below 8000 RPM the curve is drag, well under
+    // the cap, so the correction cannot have crept down into the region the
+    // 2026-04-30 coastdown calibration fitted.
+    for (double rpm = 0.0; rpm <= 8000.0; rpm += 100.0) {
+        const double p = std::abs(InterpHoldingEndpoints(zero, rpm)) * RpmToRadS(rpm);
+        INFO("drag region at " << rpm << " RPM: " << p << " W");
+        CHECK(p <= kRegenCapW);
+    }
+    CHECK_THAT(InterpHoldingEndpoints(zero, 8000.0), WithinAbs(-12.0, 1e-9));
+
+    // Road speed at the knee, so the header's "52.1 mph" is re-derived here
+    // rather than trusted.
+    const double knee_mph =
+        MpsToMph(RpmToRadS(kKneeRpm) / ReductionRatio() * TireRadiusM());
+    INFO("knee at " << kKneeRpm << " RPM = " << knee_mph << " mph");
+    CHECK_THAT(knee_mph, WithinRel(52.1, 0.01));
 }
 
 // ---------------------------------------------------------------------------
