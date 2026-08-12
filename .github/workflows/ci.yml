@@ -25,7 +25,7 @@ on:
     #    (~20-40 min) Chrono build.
     #
     # 2. settle-table re-derives the measured barrier releases (2026-08-12):
-    #    seven headless scenario runs, ~18 min locally and more on a runner.
+    #    seven headless scenario runs, ~3 min on a runner with a warm cache.
     #    It is here and not on the PR path deliberately.  Adding that to a lane
     #    that gates every PR is the wrong direction for a repo that keeps
     #    finding lanes run at zero headroom, and sharing a job with a cold
@@ -347,14 +347,17 @@ jobs:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     needs: chrono-smoke
     runs-on: ubuntu-latest
-    # Ceiling with headroom, stated rather than defaulted.  Budget: ev1sim
-    # build against a cached Chrono (~5 min with ccache) + seven headless
-    # scenarios.  The scenarios take ~18 min locally (slowest, abs_hard_brake,
-    # ~2.5 min); the runner figure is recorded in the PR that added this once
-    # measured, rather than guessed at here.  A default timeout is the wrong
-    # thing for this job specifically: killed partway it would leave a log that
-    # reads like a clean run, which is the exact failure the completion marker
-    # below exists to prevent.
+    # MEASURED, not guessed: on a warm cache the whole job is ~4 min — 11 s to
+    # build ev1sim under ccache and 3 min 02 s for all seven scenarios
+    # (2026-08-12, run 31629938532).  The same seven take ~18 min on the
+    # developer machine they were first timed on, so the real spread across
+    # machines is already ~6x, and a budget tight enough to look sensible
+    # against either figure would make the timeout itself the flaky part.
+    # Hence a lot of headroom, deliberately, on a lane nobody waits on.
+    #
+    # A default timeout would be the wrong thing here specifically: killed
+    # partway this leaves a log that reads like a clean run, which is exactly
+    # what the completion marker below exists to prevent.
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v6
@@ -401,6 +404,8 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           cmake --build build --target ev1sim -j"$(nproc)"
 
+      # ~3 min measured on a warm runner; 60 is headroom for a slower runner
+      # class, not an estimate.  See the job timeout above for why it is loose.
       - name: Re-derive the measured settle table
         timeout-minutes: 60
         run: |
