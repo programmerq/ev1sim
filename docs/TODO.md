@@ -79,37 +79,33 @@ future-UI input on one side, chassis-segment signal publishing on the other.
 
 ## ABS scenarios
 
-- [ ] **The three uniform-surface stops brake on the barrier tick.**
-  `abs_high_mu_stop`, `abs_hard_brake` and `abs_brake_and_steer` schedule
-  `set_brake` at 7.0 / 7.0 / 6.0 s, all of which sit **behind** their
-  `wait_for_speed` barrier — which releases at 15.03 / 15.03 / 12.01 s
-  (measured, `scripts/scenario_runway_report.py`).  A barrier does not advance
-  the event index (`src/Scenario.cpp:106-120`), so full brake is applied on the
-  exact tick the throttle drops to zero: no settle, drivetrain still loaded,
-  launch slip still in the tyres.  Same defect class the 2026-08-11 runway work
-  fixed for the four transition scenarios.
-  **Why it was not bundled there:** these three launch and brake on ONE
-  surface, so nothing is mistimed relative to a transition and the brake event
-  is on the intended surface by construction — and retiming them moves three
-  more headline stop distances on top of the three that change already.
-  Doing it means: move each brake pair past its measured release by ~2-3 s,
-  extend `max_time_s` to match, move the row from the "unsettled" table to the
-  "settled" table in `tests/test_scenario.cpp`'s `[Runway]` cases (which fail
-  today if you retime without doing so), and re-measure the stop distances.
+- [x] **The three uniform-surface stops brake on the barrier tick.**
+  Done 2026-08-12.  `abs_high_mu_stop`, `abs_hard_brake` and
+  `abs_brake_and_steer` scheduled `set_brake` at 7.0 / 7.0 / 6.0 s, all behind
+  a `wait_for_speed` barrier releasing at 15.028 / 15.028 / 12.011 s, so full
+  brake landed on the exact tick the throttle dropped to zero.  Brakes moved to
+  18.0 / 18.0 / 15.0 s — a 2.97 / 2.97 / 2.99 s settle — with brake values, mu
+  values, the 0.30 s brake-to-steer offset and the hold durations (18 / 18 / 19
+  s) all unchanged; `max_time_s` extended to keep the same 5 s tail after brake
+  release.  `scripts/scenario_runway_report.py` now covers all seven ABS
+  scenarios rather than the four transition ones, and
+  `config/abs_hard_brake.json` was added because `abs_hard_brake` had no config
+  wrapper at all — which is part of why nobody had measured it.
 
-- [ ] **The coast map exceeds the manual's stated regeneration bound above
-  ~8400 RPM.**  `EV1_EngineSimpleMap.json`'s Map Zero Throttle is
-  representative drag (bearing friction + windage), fitted by the 2026-04-30
-  coastdown calibration and never sourced.  @source:manual propulsion p60,
-  "REGENERATION": the PIM function "allows the drive motor to supply negative
-  shaft torque", and "The maximum allowed regeneration is 365 volts DC and 30
-  amps DC" — ~11 kW.  The shipped coast curve passes 11 kW at roughly 8400 RPM
-  (~52 mph) and reaches ~34 kW at 13 000 RPM.  Mechanical drag is not bounded
-  by an electrical limit, so this is not a straight contradiction — but ~34 kW
-  of bearing-and-windage drag is not credible either, and the file's own header
-  says engine coast is < 10 % of total drag at typical speeds.  Re-cutting the
-  curve moves the coastdown fit, so it belongs with the drag calibration item
-  below rather than with a torque-map correction.
+- [x] **The coast map exceeds the manual's stated regeneration bound above
+  ~8400 RPM.**  Done 2026-08-12, and the framing above was wrong in the way
+  that mattered.  It is not a category error that the bound is electrical and
+  the map "mechanical drag": @source:manual propulsion p57, "COAST DOWN
+  FUNCTION" says the zero-pedal negative torque IS commanded regenerative
+  braking ("The coast down feature uses a calibrated amount of regenerative
+  braking... The PCM controls coast down by providing a negative torque current
+  as a function of drive motor shaft speed/direction sensor rate"), so the
+  printed limit on p60/p209 applies to it directly and the curve was in
+  straight violation — 5.5× the ceiling at its worst, not merely implausible.
+  Curve re-cut as constant power above an 8350 RPM knee; nothing at or below
+  8000 RPM moved, so the 2026-04-30 calibration region is untouched.  Details,
+  the conditions the map still does not represent, and the coastdown effect are
+  in `docs/ev1_chrono_audit.md` §3.1 and §11.1.
 
 ## ABS scenario integration artefacts (need a built electricsim)
 
@@ -135,6 +131,15 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   have measured EV1 slip-curve data or migrate to a Pacejka tire model.
   (The `Body aerodynamics` follow-up — "trim tire rolling/slip dissipation
   now that drag is no longer lumped into it" — is this same item.)
+  **Updated 2026-08-12:** re-fit this against the corrected coast map, not the
+  old one.  The pre-2026-08-12 coast curve's torque rose with speed, and a
+  two-parameter `F_rr + CdA·v²` fit loaded that ramp onto CdA — which is where
+  the tidy "2× on both terms" reading in audit §11 came from.  With the coast
+  map bounded by the print, measured decel between 15 and 30 m/s is nearly
+  speed-independent (0.330 / 0.371 / 0.372 m/s²), CdA collapses to 0.25× spec
+  and F_rr absorbs everything.  The excess is therefore **not aero-shaped**,
+  which points at suspicions 1 and 2 in §11 (TMeasy slip dissipation, driveline
+  solver) rather than at the aero term.  See §11.1 for the measured comparison.
 - [ ] **EMB shoe-force integrator (refinement).**  Current model
   treats the BTCM cmd (-1 / 0 / +1) as a proportional force command.
   More faithful: integrate cmd × motor_speed × dt to track shoe

@@ -38,15 +38,31 @@ geometry is pinned by `tests/test_level_file.cpp`, and the brake
 timing that produces the settle is pinned by the `[Runway]` cases in
 `tests/test_scenario.cpp`.
 
-The three uniform-surface stops — `high_mu`, `hard_brake` and
-`brake_and_steer` — do **not** have that settle.  Their `set_brake` sits
-behind the `wait_for_speed` barrier, so it applies full brake on the
-tick the throttle releases.  They launch and brake on one surface, so
-nothing is mistimed relative to a transition, but the brake event still
-begins with launch slip in the tyres.  Recorded in
-[`docs/TODO.md`](TODO.md); the `[Runway]` cases assert they are still in
-that state, so fixing one turns the check red and asks for the record
-to be updated.
+**The three uniform-surface stops — `high_mu`, `hard_brake` and
+`brake_and_steer` — now have that settle too (2026-08-12).**  Their
+`set_brake` used to sit behind the `wait_for_speed` barrier, so full
+brake was applied on the tick the throttle released: no coast, drivetrain
+still loaded, launch slip still in the tyres.  Nothing was mistimed
+relative to a transition — they launch and brake on one surface — but the
+entry condition was a transient rather than a steady state, which is the
+same defect the transition four carried.  The brakes moved to 18.0 / 18.0
+/ 15.0 s, past their measured barrier releases of 15.028 / 15.028 /
+12.011 s.  Brake values, mu values, the 0.30 s brake-to-steer offset and
+the hold durations are unchanged; only the schedule moved.
+
+`scripts/scenario_runway_report.py` now covers all seven rather than the
+four transition scenarios, and so do the `[Runway]` cases in
+`tests/test_scenario.cpp` — the second case there used to assert these
+three were *still* broken, and has been replaced by a guard requiring
+**every** `config/scenarios/abs_*.json` that gates a brake behind a
+barrier to appear in the measured settle table.  A new scenario written
+with the same defect now fails on arrival instead of sailing past a
+hard-coded list of three.
+
+`abs_hard_brake` also gained a config wrapper (`config/abs_hard_brake.json`).
+It had none, so neither `run_abs_compare.sh` nor the runway report could
+launch it — a scenario nobody can run is a scenario nobody can measure,
+which is part of how its zero settle survived.
 
 ## How to run
 

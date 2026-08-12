@@ -13,7 +13,7 @@ abs_diagonal_mu's runway 1.5 m from its boundary.
 So: run this after any powertrain, tyre, mass or throttle-ramp change, and
 compare its output against the level headers.
 
-    scripts/scenario_runway_report.py                # all four transition scenarios
+    scripts/scenario_runway_report.py                # all seven ABS scenarios
     scripts/scenario_runway_report.py mu_jump        # just one
 
 It runs each scenario headless with the external sim OFF, so it needs only
@@ -24,6 +24,14 @@ printed in metres and in mph.
 
 Boundary positions come from the level file, not from a constant here, so a
 level edit cannot silently invalidate the report.
+
+Since 2026-08-12 this also covers the three uniform-surface stops (high_mu,
+hard_brake, brake_and_steer).  They have no runway budget to re-derive -- there
+is no boundary -- but they have the same SETTLE requirement, and it was
+violated in all three: a set_brake scheduled behind a wait_for_speed barrier
+fires on the barrier's release tick, not at its own at_time_s, so full brake
+landed on the tick the throttle dropped to zero.  For those three the report
+prints the settle and the stop distance instead of the crossing geometry.
 """
 
 from __future__ import annotations
@@ -45,12 +53,27 @@ ROOT = Path(__file__).resolve().parent.parent
 # scenario key -> (config wrapper, how to find the surface boundary in the level)
 #   "x_of_second_patch"  : boundary is the -X edge of the level's second patch
 #   "x_of_runway_end"    : boundary is the +X edge of patch 0 (the runway)
+#   None                 : uniform surface, no boundary to clear
+#
+# The uniform-surface stops have no transition to mistime, so the crossing and
+# runway checks below do not apply to them — but the settle does, and it is the
+# same defect: a set_brake scheduled behind the wait_for_speed barrier fires on
+# the release tick, so the brake event begins with launch slip in the tyres.
+# They were outside this report until 2026-08-12, which is part of why that
+# went unmeasured for as long as it did.
 SCENARIOS = {
     "mu_jump":     ("config/abs_mu_jump.json",     "x_of_second_patch", "ice"),
     "split_mu":    ("config/abs_split_mu.json",    "x_of_runway_end",   "the split"),
     "diagonal_mu": ("config/abs_diagonal_mu.json", "x_of_runway_end",   "the stripes"),
     "low_mu":      ("config/abs_low_mu.json",      "x_of_second_patch", "packed snow"),
+    "high_mu":     ("config/abs_high_mu.json",     None,                "dry asphalt"),
+    "hard_brake":  ("config/abs_hard_brake.json",  None,                "dry asphalt"),
+    "brake_and_steer": ("config/abs_brake_and_steer.json", None,        "dry asphalt"),
 }
+
+# A gap shorter than this between throttle release and brake-on is the
+# zero-settle defect, not a deliberately short coast.
+MIN_SETTLE_S = 2.0
 
 
 def boundary_x(level: dict, how: str) -> float:
@@ -126,12 +149,36 @@ def sample_at_x(rows, x):
     return None
 
 
+def stop_distance(rows, brake_t):
+    """Ground distance covered from brake-on to standstill, or None."""
+    b = sample_at_time(rows, brake_t)
+    if b is None:
+        return None, None
+    prev = None
+    dist = 0.0
+    for r in rows:
+        if r["sim_time_s"] < brake_t:
+            continue
+        if prev is not None:
+            dx = r["pos_x"] - prev["pos_x"]
+            dy = r.get("pos_y", 0.0) - prev.get("pos_y", 0.0)
+            dist += (dx * dx + dy * dy) ** 0.5
+        if r["speed_mps"] <= 0.1:
+            return dist, r["sim_time_s"] - brake_t
+        prev = r
+    return None, None
+
+
 def report(key: str, binary: Path) -> bool:
     cfg_rel, how, surface = SCENARIOS[key]
     cfg = json.loads((ROOT / cfg_rel).read_text())
-    level = json.loads((ROOT / cfg["terrain"]["level_file"]).read_text())
-    xb = boundary_x(level, how)
-    mu_runway = level["patches"][0]["friction"]
+    if how is None:
+        xb = None
+        mu_runway = cfg["terrain"]["friction"]
+    else:
+        level = json.loads((ROOT / cfg["terrain"]["level_file"]).read_text())
+        xb = boundary_x(level, how)
+        mu_runway = level["patches"][0]["friction"]
 
     with tempfile.TemporaryDirectory() as td:
         rows, events = run_scenario(cfg_rel, Path(td), binary)
@@ -141,8 +188,12 @@ def report(key: str, binary: Path) -> bool:
                     if a == "set_brake" and v not in ("", "0")), None)
     spawn_x = rows[0]["pos_x"]
 
-    print(f"=== {key}   (boundary at x={xb:g} m, onto {surface})")
-    print(f"    spawn x={spawn_x:.2f} m   spawn-to-boundary {xb - spawn_x:.2f} m")
+    if xb is None:
+        print(f"=== {key}   (uniform {surface}, mu {mu_runway:g}, no boundary)")
+        print(f"    spawn x={spawn_x:.2f} m")
+    else:
+        print(f"=== {key}   (boundary at x={xb:g} m, onto {surface})")
+        print(f"    spawn x={spawn_x:.2f} m   spawn-to-boundary {xb - spawn_x:.2f} m")
 
     ok = True
     if entry_t is None:
@@ -153,6 +204,41 @@ def report(key: str, binary: Path) -> bool:
     print(f"    launch       {e['pos_x'] - spawn_x:7.2f} m   entry speed "
           f"{e['speed_mps']:.3f} m/s ({e['speed_mps'] * MPS_TO_MPH:.1f} mph) "
           f"at t={entry_t:.3f} s")
+
+    if xb is None:
+        # Uniform surface: no crossing to clear, so the settle IS the whole
+        # entry-condition question.
+        if brake_t is None:
+            print("    no brake event fired")
+            return ok
+        b = sample_at_time(rows, brake_t)
+        settle_s = brake_t - entry_t
+        print(f"    brake on     x={b['pos_x']:7.2f} m   t={brake_t:.3f} s, "
+              f"{b['speed_mps']:.3f} m/s ({b['speed_mps'] * MPS_TO_MPH:.1f} mph), "
+              f"{settle_s:.2f} s after entry speed")
+        if settle_s < MIN_SETTLE_S:
+            print(f"    *** ZERO SETTLE: the brake fired {settle_s:.3f} s after "
+                  f"the throttle released — a set_brake scheduled behind the "
+                  f"wait_for_speed barrier fires on the release tick")
+            ok = False
+        d, dt = stop_distance(rows, brake_t)
+        if d is None:
+            print("    never reaches standstill inside max_time_s")
+            ok = False
+        else:
+            ideal = b["speed_mps"] ** 2 / (2.0 * mu_runway * G)
+            print(f"    stop         {d:7.2f} m in {dt:.2f} s   "
+                  f"(ideal at mu {mu_runway:g}: {ideal:.2f} m, "
+                  f"ratio {d / ideal:.2f})")
+        peak_slip = max(abs(r[k]) for r in rows if r["sim_time_s"] <= brake_t
+                        for k in ("slip_ratio_fl", "slip_ratio_fr",
+                                  "slip_ratio_rl", "slip_ratio_rr")
+                        if k in r)
+        line = f"    peak |slip| before the brake {peak_slip:.3f}"
+        if "yaw_deg" in rows[0]:
+            line += f"   yaw carried in {b['yaw_deg']:+.3f} deg"
+        print(line)
+        return ok
 
     c = sample_at_x(rows, xb)
     if c is None:
@@ -178,7 +264,7 @@ def report(key: str, binary: Path) -> bool:
     print(f"    brake on     x={b['pos_x']:7.2f} m   t={brake_t:.3f} s, "
           f"{b['speed_mps']:.3f} m/s ({b['speed_mps'] * MPS_TO_MPH:.1f} mph), "
           f"{settle_s:.2f} s after entry speed")
-    if settle_s < 0.5:
+    if settle_s < MIN_SETTLE_S:
         print(f"    *** ZERO SETTLE: the brake fired {settle_s:.3f} s after the "
               f"throttle released — a set_brake scheduled behind the "
               f"wait_for_speed barrier fires on the release tick")

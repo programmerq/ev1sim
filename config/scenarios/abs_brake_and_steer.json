@@ -15,7 +15,7 @@
   "name": "abs_brake_and_steer",
   "requires_external_sim": true,
   "driver_mode": "local",
-  "max_time_s": 30.0,
+  "max_time_s": 39.0,
   "events": [
     {"at_time_s":  0.30, "action": "key_on_cycle"},
     {"at_time_s":  0.60, "action": "key_on_cycle"},
@@ -32,9 +32,19 @@
     {"at_time_s":  2.25, "action": "set_throttle",     "value": 1.00},
     {"at_time_s":  5.00, "action": "wait_for_speed",   "value": 25.0},
     {"at_time_s":  5.00, "action": "set_throttle",     "value": 0.0},
-    {"at_time_s":  6.00, "action": "set_brake",        "value": 1.0},
-    {"at_time_s":  6.30, "action": "set_steering",     "value": 0.4},
-    {"at_time_s": 25.00, "action": "set_brake",        "value": 0.0}
+    {"//": "SETTLE, then brake, then steer 0.30 s into the brake.",
+     "//1": "wait_for_speed is a barrier that does not advance the event index",
+     "//2": "(src/Scenario.cpp), so events behind it fire on its RELEASE tick",
+     "//3": "rather than at their own at_time_s.  This barrier releases at",
+     "//4": "12.011 s (measured 2026-08-12, scripts/scenario_runway_report.py),",
+     "//5": "so the old 6.00 s brake landed on the tick the throttle dropped —",
+     "//6": "no settle, and the steer input followed 0.30 s later into a car",
+     "//7": "still shedding launch slip.  15.00 s gives a 2.99 s coast first.",
+     "//8": "Brake value (1.0), the 0.30 s brake-to-steer offset, the steering",
+     "//9": "value (0.4) and the hold duration (19.0 s) are all UNCHANGED."},
+    {"at_time_s": 15.00, "action": "set_brake",        "value": 1.0},
+    {"at_time_s": 15.30, "action": "set_steering",     "value": 0.4},
+    {"at_time_s": 34.00, "action": "set_brake",        "value": 0.0}
   ],
   "stats": {
     "output_csv": "scenario_abs_brake_and_steer.csv",

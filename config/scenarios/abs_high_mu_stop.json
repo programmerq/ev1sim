@@ -10,7 +10,7 @@
   "name": "abs_high_mu_stop",
   "requires_external_sim": true,
   "driver_mode": "local",
-  "max_time_s": 30.0,
+  "max_time_s": 41.0,
   "events": [
     {"at_time_s": 0.30, "action": "key_on_cycle"},
     {"at_time_s": 0.60, "action": "key_on_cycle"},
@@ -32,8 +32,19 @@
     {"at_time_s": 2.25, "action": "set_throttle", "value": 1.00},
     {"at_time_s": 5.00, "action": "wait_for_speed", "value": 30.0},
     {"at_time_s": 5.00, "action": "set_throttle", "value": 0.0},
-    {"at_time_s": 7.00, "action": "set_brake",   "value": 1.0},
-    {"at_time_s": 25.0, "action": "set_brake",   "value": 0.0}
+
+    {"//": "SETTLE, then brake.  wait_for_speed is a barrier that does not",
+     "//1": "advance the event index (src/Scenario.cpp), so every later event",
+     "//2": "fires when the barrier RELEASES, not at its own at_time_s.  The",
+     "//3": "barrier releases at 15.028 s (measured 2026-08-12,",
+     "//4": "scripts/scenario_runway_report.py), so the old 7.00 s brake was",
+     "//5": "applied on the exact tick the throttle dropped to zero: full brake",
+     "//6": "with the drivetrain still loaded and launch slip still in the",
+     "//7": "tyres.  18.00 s gives a 2.97 s coast to settle first.",
+     "//8": "Brake value (1.0) and hold duration (18.0 s) are UNCHANGED, as is",
+     "//9": "the 5 s tail after brake release; only the schedule moved."},
+    {"at_time_s": 18.00, "action": "set_brake",   "value": 1.0},
+    {"at_time_s": 36.00, "action": "set_brake",   "value": 0.0}
   ],
   "stats": {
     "output_csv": "scenario_abs_high_mu_stop.csv",

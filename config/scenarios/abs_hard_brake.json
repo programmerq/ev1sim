@@ -15,7 +15,7 @@
   "name": "abs_hard_brake",
   "requires_external_sim": true,
   "driver_mode": "local",
-  "max_time_s": 30.0,
+  "max_time_s": 41.0,
   "events": [
     {"//": "Boot RSA + drop into D."},
     {"at_time_s": 0.30, "action": "key_on_cycle"},
@@ -35,12 +35,20 @@
     {"at_time_s": 5.00, "action": "wait_for_speed", "value": 30.0},
     {"at_time_s": 5.00, "action": "set_throttle", "value": 0.0},
 
-    {"//": "Brief coast to settle dynamics, then SLAM the brake to 100 %.",
-     "//1": "Hard enough that without ABS modulation the wheels lock up."},
-    {"at_time_s": 7.00, "action": "set_brake",   "value": 1.0},
+    {"//": "Coast to settle dynamics, then SLAM the brake to 100 %.  Hard",
+     "//1": "enough that without ABS modulation the wheels lock up.",
+     "//2": "This comment used to say \"brief coast to settle\" above a 7.00 s",
+     "//3": "brake, and there was no coast at all: wait_for_speed is a barrier",
+     "//4": "that does not advance the event index (src/Scenario.cpp), so a",
+     "//5": "brake scheduled behind it fires on the RELEASE tick — measured",
+     "//6": "15.028 s (2026-08-12, scripts/scenario_runway_report.py), the same",
+     "//7": "tick the throttle dropped to zero.  18.00 s makes the settle real:",
+     "//8": "2.97 s of coast.  Brake value (1.0) and hold duration (18.0 s)",
+     "//9": "are UNCHANGED; only the schedule moved."},
+    {"at_time_s": 18.00, "action": "set_brake",   "value": 1.0},
 
     {"//": "Hold full brake until vehicle stops or scenario ends."},
-    {"at_time_s": 25.0, "action": "set_brake",   "value": 0.0}
+    {"at_time_s": 36.00, "action": "set_brake",   "value": 0.0}
   ],
   "stats": {
     "output_csv": "scenario_abs_hard_brake.csv",
