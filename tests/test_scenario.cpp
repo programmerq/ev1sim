@@ -14,7 +14,9 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <set>
 #include <sstream>
+#include <string>
 #include <thread>
 
 #include "Scenario.h"
@@ -1089,19 +1091,50 @@ struct BarrierCase {
     double      min_on_surface_s;      // required settle AFTER that crossing
 };
 
+// THE measured settle table — one copy, read by both [Runway] cases below.
+// It lives at namespace scope precisely so the coverage guard can derive its
+// expected set from it instead of keeping a second hand-maintained list; a
+// second list would let a scenario be "covered" while nothing had measured it.
+//
+// Measured with scripts/scenario_runway_report.py: the transition four on
+// 2026-08-11, the uniform three on 2026-08-12 when they were fixed.
+//
+// The uniform-surface stops joined on 2026-08-12.  They have no transition to
+// mistime — measured_crossing_s is -1 for all three — but the settle
+// requirement is identical and was identically violated: their brakes sat at
+// 7.0 / 7.0 / 6.0 s behind barriers releasing at 15.028 / 15.028 / 12.053 s,
+// so full brake landed on the tick the throttle dropped.
+//
+// abs_brake_and_steer's release is 12.053, not the 12.011 that docs/TODO.md
+// and the retired [Runway] case both carried.  That figure cited
+// scripts/scenario_runway_report.py — but the report could not run any of
+// these three until 2026-08-12: two needed support for boundary-less levels
+// and abs_hard_brake had no config wrapper at all.  So the tool it cited
+// cannot have produced it.  Re-measured on both sides of this branch's
+// changes: 12.053 either way, so nothing here moved it.
+//
+// KNOWN LIMIT: these release times are frozen measurements.  If the plant
+// moves and a barrier starts releasing later, a brake that still clears
+// release + settle by these numbers can have a much smaller real settle, and
+// nothing here would notice — the same staleness that produced the phantom
+// 12.011.  Closing it means running scenario_runway_report.py in the Chrono CI
+// job; see docs/TODO.md.
+const BarrierCase kSettled[] = {
+    {"config/scenarios/abs_mu_jump.json",         7.718, 2.0,   -1.0, 0.0},
+    {"config/scenarios/abs_split_mu.json",        9.690, 2.0, 12.291, 2.0},
+    {"config/scenarios/abs_diagonal_mu.json",     8.891, 2.0, 11.373, 1.0},
+    {"config/scenarios/abs_low_mu_stop.json",     7.718, 2.0, 10.118, 1.0},
+    {"config/scenarios/abs_high_mu_stop.json",   15.028, 2.0,   -1.0, 0.0},
+    {"config/scenarios/abs_hard_brake.json",     15.028, 2.0,   -1.0, 0.0},
+    {"config/scenarios/abs_brake_and_steer.json", 12.053, 2.0,  -1.0, 0.0},
+};
+
 }  // namespace
 
 TEST_CASE("Scenario: the shipped transition scenarios brake after a settle, "
           "not on the wait_for_speed barrier", "[Scenario][Runway]") {
     const std::filesystem::path source_root(EV1SIM_SOURCE_DIR);
-
-    // Measured 2026-08-11 with scripts/scenario_runway_report.py.
-    const BarrierCase settled[] = {
-        {"config/scenarios/abs_mu_jump.json",     7.718, 2.0,   -1.0, 0.0},
-        {"config/scenarios/abs_split_mu.json",    9.690, 2.0, 12.291, 2.0},
-        {"config/scenarios/abs_diagonal_mu.json", 8.891, 2.0, 11.373, 1.0},
-        {"config/scenarios/abs_low_mu_stop.json", 7.718, 2.0, 10.118, 1.0},
-    };
+    const auto& settled = kSettled;
 
     for (const auto& c : settled) {
         INFO("scenario " << c.path);
@@ -1138,40 +1171,61 @@ TEST_CASE("Scenario: the shipped transition scenarios brake after a settle, "
     }
 }
 
-TEST_CASE("Scenario: the uniform-surface stops still brake on the barrier tick "
-          "(known, recorded)", "[Scenario][Runway]") {
+// This slot used to hold "the uniform-surface stops still brake on the barrier
+// tick (known, recorded)", which asserted that abs_high_mu_stop, abs_hard_brake
+// and abs_brake_and_steer were STILL defective — deliberately, so that fixing
+// one went red instead of silent.  On 2026-08-12 they were fixed, so it went
+// red as designed and has served its purpose.  It is not deleted: the three
+// rows moved up into the settled table, and the case is replaced by the guard
+// below, which is the property the old one was a hard-coded sample of.
+//
+// The replacement is strictly stronger.  The retired case could only fail for
+// the three scenarios named in it; a NEW abs scenario written with a brake
+// behind its barrier would have sailed past both cases — the exact hole that
+// let this defect ship seven times.  This one enumerates the directory.
+TEST_CASE("Scenario: every shipped ABS scenario with a barrier is covered by "
+          "the settle table", "[Scenario][Runway]") {
     const std::filesystem::path source_root(EV1SIM_SOURCE_DIR);
+    const std::filesystem::path dir = source_root / "config" / "scenarios";
 
-    // These three launch and brake on ONE surface, so no mixed-grip transition
-    // is mistimed and the brake event is on the intended surface by
-    // construction — but their brakes still sit behind the barrier and fire on
-    // its release tick, with zero settle.  Same defect class as the four above,
-    // different blast radius, and fixing them moves three more baselines; it is
-    // recorded in docs/TODO.md rather than bundled here.
+    // The settle table is the record of what has been MEASURED.  Any
+    // abs_*.json that gates a brake behind a wait_for_speed barrier has to be
+    // in it, because its at_time_s alone cannot tell you when the brake fires.
     //
-    // Asserted rather than left silent, and asserted in the direction that
-    // FAILS when somebody fixes one: if you retime a brake here, this case goes
-    // red and tells you to move that row into the settled table above.
-    const BarrierCase unsettled[] = {
-        {"config/scenarios/abs_high_mu_stop.json",    15.028, 0.0, -1.0, 0.0},
-        {"config/scenarios/abs_hard_brake.json",      15.028, 0.0, -1.0, 0.0},
-        {"config/scenarios/abs_brake_and_steer.json", 12.011, 0.0, -1.0, 0.0},
-    };
+    // DERIVED from kSettled, never re-typed: a second hand-kept list would let
+    // somebody add a name here and satisfy this guard while nothing had
+    // actually measured that scenario's release — which is the same
+    // second-copy failure the 12.011 came from.
+    std::set<std::string> covered;
+    for (const auto& c : kSettled)
+        covered.insert(std::filesystem::path(c.path).filename().string());
+    REQUIRE(covered.size() == std::size(kSettled));
 
-    for (const auto& c : unsettled) {
-        INFO("scenario " << c.path);
-        auto loaded = ev1sim::Scenario::LoadFromFile((source_root / c.path).string());
+    int barrier_scenarios = 0;
+    for (const auto& entry : std::filesystem::directory_iterator(dir)) {
+        const std::string name = entry.path().filename().string();
+        if (name.rfind("abs_", 0) != 0 || entry.path().extension() != ".json")
+            continue;
+
+        auto loaded = ev1sim::Scenario::LoadFromFile(entry.path().string());
         REQUIRE(loaded.has_value());
 
-        double brake_at = -1.0;
-        bool   has_barrier = false;
+        bool has_barrier = false, has_brake = false;
         for (const auto& e : loaded->events()) {
             if (e.action == "wait_for_speed") has_barrier = true;
-            if (e.action == "set_brake" && e.value > 0.0 && brake_at < 0.0)
-                brake_at = e.at_time_s;
+            if (e.action == "set_brake" && e.value > 0.0) has_brake = true;
         }
-        REQUIRE(has_barrier);
-        REQUIRE(brake_at >= 0.0);
-        CHECK(brake_at < c.measured_release_s);
+        if (!has_barrier || !has_brake) continue;
+
+        ++barrier_scenarios;
+        INFO("scenario " << name << " gates a brake behind a wait_for_speed "
+             "barrier, so its brake time is only meaningful against the "
+             "MEASURED release time — add it to the settled[] table above "
+             "(re-derive with scripts/scenario_runway_report.py)");
+        CHECK(covered.count(name) == 1);
     }
+
+    // ...and the enumeration actually saw the directory.  Without this the
+    // whole case passes vacuously if the glob or the path is ever wrong.
+    CHECK(barrier_scenarios == 7);
 }

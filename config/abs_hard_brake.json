@@ -1,0 +1,38 @@
+{
+  "//": "Config wrapper for the ABS hard-brake (straight-line panic stop)",
+  "//1": "scenario.  Added 2026-08-12: config/scenarios/abs_hard_brake.json had",
+  "//2": "shipped for months with no wrapper, so scenario_runway_report.py",
+  "//3": "could not launch it.  run_abs_compare.sh could not either, and needed",
+  "//4": "THREE fixes, not one: it resolves config/abs_<test>.json, which",
+  "//5": "did not exist, AND its case-statement whitelist rejected 'hard_brake'",
+  "//5a": "before it ever resolved a path, and a SECOND list inside run_scenario()",
+  "//5b": "maps the test name to the CSV basename.  All three are fixed as of",
+  "//5c": "this date; adding this file alone would not have made it runnable.",
+  "//6": "",
+  "//7": "Surface is a CHOICE, not a recovered one: the scenario file names no",
+  "//8": "surface, it just says 'drive to 30 m/s and slam the brakes' and",
+  "//9": "expects locked wheels without ABS.  Uniform dry asphalt at mu 0.9 —",
+  "//10": "the same plane config/abs_high_mu.json uses — makes it the",
+  "//11": "stopping-distance sibling of the high-mu stop, differing only in the",
+  "//12": "telemetry it records.  If that is not what it should be testing,",
+  "//13": "change it here rather than leaving it unrunnable.",
+
+  "vehicle_model": "ev1",
+  "terrain": {
+    "type": "rigid_plane",
+    "surface": "asphalt",
+    "friction": 0.9,
+    "length_m": 800.0,
+    "width_m":  200.0
+  },
+  "simulation": {
+    "step_size_s": 0.001,
+    "render_fps": 60,
+    "realtime": true,
+    "headless": true
+  },
+  "telemetry": { "log_to_file": false, "show_hud": false },
+  "external_sim": { "enabled": true },
+  "vehicle_dynamics": { "start_propulsion_enabled": true },
+  "scenario": { "path": "config/scenarios/abs_hard_brake.json" }
+}

@@ -38,23 +38,87 @@ geometry is pinned by `tests/test_level_file.cpp`, and the brake
 timing that produces the settle is pinned by the `[Runway]` cases in
 `tests/test_scenario.cpp`.
 
-The three uniform-surface stops — `high_mu`, `hard_brake` and
-`brake_and_steer` — do **not** have that settle.  Their `set_brake` sits
-behind the `wait_for_speed` barrier, so it applies full brake on the
-tick the throttle releases.  They launch and brake on one surface, so
-nothing is mistimed relative to a transition, but the brake event still
-begins with launch slip in the tyres.  Recorded in
-[`docs/TODO.md`](TODO.md); the `[Runway]` cases assert they are still in
-that state, so fixing one turns the check red and asks for the record
-to be updated.
+**The three uniform-surface stops — `high_mu`, `hard_brake` and
+`brake_and_steer` — now have that settle too (2026-08-12).**  Their
+`set_brake` used to sit behind the `wait_for_speed` barrier, so full
+brake was applied on the tick the throttle released: no coast, drivetrain
+still loaded, launch slip still in the tyres.  Nothing was mistimed
+relative to a transition — they launch and brake on one surface — but the
+entry condition was a transient rather than a steady state, which is the
+same defect the transition four carried.  The brakes moved to 18.0 / 18.0
+/ 15.0 s, past their measured barrier releases of 15.028 / 15.028 /
+12.053 s.  Brake values, mu values, the 0.30 s brake-to-steer offset and
+the hold durations in the files are unchanged; only the schedule moved.
+
+One precision about "hold durations unchanged": that is true of the
+numbers in the scenario files (18 / 18 / 19 s), not of what the car did.
+Because the old brake fired late — on the barrier release, not at its own
+`at_time_s` — while brake-off stayed at 25.0 s, the *realized* hold was
+~10.0 / 10.0 / 12.9 s.  It is now the full 18 / 18 / 19 s.  That changes
+no measurement here: the car reaches standstill in 5–7 s, well inside
+either hold.
+
+`scripts/scenario_runway_report.py` now covers all seven rather than the
+four transition scenarios, and so do the `[Runway]` cases in
+`tests/test_scenario.cpp` — the second case there used to assert these
+three were *still* broken, and has been replaced by a guard requiring
+**every** `config/scenarios/abs_*.json` that gates a brake behind a
+barrier to appear in the measured settle table.  A new scenario written
+with the same defect now fails on arrival instead of sailing past a
+hard-coded list of three.
+
+`abs_hard_brake` also gained a config wrapper (`config/abs_hard_brake.json`).
+It had none, so neither `run_abs_compare.sh` nor the runway report could
+launch it — a scenario nobody can run is a scenario nobody can measure,
+which is part of how its zero settle survived.
+
+### What moved
+
+Measured with `scripts/scenario_runway_report.py`, no BTCM attached (front
+braking is straight hydraulic pass-through).  "before" is origin/main — the
+old brake schedule *and* the pre-correction coast map, since both change
+what the car is doing when the pedal goes down.
+
+| | high_mu | hard_brake | brake_and_steer |
+|---|---|---|---|
+| barrier releases | 15.028 s | 15.028 s | 12.053 s |
+| settle, before → after | 0.00 → **2.97 s** | 0.00 → **2.97 s** | 0.00 → **2.96 s** |
+| brake-on speed, before | 67.1 mph | 67.1 mph | 55.9 mph |
+| brake-on speed, after | **65.3 mph** | **65.3 mph** | **54.1 mph** |
+| stop distance, before | 108.69 m | 108.69 m | 64.91 m |
+| stop distance, after | **102.30 m** | **102.29 m** | **66.72 m** |
+| vs. ideal at μ 0.9 | 2.14 → 2.12 | 2.14 → 2.12 | 1.83 → **2.01** |
+
+Entry speed drops ~1.8 mph on all three, because the car now coasts ~3 s
+before the pedal goes down instead of braking on the tick the throttle
+released.
+
+**`brake_and_steer`'s stop got 1.81 m longer, and that is not a
+regression** — it is the measurement moving to the thing the scenario
+claims to test.  Two real effects: it brakes from 55.9 → 54.1 mph, only a
+small v² saving; and it brakes from just above the coast map's 52.1 mph
+knee, so it loses the extra (unsourced) coast drag the old map contributed
+right there.  Its ratio to an ideal μ-limited stop moves 1.83 → 2.01, into
+line with the other two, because the steering input at brake + 0.30 s now
+bites a settled car instead of one still shedding launch slip.  A
+brake-and-steer number taken during the launch transient was flattering.
+
+`abs_brake_and_steer`'s barrier release is **12.053 s**, not the 12.011 s
+that `docs/TODO.md` and the retired `[Runway]` case both carried.  That
+figure cited this report script, but the script could not run any of these
+three until 2026-08-12 — so it cannot have produced them.  Re-measured
+either side of this branch's changes: 12.053 both times.
 
 ## How to run
 
 ### Automated test sweep (headless)
 
 ```sh
-# All four scenarios, BTCM-on vs BTCM-off comparison:
-for t in high_mu low_mu mu_jump split_mu; do
+# All seven scenarios, BTCM-on vs BTCM-off comparison.  hard_brake and
+# diagonal_mu were absent from this loop; hard_brake could not be run at all
+# before 2026-08-12 (no config wrapper, and two name lists in
+# run_abs_compare.sh that did not know it).
+for t in high_mu low_mu mu_jump split_mu diagonal_mu brake_and_steer hard_brake; do
     ./scripts/run_abs_compare.sh "$t"
 done
 
@@ -77,7 +141,7 @@ done
 ### Manual scenario run (with window, for visual debugging)
 
 To watch a scenario with the Chrono visualization open, start the
-controllers in separate terminals.  All four ABS configs are set up
+controllers in separate terminals.  All seven ABS configs are set up
 for `realtime: true` so BTCM has wall-clock time to engage; flip
 `headless: false` in the config you're running to get a window.
 

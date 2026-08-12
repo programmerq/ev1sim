@@ -2,6 +2,24 @@
 
 _Generated 2026-05-02 11:49 by `scripts/abs_report.py`._
 
+> **STALE as of 2026-08-12 — do not read these numbers as current.** Four
+> changes since this capture move the trajectories it was measured on, and none
+> of them is a regression:
+>
+> 1. the motor torque map's corner point moved to the propulsion p250 rating
+>    (141 N·m at 7000 RPM), slowing every launch ~3 %;
+> 2. the `mu_jump` / `split_mu` / `diagonal_mu` runways were lengthened so the
+>    launch finishes before the surface under test;
+> 3. the `high_mu` / `hard_brake` / `brake_and_steer` brakes moved past their
+>    measured barrier releases, so each brakes from a settled entry rather than
+>    the tick the throttle dropped — `high_mu`'s stop measured 102.30 m on
+>    2026-08-12, against the 150.18 m below;
+> 4. the coast map was re-cut to the propulsion p60/p209 regeneration ceiling
+>    (365 V × 30 A), which lowers coast drag above 52 mph.
+>
+> Regenerating this needs PIM/BTCM/RSA binaries built from electricsim, which
+> the unit suite does not depend on. See `docs/TODO.md`.
+
 This report aggregates the four standard ABS validation
 scenarios.  Each scenario gets its own section with setup,
 numerical result tables, and a stack of charts: vehicle

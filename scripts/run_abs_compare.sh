@@ -31,8 +31,11 @@ set -euo pipefail
 
 TEST="${1:-high_mu}"
 case "$TEST" in
-    high_mu|low_mu|mu_jump|split_mu|brake_and_steer|diagonal_mu) ;;
-    *) echo "[abs] unknown test '$TEST' — use high_mu | low_mu | mu_jump | split_mu | brake_and_steer | diagonal_mu" >&2; exit 1 ;;
+    # hard_brake added 2026-08-12 alongside config/abs_hard_brake.json.  Before
+    # that this list rejected it before ever resolving a config path, so the
+    # scenario could not be launched through this script at all.
+    high_mu|low_mu|mu_jump|split_mu|brake_and_steer|diagonal_mu|hard_brake) ;;
+    *) echo "[abs] unknown test '$TEST' — use high_mu | low_mu | mu_jump | split_mu | brake_and_steer | diagonal_mu | hard_brake" >&2; exit 1 ;;
 esac
 
 EV1SIM_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -143,7 +146,7 @@ run_scenario() {
     # Scenario writes its CSV in ev1sim's cwd (here, EV1SIM_DIR).  Filename
     # convention: scenario_<name>.csv where <name> matches the scenario's
     # "name" field — for our suite, that's the basename of the scenario file.
-    local sc_name
+    local sc_name=""
     case "$TEST" in
         high_mu)         sc_name="abs_high_mu_stop"     ;;
         low_mu)          sc_name="abs_low_mu_stop"      ;;
@@ -151,7 +154,17 @@ run_scenario() {
         split_mu)        sc_name="abs_split_mu"         ;;
         brake_and_steer) sc_name="abs_brake_and_steer"  ;;
         diagonal_mu)     sc_name="abs_diagonal_mu"      ;;
+        hard_brake)      sc_name="abs_hard_brake"       ;;
     esac
+    # A test name has to appear in TWO lists: the whitelist at the top and this
+    # one.  Adding it to only the whitelist left sc_name unset, and under
+    # `set -u` the script then died on an unbound variable at the next line
+    # without saying which list was missing it.  Fail loudly and name the fix.
+    if [[ -z "$sc_name" ]]; then
+        echo "[abs] '$TEST' passed the whitelist but has no scenario-name mapping" >&2
+        echo "[abs] add it to the case statement in run_scenario()" >&2
+        exit 1
+    fi
     local default_csv="$EV1SIM_DIR/scenario_${sc_name}.csv"
     if [[ -f "$default_csv" ]]; then
         mv "$default_csv" "$csv_dest"
