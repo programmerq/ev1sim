@@ -2457,7 +2457,8 @@ ExternalSimConnector::AbsPhaseFront ExternalSimConnector::GetAbsPhaseFront(
     // determinism property and not just pedantry.
     const bool btcm_alive = [&]() -> bool {
         if (st.btcm_uart_frame_ns == 0) return false;
-        if (now_ns < st.btcm_uart_frame_ns) return false;  // rewind guard
+        // now_ns >= any stamp: SetSimTime holds the clock's high-water mark, so
+        // the unsigned subtraction below cannot wrap.
         return (now_ns - st.btcm_uart_frame_ns) < window_ns;
     }();
 
@@ -2541,7 +2542,8 @@ ExternalSimConnector::RearEmbCmd ExternalSimConnector::GetRearEmbCmd(
     // breaking older producers.
     const bool btcm_alive = [&]() -> bool {
         if (st.btcm_uart_frame_ns == 0) return false;
-        if (now_ns < st.btcm_uart_frame_ns) return false;  // rewind guard
+        // now_ns >= any stamp: SetSimTime holds the clock's high-water mark, so
+        // the unsigned subtraction below cannot wrap.
         return (now_ns - st.btcm_uart_frame_ns) < window_ns;
     }();
 
@@ -2574,7 +2576,8 @@ ExternalSimConnector::GetFrontWheelCylinderPressuresKpa(
     // a sustained-pressure regime.
     const bool btcm_alive = [&]() -> bool {
         if (st.btcm_uart_frame_ns == 0) return false;
-        if (now_ns < st.btcm_uart_frame_ns) return false;  // rewind guard
+        // now_ns >= any stamp: SetSimTime holds the clock's high-water mark, so
+        // the unsigned subtraction below cannot wrap.
         return (now_ns - st.btcm_uart_frame_ns) < window_ns;
     }();
 

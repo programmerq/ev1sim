@@ -248,11 +248,16 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
     // = 3000 ms, the authoritative source of truth).  The two diverged once:
     // this stats-CSV observer read the same signals with a 200 ms window while
     // the control path used 3000 ms.  Liveness comes from the BTCM's ~5 Hz
-    // canonical-frame heartbeat, which is paced in sim time; under wall-clock
-    // pacing on long, low-friction stops the inter-heartbeat gap can stretch
-    // past 200 ms, so the observer wrongly declared the BTCM dead and emitted
-    // the -1 no-data sentinel for a phase that was actually live (and that the
-    // control path, on 3000 ms, still saw). Keep these two windows in lockstep.
+    // canonical-frame heartbeat, and the observed inter-heartbeat gap can
+    // stretch past 200 ms, so the observer wrongly declared the BTCM dead and
+    // emitted the -1 no-data sentinel for a phase that was actually live (and
+    // that the control path, on 3000 ms, still saw).  Keep the two in lockstep.
+    //
+    // That gap is measured in sim time now — see
+    // ExternalSimConnector::SetSimTime.  The previous version of this comment
+    // said the heartbeat is "paced in sim time"; it is not.  The producer paces
+    // its bit-level output on its own host clock, which is the second finding
+    // in DECISION_QUEUE.md.
     constexpr auto kAbsPhaseFreshness = std::chrono::milliseconds(3000);
     const auto bus_abs    = bus.GetAbsPhaseFront(kAbsPhaseFreshness);
     const auto bus_rear   = bus.GetRearEmbCmd(kAbsPhaseFreshness);

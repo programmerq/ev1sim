@@ -69,7 +69,16 @@ TEST_CASE("ExternalSimConnector: subsequent inject re-freshens the throttle",
           "[ExternalSim][ThrottleBus]") {
     ExternalSimConnector c;
     c.DebugInjectU8(4073, 10);
-    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+
+    // Age the first value PAST the window before re-injecting, so the final
+    // CHECK can only pass because the second inject restamped.  A gap smaller
+    // than the window would pass whether or not it restamped — the case would
+    // then be unable to fail on the property in its own name.  (It aged with a
+    // 5 ms sleep_for before the freshness windows moved to the sim clock, and
+    // a wall-clock sleep no longer ages anything at all.)
+    c.SetSimTime(0.060);
+    CHECK_FALSE(c.GetThrottleCmd(std::chrono::milliseconds(50)).fresh);
+
     c.DebugInjectU8(4073, 200);  // re-freshen
 
     auto t = c.GetThrottleCmd(std::chrono::milliseconds(50));

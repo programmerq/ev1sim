@@ -1310,9 +1310,9 @@ TEST_CASE("A signal arriving on the very first tick is not read as never-seen",
     // heartbeat delivered at sim t = 0 would stamp 0 and the BTCM would look
     // as though it had never spoken.
     ExternalSimConnector c;
-    CHECK_FALSE(c.GetAbsPhaseFront(kShortWindow).fl_fresh);   // genuinely none
+    CHECK_FALSE(c.GetAbsPhaseFront(kShortWindow).fl_fresh);   // nothing received
 
-    c.SetSimTime(0.0);
+    // No SetSimTime call: the clock starts at 0 and this is the first tick.
     c.DebugInjectDelta(5050, true);
     c.DebugInjectDelta(5010, true);
     c.DebugInjectDelta(5011, false);
