@@ -451,7 +451,7 @@ What's also still missing:
 | Transmission type | single forward gear, ratio 1.0 | single-speed reduction | ✅ |
 | Final drive (Conical Gear) | 0.1 → **10.0:1 reduction** | **10.946:1 reduction** | 🔧 0.1 → 0.0913 |
 | Driveline | FWD (`ShaftsDriveline2WD`) | FWD | ✅ |
-| Driveshaft inertia | 0.5 kg·m² | unknown — typical | ⚠️  |
+| Driveshaft inertia | 0.03 kg·m² | no manual figure — @inferred 0.013–0.035 kg·m² | 🔧 0.5 → 0.03 |
 | Differential box inertia | 0.6 kg·m² | unknown — typical | ⚠️  |
 | Differential lock limit | 100 N·m | open differential, no LSD on EV1 | ✅ (open at this limit) |
 
@@ -459,6 +459,38 @@ The 10.0 vs 10.946 final drive change is small (~9% off) and shifts the
 operating RPM at a given speed slightly.  At 13 m/s with current ratio:
 motor RPM = 4250.  After fix: 4651 RPM — still well within flat-torque
 region, so peak-torque behavior is unchanged.
+
+**Driveshaft inertia, 2026-08-13.** The 0.5 kg·m² was Chrono's own ICE-template
+default (byte-identical across the sedan/audi/HMMWV stock vehicles) sitting
+*upstream* of the conical-gear reduction — i.e. at full motor RPM.  The
+reference vehicles' multi-speed gearboxes reduce speed at that shaft before it
+gets there; the EV1's single-speed driveline does not, so 0.5 was landing
+~705 kg of phantom effective mass on every acceleration and deceleration
+transient (reflected mass = `I × N_final² / r_wheel²`).  No EV1 propulsion-
+manual page states a rotor mass or moment of inertia (checked against the page
+`.jpg` scans, not the OCR sidecars).  The replacement is a geometry-derived
+estimate — full derivation, sourcing and the sensitivity sweep behind it are
+in the `Shaft Inertia` block's own comments in
+[`data/vehicle/ev1/driveline/EV1_Driveline2WD.json`](../data/vehicle/ev1/driveline/EV1_Driveline2WD.json)
+and in electricsim's `docs/backlog/BL-2026-08-13-ev1-driveshaft-inertia-is-an-
+unadapted-ice-template-default.md`.  Measured with the real binary
+(`config/accel_brake.json`, full throttle to 30 km/h, asphalt, same build):
+time to target speed drops **3.162 s → 2.278 s** (28% faster), and — because
+the driveline stays mechanically coupled to the wheels under braking too, with
+no clutch to decouple it — the following full-brake stop from that speed is
+also shorter: brake-phase duration **2.040 s → 1.564 s** and integrated
+stopping distance **8.90 m → 6.64 m** (both ~25% shorter).  That braking
+effect was not anticipated by the original finding (which assumed brake
+torque alone dominates and the driveline's contribution would be negligible)
+— it is real and measured here, not inferred, and revises that assumption.
+`Differential Box` (wheel-side, downstream of the reduction) is unaffected by
+this and untouched: its inertia is not multiplied by `N_final²`, so at 0.6
+kg·m² it reflects to only ~7 kg of effective mass, and is not implicated in
+the phantom-mass finding.  Re-running the coastdown fit (§11) after this
+change was not done here — suspicion #2 there (driveline inertia as an
+effective numerical damper) may now be smaller, but confirming that is a
+separate exercise on top of the fit-tooling work already in flight and is not
+claimed as resolved by this entry.
 
 ## 5. Tires
 
@@ -676,7 +708,11 @@ component.  Likely culprits, in order of suspicion:
    in the current JSON) could halve the v² term.
 2. **Driveline shaft inertia acting as effective damper** in the
    `ChShaftsDriveline2WD` solver.  The 0.5 + 0.6 kg·m² shaft inertias
-   combined with stiff joints may produce numerical viscosity.
+   combined with stiff joints may produce numerical viscosity.  **Update
+   2026-08-13:** `Driveshaft` is now 0.03, not 0.5 — see §4 — so this
+   suspicion's premise has changed.  Not re-run here; if this is picked up
+   again, redo the fit against the new value before trusting the old 198 N /
+   0.756 m² figures as a baseline for it.
 3. **Powertrain coast torque firing during coastdown** — the engine
    `Map Zero Throttle` fires at zero throttle.  As written this said the map
    was "-5 to -25 N·m", that coastdown covered "rpm range 4000-7000", and that
