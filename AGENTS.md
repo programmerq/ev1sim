@@ -121,8 +121,9 @@ message, on one screen, and carries all eight elements:
    "A/B/C" (the owner once read option letters as motor phases).
 4. **Recommendation**, with a one-line reason.
 5. **Default-if-silent**, explicitly named.
-6. **Provenance** — date first asked + where it lives; cite a prior ask
-   instead of re-asking cold.
+6. **Provenance** — date first asked + where it lives; check the
+   coordinator's decision queue for an existing ask before raising a new
+   one, and cite a prior ask instead of re-asking cold.
 7. **One-word-answerable *answer*** — constrains the reply only, never the
    ask: full context ships even inside a batch; a lead-in table is fine,
    but never a bare compressed row standing alone.
