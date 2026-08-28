@@ -112,7 +112,7 @@ An ask whose context lives elsewhere invites an answer to the wrong
 question — an already-engaged fork was once re-asked as bare option
 letters and the earlier answer was never durably recorded. Every decision
 ask — chat, PR comment, or queue entry — is answerable from that one
-message, on one screen, and carries all eight elements:
+message, on one screen, and carries all seven elements:
 
 1. **Title/moniker**, glossed — never a bare ID, letter, or hex suffix
    (`BL-0180 (SDM driver seat-belt switch polarity)`).
@@ -124,10 +124,7 @@ message, on one screen, and carries all eight elements:
 6. **Provenance** — date first asked + where it lives; check the
    coordinator's decision queue for an existing ask before raising a new
    one, and cite a prior ask instead of re-asking cold.
-7. **One-word-answerable *answer*** — constrains the reply only, never the
-   ask: full context ships even inside a batch; a lead-in table is fine,
-   but never a bare compressed row standing alone.
-8. **Why not self-derived** — name the recorded-objective category
+7. **Why not self-derived** — name the recorded-objective category
    (convention, manual/provenance, prior ruling, standing preference) that
    leaves it genuinely open, or self-decide instead of asking.
 
