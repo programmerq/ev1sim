@@ -105,16 +105,31 @@ files directly until they are:
 
 ### Owner decision asks are self-contained
 
-Never ask the owner a bare option-letter question ("A, B, or C?") — an ask
-whose context lives somewhere else invites an answer to the wrong question
-(owner directive 2026-07-22). Any decision question aimed at the owner — chat,
-PR comment, or queue — must be answerable from that one message on one screen:
-what's being decided in plain language and why now; a link to the source that
-raised it; the options with one-line implications each, a recommendation, and a
-default-if-silent. Check first whether the fork was already asked or answered
-(the PR thread, the coordinator's decision queue) and cite the prior ask plus
-what changed instead of re-asking cold; when the owner answers, restate the
-ruling in-thread immediately so it stays findable and is never re-asked.
+<!-- BEGIN ev1-canon:decision-ask v1 -->
+**Owner decision asks are self-contained (owner directive 2026-07-22,
+canonical across all four EV1 repos — supersedes prior per-repo text).**
+An ask whose context lives elsewhere invites an answer to the wrong
+question — an already-engaged fork was once re-asked as bare option
+letters and the earlier answer was never durably recorded. Every decision
+ask — chat, PR comment, or queue entry — is answerable from that one
+message, on one screen, and carries all seven elements:
+
+1. **Title/moniker**, glossed — never a bare ID, letter, or hex suffix
+   (`BL-0180 (SDM driver seat-belt switch polarity)`).
+2. **Context** — why it exists, what's blocked, cited facts.
+3. **Options in prose**, each with its implication beside it — never bare
+   "A/B/C" (the owner once read option letters as motor phases).
+4. **Recommendation**, with a one-line reason.
+5. **Default-if-silent**, explicitly named.
+6. **Provenance** — date first asked + where it lives; check the
+   coordinator's decision queue for an existing ask before raising a new
+   one, and cite a prior ask instead of re-asking cold.
+7. **Why not self-derived** — name the recorded-objective category
+   (convention, manual/provenance, prior ruling, standing preference) that
+   leaves it genuinely open, or self-decide instead of asking.
+
+Record the ruling immediately where it was asked.
+<!-- END ev1-canon:decision-ask v1 -->
 
 ## Commits
 
