@@ -55,6 +55,29 @@ class PhysicalWorld;
 //       would hide whether that OR works.
 //   set_horn:      value != 0 closes the driver horn contact (circuit 28) and
 //       holds it until a set_horn 0; the LHJB decides which tones sound.
+//   lane_hold:  engage the scenario's lane-keeping driver: every tick until
+//       lane_release, steering is computed to hold the chassis on the world
+//       line y = value (metres), travelling along it toward +x, from pos_x /
+//       pos_y / yaw_rate in the VehicleState of the previous scenario tick
+//       (SimApp ticks the scenario once per render tick, 60 Hz).  Assumes
+//       travel in the +x direction, which every shipped level spawns for; a
+//       -x scenario would need the course and target wrapped.  This is the
+//       scripted driver's hands on the wheel during a SETTLE: an open-loop
+//       coast holds whatever heading the launch wrote (measured on
+//       abs_split_mu: +0.40 deg by the throttle release, the two driven
+//       fronts not spinning equally under full throttle), and 0.4 deg held
+//       over the 145 m to the brake is 1.3 m — more than the EV1's 0.735 m
+//       front half-track, so the brake event landed with all four wheels
+//       on one surface.  A spawn offset cannot fix that, because the drift
+//       is not a constant (measured 2026-09-08 on the same scenario:
+//       +1.28 m and +1.30 m on one pair of runs, +0.49 m on another,
+//       +0.47 m from a spawn 1.15 m to the right).
+//       Overrides any set_steering while engaged.  Steers on the measured
+//       course, not the body heading: see Scenario::LaneHoldSteering.
+//   lane_release:  disengage lane_hold and centre the wheel (steering held
+//       at 0 until a later set_steering).  Schedule it on the brake tick
+//       so the stop itself is open-loop: what the car does under the
+//       brake is then the brake system's answer, not the driver's.
 //   flash_to_pass: value != 0 holds the combination-switch flash-to-pass lever
 //       until a flash_to_pass 0.
 //
@@ -214,6 +237,8 @@ public:
     // before the brake or is braked on the tick the throttle releases.
     const std::vector<ScenarioEvent>& events() const { return m_events; }
 
+    bool lane_hold_engaged() const { return m_lane_hold_y.has_value(); }
+
     // Test-only setters.
     void set_events(std::vector<ScenarioEvent> e) { m_events = std::move(e); }
     void set_stats(ScenarioStats s)               { m_stats  = std::move(s); }
@@ -236,6 +261,17 @@ private:
     std::optional<double>      m_held_throttle;
     std::optional<double>      m_held_brake;
     std::optional<double>      m_held_steering;
+    // lane_hold target (world y, metres); disengaged when empty.
+    std::optional<double>      m_lane_hold_y;
+    // Previous-tick chassis position, from which the lane hold derives the
+    // COURSE (direction of travel) — see LaneHoldSteering for why it steers
+    // on course rather than on body heading.  Empty on the first tick.
+    struct LanePoint { double x, y; };
+    std::optional<LanePoint>   m_lane_prev;
+    // Lane-keeping steering command in [-1, 1] for the current state; see
+    // the definition for the law and the gain provenance.  Updates
+    // m_lane_prev.
+    double LaneHoldSteering(const VehicleState& state);
     // Horn contact, held like the pedals: set_horn value != 0 closes the
     // single driver horn contact (circuit 28) until the next set_horn 0.
     std::optional<bool>        m_held_horn;

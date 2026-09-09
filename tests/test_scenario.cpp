@@ -9,6 +9,13 @@
 //   - IsDone() vs max_time_s
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
+
+#include <algorithm>
+#include <cmath>
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 #include <chrono>
 #include <cstdio>
@@ -232,6 +239,144 @@ TEST_CASE("Scenario: wait_for_speed blocks subsequent events until threshold rea
     fast.speed_mps = 12.0;
     s.Tick(1.5, fast, hooks, cmd);
     CHECK(hooks.cruise_set == 1);
+}
+
+TEST_CASE("Scenario: lane_hold steers back toward the target line, "
+          "lane_release centres the wheel", "[Scenario][LaneHold]") {
+    using ev1sim::Scenario;
+    Scenario s;
+    s.set_events({
+        {1.00, "lane_hold",    0.0, 0.0},
+        {5.00, "lane_release", 0.0, 0.0},
+        {5.00, "set_brake",    1.0, 0.0},
+    });
+    CountingHooks hooks;
+    DriverCommand cmd{};
+
+    // Before the event: no steering authority.
+    VehicleState st{};
+    st.pos_y = 1.0;
+    s.Tick(0.5, st, hooks, cmd);
+    CHECK_FALSE(s.lane_hold_engaged());
+    CHECK(cmd.steering == 0.0);
+
+    // First engaged tick has no previous position, so the body heading
+    // stands in for the course: LEFT of the line (+y) with a straight nose,
+    // the driver steers RIGHT (negative — DriverCommand: positive is a left
+    // turn).
+    s.Tick(1.5, st, hooks, cmd);
+    CHECK(s.lane_hold_engaged());
+    CHECK(cmd.steering < 0.0);
+    const double from_offset = cmd.steering;
+
+    // Travelling straight along +x (course 0) at the same offset: same
+    // demand — the body heading is not what the law reads once it has a
+    // course, so a crabbed body (nose off the direction of travel) changes
+    // nothing.
+    VehicleState next = st;
+    next.pos_x = 0.3;
+    next.yaw_deg = -0.9;   // the split-mu coast crab, measured
+    s.Tick(1.6, next, hooks, cmd);
+    CHECK(cmd.steering == Catch::Approx(from_offset));
+
+    // Now travelling on the look-ahead course toward the line — at y=0.5
+    // the law wants course -atan2(0.5, 15), and that is the course the last
+    // tick shows: no correction needed, and none commanded.
+    VehicleState toward = next;
+    toward.pos_x = next.pos_x + 15.0;
+    toward.pos_y = next.pos_y - 0.5;
+    s.Tick(1.7, toward, hooks, cmd);
+    CHECK(std::abs(cmd.steering) < 1e-9);
+
+    // Mirror image: right of the line, travelling straight, steers left.
+    VehicleState right{};
+    right.pos_x = 100.0;
+    right.pos_y = -1.0;
+    s.Tick(1.8, right, hooks, cmd);   // establishes the previous point
+    VehicleState right2 = right;
+    right2.pos_x = 100.3;
+    s.Tick(1.9, right2, hooks, cmd);
+    CHECK(cmd.steering > 0.0);
+    CHECK(cmd.steering == Catch::Approx(-from_offset));
+
+    // Yaw-rate damping opposes the turn already in progress.
+    VehicleState turning = right2;
+    turning.pos_y = 0.0;
+    turning.pos_x = right2.pos_x + 0.3;
+    s.Tick(2.0, turning, hooks, cmd);   // previous point
+    VehicleState turning2 = turning;
+    turning2.pos_x += 0.3;
+    turning2.yaw_rate = 0.5;   // rad/s, nose swinging left
+    s.Tick(2.1, turning2, hooks, cmd);
+    CHECK(cmd.steering < 0.0);
+
+    // The command is a settle correction, never a swerve: clamped well
+    // inside the rack's authority even for a gross error.  From the last
+    // point (~(100.9, 0)) to (0, 100) the course is ~135 deg while the law
+    // wants -atan2(100, 15) ≈ -81 deg: a huge leftward course error, so
+    // the demand is a hard right, clamped.
+    VehicleState far{};
+    far.pos_y = 100.0;
+    s.Tick(2.2, far, hooks, cmd);
+    CHECK(cmd.steering == Catch::Approx(-0.3));
+
+    // lane_release on the brake tick: wheel centred, brake applied, and the
+    // controller stays off however far the car then wanders.
+    s.Tick(5.0, far, hooks, cmd);
+    CHECK_FALSE(s.lane_hold_engaged());
+    CHECK(cmd.steering == 0.0);
+    CHECK(cmd.front_brake == 1.0);
+    s.Tick(6.0, far, hooks, cmd);
+    CHECK(cmd.steering == 0.0);
+}
+
+TEST_CASE("Scenario: lane_hold wins over a held set_steering while engaged",
+          "[Scenario][LaneHold]") {
+    using ev1sim::Scenario;
+    Scenario s;
+    s.set_events({
+        {1.00, "set_steering", 0.4, 0.0},
+        {2.00, "lane_hold",    0.0, 0.0},
+    });
+    CountingHooks hooks;
+    DriverCommand cmd{};
+    VehicleState st{};
+    st.pos_y = 1.0;
+    s.Tick(1.5, st, hooks, cmd);
+    CHECK(cmd.steering == 0.4);
+    s.Tick(2.5, st, hooks, cmd);
+    CHECK(cmd.steering < 0.0);
+}
+
+TEST_CASE("Scenario: the shipped split-mu scenario holds the lane for the "
+          "whole coast and releases on the brake tick", "[Scenario][LaneHold]") {
+    const std::filesystem::path source_root(EV1SIM_SOURCE_DIR);
+    auto loaded = ev1sim::Scenario::LoadFromFile(
+        (source_root / "config/scenarios/abs_split_mu.json").string());
+    REQUIRE(loaded.has_value());
+
+    double hold_at = -1.0, release_at = -1.0, brake_at = -1.0, throttle_off_at = -1.0;
+    for (const auto& e : loaded->events()) {
+        if (e.action == "lane_hold")    hold_at = e.at_time_s;
+        if (e.action == "lane_release") release_at = e.at_time_s;
+        if (e.action == "set_brake" && e.value > 0.0 && brake_at < 0.0)
+            brake_at = e.at_time_s;
+        if (e.action == "set_throttle" && e.value == 0.0) throttle_off_at = e.at_time_s;
+    }
+    REQUIRE(hold_at >= 0.0);
+    REQUIRE(release_at >= 0.0);
+    REQUIRE(brake_at >= 0.0);
+    // Engaged from the throttle release (behind the same wait_for_speed
+    // barrier, so it fires on the release tick) ...
+    CHECK(hold_at == throttle_off_at);
+    // ... and released ON the brake tick, not before it (a gap would let
+    // the coast-drag asymmetry walk the car off the seam again) and not
+    // after it (steering into the stop would write the yaw answer).
+    CHECK(release_at == brake_at);
+    // The surface columns the acceptance rule reads must be logged.
+    const auto& f = loaded->stats().fields;
+    for (const char* col : {"wheel_mu_fl", "wheel_mu_fr", "applied_steering", "pos_y"})
+        CHECK(std::find(f.begin(), f.end(), col) != f.end());
 }
 
 TEST_CASE("Scenario: assert_speed_within passes when within tolerance",

@@ -47,6 +47,44 @@ the script catches the plant moving forwards under a table that still says what
 it always said.  Neither can see the other's failure, which is why both exist.
 Re-measure with `--update` and commit what moved.
 
+**`split_mu` also has to STAY on the seam through its settle, and since
+2026-09-08 the scenario driver steers to keep it there.**  A runway long
+enough was not enough, because an open-loop coast holds whatever heading
+the launch wrote.  Under full throttle the two driven fronts do not spin
+equally (FL −0.089 / FR −0.094 slip at t = 4 s; launch means −0.074 /
+−0.078), the car yaws at ~0.001 rad/s for the whole launch and carries
++0.40° into the coast; the coast then holds
+it, yaw rate 0.0000, for the 145 m to the brake, and 0.4° over 145 m is
+1.3 m.  (On the split itself the car additionally crabs — body ~0.9° off
+its direction of travel — because the drag asymmetry is a yaw moment the
+tyres balance with a force couple; that is a sideslip, not a walk.)
+Measured under the acceptance harness on
+2026-09-08 (ev1sim `e3613d3`), the t = 15 s brake event landed at
+pos_y = +1.28 m with the brake controller on the bus and +1.30 m without
+it, against a front half-track of 0.735 m — every wheel on asphalt, both
+front slip traces mirror images (0.104 / 0.102 mean), a plain dry stop.  A
+spawn offset cannot place the car, because the drift is not a constant:
+the same scenario spawned at y = −1.15 m arrived at +0.47 m (a 1.6 m
+walk, versus 1.3 m from y = 0).
+
+So `abs_split_mu.json` now engages `lane_hold` (a scenario action, see
+`src/Scenario.h`) on the throttle-release tick and `lane_release` on the
+brake tick.  The law steers on the measured **course** (direction of
+travel from the last tick's displacement), not on body heading — a
+heading-error controller reads the crab angle as "already turning toward
+the line" and parks the car 0.18 m off the seam; the course law settles
+on it.  Measured with the hold: brake event at pos_y = −0.028 m, course
+−0.03°, body yaw −0.87° (the crab), wheel_mu 0.90 / 0.08 under FL / FR,
+steering 0.000 on the brake tick.  The release is deliberate: the stop is
+open-loop, so what the car does under the brake is the brake system's
+answer, not the driver's.  Peak steering demand during the whole coast
+was 0.04 of the rack (0.4° road wheel).  The stats CSV now also carries
+`wheel_mu_fl..rr` (the terrain friction under each contact patch) and
+`applied_steering`, so a reader — or an acceptance rule — can see which
+surface each wheel actually braked on rather than infer it from position.
+
+What the correctly placed car then shows is in "Outstanding issues".
+
 **The three uniform-surface stops — `high_mu`, `hard_brake` and
 `brake_and_steer` — now have that settle too (2026-08-12).**  Their
 `set_brake` used to sit behind the `wait_for_speed` barrier, so full
@@ -291,6 +329,22 @@ sections.  At the architectural level:
 - **Rear EMB lacks per-wheel modulation.** `split_mu` BTCM-on takes
   ~25 % longer to stop than BTCM-off because the rear motors apply
   symmetric force regardless of which side is on ice.
+- **On the seam, `split_mu` BTCM-on SPINS.** Every earlier split_mu number
+  was a dry stop (see "The four scenarios"); the first stop actually
+  straddling the seam (2026-09-08, lane-held entry, ev1sim at this commit
+  under the electricsim acceptance harness) reads: BTCM-off yaws +5.2°
+  and holds it (both fronts lock by 0.6 s, the unbraked rear keeps its
+  grip, 34.6 m stop); BTCM-on reaches +18° 1.0 s after the brake, +51° at 1.6 s and
+  comes to rest at +64.5°, 9.4 m sideways, in 28.4 m.  The fronts keep
+  cycling (asymmetric longitudinal force at each side's own limit, so
+  the yaw moment never lets up) while the rear EMBs are commanded on a
+  rear axle with one wheel on ice — the ice-side rear reaches 0.31 slip at
+  0.6 s and the rear loses the lateral grip that held the BTCM-off car.
+  A split-mu ABS conventionally limits the front yaw-moment build-up
+  (select-low or a rate limit on the high-mu side) for exactly this
+  reason; this one does not.  A controller finding, not a plant one, and
+  not fixed here — the electricsim acceptance case is expected red until
+  it is.
 - **Low-mu / mu-jump still show extended lock.** When all four
   wheels lock together on ice, the no-accelerometer speed estimator
   collapses with them.  Fundamental first-gen ABS limitation.
