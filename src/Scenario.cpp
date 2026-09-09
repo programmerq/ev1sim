@@ -1,13 +1,19 @@
 #include "Scenario.h"
 
+#include <algorithm>
 #include <cctype>
 #include <chrono>
+#include <cmath>
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <sstream>
 
 #include "ExternalSimConnector.h"
 #include "PhysicalWorld.h"
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 namespace ev1sim {
 
@@ -64,7 +70,7 @@ std::optional<Scenario> Scenario::LoadFromFile(const std::string& path) {
     }
     // Stable ordering by time so events fire in the right order regardless of
     // file authoring order.
-    std::sort(s.m_events.begin(), s.m_events.end(),
+    std::stable_sort(s.m_events.begin(), s.m_events.end(),
               [](const ScenarioEvent& a, const ScenarioEvent& b) {
                   return a.at_time_s < b.at_time_s;
               });
@@ -177,6 +183,12 @@ void Scenario::Tick(double sim_time, const VehicleState& state,
         } else if (e.action == "fail_throttle_input") {
             // value != 0 → fail, 0 → restore.
             hooks.FailThrottleInput(e.value != 0.0);
+        } else if (e.action == "lane_hold") {
+            m_lane_hold_y = e.value;
+            m_lane_prev.reset();
+        } else if (e.action == "lane_release") {
+            m_lane_hold_y.reset();
+            m_held_steering = 0.0;
         } else {
             std::cerr << "[Scenario] unknown action '" << e.action
                       << "' — skipping\n";
@@ -186,9 +198,73 @@ void Scenario::Tick(double sim_time, const VehicleState& state,
     if (m_held_throttle) cmd.throttle    = *m_held_throttle;
     if (m_held_brake)    cmd.front_brake = cmd.rear_brake = *m_held_brake;
     if (m_held_steering) cmd.steering    = *m_held_steering;
+    if (m_lane_hold_y)   cmd.steering    = LaneHoldSteering(state);
     // One physical horn contact (circuit 28); SimApp ORs low||high into
     // HornButton::set_held, so driving both mirrors a closed contact.
     if (m_held_horn)     cmd.horn_low    = cmd.horn_high = *m_held_horn;
+}
+
+// Lane-keeping law: a look-ahead COURSE controller with yaw-rate damping.
+//
+//   psi_des = -atan2(y - y_target, L_look)        course that closes the offset
+//   course  = atan2(dy, dx) over the last tick    direction of travel
+//   steer   = k * (psi_des - course) - k_r * r    clamped to +/- kSteerLimit
+//
+// COURSE, NOT BODY HEADING — measured, not assumed.  A car coasting straight
+// along a split-mu seam runs with a crab angle: the drag asymmetry is a yaw
+// moment, the tyres balance it with a force couple, and a rear lateral force
+// needs a rear slip angle, so the body sits ~0.8 deg off its own direction of
+// travel (measured -0.83 deg at 17 m/s on level/flat_split_mu.json).  A
+// heading-error controller reads that crab as "already turning toward the
+// line" and parks the car 0.18 m off the seam, satisfied.  The course has no
+// such offset: y is constant exactly when the course is zero, and the law
+// asks for a zero course exactly when y is on target, so the closed loop
+// settles ON the line with no integral term.  The tick displacement at 60 Hz
+// and 17 m/s is 0.28 m in double precision, ample for the angle; below
+// kMinStepM the course is undefined and the body heading stands in (only
+// reachable if lane_hold is engaged on a stationary car).
+//
+// Sign convention: DriverCommand.steering > 0 is a LEFT turn (toward +y),
+// yaw_deg > 0 is a nose toward +y (VehicleWorld: atan2(fwd.y, fwd.x)), so a
+// car left of the line travelling straight gets a negative (rightward)
+// command.  Verified against abs_brake_and_steer: set_steering +0.4 yaws
+// +139 deg in the recorded baseline.
+//
+// @design 2026-09-08 claude — gains sized on the EV1 rack (10 deg road-wheel
+// at steering 1.0, data/vehicle/ev1/steering/EV1_RackPinion.json) at the
+// ~20 m/s the ABS scenarios settle at:
+//   kLookAheadM  15 m   ≈ 0.75 s of travel; lateral loop ≈ V / L_look
+//                       ≈ 1.3 rad/s, well below the yaw dynamics.
+//   kCourseGain  2.0    per rad of course error → 0.35 rad road-wheel per
+//                       rad, i.e. 1 deg of error asks for 0.35 deg at the
+//                       wheels.  Loop gain ≈ V/L * 0.35 ≈ 2.8 rad/s on the
+//                       2.5 m wheelbase.
+//   kYawRateGain 0.3    per rad/s, damps the loop.
+//   kSteerLimit  0.3    3 deg road-wheel — a settle correction, not a swerve;
+//                       the lane-keeping driver must never be the thing that
+//                       writes a yaw story into a directional-stability test.
+// Measured on abs_split_mu: see config/scenarios/abs_split_mu.json's header
+// for the brake-entry position this delivers against the open-loop drift.
+double Scenario::LaneHoldSteering(const VehicleState& state) {
+    constexpr double kLookAheadM  = 15.0;
+    constexpr double kCourseGain  = 2.0;
+    constexpr double kYawRateGain = 0.3;
+    constexpr double kSteerLimit  = 0.3;
+    constexpr double kMinStepM    = 1e-3;
+    constexpr double kDegToRad    = M_PI / 180.0;
+
+    double course = state.yaw_deg * kDegToRad;
+    if (m_lane_prev) {
+        const double dx = state.pos_x - m_lane_prev->x;
+        const double dy = state.pos_y - m_lane_prev->y;
+        if (std::hypot(dx, dy) >= kMinStepM) course = std::atan2(dy, dx);
+    }
+    m_lane_prev = LanePoint{state.pos_x, state.pos_y};
+
+    const double e_y     = state.pos_y - *m_lane_hold_y;
+    const double psi_des = -std::atan2(e_y, kLookAheadM);
+    const double steer   = kCourseGain * (psi_des - course) - kYawRateGain * state.yaw_rate;
+    return std::clamp(steer, -kSteerLimit, kSteerLimit);
 }
 
 void Scenario::OpenStats() {
@@ -305,6 +381,15 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
         else if (f == "slip_ratio_fr")        m_csv << state.slip_ratio[1];
         else if (f == "slip_ratio_rl")        m_csv << state.slip_ratio[2];
         else if (f == "slip_ratio_rr")        m_csv << state.slip_ratio[3];
+        // Terrain friction coefficient under each contact patch, same order;
+        // -1 when unavailable.  THE surface each wheel is actually on — on a
+        // split-mu level this is what tells a reader (or an acceptance rule)
+        // that the brake event landed with the fronts on different surfaces,
+        // which pos_y alone only implies.  @design 2026-09-08 claude.
+        else if (f == "wheel_mu_fl")          m_csv << state.wheel_mu[0];
+        else if (f == "wheel_mu_fr")          m_csv << state.wheel_mu[1];
+        else if (f == "wheel_mu_rl")          m_csv << state.wheel_mu[2];
+        else if (f == "wheel_mu_rr")          m_csv << state.wheel_mu[3];
         // BTCM-side bus state — captures what the controller is commanding,
         // independent of what the physics is doing.  Useful for annotating
         // ABS events on a wheel-speed graph.
