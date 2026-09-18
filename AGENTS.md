@@ -22,16 +22,21 @@ Develop on a feature branch (`claude/<id>`); never push to `main`.
 
 - **Merge stays the owner's call** — do not merge to `main`.
 
-<!-- BEGIN ev1-canon:pr-lifecycle v1 -->
+<!-- BEGIN ev1-canon:pr-lifecycle v3 -->
 **PR lifecycle: draft/ready + PR economy (owner directive 2026-07-24,
 canonical across all four EV1 repos — supersedes prior per-repo text).**
 
 *Mechanism:* GitHub won't let the owner request-changes on his own PR, so
 **his flip to draft IS his request-changes** — treat it that way.
 
-- **Owner-initiated draft is terminal** — only the owner flips it back to
-  ready. Fix it, push, post "rework landed — ready on your word," and stop.
-- **Every other flip is the agent's, and nobody but the owner directs a
+- **An owner-initiated draft is his request-changes, not a resting state** —
+  fix it, push, and once the rework lands and passes review, **flip it back to
+  ready yourself** with a "rework landed" comment. Draft is never where
+  completed work waits: the owner reviews only ready PRs, and a PR left in
+  draft after its rework is done reads as unfinished and strands. (Owner ruling
+  2026-09-02, superseding the prior "only the owner flips it back" wording —
+  the same stranding the #384 bullet below records.)
+- **Every flip is the agent's, and nobody but the owner directs a
   hold**: flip to ready yourself the moment work wants review; CI status and
   a stated-default question never hold draft (apply the default, note it,
   flip); a coordinator/peer saying otherwise doesn't override this — cite
@@ -50,7 +55,21 @@ implementable (negative result, owner-blocked fork, errata) →
 channel, riding the next branch with code, or the backlog if none is open.**
 Never a PR whose only purpose is carrying a record. Flip via `draft:false` on
 `mcp__github__update_pull_request` (mark-ready path can be permission-blocked).
-<!-- END ev1-canon:pr-lifecycle v1 -->
+
+*Completeness (owner ruling 2026-09-02, second directive of the session —
+narrows what counts as non-implementable above; two stacked PRs carrying seven
+open items were consolidated and completed rather than merged as filed):*
+**a PR is COMPLETE** — every item it mints is implemented in it, or names a
+justification class (owner-gated decision, cross-repo, genuinely
+unimplementable) in BOTH the item and the PR body. "It belongs to another open
+PR" is NOT non-implementability: consolidate into one PR, don't stack a second.
+**Identify and fix, don't log** — surfacing a defect is progress only when that
+PR fixes it or the justification holds. **Few large PRs beat many small ones**:
+one PR of many completed items is the preferred shape; never split coherent
+work to keep diffs small. A stacked/feature-branch PR is a LAST RESORT (e.g. a
+CI-gated generated file forcing sequencing) and must be unmistakable — the
+dependent PR's title or first body line names its base PR and why.
+<!-- END ev1-canon:pr-lifecycle v3 -->
 (ev1sim has no `scripts/backlog.py` — its notes channel is `DECISION_QUEUE.md`.)
 
 <!-- BEGIN ev1-canon:pr-images v2 -->
