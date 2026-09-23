@@ -312,7 +312,7 @@ private:
 ///   1. Enter the correct 5-digit interior code on the RSA keypad by
 ///      pressing the per-digit button signals (6975-6979).  This opens the
 ///      RSA's authentication window (~5 s on the external sim side).
-///   2. Press the ACC or RUN mode button on the RSA HMI (6971).
+///   2. Press the ACC or RUN mode button on the RSA HMI (6972 LOCK / 6973 OFF/ACC / 6974 RUN).
 ///
 /// The K key in ev1sim cycles a local "expected key state" through the
 /// faithful EV1 detent order — OFF → ACC → RUN → OFF — so a cold start that

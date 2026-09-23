@@ -767,7 +767,7 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 //   6903 throttle_q8, 6904 brake_switch, 6944 hazard_request,
 //   6948 turn_signal_left, 6949 turn_signal_right, 6964 seatbelt_buckled,
 //   6972-6974 rsa_mode_sw_{lock,off_acc,run},
-//   6975 rsa_keypad_button1, 6976..6979 (buttons 2-5)  (15 total).
+//   6975 rsa_keypad_button1, 6976..6979 (buttons 2-5)  (17 total).
 //   + 1 new: 6952 ipc_trip_reset.  (Cruise 6953-6957 and wiper 6958/6959 moved
 //     to the chassis switch cavities below.)
 //   + 4 new: 6980-6983 power window switches (driver up/down, passenger up/down).

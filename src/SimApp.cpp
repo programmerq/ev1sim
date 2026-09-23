@@ -1714,7 +1714,7 @@ int SimApp::RunWithVisualization() {
                 m_physical->turn_signal_stalk().active_right());
             m_external_sim->SetDriverHazardRequest(
                 m_physical->hazard_switch().on());
-            // RSA keypad buttons (6975-6979) and mode button (6971) — tick the
+            // RSA keypad buttons (6975-6979) and mode buttons (6972-6974) — tick the
             // scheduler and consume whatever it has ready for this frame.
             // button_value encoding: 0=idle, 1=tap, 2=long-press.
             m_physical->rsa_keypad().update(render_dt);
