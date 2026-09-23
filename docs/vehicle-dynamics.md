@@ -68,7 +68,7 @@ for the constants and the drag law `F = 0.5·ρ·Cd·A·v²`:
 | ⇒ CdA | 0.359 m² | |
 
 Reference points the unit test pins: at **100 km/h** drag ≈ **170 N**
-(~4.7 kW to overcome).  `VehicleWorld::CreateEV1` feeds these same constants
+(~4.7 kW to overcome).  `ev1sim::BuildEV1Vehicle` (src/EV1Vehicle.cpp) feeds these same constants
 into Chrono's `ChChassis::SetAerodynamicDrag(Cd, area, air_density)`, which
 applies the identical formula at the chassis COM each `Synchronize`.
 

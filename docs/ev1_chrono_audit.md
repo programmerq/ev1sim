@@ -503,7 +503,7 @@ claimed as resolved by this entry.
 | Coefficient of friction | 0.8 | typical dry asphalt | ✅ |
 | Rolling resistance | 0.008 | EV1 spec'd 0.006-0.008 (Michelin Proxima LRR) | ✅ |
 | Load index | 82 (475 kg/tire) | 95 (Q-rated) | ⚠️  probably under-spec'd |
-| Tire model | TMeasy | n/a | ✅ standard choice |
+| Tire model | TMeasy + first-order longitudinal tire dynamics (§5.2) | n/a | ✅ standard choice |
 
 Tires are the best-modeled part of the vehicle.  The wide margin on
 bearing capacity (4750 N vs ~3140 N actual peak load per tire) is
@@ -534,6 +534,39 @@ default). `steps_per_tick = round(tick_dt / step)` auto-doubles, so the
 only the physics integration is finer. Deterministic (bit-identical run-to-run
 preserved); VAT baselines recaptured because every physics value shifts
 slightly. Tracked as electricsim `BL-0181`.
+
+### 5.2 Launch wheel-slip ringing → first-order tire dynamics (2026-09-23)
+
+The 1 ms step fixed standstill but not the launch.  On a dry half-pedal launch
+(electricsim VAT `safety_pps_triplet_fail` before its fault, and reproduced
+here with no fleet attached) the slip rang from ~1.7 m/s to ~7 m/s: front
+slip ±0.2–0.3 in anti-phase left/right, the undriven rears ±0.29.  In co-sim
+the BTCM read it as wheel spin and raised a traction retard request (duty up
+to ~40 %), and the PIM command dipped 128 → 90: a false traction cut.
+
+Mechanism: Chrono 9's TMeasy maps slip to force algebraically and the vehicle
+applies that force frozen over the step.  Its sensitivity to wheel speed is
+`dFx/dω ≈ C·R/v` (C = `dFx/dsx`), a damper that grows as 1/v, and an explicitly
+applied damper is stable only while `h·C·R²/(I·v) < 2`.  The ringing starts
+where the friction blend (1 → 3 m/s) hands the force to the slip curve and
+dies out above the speed where that inequality holds again.  The fronts ring in
+anti-phase because the open differential's symmetric mode carries the motor
+inertia and stays stable.  Step sweep (front `slip_FL − slip_FR` half
+peak-to-peak, t = 2–3 s): 1 ms → 0.39, 0.5 ms → 0.10, 0.25 ms → 0.00.  The
+time to 12 m/s is the same at every step (7.95 s), so it is numerical and
+leaves the mean launch alone.  PR #58's driveshaft-inertia change is not the
+cause: the undriven rears ring too.
+
+Fix: restore the first-order tire dynamics that TMeasy defines (Rill: a
+tread/carcass spring `cx` and damper `dx` in series with the slip curve).
+Chrono 8.0 had them and Chrono 9 dropped them.  `src/EV1TMeasyTire.{h,cpp}`
+adds the longitudinal half back on top of Chrono's force.  The values are
+derived by Chrono 8's own rule (`cx = 0.9·CZ`, `dx = 0.5·√(cx·m)`) and tagged
+inferred in the tire JSON.  In steady state the force is unchanged: coastdown,
+the 0.7-pedal accel/brake run and the ice wheel-spin probe all match the pre-fix
+runs to ≤ 0.02 m/s.  The launch is now flat: front L−R 0.0005 and every wheel
+within 0.0004 of its 100 ms mean.  `tests/test_launch_slip.cpp`
+(`ev1sim_plant_tests`, label `plant`) pins that bound.
 
 ## 6. Brakes
 

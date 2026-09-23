@@ -1,5 +1,5 @@
 #include "VehicleWorld.h"
-#include "Aerodynamics.h"
+#include "EV1Vehicle.h"
 #include "SlipRatio.h"
 
 #include "chrono/core/ChGlobal.h"
@@ -96,53 +96,13 @@ VehicleWorld::~VehicleWorld() = default;
 // ---------------------------------------------------------------------------
 
 void VehicleWorld::CreateEV1(const Config& cfg) {
-    std::string vehicle_json = vehicle::GetDataFile("ev1/vehicle/EV1_Vehicle.json");
-    std::string engine_json  = vehicle::GetDataFile("ev1/powertrain/EV1_EngineSimpleMap.json");
-    std::string trans_json   = vehicle::GetDataFile("ev1/powertrain/EV1_AutomaticTransmissionSimpleMap.json");
-    std::string tire_json    = vehicle::GetDataFile("ev1/tire/EV1_TMeasyTire.json");
-
-    // Create the vehicle from JSON (without powertrain/tires — we attach those manually).
-    m_ev1 = std::make_unique<vehicle::WheeledVehicle>(
-        vehicle_json, ChContactMethod::SMC, false, false);
-    m_ev1->SetCollisionSystemType(ChCollisionSystem::Type::BULLET);
-    m_ev1->Initialize(ChCoordsys<>(m_spawn_pos, m_spawn_rot));
+    // Chassis, driveline, aero, powertrain and tires: one builder shared
+    // with the plant tests (EV1Vehicle.cpp), so both run the same car.
+    m_ev1 = ev1sim::BuildEV1Vehicle(ChCoordsys<>(m_spawn_pos, m_spawn_rot),
+                                    cfg.simulation.step_size_s);
 
     m_vehicle = m_ev1.get();
     m_system  = m_ev1->GetSystem();
-
-    // --- Body aerodynamics (Round 4) -------------------------------------
-    // The EV1's signature 0.19 Cd was previously lumped into tire dissipation;
-    // apply it explicitly to the chassis instead.  ChChassis::SetAerodynamicDrag
-    // applies F = 0.5·rho·Cd·A·v² at the COM opposing chassis velocity each
-    // Synchronize.  The constants (and the matching formula the unit tests pin)
-    // live in Aerodynamics.h.  NOTE: now that drag is no longer baked into the
-    // tire model, tire rolling/slip dissipation may want a small downward
-    // recalibration to keep top speed / coastdown honest.
-    m_ev1->GetChassis()->SetAerodynamicDrag(
-        ev1sim::Aerodynamics::kEV1DragCoefficient,
-        ev1sim::Aerodynamics::kEV1FrontalAreaM2,
-        ev1sim::Aerodynamics::kAirDensityIsaSeaLevel);
-
-    // Powertrain: engine + single-speed transmission.
-    auto engine       = vehicle::ReadEngineJSON(engine_json);
-    auto transmission = vehicle::ReadTransmissionJSON(trans_json);
-    auto powertrain   = chrono_types::make_shared<vehicle::ChPowertrainAssembly>(engine, transmission);
-    m_ev1->InitializePowertrain(powertrain);
-
-    // Tires on all wheels.
-    for (auto& axle : m_ev1->GetAxles()) {
-        for (auto& wheel : axle->GetWheels()) {
-            auto tire = vehicle::ReadTireJSON(tire_json);
-            m_ev1->InitializeTire(tire, wheel, VisualizationType::MESH);
-        }
-    }
-
-    // Set tire step size.
-    for (auto& axle : m_ev1->GetAxles()) {
-        for (auto& wheel : axle->GetWheels()) {
-            wheel->GetTire()->SetStepsize(cfg.simulation.step_size_s);
-        }
-    }
 
     m_vehicle->SetChassisVisualizationType(VisualizationType::MESH);
     m_vehicle->SetSuspensionVisualizationType(VisualizationType::PRIMITIVES);

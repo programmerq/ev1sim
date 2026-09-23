@@ -301,6 +301,8 @@ add_executable(ev1sim
     src/main.cpp
     src/SimApp.cpp
     src/VehicleWorld.cpp
+    src/EV1Vehicle.cpp
+    src/EV1TMeasyTire.cpp
     src/CommandDriver.cpp
     src/KeyboardInputController.cpp
     src/CameraManager.cpp
@@ -518,6 +520,28 @@ if(BUILD_TESTS)
     include(CTest)
     include(Catch)
     catch_discover_tests(ev1sim_tests)
+
+    # ── Plant tests (need Chrono: they step the real EV1 vehicle) ──────────
+    # Kept out of ev1sim_tests so the unit suite stays Chrono-free for a
+    # tests-only build.  One launch is ~4.5 s of simulated time at 1 ms.
+    if(Chrono_FOUND)
+        add_executable(ev1sim_plant_tests
+            tests/test_launch_slip.cpp
+            src/EV1Vehicle.cpp
+            src/EV1TMeasyTire.cpp
+        )
+        target_include_directories(ev1sim_plant_tests PRIVATE src)
+        target_compile_definitions(ev1sim_plant_tests PRIVATE
+            CHRONO_DATA_DIR="${CHRONO_DATA_DIR}"
+            EV1SIM_VEHICLE_DATA_DIR="${EV1SIM_VEHICLE_DATA_DIR}"
+        )
+        target_link_libraries(ev1sim_plant_tests PRIVATE
+            Catch2::Catch2WithMain
+            nlohmann_json::nlohmann_json
+            ${CHRONO_LIBRARIES}
+        )
+        catch_discover_tests(ev1sim_plant_tests PROPERTIES LABELS "plant" TIMEOUT 300)
+    endif()
 
     # ── Vendored-stub honesty checks ────────────────────────────────────────
     # tests/electricsim_stub/ is a second copy of the external sim's substrate
