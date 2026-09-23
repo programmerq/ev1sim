@@ -30,6 +30,22 @@
  *     new "previous" level, so a back-to-back next Start (0) is caught on the
  *     following bit.
  *
+ * Idle Line (the GM-8192 frame boundary; docs/gm8192_protocol.md §"Physical
+ * layer": continuous logic-1 for ≥ 10 bit times): counted in kIdle as the run
+ * of logic-1 bits AFTER a Stop bit (the Stop bit itself is not counted). No
+ * run of 10 ones can occur inside back-to-back bytes — the longest is a $FF
+ * byte's 8 data ones plus its Stop bit, then the next Start (0) — so a run of
+ * kIdleLineBits ones is unambiguous. The transmitter appends a bounded
+ * Idle-Line tail of exactly that many ones when its queue drains (see
+ * uart_tx.hpp), so the boundary is present in the stream itself; no sim-time
+ * inference is needed. The next decoded byte is flagged "boundary before" and
+ * pop_byte(out, gap_before) reports it, so a byte-level framer can drop
+ * whatever it assembled before the gap — the way a real receiver resyncs.
+ * An overrun (bits lost) flags the next byte as following a hole instead:
+ * bytes on either side of a hole cannot belong to one frame, and unlike an
+ * Idle Line a hole does not put the next byte at a frame start. An Idle Line
+ * seen after a hole supersedes it.
+ *
  * Overrun: if this reader falls more than the ring capacity behind the
  * producer (a tick so coarse / a producer so fast that the ring wrapped past
  * the cursor), read_bits_since reports it; UartRx counts the event, resets to
@@ -76,6 +92,27 @@ class UartRx {
   // if the decode queue is empty.
   bool pop_byte(std::uint8_t* out);
 
+  // What separated a decoded byte from the byte decoded before it.
+  enum class Gap : std::uint8_t {
+    kNone,      // contiguous (back-to-back, or an idle gap under 10 bit times)
+    kIdleLine,  // an Idle Line: this byte is the first after a frame boundary
+    kLostBits,  // an overrun hole: bits were lost, this byte is mid-stream
+  };
+
+  // As above, and also report the Gap before this byte. A byte-level framer
+  // uses kIdleLine as the frame boundary (nothing before it can be part of a
+  // frame that continues after it) and kLostBits as a discontinuity to hunt
+  // past until the next Idle Line.
+  bool pop_byte(std::uint8_t* out, Gap* gap_before);
+
+  // Idle Lines observed since construction (each ≥ kIdleLineBits run of
+  // logic-1 after a Stop bit counts once, however long the quiet lasts).
+  std::uint32_t idle_lines() const noexcept { return idle_lines_; }
+
+  // Bit times of continuous logic-1 that make an Idle Line. @source:manual;
+  // docs/gm8192_protocol.md §"Physical layer". Matches UartTx::kIdleLineBits.
+  static constexpr int kIdleLineBits = 10;
+
   // Framing errors observed since construction (Stop bit sampled logic-0).
   std::uint32_t framing_errors() const noexcept { return framing_errors_; }
 
@@ -102,8 +139,15 @@ class UartRx {
   bool          last_high_{true};    // previous bit (for 1→0 edge detection)
   std::uint32_t framing_errors_{0};
   std::uint32_t overruns_{0};
+  std::uint32_t idle_lines_{0};
+  int           idle_ones_{0};       // logic-1 run length since the last Stop
+  Gap           gap_pending_{Gap::kNone};  // Gap to attach to the next byte
 
-  std::deque<std::uint8_t> byte_q_;  // decoded bytes awaiting pop_byte()
+  struct RxByte {
+    std::uint8_t value;
+    Gap          gap_before;
+  };
+  std::deque<RxByte> byte_q_;        // decoded bytes awaiting pop_byte()
 };
 
 }  // namespace electricsim::io

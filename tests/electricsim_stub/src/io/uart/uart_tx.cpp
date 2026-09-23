@@ -18,12 +18,16 @@
  * still governs HOW MANY bits a tick produces (the producer paces bit
  * production by the wall clock); they just land in the ring now.
  *
- * Idle Line: when the queue drains, the transmitter simply STOPS appending —
- * it does NOT flood the ring with idle 1-bits. The receiver's edge detector
- * keys off its own last-sampled level, so the next frame's Start bit presents
- * as a 1→0 transition from the previous Stop bit regardless of how long the
- * gap was. (A level-held cell needed a held logic-1; a stream does not, and
- * appending unbounded idle bits would overrun the ring during long quiets.)
+ * Idle Line: when the queue drains, the transmitter appends a BOUNDED tail of
+ * kIdleLineBits logic-1 bits (paced one per bit period, like frame bits) and
+ * then stops appending — it does NOT flood the ring with idle 1-bits for the
+ * whole quiet, which would overrun the ring during long quiets. The tail is
+ * exactly enough for a receiver to count an Idle Line (≥ 10 bit times of
+ * logic-1, the frame boundary) from the stream itself; the receiver's edge
+ * detector keys off its own last-sampled level, so the next frame's Start
+ * bit still presents as a 1→0 transition however long the real gap was.
+ * A byte enqueued mid-tail cuts the tail short: the line was idle for fewer
+ * than 10 bit times, so no Idle Line is signalled — as on a real wire.
  *
  * @design 2026-06-13 claude — docs/wire_truth_gm8192_step4.md §"Sub-PR 4-C½"
  *   (transport); §"Sub-PR 4-B" (state machine); docs/gm8192_protocol.md
@@ -51,7 +55,8 @@ void UartTx::enqueue(const std::uint8_t* data, std::size_t len) {
 void UartTx::enqueue(std::uint8_t byte) { queue_.push_back(byte); }
 
 bool UartTx::idle() const noexcept {
-  return state_ == State::kIdle && queue_.empty();
+  return (state_ == State::kIdle || state_ == State::kIdleTail) &&
+         queue_.empty();
 }
 
 bool UartTx::frame_bit(std::uint8_t byte, int pos) {
@@ -62,6 +67,41 @@ bool UartTx::frame_bit(std::uint8_t byte, int pos) {
 
 void UartTx::tick(std::uint64_t now_ns) {
   for (;;) {
+    if (state_ == State::kIdleTail) {
+      // A byte enqueued since the last tick is treated as enqueued at now_ns,
+      // the same assumption the kIdle re-seed below makes: the line was idle
+      // for every bit time strictly before now_ns, so those tail bits are
+      // sent first. With no byte waiting, a tail bit is due at its boundary.
+      const bool byte_waiting = !queue_.empty();
+      const bool idle_bit_due = byte_waiting ? (next_edge_ns_ < now_ns)
+                                             : (next_edge_ns_ <= now_ns);
+      if (idle_bit_due) {
+        if (table_ != nullptr) {
+          table_->append_bit(tx_cell_, true);  // Idle Line: logic-1.
+        }
+        next_edge_ns_ += bit_period_ns_;
+        if (--tail_left_ == 0) {
+          // A full Idle Line has been sent; stop appending idle bits (the
+          // stream carries no more of them than that). A waiting byte is
+          // started by the kIdle branch on the next loop pass.
+          state_ = State::kIdle;
+          if (!byte_waiting) return;
+        }
+        continue;
+      }
+      if (!byte_waiting) {
+        return;  // Next idle bit boundary is still in the future.
+      }
+      // The byte arrived before a full Idle Line elapsed: the gap was shorter
+      // than 10 bit times. Its Start bit goes on the next bit boundary, right
+      // after the idle bits already sent (no re-seed — the bit clock is still
+      // running from the last Stop bit).
+      cur_byte_ = queue_.front();
+      queue_.pop_front();
+      bit_pos_ = 0;
+      state_ = State::kInFrame;
+    }
+
     if (state_ == State::kIdle) {
       if (queue_.empty()) {
         return;  // Nothing to send; cell already holds the Idle Line (logic-1).
@@ -94,11 +134,12 @@ void UartTx::tick(std::uint64_t now_ns) {
     ++bit_pos_;
 
     if (bit_pos_ == 10) {
-      // Frame complete. Chain to the next queued byte back-to-back, or go idle
-      // (leaving the cell at the Stop bit's logic-1 — the Idle Line).
+      // Frame complete. Chain to the next queued byte back-to-back, or start
+      // the bounded Idle-Line tail (the line rests at logic-1).
       if (queue_.empty()) {
-        state_ = State::kIdle;
-        return;
+        state_ = State::kIdleTail;
+        tail_left_ = kIdleLineBits;
+        continue;
       }
       cur_byte_ = queue_.front();
       queue_.pop_front();

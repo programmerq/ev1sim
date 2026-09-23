@@ -2,7 +2,7 @@
  * Gm8192RxFramer — stream-to-frame bridge for legacy-ring-free GM-8192 consumers.
  *
  * Wraps one electricsim::io::UartRx attached to a bit-stream wire cell with a
- * small bounded byte buffer + the generic gm8192_decode_next() decoder, so a
+ * small bounded byte buffer + the generic gm8192_decode() decoder, so a
  * consumer migrating off the legacy `kSig*UartFrame` ring deltas can replace
  *
  *     auto polled = transport.poll_frame(...);
@@ -24,8 +24,26 @@
  *   1. ticks the UartRx (drains new bits, runs the framing FSM, decoding any
  *      complete byte frames into the UartRx's internal byte queue),
  *   2. pops every newly available byte into this framer's bounded buffer,
- *   3. runs gm8192_decode_next() over the buffer, and on success consumes the
- *      framed bytes (header + payload + sumcheck) and returns the frame view.
+ *   3. decodes the frame at the head of the current Idle-Line segment, and on
+ *      success returns the frame view (its bytes — header + payload +
+ *      sumcheck — are consumed at the start of the next step()).
+ *
+ * Idle-Line framing: the UartRx flags each byte that follows an Idle Line
+ * (≥ 10 bit times of logic-1 — the GM-8192 frame boundary, docs/
+ * gm8192_protocol.md §"Physical layer": "Frames between Idle Lines") or an
+ * overrun hole. The framer records those byte offsets as segment boundaries
+ * and parses each segment the way a GM-8192 receiver does: the first frame
+ * starts at the segment's first byte, its Length says where it ends, and a
+ * back-to-back next frame (gap under 10 bit times) starts right after its
+ * SumCheck. A frame with a bad SumCheck is rejected by its own extent. When
+ * the head of a segment is not a frame start at all (bad ID or Length — a
+ * receiver that joined mid-frame, an overrun hole, noise), or a frame is
+ * still incomplete when the Idle Line closes its segment (a corrupted
+ * Length that over-claims), the framer drops bytes up to the next Idle Line
+ * and resumes there. No real frame spans an Idle Line, so resyncing there
+ * loses no real frame; and with no byte-by-byte scan, a window of garbage
+ * that happens to pass ID + Length + SumCheck cannot surface as a frame
+ * unless it sits where a frame must start.
  *
  * `Gm8192RxFramer` is safe to construct with a null WireTable* — every step()
  * call simply returns std::nullopt, mirroring the disabled-substrate seam the
@@ -33,8 +51,10 @@
  *
  * The returned `gm8192_frame_t` view's `payload` pointer references the
  * framer's internal byte buffer; it stays valid until the NEXT step() call
- * that consumes from the buffer (so the caller should copy the payload bytes
- * before the next step() if they need to outlive that boundary). Single-
+ * (the frame's bytes are removed from the buffer at the start of that call,
+ * not before step() returns, so a burst of back-to-back frames decoded in
+ * one coarse tick each keep their own payload). Copy the payload out before
+ * the next step() if it must outlive that boundary. Single-
  * threaded; one Gm8192RxFramer per producer cell per consumer thread.
  *
  * Capacity choice: a single GM-8192 frame is at most 173 bytes (ID + Length +
@@ -104,11 +124,47 @@ class Gm8192RxFramer {
   // never lines up to a valid frame. Either way: a diagnostic hint.
   std::uint64_t bytes_dropped() const noexcept { return bytes_dropped_; }
 
+  // Count of buffered bytes discarded by the receive rule rather than
+  // returned as frames: rejected frames, a partial frame from a mid-frame
+  // join, bytes skipped while hunting for an Idle Line. A diagnostic, like
+  // bytes_dropped().
+  std::uint64_t bytes_discarded_at_idle() const noexcept {
+    return bytes_discarded_at_idle_;
+  }
+
+  // Frames rejected by the receive rule (bad SumCheck, cut short by an Idle
+  // Line, or an unparseable segment head that started a hunt). Diagnostic.
+  std::uint64_t frames_rejected() const noexcept { return frames_rejected_; }
+
+  // Idle Lines the underlying receiver has seen (diagnostic passthrough).
+  std::uint32_t idle_lines() const noexcept { return rx_.idle_lines(); }
+
  private:
+  // Remove the first `n` buffered bytes, shifting segment boundaries; when
+  // the new head is a segment start, hunting_ takes that segment's state.
+  void erase_front(std::size_t n);
+
   WireTable*               table_;        // borrowed; nullptr-safe
   UartRx                   rx_;
   std::vector<std::uint8_t> buffer_;       // bounded; oldest-drops-first
+  // A byte offset into buffer_ at which a new segment starts: an Idle Line
+  // preceded that byte (a frame starts there), or an overrun hole did
+  // (`hunt`: the segment is mid-stream, skip it to the next Idle Line).
+  struct Boundary {
+    std::size_t offset;  // ascending across boundaries_; never 0
+    bool        hunt;
+  };
+  std::vector<Boundary>    boundaries_;
+  // Bytes of the frame returned by the last step(), erased at the start of
+  // the next step() so the returned payload pointer stays valid until then.
+  std::size_t              pending_consume_{0};
   std::uint64_t            bytes_dropped_{0};
+  std::uint64_t            bytes_discarded_at_idle_{0};
+  std::uint64_t            frames_rejected_{0};
+  // True while the head of the buffer is known not to be a frame start (an
+  // unparseable Length, an overrun hole, an evicted byte): drop bytes until
+  // the next Idle Line boundary.
+  bool                     hunting_{false};
 };
 
 }  // namespace electricsim::io
