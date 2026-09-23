@@ -822,7 +822,7 @@ TEST_CASE("test_power_windows_independent_per_window", "[PhysicalWorld][PowerWin
 namespace {
 
 // Drives the keypad scheduler for `ticks` updates of `dt`, collecting the
-// ordered list of mode-button pulses (1=OFF, 2=ACC, 3=RUN) and the total digit
+// ordered list of mode-button presses (kModeSw* masks) and the total digit
 // pulses emitted.  Mirrors the SimApp publish path: update() then
 // consume_fires_now() each tick.
 struct KeypadTrace {
@@ -837,7 +837,7 @@ KeypadTrace drain_keypad(RsaKeypadDriver& kp, double dt, int ticks) {
         auto fires = kp.consume_fires_now();
         for (int b = 0; b < 5; ++b)
             if (fires.button_value[b] != 0) ++tr.digit_pulses;
-        if (fires.mode_button != 0) tr.mode_presses.push_back(fires.mode_button);
+        if (fires.mode_switches != 0) tr.mode_presses.push_back(fires.mode_switches);
     }
     return tr;
 }
@@ -864,11 +864,14 @@ TEST_CASE("test_rsa_keypad_cold_start_reaches_RUN_in_two_cycles",
     // entered exactly once (on the OFF→ACC transition, opening the auth window).
     CHECK(tr.digit_pulses == 5);
 
-    // Mode presses, in order: ACC (2) then RUN (3) — never an ACC press AFTER
+    // Each press is ONE button (the driver serialises detents; see the class
+    // comment), never a superposed mask.
+    for (auto m : tr.mode_presses) CHECK((m != 0 && (m & (m - 1)) == 0));
+    // Mode presses, in order: ACC then RUN — never an ACC press AFTER
     // RUN, and never a spurious OFF.
     REQUIRE(tr.mode_presses.size() == 2);
-    CHECK(tr.mode_presses[0] == 2);  // ACC
-    CHECK(tr.mode_presses[1] == 3);  // RUN
+    CHECK(tr.mode_presses[0] == RsaKeypadDriver::kModeSwOffAcc);  // ACC
+    CHECK(tr.mode_presses[1] == RsaKeypadDriver::kModeSwRun);
 }
 
 TEST_CASE("test_rsa_keypad_RUN_press_follows_the_code_not_races_it",
@@ -886,7 +889,7 @@ TEST_CASE("test_rsa_keypad_RUN_press_follows_the_code_not_races_it",
         kp.update(0.10);
         auto f = kp.consume_fires_now();
         for (int b = 0; b < 5; ++b) if (f.button_value[b]) ++tr.digit_pulses;
-        if (f.mode_button) tr.mode_presses.push_back(f.mode_button);
+        if (f.mode_switches) tr.mode_presses.push_back(f.mode_switches);
     }
     // ...then cycle 2 (ACC→RUN) arrives mid-sequence (~t=300 ms).
     kp.cycle_k();
@@ -901,8 +904,8 @@ TEST_CASE("test_rsa_keypad_RUN_press_follows_the_code_not_races_it",
     // the code completes (the FIFO serialises it behind the in-flight digits).
     CHECK(tr.digit_pulses == 5);
     REQUIRE(tr.mode_presses.size() == 2);
-    CHECK(tr.mode_presses[0] == 2);  // ACC
-    CHECK(tr.mode_presses[1] == 3);  // RUN
+    CHECK(tr.mode_presses[0] == RsaKeypadDriver::kModeSwOffAcc);  // ACC
+    CHECK(tr.mode_presses[1] == RsaKeypadDriver::kModeSwRun);
 }
 
 TEST_CASE("test_rsa_keypad_cycle_never_downgrades_RUN_to_ACC",
@@ -917,7 +920,7 @@ TEST_CASE("test_rsa_keypad_cycle_never_downgrades_RUN_to_ACC",
     CHECK(kp.expected_state() == RsaKeypadDriver::ExpectedState::OFF);
     const auto tr = drain_keypad(kp, 0.10, 5);
     REQUIRE(tr.mode_presses.size() == 1);
-    CHECK(tr.mode_presses[0] == 1);  // OFF
+    CHECK(tr.mode_presses[0] == RsaKeypadDriver::kModeSwLock);  // LOCK -> OFF
     CHECK(tr.digit_pulses == 0);     // no re-entry of the code going to OFF
 }
 
@@ -933,26 +936,26 @@ TEST_CASE("test_rsa_keypad_full_loop_OFF_ACC_RUN_OFF",
     auto t1 = drain_keypad(kp, 0.10, 20);
     CHECK(t1.digit_pulses == 5);              // code entered, then ACC
     REQUIRE(t1.mode_presses.size() == 1);
-    CHECK(t1.mode_presses[0] == 2);           // ACC
+    CHECK(t1.mode_presses[0] == RsaKeypadDriver::kModeSwOffAcc);
 
     kp.cycle_k(); CHECK(kp.expected_state() == S::RUN);
     auto t2 = drain_keypad(kp, 0.10, 5);
     CHECK(t2.digit_pulses == 0);              // no re-entry going ACC→RUN
     REQUIRE(t2.mode_presses.size() == 1);
-    CHECK(t2.mode_presses[0] == 3);           // RUN
+    CHECK(t2.mode_presses[0] == RsaKeypadDriver::kModeSwRun);
 
     kp.cycle_k(); CHECK(kp.expected_state() == S::OFF);
     auto t3 = drain_keypad(kp, 0.10, 5);
     CHECK(t3.digit_pulses == 0);              // no re-entry going RUN→OFF
     REQUIRE(t3.mode_presses.size() == 1);
-    CHECK(t3.mode_presses[0] == 1);           // OFF
+    CHECK(t3.mode_presses[0] == RsaKeypadDriver::kModeSwLock);
 
     // Wraps: OFF → ACC again, re-entering the code.
     kp.cycle_k(); CHECK(kp.expected_state() == S::ACC);
     auto t4 = drain_keypad(kp, 0.10, 20);
     CHECK(t4.digit_pulses == 5);              // code re-entered on the wrap
     REQUIRE(t4.mode_presses.size() == 1);
-    CHECK(t4.mode_presses[0] == 2);           // ACC
+    CHECK(t4.mode_presses[0] == RsaKeypadDriver::kModeSwOffAcc);
 }
 
 TEST_CASE("test_rsa_keypad_custom_code_is_emitted",

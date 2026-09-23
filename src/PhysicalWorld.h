@@ -335,8 +335,10 @@ private:
 /// the code must be entered before the RUN press, and entering it at the ACC
 /// detent (rather than re-entering at RUN) matches "authenticate, then select
 /// the detent".  The RUN press is intentionally serialised one scheduler tick
-/// after the ACC press because the supervisor evaluates a single mode-button
-/// pulse per tick and clears it; two presses on one tick would drop one.
+/// after the ACC press: each press is its own transition.  The RSA now accepts
+/// several buttons in one tick (one wire bit per button), but it resolves them
+/// to ONE transition, least-energised first, so ACC+RUN together would land in
+/// ACC, not RUN.
 ///
 /// Long-press encoding (Option A):
 ///   Each button signal (6975-6979) carries a uint8 payload:
@@ -357,8 +359,19 @@ public:
         /// Per-button value (index 0..4, signals 6975-6979).
         /// 0 = idle, 1 = tap (lower digit), 2 = long-press (higher digit).
         std::uint8_t button_value[5] = {};
-        std::uint8_t mode_button = 0; ///< 0=none, 1=OFF, 2=ACC, 3=RUN
+        /// Mode buttons pressed this tick, one bit per console press area:
+        /// kModeSwLock | kModeSwOffAcc | kModeSwRun.  0 = none.
+        std::uint8_t mode_switches = 0;
     };
+
+    /// Mode-button bits.  The EV1 console has three mode buttons, LOCK, OFF/ACC
+    /// and RUN (ESM electrical ELPD 441), and the RSA reads each as its own
+    /// switch input: RUN MODE SW (ELPD 45), OFF/ACC MODE SW and LOCK MODE SW
+    /// (ELPD 46).  No START: the car has no START key.  Values match the
+    /// external sim's RSA_MODE_SW_* (rsa_supervisor.h).
+    static constexpr std::uint8_t kModeSwLock   = 0x01u;
+    static constexpr std::uint8_t kModeSwOffAcc = 0x02u;
+    static constexpr std::uint8_t kModeSwRun    = 0x04u;
 
     /// Set the code that will be entered on the next OFF → RUN transition.
     /// code_str must be exactly 5 digits (0-9) in EV1 community notation:
@@ -410,17 +423,18 @@ private:
     DigitEntry    m_code[kMaxCodeLen];
     int           m_code_len     = kMaxCodeLen;  ///< always 5
 
-    /// FIFO of mode-button pulses still to emit (1=OFF, 2=ACC, 3=RUN).  Each is
-    /// fired on its own scheduler tick so the RSA never sees two pulses in one
-    /// tick (it evaluates a single pulse per tick and clears it).  Enqueued by
-    /// cycle_k(); drained one-per-event by update().
+    /// FIFO of mode-button presses still to emit (kModeSw* masks).  Each is
+    /// fired on its own scheduler tick, because each is its own transition (see
+    /// the class comment).  Enqueued by cycle_k(); drained one-per-event by
+    /// update().
     std::uint8_t  m_mode_queue[kMaxModeQueue] = {};
     int           m_mode_queue_len = 0;
 
     KeypadFireSet m_pending{};           ///< accumulated this tick; cleared by consume
 
-    /// Enqueue a mode-button pulse for emission (FIFO).  Drops on overflow.
-    void enqueue_mode_(std::uint8_t mode_button);
+    /// Enqueue a mode-button press (kModeSw* mask) for emission (FIFO).  Drops
+    /// on overflow.
+    void enqueue_mode_(std::uint8_t mode_switches);
 
     /// Initialise m_code to default "11111" (five button-0 taps).
     void init_default_code_();

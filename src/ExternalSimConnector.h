@@ -241,10 +241,16 @@ public:
     void SetDriverRsaKeypadButton4(std::uint8_t value);
     void SetDriverRsaKeypadButton5(std::uint8_t value);
 
-    /// Outgoing RSA mode-button press (ID 6971, main harness segment).
-    /// Momentary 1-tick pulse indicating the user's button press.
-    /// Encoded as 1-byte uint8: 0=NONE, 1=OFF, 2=ACC, 3=RUN, 4=START.
-    void SetDriverRsaModeButton(std::uint8_t button_enum);
+    /// Outgoing RSA mode-selection buttons, one bool signal per console press
+    /// area (IDs 6972 LOCK, 6973 OFF/ACC, 6974 RUN; main harness segment; wire
+    /// cells DRIVER_RSA_MODE_SW_*).  `mask` is RsaKeypadDriver::kModeSw* bits
+    /// (0x01 LOCK, 0x02 OFF/ACC, 0x04 RUN); 0 = none.  Momentary: set the mask
+    /// on the press tick and 0 after; each signal publishes on change, so
+    /// two buttons in one mask reach the RSA in the same tick.  Replaces the
+    /// byte press-enum on 6971, which could not carry two buttons at once.
+    /// @source ESM electrical ELPD 441 (the three modes), ELPD 45-46 (the RSA's
+    /// RUN / OFF/ACC / LOCK MODE SW inputs).
+    void SetDriverRsaModeSwitches(std::uint8_t mask);
 
     /// Outgoing IPC trip-reset button (ID 6952, main harness segment).
     /// Momentary 1-byte uint8 bool (0=idle, 1=pressed this tick).

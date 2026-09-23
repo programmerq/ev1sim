@@ -175,7 +175,12 @@ static const std::unordered_map<std::uint32_t, ProducerCell>& ProducerRegistry()
         {6952U, {kWireDRIVER_IPC_TRIP_RESET_BUTTON,      WireType::kBit}},
         {6964U, {kWireDRIVER_SEATBELT_BUCKLED,           WireType::kBit}},
         {6965U, {kWireDRIVER_SEATBELT_BUCKLED_PASSENGER, WireType::kBit}},
-        {6971U, {kWireDRIVER_RSA_MODE_BUTTON,            WireType::kByte}},
+        // RSA mode buttons: one bit cell per press area (LOCK / OFF-ACC / RUN,
+        // ESM ELPD 441; the RSA's LOCK/OFF-ACC/RUN MODE SW inputs, ELPD 45-46).
+        // Replace the 6971 byte press-enum, which ev1sim no longer publishes.
+        {6972U, {kWireDRIVER_RSA_MODE_SW_LOCK,           WireType::kBit}},
+        {6973U, {kWireDRIVER_RSA_MODE_SW_OFF_ACC,        WireType::kBit}},
+        {6974U, {kWireDRIVER_RSA_MODE_SW_RUN,            WireType::kBit}},
         // Interior keypad buttons are BYTE, not bit: the cell carries the
         // tap-vs-long-press digit encoding (0=idle, 1=tap/lower, 2=long/higher),
         // matching the external sim's topology (the external sim's topology declaration
@@ -184,7 +189,7 @@ static const std::unordered_map<std::uint32_t, ProducerCell>& ProducerRegistry()
         // rsa_apply_driver_input_wires(). Declaring them kBit here silently sent
         // every digit to a bit cell RSA never reads as a byte, so RSA never
         // authenticated and the co-sim vehicle never left PARK. The mode button
-        // (6971) and exterior keypad (6985-6989) were already byte, which is why
+        // (then the 6971 byte) and exterior keypad (6985-6989) were already byte, which is why
         // ACC was received but no interior code ever was.
         // @design 2026-06-25 claude — cross-repo wire-type sync fix.
         {6975U, {kWireDRIVER_RSA_KEYPAD_BUTTON1,         WireType::kByte}},

@@ -1725,7 +1725,7 @@ int SimApp::RunWithVisualization() {
                 m_external_sim->SetDriverRsaKeypadButton3(fires.button_value[2]);
                 m_external_sim->SetDriverRsaKeypadButton4(fires.button_value[3]);
                 m_external_sim->SetDriverRsaKeypadButton5(fires.button_value[4]);
-                m_external_sim->SetDriverRsaModeButton(fires.mode_button);
+                m_external_sim->SetDriverRsaModeSwitches(fires.mode_switches);
             }
             // IPC trip-reset (6952): consume one-shot event and publish.
             m_external_sim->SetDriverIpcTripReset(
@@ -2272,7 +2272,7 @@ int SimApp::RunHeadless() {
                 m_external_sim->SetDriverRsaKeypadButton3(fires.button_value[2]);
                 m_external_sim->SetDriverRsaKeypadButton4(fires.button_value[3]);
                 m_external_sim->SetDriverRsaKeypadButton5(fires.button_value[4]);
-                m_external_sim->SetDriverRsaModeButton(fires.mode_button);
+                m_external_sim->SetDriverRsaModeSwitches(fires.mode_switches);
             }
             // IPC trip-reset (6952) + cruise stalk cavities (4047-4049), wiper.
             // Headless: no keyboard/UI input; evolve the cruise model with both
