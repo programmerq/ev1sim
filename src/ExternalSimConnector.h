@@ -751,6 +751,11 @@ public:
     ///  - SERVICE SOON telltale (CHASSIS_IPC_SERVICE_SOON_TELLTALE, circuit
     ///    1885, PCM-grounded — elec-296).
     bool          GetIpcServiceSoonTelltale() const;
+    ///  - WAIT telltale (CHASSIS_IPC_WAIT_TELLTALE, circuit 2029, IPC-grounded
+    ///    while the AD is open — elec-488, prop-106).
+    bool          GetIpcWaitTelltale() const;
+    ///  - the IPC's command to ground circuit 2029 (IPC_ES_WAIT_TT_DRV).
+    bool          GetIpcWaitDrive() const;
 
     /// Current vehicle speed from the ev1sim physics model (m/s).
     /// Derived from the VehicleState snapshot set each tick via SetVehicleState().

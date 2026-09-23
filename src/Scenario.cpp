@@ -474,6 +474,14 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
         // SERVICE SOON telltales are illuminated"; circuit 1885, elec-296).
         else if (f == "ipc_service_soon_telltale")
             m_csv << (bus.GetIpcServiceSoonTelltale() ? 1 : 0);
+        // The other lamp batt-714 names for DTC 279: WAIT (circuit 2029),
+        // lit by the IPC whenever the AD is open (elec-488, prop-106).
+        else if (f == "ipc_wait_telltale")
+            m_csv << (bus.GetIpcWaitTelltale() ? 1 : 0);
+        // The IPC's command on that lamp's output stage (main.D4 -> 2029),
+        // independent of whether the lamp's bank has B+.
+        else if (f == "ipc_wait_drive")
+            m_csv << (bus.GetIpcWaitDrive() ? 1 : 0);
         // Latched precharge participation (derived from 5225) — sticky-true
         // once the precharge relay has ever been observed closed. Alias-proofs
         // a brief relay-closed transient the periodic sampler could step over,

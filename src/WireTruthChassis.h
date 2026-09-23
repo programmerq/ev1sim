@@ -235,6 +235,12 @@ public:
     std::optional<std::uint32_t> ad_active_dtc_bitmap() const;
     std::optional<std::uint16_t> bpm_ad_dtc_bitmap() const;
     std::optional<bool>          ipc_service_soon_telltale() const;
+    std::optional<bool>          ipc_wait_telltale() const;  // CHASSIS_IPC_WAIT_TELLTALE
+    // The IPC's COMMAND to ground circuit 2029 (IPC_ES_WAIT_TT_DRV, an
+    // element_state cause the IPC writes). Read-only here, as every cell ev1sim
+    // consumes. Separate from the lamp because the lamp also needs its bank's
+    // B+ feed.
+    std::optional<bool>          ipc_wait_drive() const;
 
     // The vehicle's injected insulation fault: HV_ISOLATION_FAULT_LEAD (0 none,
     // 1 HV+, 2 HV-) and HV_ISOLATION_FAULT_KOHM. ev1sim is these cells'

@@ -759,6 +759,20 @@ std::optional<bool> WireTruthChassis::ipc_service_soon_telltale() const {
     return read_bit(ReadOnlyWireId(
         electricsim::topology::kWireCHASSIS_IPC_SERVICE_SOON_TELLTALE));
 }
+std::optional<bool> WireTruthChassis::ipc_wait_telltale() const {
+    return read_bit(ReadOnlyWireId(
+        electricsim::topology::kWireCHASSIS_IPC_WAIT_TELLTALE));
+}
+std::optional<bool> WireTruthChassis::ipc_wait_drive() const {
+    if (!attached()) return std::nullopt;
+    electricsim::io::WireTable::Sample<bool> s;
+    if (!impl_->table->read_bit_sample(
+            electricsim::topology::kWireIPC_ES_WAIT_TT_DRV, &s) ||
+        !s.written()) {
+        return std::nullopt;
+    }
+    return s.value;
+}
 bool WireTruthChassis::publish_hv_isolation_fault(std::uint8_t lead,
                                                   std::uint32_t kohm) {
     if (!attached()) return false;
@@ -914,6 +928,12 @@ std::optional<std::uint16_t> WireTruthChassis::bpm_ad_dtc_bitmap() const {
     return std::nullopt;
 }
 std::optional<bool> WireTruthChassis::ipc_service_soon_telltale() const {
+    return std::nullopt;
+}
+std::optional<bool> WireTruthChassis::ipc_wait_telltale() const {
+    return std::nullopt;
+}
+std::optional<bool> WireTruthChassis::ipc_wait_drive() const {
     return std::nullopt;
 }
 bool WireTruthChassis::publish_hv_isolation_fault(std::uint8_t, std::uint32_t) {

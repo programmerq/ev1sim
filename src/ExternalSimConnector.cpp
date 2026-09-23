@@ -1511,6 +1511,8 @@ struct ExternalSimConnector::State {
     std::uint32_t ad_active_dtc_bitmap            = 0u;
     std::uint16_t bpm_ad_dtc_bitmap               = 0u;
     bool          ipc_service_soon_telltale       = false;
+    bool          ipc_wait_telltale               = false;
+    bool          ipc_wait_drive                  = false;
     // Injected insulation fault (scenario action hv_isolation_fault).
     bool          hv_iso_fault_armed              = false;
     std::uint8_t  hv_iso_fault_lead               = 0u;
@@ -2192,6 +2194,12 @@ std::uint16_t ExternalSimConnector::GetBpmAdDtcBitmap() const {
 }
 bool ExternalSimConnector::GetIpcServiceSoonTelltale() const {
     return m_state->ipc_service_soon_telltale;
+}
+bool ExternalSimConnector::GetIpcWaitTelltale() const {
+    return m_state->ipc_wait_telltale;
+}
+bool ExternalSimConnector::GetIpcWaitDrive() const {
+    return m_state->ipc_wait_drive;
 }
 
 float ExternalSimConnector::GetVehicleSpeedMps() const {
@@ -3333,6 +3341,8 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         if (auto v = st.wire->ipc_service_soon_telltale()) {
             st.ipc_service_soon_telltale = *v;
         }
+        if (auto v = st.wire->ipc_wait_telltale()) st.ipc_wait_telltale = *v;
+        if (auto v = st.wire->ipc_wait_drive())    st.ipc_wait_drive    = *v;
 
         // BTCM liveness (was the kSigBtcmUartFrame 5050 heartbeat). The full
         // canonical-frame payload reconstruction off GM8192_BTCM_TX (a kBitStream
