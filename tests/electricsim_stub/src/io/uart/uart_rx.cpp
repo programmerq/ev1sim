@@ -29,8 +29,14 @@ UartRx::UartRx(WireTable* table, WireId rx_cell, std::uint64_t bit_period_ns,
 }
 
 bool UartRx::pop_byte(std::uint8_t* out) {
+  Gap gap = Gap::kNone;
+  return pop_byte(out, &gap);
+}
+
+bool UartRx::pop_byte(std::uint8_t* out, Gap* gap_before) {
   if (byte_q_.empty()) return false;
-  *out = byte_q_.front();
+  *out = byte_q_.front().value;
+  *gap_before = byte_q_.front().gap_before;
   byte_q_.pop_front();
   return true;
 }
@@ -42,7 +48,18 @@ void UartRx::consume_bit(bool bit) {
       if (last_high_ && !bit) {
         shift_reg_ = 0;
         bit_idx_ = 0;
+        idle_ones_ = 0;
         state_ = State::kData;
+      } else if (bit) {
+        // Count the Idle Line: logic-1 bit times since the last Stop bit.
+        // The run is counted once when it reaches kIdleLineBits; a longer
+        // quiet is the same Idle Line. @source:manual; docs/gm8192_protocol.md.
+        if (idle_ones_ < kIdleLineBits && ++idle_ones_ == kIdleLineBits) {
+          ++idle_lines_;
+          gap_pending_ = Gap::kIdleLine;  // supersedes an earlier hole
+        }
+      } else {
+        idle_ones_ = 0;  // a stray low breaks the run
       }
       // Any other bit (idle high, or a stray low without a preceding high)
       // keeps the line idle.
@@ -61,10 +78,13 @@ void UartRx::consume_bit(bool bit) {
 
     case State::kStop:
       if (bit) {
-        byte_q_.push_back(shift_reg_);  // Valid Stop bit (logic-1).
+        // Valid Stop bit (logic-1).
+        byte_q_.push_back(RxByte{shift_reg_, gap_pending_});
+        gap_pending_ = Gap::kNone;
       } else {
         ++framing_errors_;              // Stop bit was logic-0.
       }
+      idle_ones_ = 0;  // the Idle Line is counted from AFTER the Stop bit
       // Return to idle. A back-to-back byte's Start bit (0) is detected on
       // the next bit because last_high_ is set from THIS Stop bit (1 on a
       // good frame). On a framing error (Stop = 0) the next bit cannot be a
@@ -101,6 +121,8 @@ void UartRx::tick(std::uint64_t now_ns) {
       ++overruns_;
       state_ = State::kIdle;
       last_high_ = true;
+      idle_ones_ = 0;
+      gap_pending_ = Gap::kLostBits;  // bytes across a hole are not one frame
     }
     for (std::size_t i = 0; i < got; ++i) {
       consume_bit(buf[i]);
