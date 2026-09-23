@@ -2,6 +2,7 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include "ExternalSimConnector.h"
+#include "PhysicalWorld.h"  // ev1sim::RsaKeypadDriver::kModeSw*
 
 #include <chrono>
 #include <limits>
@@ -67,7 +68,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     // gear_selector (6902), throttle_q8 (6903), brake_switch (6904),
     // (hazard/turn moved to chassis cavities kSigTurnHazSw_* 4043-4045),
     // seatbelt_buckled (6964), seatbelt_buckled_passenger (6965),
-    // rsa_mode_button (6971),
+    // rsa_mode_sw_lock (6972), rsa_mode_sw_off_acc (6973), rsa_mode_sw_run (6974),
     // rsa_keypad_button1 (6975), button2 (6976), button3 (6977),
     // button4 (6978), button5 (6979),
     // ipc_trip_reset (6952),
@@ -80,7 +81,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     // rsa_exterior_keypad5 (6989),
     // door_handle_attempt_driver (6990), door_handle_attempt_passenger (6991).
     // (6970 is reserved — not registered as an endpoint.)
-    constexpr int kNumDriverInputs = 25;  // wiper + turn/hazard + cruise moved to chassis cavities
+    constexpr int kNumDriverInputs = 27;  // wiper + turn/hazard + cruise moved to chassis cavities
     const int expected = NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS +
                          kNumCombSw + kNumChargeCplr + kNumPrnd + kNumWiperSwCavity + kNumTurnHazSwCavity + kNumCruiseSwCavity + kNumMotor +
                          kNumSimTime +
@@ -253,7 +254,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
         } else if ((e.signal_id >= 6900 && e.signal_id <= 6904) ||
                    e.signal_id == 6964 ||
                    e.signal_id == 6965 ||
-                   e.signal_id == 6971 ||
+                   (e.signal_id >= 6972 && e.signal_id <= 6974) ||
                    (e.signal_id >= 6975 && e.signal_id <= 6979) ||
                    e.signal_id == 6952 ||
                    (e.signal_id >= 6980 && e.signal_id <= 6983) ||
@@ -266,7 +267,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
             // (cruise stalk now publishes on chassis cavities 4047-4049)
             // (wiper switch/wash now publish on chassis cavities 4054-4057)
             // 6964=seatbelt_buckled  6965=seatbelt_buckled_passenger
-            // 6971=rsa_mode_button
+            // 6972..6974=rsa_mode_sw_{lock,off_acc,run}  (6971 byte retired)
             // 6975..6979=rsa_keypad_button[1..5]  (6970 reserved; not registered)
             // 6980=power_window_driver_up   6981=power_window_driver_down
             // 6982=power_window_passenger_up  6983=power_window_passenger_down
@@ -568,10 +569,20 @@ TEST_CASE("RSA keypad endpoints have correct IDs and direction", "[ExternalSim]"
     // Slot 6970 is reserved — must NOT be registered.
     CHECK(ExternalSimConnector::FindEndpoint(6970) == nullptr);
 
-    const auto* mode_btn = ExternalSimConnector::FindEndpoint(6971);
-    REQUIRE(mode_btn != nullptr);
-    CHECK(std::string(mode_btn->qualified_name) == "vehicle.driver.rsa_mode_button");
-    CHECK_FALSE(mode_btn->input_to_sim);  // output from ev1sim
+    // The byte press-enum 6971 is no longer published: one value cannot carry
+    // two mode buttons pressed together.  One bool per press area instead.
+    CHECK(ExternalSimConnector::FindEndpoint(6971) == nullptr);
+    struct { std::uint32_t id; const char* name; } const mode_sws[] = {
+        {6972, "vehicle.driver.rsa_mode_sw_lock"},
+        {6973, "vehicle.driver.rsa_mode_sw_off_acc"},
+        {6974, "vehicle.driver.rsa_mode_sw_run"},
+    };
+    for (const auto& m : mode_sws) {
+        const auto* ep = ExternalSimConnector::FindEndpoint(m.id);
+        REQUIRE(ep != nullptr);
+        CHECK(std::string(ep->qualified_name) == m.name);
+        CHECK_FALSE(ep->input_to_sim);  // output from ev1sim
+    }
 
     // Per-digit keypad buttons 6975-6979.
     const auto* btn1 = ExternalSimConnector::FindEndpoint(6975);
@@ -693,7 +704,7 @@ TEST_CASE("SetAmbientTempC and SetAmbientHumidityPct store without crashing", "[
     CHECK_NOTHROW(c.Tick(0.0));
 }
 
-TEST_CASE("SetDriverRsaKeypadButtons and SetDriverRsaModeButton store without crashing", "[ExternalSim]") {
+TEST_CASE("SetDriverRsaKeypadButtons and SetDriverRsaModeSwitches store without crashing", "[ExternalSim]") {
     ExternalSimConnector c;
     // 0=idle, 1=tap (lower digit), 2=long-press (higher digit).
     CHECK_NOTHROW(c.SetDriverRsaKeypadButton1(1));  // tap button 1 -> digit '1'
@@ -701,7 +712,10 @@ TEST_CASE("SetDriverRsaKeypadButtons and SetDriverRsaModeButton store without cr
     CHECK_NOTHROW(c.SetDriverRsaKeypadButton3(0));  // idle
     CHECK_NOTHROW(c.SetDriverRsaKeypadButton4(0));  // idle
     CHECK_NOTHROW(c.SetDriverRsaKeypadButton5(0));  // idle
-    CHECK_NOTHROW(c.SetDriverRsaModeButton(3));     // RUN
+    CHECK_NOTHROW(c.SetDriverRsaModeSwitches(ev1sim::RsaKeypadDriver::kModeSwRun));
+    CHECK_NOTHROW(c.Tick(0.0));
+    CHECK_NOTHROW(c.SetDriverRsaModeSwitches(ev1sim::RsaKeypadDriver::kModeSwLock |
+                                             ev1sim::RsaKeypadDriver::kModeSwRun));  // two at once
     CHECK_NOTHROW(c.Tick(0.0));
 }
 

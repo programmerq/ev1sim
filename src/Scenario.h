@@ -36,9 +36,9 @@ class PhysicalWorld;
 //   ipc_trip_reset:  press the IPC trip-reset button (momentary).
 //   cruise_set / cruise_resume / cruise_cancel / cruise_speed_up / cruise_speed_down:
 //       press the corresponding cruise stalk button (momentary).
-//   exterior_keypad_code:  enter the factory 6-digit code "111111" on the RSA
+//   exterior_keypad_code:  enter the factory 5-digit code "11111" on the RSA
 //       EXTERIOR keypad as a timed button sequence (~100 ms per digit, so the
-//       whole entry takes ~0.6 s — schedule any follow-on door_handle_driver
+//       whole entry takes ~0.5 s — schedule any follow-on door_handle_driver
 //       at least 1 s later).
 //   door_handle_driver:  pull the driver door handle (momentary).
 //   door_lock_switch:  press a door-lock rocker once.  value != 0 is a LOCK
@@ -152,7 +152,7 @@ public:
     // electronics instead of asserting the answer it wanted.
     virtual void DoorLockSwitchPress(bool lock, bool driver_door) = 0;
     // RSA EXTERIOR keypad (the five buttons on the driver's door pillar) —
-    // queues the factory 6-digit code "111111" as a timed button sequence,
+    // queues the factory 5-digit code "11111" as a timed button sequence,
     // exactly as the interactive `K` binding does. This is the physical way
     // a locked EV1 is opened from outside; door_unlock_all is the UI
     // shortcut that bypasses the RSA's code validation entirely.

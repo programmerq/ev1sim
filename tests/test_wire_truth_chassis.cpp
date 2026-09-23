@@ -337,6 +337,102 @@ TEST_CASE("WireTruthChassis::mirror_signal: unregistered signal_id returns false
 }
 
 // ---------------------------------------------------------------------------
+// RSA mode buttons: one bit cell per press area (LOCK / OFF-ACC / RUN — ESM
+// electrical ELPD 441; the RSA's LOCK/OFF-ACC/RUN MODE SW inputs, ELPD 45-46).
+// They replace the 6971 byte press-enum, which could not carry two buttons
+// pressed together. The connector case drives the REAL publish path (Tick ->
+// on-change bool deltas -> MirrorBatch) and reads the cells back as the RSA
+// would, proving a two-button press lands on the wire in ONE tick.
+// ---------------------------------------------------------------------------
+TEST_CASE("WireTruthChassis::mirror_signal: RSA mode buttons are three bit cells",
+          "[wire_truth][mirror_signal]") {
+    const std::string seg = unique_segment("ms_rsa_mode");
+    auto creator = create_fleet_table(seg, electricsim::topology::kTopologyHash);
+    REQUIRE(creator != nullptr);
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+
+    namespace topo = electricsim::topology;
+    const std::uint8_t on[] = {0x01u};
+    struct { std::uint32_t id; WireId cell; } const sws[] = {
+        {6972U, topo::kWireDRIVER_RSA_MODE_SW_LOCK},
+        {6973U, topo::kWireDRIVER_RSA_MODE_SW_OFF_ACC},
+        {6974U, topo::kWireDRIVER_RSA_MODE_SW_RUN},
+    };
+    for (const auto& sw : sws) {
+        REQUIRE(wire->mirror_signal(sw.id, on, 1u));
+        bool v = false;
+        REQUIRE(creator->read_bit(sw.cell, &v));
+        CHECK(v);
+    }
+    // The superseded byte is no longer produced by ev1sim.
+    REQUIRE_FALSE(wire->mirror_signal(6971U, on, 1u));
+}
+
+namespace {
+class ScopedEnv {
+public:
+    ScopedEnv(const char* key, const char* value) : key_(key) {
+        const char* prev = std::getenv(key);
+        had_prev_ = prev != nullptr;
+        if (had_prev_) prev_ = prev;
+        ::setenv(key, value, 1);
+    }
+    ~ScopedEnv() {
+        if (had_prev_) ::setenv(key_, prev_.c_str(), 1);
+        else ::unsetenv(key_);
+    }
+private:
+    const char* key_;
+    bool had_prev_ = false;
+    std::string prev_;
+};
+}  // namespace
+
+TEST_CASE("Connector publishes two RSA mode buttons pressed in one tick",
+          "[wire_truth][e2e]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("e2e_rsa_mode");
+    auto rsa = create_fleet_table(seg, topo::kTopologyHash);  // the RSA's view
+    REQUIRE(rsa != nullptr);
+    ScopedEnv env("ELECTRICSIM_WIRES_NAME", seg.c_str());
+
+    ExternalSimConnector::Options opts;
+    opts.enabled = true;
+    ExternalSimConnector c(opts);
+
+    auto read = [&](WireId id, bool* v, std::uint32_t* gen) {
+        electricsim::io::WireTable::Sample<bool> s;
+        const bool ok = rsa->read_bit_sample(id, &s) && s.written();
+        if (ok) { *v = s.value; *gen = s.generation; }
+        return ok;
+    };
+
+    // LOCK + RUN in one tick.
+    c.SetDriverRsaModeSwitches(0x01u | 0x04u);
+    c.Tick(0.01);
+    bool lock = false, off_acc = true, run = false;
+    std::uint32_t g_lock = 0, g_off_acc = 0, g_run = 0;
+    REQUIRE(read(topo::kWireDRIVER_RSA_MODE_SW_LOCK, &lock, &g_lock));
+    REQUIRE(read(topo::kWireDRIVER_RSA_MODE_SW_OFF_ACC, &off_acc, &g_off_acc));
+    REQUIRE(read(topo::kWireDRIVER_RSA_MODE_SW_RUN, &run, &g_run));
+    CHECK(lock);
+    CHECK_FALSE(off_acc);
+    CHECK(run);
+
+    // Released: both drop, with fresh writes (published on change).
+    c.SetDriverRsaModeSwitches(0u);
+    c.Tick(0.02);
+    std::uint32_t g2 = 0;
+    REQUIRE(read(topo::kWireDRIVER_RSA_MODE_SW_LOCK, &lock, &g2));
+    CHECK_FALSE(lock);
+    CHECK(g2 != g_lock);
+    REQUIRE(read(topo::kWireDRIVER_RSA_MODE_SW_RUN, &run, &g2));
+    CHECK_FALSE(run);
+    CHECK(g2 != g_run);
+}
+
+// ---------------------------------------------------------------------------
 // apply_consumer_overlay tests.
 // @design 2026-06-15 — consumer overlay batch.
 //
