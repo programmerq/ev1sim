@@ -560,11 +560,15 @@ cause: the undriven rears ring too.
 Fix: restore the first-order tire dynamics that TMeasy defines (Rill: a
 tread/carcass spring `cx` and damper `dx` in series with the slip curve).
 Chrono 8.0 had them and Chrono 9 dropped them.  `src/EV1TMeasyTire.{h,cpp}`
-adds the longitudinal half back on top of Chrono's force.  The values are
+adds a reduced form back on top of Chrono's force: longitudinal only, without
+Chrono 8's separate low-sliding-speed structural-force branch.  The values are
 derived by Chrono 8's own rule (`cx = 0.9·CZ`, `dx = 0.5·√(cx·m)`) and tagged
-inferred in the tire JSON.  In steady state the force is unchanged: coastdown,
-the 0.7-pedal accel/brake run and the ice wheel-spin probe all match the pre-fix
-runs to ≤ 0.02 m/s.  The launch is now flat: front L−R 0.0005 and every wheel
+inferred in the tire JSON.  At constant slip the force is unchanged.  The ice
+wheel-spin probe matches the pre-fix run to 0.001 m/s, coastdown above 7 m/s
+to 0.006 m/s, and the 0.7-pedal accel/brake run to 0.03 m/s.  Coastdown
+between 7 and 2 m/s does change, because it rang there too: the ringing cut
+the deceleration from 0.29 to 0.27 m/s².  It is now 0.29–0.30 m/s² through
+that band, continuous with the band above, and the car stops ~1.8 s sooner.  The launch is now flat: front L−R 0.0005 and every wheel
 within 0.0004 of its 100 ms mean.  `tests/test_launch_slip.cpp`
 (`ev1sim_plant_tests`, label `plant`) pins that bound.
 

@@ -541,6 +541,10 @@ if(BUILD_TESTS)
             ${CHRONO_LIBRARIES}
         )
         catch_discover_tests(ev1sim_plant_tests PROPERTIES LABELS "plant" TIMEOUT 300)
+        # Building ev1sim_tests builds this too, so every job that builds the
+        # unit suite against a real Chrono also runs the launch test (and ctest
+        # never meets an unbuilt plant-test placeholder).
+        add_dependencies(ev1sim_tests ev1sim_plant_tests)
     endif()
 
     # ── Vendored-stub honesty checks ────────────────────────────────────────

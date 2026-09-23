@@ -20,10 +20,12 @@ EV1TMeasyTire::EV1TMeasyTire(const std::string& filename)
         const auto& d = j["Longitudinal Tire Dynamics"];
         m_cx = d.at("Stiffness [N/m]").get<double>();
         m_dx = d.at("Damping [Ns/m]").get<double>();
-        if (!(m_cx > 0.0) || !(m_dx >= 0.0))
+        // dx > 0, not >= 0: at zero slip fos = 0, and dx is then the whole
+        // denominator of xe_dot.
+        if (!(m_cx > 0.0) || !(m_dx > 0.0))
             throw std::runtime_error(
                 "EV1TMeasyTire: Longitudinal Tire Dynamics needs Stiffness > 0 "
-                "and Damping >= 0 in " + filename);
+                "and Damping > 0 in " + filename);
     }
 }
 

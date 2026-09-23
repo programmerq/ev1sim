@@ -11,8 +11,9 @@
 // (C = slip stiffness dFx/dsx), so the wheel-spin equation behaves like a
 // damper whose coefficient grows as 1/v.  An explicitly applied damper is
 // stable only while h * C * R^2 / (I * v) < 2 — i.e. above a critical speed
-// that scales with the step h.  Below it the wheel over-corrects every step
-// and the slip rings.  At the 1 ms step the EV1 runs, that is a sustained
+// that scales with the step h (a simple explicit-damper bound; any lag
+// in how the vehicle applies the tire force only tightens it).  Below that
+// speed the wheel over-corrects every step and the slip rings.  At the 1 ms step the EV1 runs, that is a sustained
 // +-20..30 % slip oscillation from ~1.7 m/s (where TMeasy's friction blend
 // starts handing the force from the Dahl model to the slip curve) up to
 // ~5-7 m/s, measured on a dry half-pedal launch with no external fleet.
@@ -27,11 +28,12 @@
 // carcass deflect first.  TMeasy's own formulation (Rill; Hirschberg, Rill &
 // Weinfurter, "Tire model TMeasy", 2007) models that as a spring cx and
 // damper dx in SERIES with the slip-force characteristic, a first-order
-// "tire dynamics" state xe.  Chrono 8.0 implemented exactly that
-// (ChTMeasyTire.cpp, m_consider_relaxation, cx = 0.9*CZ,
-// dx = damping_ratio*sqrt(cx*m_tire)); Chrono 9 removed it.  This class puts
-// the longitudinal half back, as a correction to the force the base class
-// computed:
+// "tire dynamics" state xe.  Chrono 8.0 implemented it (ChTMeasyTire.cpp,
+// m_consider_relaxation, cx = 0.9*CZ, dx = damping_ratio*sqrt(cx*m_tire));
+// Chrono 9 removed it.  This class is a reduced form of that: the
+// longitudinal half only, without Chrono 8's separate structural-force
+// branch for low sliding speed, applied as a correction to the force the
+// base class computed:
 //
 //     ks      = fos / vta                  (slip force per m/s sliding speed)
 //     Fx_ss   = -ks * vsx                  (the base's steady-state TMeasy Fx)
@@ -40,9 +42,13 @@
 //
 // With the series spring the force's sensitivity to wheel speed is bounded by
 // dx (plus cx*h), not by C/v, so the step no longer has to shrink as the car
-// slows.  In steady state xe_dot -> 0 and Fx_dyn -> Fx_ss exactly, so
-// coastdown, top speed and any steady slip are unchanged; only the transient
-// (a relaxation length of ~ C/cx, 0.2-0.3 m here) is new.
+// slows.  At constant slip xe_dot -> 0 and Fx_dyn -> Fx_ss exactly; only the
+// transient is new (a relaxation length of ~ C/cx, 0.2-0.3 m here).  Runs
+// that were stable before are unchanged: the ice wheel-spin probe matches to
+// 0.001 m/s and coastdown above 7 m/s to 0.006 m/s.  Coastdown between 7 and
+// 2 m/s is not unchanged: it rang there too, and the ringing had cut the
+// deceleration from ~0.29 to ~0.27 m/s^2.  With the fix it stays at
+// 0.29-0.30 m/s^2, continuous with the band above.
 //
 // Scope: longitudinal only, and only on the TMeasy share of the force — the
 // low-speed Dahl bristle model (below the friction blend, < 1 m/s) is left
