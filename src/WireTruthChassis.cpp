@@ -95,6 +95,8 @@ static const std::unordered_map<std::uint32_t, ProducerCell>& ProducerRegistry()
         {4051U, {kWirePRND_SELECTOR_B,              WireType::kBit}},
         {4052U, {kWirePRND_SELECTOR_C,              WireType::kBit}},
         {4053U, {kWirePRND_SELECTOR_D,              WireType::kBit}},
+        // PRND switch PARK SELECT contact (circuit 275) -> BPM
+        {5142U, {kWireBPM_PARK_SELECT,              WireType::kBit}},
         // Wiper switch outputs (bit)
         {4054U, {kWireWIPER_SW_DELAY_OUT,           WireType::kBit}},
         {4055U, {kWireWIPER_SW_REQUEST_OUT,         WireType::kBit}},
