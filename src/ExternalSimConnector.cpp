@@ -1503,6 +1503,16 @@ struct ExternalSimConnector::State {
     bool          ad_precharge_ever       = false;
     std::uint32_t ad_state_enum           = 0u;
     bool          has_ad_state_enum       = false;
+    // HV isolation-loss chain (BL-2026-07-18-hv-isolation-loss-vat).
+    std::uint32_t ad_iso_chassis_ref_permille     = 0u;
+    bool          has_ad_iso_chassis_ref_permille = false;
+    std::uint32_t ad_active_dtc_bitmap            = 0u;
+    std::uint16_t bpm_ad_dtc_bitmap               = 0u;
+    bool          ipc_service_soon_telltale       = false;
+    // Injected insulation fault (scenario action hv_isolation_fault).
+    bool          hv_iso_fault_armed              = false;
+    std::uint8_t  hv_iso_fault_lead               = 0u;
+    std::uint32_t hv_iso_fault_kohm               = 0u;
 
     // IPC extra LCD telltales (IDs 4140–4145, chassis segment) — received from IPC.
     // bool: false=lamp off, true=lamp on.
@@ -2165,6 +2175,21 @@ std::uint32_t ExternalSimConnector::GetAdStateEnum() const {
 bool ExternalSimConnector::HasReceivedAdStateEnum() const {
     return m_state->has_ad_state_enum;
 }
+std::uint32_t ExternalSimConnector::GetAdIsolationChassisRefPermille() const {
+    return m_state->ad_iso_chassis_ref_permille;
+}
+bool ExternalSimConnector::HasReceivedAdIsolationChassisRefPermille() const {
+    return m_state->has_ad_iso_chassis_ref_permille;
+}
+std::uint32_t ExternalSimConnector::GetAdActiveDtcBitmap() const {
+    return m_state->ad_active_dtc_bitmap;
+}
+std::uint16_t ExternalSimConnector::GetBpmAdDtcBitmap() const {
+    return m_state->bpm_ad_dtc_bitmap;
+}
+bool ExternalSimConnector::GetIpcServiceSoonTelltale() const {
+    return m_state->ipc_service_soon_telltale;
+}
 
 float ExternalSimConnector::GetVehicleSpeedMps() const {
     return m_state->has_vstate
@@ -2229,6 +2254,13 @@ void ExternalSimConnector::SetDriverBrakePedalQ8(std::uint8_t q8) {
 
 void ExternalSimConnector::SetDriverThrottleQ8(std::uint8_t q8) {
     m_state->driver_throttle_q8 = q8;
+}
+
+void ExternalSimConnector::SetHvIsolationFault(std::uint8_t lead,
+                                               std::uint32_t leak_kohm) {
+    m_state->hv_iso_fault_armed = true;
+    m_state->hv_iso_fault_lead  = lead;
+    m_state->hv_iso_fault_kohm  = leak_kohm;
 }
 
 void ExternalSimConnector::SetSuppressThrottlePublish(bool suppress) {
@@ -3286,6 +3318,19 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             st.has_ad_state_enum = true;
         }
 
+        // HV isolation-loss chain witnesses (BL-2026-07-18-hv-isolation-loss-
+        // vat): the AD detector's measurand, the AD's and the BPM's DTC state,
+        // and the driver's SERVICE SOON lamp.
+        if (auto v = st.wire->ad_isolation_chassis_ref_permille()) {
+            st.ad_iso_chassis_ref_permille     = *v;
+            st.has_ad_iso_chassis_ref_permille = true;
+        }
+        if (auto v = st.wire->ad_active_dtc_bitmap()) st.ad_active_dtc_bitmap = *v;
+        if (auto v = st.wire->bpm_ad_dtc_bitmap())    st.bpm_ad_dtc_bitmap    = *v;
+        if (auto v = st.wire->ipc_service_soon_telltale()) {
+            st.ipc_service_soon_telltale = *v;
+        }
+
         // BTCM liveness (was the kSigBtcmUartFrame 5050 heartbeat). The full
         // canonical-frame payload reconstruction off GM8192_BTCM_TX (a kBitStream
         // FIFO drained via read_bits_since + gm8192_rx_framer) is DEFERRED as too
@@ -3506,6 +3551,16 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         MirrorBatch(st.wire.get(), outbound);
 #endif
     }
+
+    // Injected HV insulation fault (scenario action hv_isolation_fault). Only
+    // written once a scenario has asked for it — unwritten reads as "no fault
+    // path" at the AD — and then every tick, level-held.
+#if EV1SIM_HAVE_WIRE_TRUTH
+    if (st.hv_iso_fault_armed && st.wire) {
+        st.wire->publish_hv_isolation_fault(st.hv_iso_fault_lead,
+                                            st.hv_iso_fault_kohm);
+    }
+#endif
 
     // 4. Publish vehicle dynamics snapshot (float32 signals, every frame).
     if (st.has_vstate) {

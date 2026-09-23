@@ -183,6 +183,12 @@ void Scenario::Tick(double sim_time, const VehicleState& state,
         } else if (e.action == "fail_throttle_input") {
             // value != 0 → fail, 0 → restore.
             hooks.FailThrottleInput(e.value != 0.0);
+        } else if (e.action == "hv_isolation_fault") {
+            // value = fault-path resistance, kOhm (0 = dead short).
+            // value2 = which HV lead: 1 = HV+, 2 = HV-, 0 = clear the fault.
+            // A negative value also clears. BL-2026-07-18-hv-isolation-loss-vat.
+            const int lead = (e.value < 0.0) ? 0 : static_cast<int>(e.value2);
+            hooks.HvIsolationFault(lead, e.value < 0.0 ? 0.0 : e.value);
         } else if (e.action == "lane_hold") {
             m_lane_hold_y = e.value;
             m_lane_prev.reset();
@@ -448,6 +454,26 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
             m_csv << (bus.GetAdPrechargeRelayClosed() ? 1 : 0);
         else if (f == "ad_state_enum")
             m_csv << bus.GetAdStateEnum();
+        // HV isolation-loss chain (BL-2026-07-18-hv-isolation-loss-vat), leg by
+        // leg. The AD's detector measurand: where chassis sits between the HV
+        // leads, permille of pack voltage (500 balanced; batt-685 trips below
+        // 300 or above 700). Blank until the AD has published it.
+        else if (f == "ad_isolation_chassis_ref_permille") {
+            if (bus.HasReceivedAdIsolationChassisRefPermille())
+                m_csv << bus.GetAdIsolationChassisRefPermille();
+        }
+        // The AD's own detection: AD DTC 003 (isolation loss) active, bit 2 of
+        // CHASSIS_AD_ACTIVE_DTC_BITMAP.
+        else if (f == "ad_isolation_fault_detected")
+            m_csv << (((bus.GetAdActiveDtcBitmap() >> 2) & 1u) ? 1 : 0);
+        // The BPM's stored code: DTC 279 AD ISOLATION FAULT (batt-714), bit 7
+        // of CHASSIS_BPM_AD_DTC_BITMAP.
+        else if (f == "bpm_dtc_279_active")
+            m_csv << (((bus.GetBpmAdDtcBitmap() >> 7) & 1u) ? 1 : 0);
+        // The driver's warning: the SERVICE SOON lamp (batt-714 "the WAIT and
+        // SERVICE SOON telltales are illuminated"; circuit 1885, elec-296).
+        else if (f == "ipc_service_soon_telltale")
+            m_csv << (bus.GetIpcServiceSoonTelltale() ? 1 : 0);
         // Latched precharge participation (derived from 5225) — sticky-true
         // once the precharge relay has ever been observed closed. Alias-proofs
         // a brief relay-closed transient the periodic sampler could step over,

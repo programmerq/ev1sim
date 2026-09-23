@@ -225,6 +225,22 @@ public:
     // canonical source; revalidated at integration.
     std::optional<std::uint32_t> ad_state_enum() const;
 
+    // HV isolation-loss chain (BL-2026-07-18-hv-isolation-loss-vat). Plain
+    // reads of the electricsim cells, nullopt until written:
+    //   AD_ISOLATION_CHASSIS_REF_PERMILLE — the AD detector's measurand
+    //   CHASSIS_AD_ACTIVE_DTC_BITMAP      — AD DTCs, bit code-1 (003 = isolation)
+    //   CHASSIS_BPM_AD_DTC_BITMAP         — BPM 272..280, bit code-272
+    //   CHASSIS_IPC_SERVICE_SOON_TELLTALE — the SERVICE SOON lamp (conductor)
+    std::optional<std::uint32_t> ad_isolation_chassis_ref_permille() const;
+    std::optional<std::uint32_t> ad_active_dtc_bitmap() const;
+    std::optional<std::uint16_t> bpm_ad_dtc_bitmap() const;
+    std::optional<bool>          ipc_service_soon_telltale() const;
+
+    // The vehicle's injected insulation fault: HV_ISOLATION_FAULT_LEAD (0 none,
+    // 1 HV+, 2 HV-) and HV_ISOLATION_FAULT_KOHM. ev1sim is these cells'
+    // producer (the vehicle plant). Returns false if not attached.
+    bool publish_hv_isolation_fault(std::uint8_t lead, std::uint32_t kohm);
+
     // BTCM GM-8192 TX liveness proxy: the total bit count ever appended to the
     // BTCM transmit bit-stream cell (GM8192_BTCM_TX). The BTCM broadcasts its
     // canonical status frame at 5 Hz, so a growing total => "BTCM transmitting"

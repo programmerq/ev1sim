@@ -744,6 +744,27 @@ std::optional<std::uint32_t> WireTruthChassis::ad_state_enum() const {
     }
 }
 
+std::optional<std::uint32_t> WireTruthChassis::ad_isolation_chassis_ref_permille() const {
+    return read_uint32(electricsim::topology::kWireAD_ISOLATION_CHASSIS_REF_PERMILLE);
+}
+std::optional<std::uint32_t> WireTruthChassis::ad_active_dtc_bitmap() const {
+    return read_uint32(electricsim::topology::kWireCHASSIS_AD_ACTIVE_DTC_BITMAP);
+}
+std::optional<std::uint16_t> WireTruthChassis::bpm_ad_dtc_bitmap() const {
+    return read_uint16(electricsim::topology::kWireCHASSIS_BPM_AD_DTC_BITMAP);
+}
+std::optional<bool> WireTruthChassis::ipc_service_soon_telltale() const {
+    return read_bit(ReadOnlyWireId(
+        electricsim::topology::kWireCHASSIS_IPC_SERVICE_SOON_TELLTALE));
+}
+bool WireTruthChassis::publish_hv_isolation_fault(std::uint8_t lead,
+                                                  std::uint32_t kohm) {
+    if (!attached()) return false;
+    const bool a = write_byte(electricsim::topology::kWireHV_ISOLATION_FAULT_LEAD, lead);
+    const bool b = write_uint32(electricsim::topology::kWireHV_ISOLATION_FAULT_KOHM, kohm);
+    return a && b;
+}
+
 std::optional<std::uint64_t> WireTruthChassis::btcm_tx_total_bits() const {
     if (!attached()) return std::nullopt;
     std::uint64_t total = 0;
@@ -880,6 +901,21 @@ std::optional<bool> WireTruthChassis::ad_main_contactor_closed() const {
 }
 std::optional<std::uint32_t> WireTruthChassis::ad_state_enum() const {
     return std::nullopt;
+}
+std::optional<std::uint32_t> WireTruthChassis::ad_isolation_chassis_ref_permille() const {
+    return std::nullopt;
+}
+std::optional<std::uint32_t> WireTruthChassis::ad_active_dtc_bitmap() const {
+    return std::nullopt;
+}
+std::optional<std::uint16_t> WireTruthChassis::bpm_ad_dtc_bitmap() const {
+    return std::nullopt;
+}
+std::optional<bool> WireTruthChassis::ipc_service_soon_telltale() const {
+    return std::nullopt;
+}
+bool WireTruthChassis::publish_hv_isolation_fault(std::uint8_t, std::uint32_t) {
+    return false;
 }
 std::optional<std::uint64_t> WireTruthChassis::btcm_tx_total_bits() const {
     return std::nullopt;

@@ -177,6 +177,15 @@ public:
     /// other driver inputs keep publishing. Restore re-publishes on the
     /// next heartbeat (<= 200 ms).
     void SetSuppressThrottlePublish(bool suppress);
+
+    /// Vehicle-plant fault injection (scenario action "hv_isolation_fault"):
+    /// an insulation fault from ONE HV lead to chassis. lead 1 = HV+,
+    /// 2 = HV-, 0 = no fault path (clears). leak_kohm is the fault path's
+    /// resistance (0 = dead short). Published on the electricsim cells
+    /// HV_ISOLATION_FAULT_LEAD / HV_ISOLATION_FAULT_KOHM every tick once set;
+    /// the AD places the leak in parallel with that lead's insulation and its
+    /// imbalance detector (batt-685, 30..70 % of pack voltage) does the rest.
+    void SetHvIsolationFault(std::uint8_t lead, std::uint32_t leak_kohm);
     void SetDriverSteeringDegQ8(std::int16_t q8);
     void SetDriverGearSelector(std::uint8_t enum_v);
 
@@ -725,6 +734,23 @@ public:
     /// Returns 0 if never received — gate with HasReceivedAdStateEnum().
     std::uint32_t GetAdStateEnum() const;
     bool          HasReceivedAdStateEnum() const;
+
+    /// HV isolation-loss chain witnesses (BL-2026-07-18-hv-isolation-loss-vat).
+    /// Each returns 0 / false until first received.
+    ///  - AD isolation detector measurand: where chassis sits between the HV
+    ///    leads, permille of pack voltage from HV+ (AD_ISOLATION_CHASSIS_REF_
+    ///    PERMILLE; 500 = balanced; the printed trip is < 300 or > 700).
+    std::uint32_t GetAdIsolationChassisRefPermille() const;
+    bool          HasReceivedAdIsolationChassisRefPermille() const;
+    ///  - AD active-DTC bitmap (CHASSIS_AD_ACTIVE_DTC_BITMAP, bit code-1);
+    ///    DTC 003 = isolation loss.
+    std::uint32_t GetAdActiveDtcBitmap() const;
+    ///  - BPM AUTO DISCONNECT family bitmap (CHASSIS_BPM_AD_DTC_BITMAP, bit
+    ///    code-272); DTC 279 = AD isolation fault (batt-714).
+    std::uint16_t GetBpmAdDtcBitmap() const;
+    ///  - SERVICE SOON telltale (CHASSIS_IPC_SERVICE_SOON_TELLTALE, circuit
+    ///    1885, PCM-grounded — elec-296).
+    bool          GetIpcServiceSoonTelltale() const;
 
     /// Current vehicle speed from the ev1sim physics model (m/s).
     /// Derived from the VehicleState snapshot set each tick via SetVehicleState().

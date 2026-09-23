@@ -50,6 +50,7 @@ public:
     void DoorHandleDriver()  override;
     void FlashToPass(bool held) override;
     void FailThrottleInput(bool fail) override;
+    void HvIsolationFault(int lead, double leak_kohm) override;
 
     // Dispatch a named input action (from a wheel button / Arduino contact) by
     // reusing the same handlers the keyboard drives.  Horn is a held input

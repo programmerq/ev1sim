@@ -2638,6 +2638,17 @@ void SimApp::FailThrottleInput(bool fail) {
               << (fail ? "SUPPRESSED" : "restored") << "\n";
 }
 
+void SimApp::HvIsolationFault(int lead, double leak_kohm) {
+    const auto lead_u8 = static_cast<std::uint8_t>(
+        (lead == 1 || lead == 2) ? lead : 0);
+    const auto kohm = static_cast<std::uint32_t>(
+        leak_kohm < 0.0 ? 0.0 : (leak_kohm > 4.0e9 ? 4.0e9 : leak_kohm));
+    if (m_external_sim) m_external_sim->SetHvIsolationFault(lead_u8, kohm);
+    std::cout << "[Scenario] hv_isolation_fault -> "
+              << (lead_u8 == 1 ? "HV+" : lead_u8 == 2 ? "HV-" : "cleared")
+              << " " << kohm << " kOhm to chassis\n";
+}
+
 void SimApp::DispatchAction(ev1sim::InputAction action) {
     using A = ev1sim::InputAction;
     switch (action) {
