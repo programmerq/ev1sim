@@ -260,12 +260,12 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                     });
             }
 
-            // --- Exterior Keypad convenience macro: Enter "111111" ---
+            // --- Exterior Keypad convenience macro: Enter "11111" ---
             m_floating_ui->AddButton(
-                []() -> std::wstring { return L"[Enter \"111111\"]"; },
+                []() -> std::wstring { return L"[Enter \"11111\"]"; },
                 [this]() {
-                    m_physical->rsa_exterior_keypad().enter_code_sequence("111111");
-                    std::cout << "[UI] Ext keypad: enter_code_sequence(\"111111\") queued\n";
+                    m_physical->rsa_exterior_keypad().enter_code_sequence("11111");
+                    std::cout << "[UI] Ext keypad: enter_code_sequence(\"11111\") queued\n";
                 });
 
             // --- Door Handles ---
@@ -2621,7 +2621,7 @@ void SimApp::ExteriorKeypadCode() {
     // emitter fires one digit per ~100 ms; the headless publish block ticks
     // update()/consume_sequence_fire() every frame, so the RSA sees five
     // separate button pulses rather than one merged press.
-    if (m_physical) m_physical->rsa_exterior_keypad().enter_code_sequence("111111");
+    if (m_physical) m_physical->rsa_exterior_keypad().enter_code_sequence("11111");
 }
 
 void SimApp::DoorHandleDriver() {

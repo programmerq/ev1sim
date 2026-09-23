@@ -547,7 +547,7 @@ static RsaKeypadDriver::DigitEntry digit_char_to_entry_(char c) {
 }
 
 void RsaKeypadDriver::init_default_code_() {
-    // Default: "111111" — six taps of button 0.
+    // Default: "11111" — five taps of button 0.
     m_code_len = kMaxCodeLen;
     for (int i = 0; i < kMaxCodeLen; ++i) {
         m_code[i].button_index = 0;

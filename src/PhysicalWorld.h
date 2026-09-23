@@ -309,7 +309,7 @@ private:
 ///
 /// The EV1 RSA (Remote Security Access) module controls the vehicle's run
 /// mode.  To start the vehicle the user must:
-///   1. Enter the correct 6-digit interior code on the RSA keypad by
+///   1. Enter the correct 5-digit interior code on the RSA keypad by
 ///      pressing the per-digit button signals (6975-6979).  This opens the
 ///      RSA's authentication window (~5 s on the external sim side).
 ///   2. Press the ACC or RUN mode button on the RSA HMI (6971).
@@ -361,10 +361,10 @@ public:
     };
 
     /// Set the code that will be entered on the next OFF → RUN transition.
-    /// code_str must be exactly 6 digits (0-9) in EV1 community notation:
+    /// code_str must be exactly 5 digits (0-9) in EV1 community notation:
     ///   tap digits (lower):        1, 3, 5, 7, 9
     ///   long-press digits (higher): 2, 4, 6, 8, 0
-    /// Default if not called: "111111" (six taps of button 1).
+    /// Default if not called: "11111" (five taps of button 1).
     /// Call before cycle_k() to take effect on the next K press.
     void set_code_string(const char* code_str);
 
@@ -394,7 +394,9 @@ public:
 private:
     enum class CycleState { Idle, EmittingDigits, EmittingMode };
 
-    static constexpr int kMaxCodeLen = 6;
+    /// Five digits: EV1 Electrical Service Manual p.442 prints the RSA
+    /// keycode as "five-digit" throughout (electricsim RSA_CODE_LEN).
+    static constexpr int kMaxCodeLen = 5;
     /// Mode presses can stack up at most one deep in practice (ACC then RUN
     /// from cold), but size the FIFO to the full detent run for safety.
     static constexpr int kMaxModeQueue = 3;
@@ -406,7 +408,7 @@ private:
 
     /// Sequence of digits to emit on the OFF→ACC cycle (opens the auth window).
     DigitEntry    m_code[kMaxCodeLen];
-    int           m_code_len     = kMaxCodeLen;  ///< always 6
+    int           m_code_len     = kMaxCodeLen;  ///< always 5
 
     /// FIFO of mode-button pulses still to emit (1=OFF, 2=ACC, 3=RUN).  Each is
     /// fired on its own scheduler tick so the RSA never sees two pulses in one
@@ -420,7 +422,7 @@ private:
     /// Enqueue a mode-button pulse for emission (FIFO).  Drops on overflow.
     void enqueue_mode_(std::uint8_t mode_button);
 
-    /// Initialise m_code to default "111111" (six button-0 taps).
+    /// Initialise m_code to default "11111" (five button-0 taps).
     void init_default_code_();
 };
 
@@ -789,7 +791,7 @@ private:
 /// press_button(idx, long_press) queues a momentary value for the next tick.
 /// clear_oneshots() resets all button values to idle after they are consumed.
 /// enter_code_sequence(code_str) queues a sequence of individual taps/longs
-/// that fire one per tick — used by the "Enter 111111" convenience button.
+/// that fire one per tick — used by the "Enter 11111" convenience button.
 class RsaExteriorKeypad {
 public:
     /// Queue a momentary button press on button idx (0..4).
@@ -807,8 +809,8 @@ public:
     /// Reset all button values to idle (call after consuming them each tick).
     void clear_oneshots();
 
-    /// Queue the full 6-digit code as a sequence of button presses.
-    /// code_str must be exactly 6 digit characters (0-9).
+    /// Queue the full 5-digit code as a sequence of button presses.
+    /// code_str must be exactly 5 digit characters (0-9).
     /// Digits map to buttons: 1→btn0 tap, 2→btn0 long, 3→btn1 tap,
     /// 4→btn1 long, 5→btn2 tap, 6→btn2 long, 7→btn3 tap, 8→btn3 long,
     /// 9→btn4 tap, 0→btn4 long.
@@ -830,8 +832,8 @@ private:
     // Per-button momentary values (0=idle, 1=tap, 2=long).
     std::uint8_t m_tap_value[5] = {};
 
-    // Sequence emitter (for enter_code_sequence).
-    static constexpr int kMaxCodeLen = 6;
+    // Sequence emitter (for enter_code_sequence). Five digits, manual p.442.
+    static constexpr int kMaxCodeLen = 5;
     struct SeqEntry { std::uint8_t button_idx; bool long_press; };
     SeqEntry m_seq[kMaxCodeLen];
     int      m_seq_len    = 0;
