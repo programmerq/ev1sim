@@ -159,7 +159,7 @@ std::wstring FormatRsaRunModeLabel(std::uint8_t mode, bool ever_received) {
         return L"Mode: ---";
     }
     // kSigRunModeBroadcast (5711) encoding per rsa_scan.h: 0=OFF, 1=ACC, 2=RUN.
-    // START (enum 4 on the mode-button input 6971) is never broadcast on 5711;
+    // START (an internal RSA precharge phase, not a key) is never broadcast on 5711;
     // RSA transitions directly from START press → RUN state on the broadcast.
     switch (mode) {
         case 0: return L"Mode: OFF";

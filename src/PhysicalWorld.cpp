@@ -547,7 +547,7 @@ static RsaKeypadDriver::DigitEntry digit_char_to_entry_(char c) {
 }
 
 void RsaKeypadDriver::init_default_code_() {
-    // Default: "111111" — six taps of button 0.
+    // Default: "11111" — five taps of button 0.
     m_code_len = kMaxCodeLen;
     for (int i = 0; i < kMaxCodeLen; ++i) {
         m_code[i].button_index = 0;
@@ -570,9 +570,9 @@ void RsaKeypadDriver::set_code_string(const char* code_str) {
     }
 }
 
-void RsaKeypadDriver::enqueue_mode_(std::uint8_t mode_button) {
+void RsaKeypadDriver::enqueue_mode_(std::uint8_t mode_switches) {
     if (m_mode_queue_len >= kMaxModeQueue) return;  // overflow guard (never hit)
-    m_mode_queue[m_mode_queue_len++] = mode_button;
+    m_mode_queue[m_mode_queue_len++] = mode_switches;
     // If the scheduler is idle, arm it to drain the queue on the next update().
     if (m_sched_state == CycleState::Idle) {
         m_sched_state = CycleState::EmittingMode;
@@ -595,7 +595,7 @@ void RsaKeypadDriver::cycle_k() {
             m_timer_s     = 0.0;  // first digit fires on next update() call
             // The ACC press is enqueued; the EmittingDigits→EmittingMode
             // hand-off (in update()) drains it once the code is fully sent.
-            enqueue_mode_(2);     // ACC
+            enqueue_mode_(kModeSwOffAcc);  // OFF/ACC key -> ACC
             break;
         case ExpectedState::ACC:
             // ACC → RUN: a RUN press.  Queued behind any code digits still in
@@ -604,12 +604,12 @@ void RsaKeypadDriver::cycle_k() {
             // "key_on_cycle x2" boot recipe deterministically reach RUN even
             // when the two cycles are only ~300 ms apart.
             m_expected = ExpectedState::RUN;
-            enqueue_mode_(3);     // RUN
+            enqueue_mode_(kModeSwRun);
             break;
         case ExpectedState::RUN:
             // RUN → OFF: an OFF press (always allowed; turns the car off).
             m_expected = ExpectedState::OFF;
-            enqueue_mode_(1);     // OFF
+            enqueue_mode_(kModeSwLock);    // LOCK key -> OFF
             break;
     }
 }
@@ -637,7 +637,7 @@ void RsaKeypadDriver::update(double dt_s) {
     } else if (m_sched_state == CycleState::EmittingMode) {
         if (m_mode_queue_len > 0) {
             // Emit the head of the FIFO this tick; shift the rest down.
-            m_pending.mode_button = m_mode_queue[0];
+            m_pending.mode_switches = m_mode_queue[0];
             for (int i = 1; i < m_mode_queue_len; ++i) {
                 m_mode_queue[i - 1] = m_mode_queue[i];
             }

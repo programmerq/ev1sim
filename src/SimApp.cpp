@@ -260,12 +260,12 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                     });
             }
 
-            // --- Exterior Keypad convenience macro: Enter "111111" ---
+            // --- Exterior Keypad convenience macro: Enter "11111" ---
             m_floating_ui->AddButton(
-                []() -> std::wstring { return L"[Enter \"111111\"]"; },
+                []() -> std::wstring { return L"[Enter \"11111\"]"; },
                 [this]() {
-                    m_physical->rsa_exterior_keypad().enter_code_sequence("111111");
-                    std::cout << "[UI] Ext keypad: enter_code_sequence(\"111111\") queued\n";
+                    m_physical->rsa_exterior_keypad().enter_code_sequence("11111");
+                    std::cout << "[UI] Ext keypad: enter_code_sequence(\"11111\") queued\n";
                 });
 
             // --- Door Handles ---
@@ -1714,7 +1714,7 @@ int SimApp::RunWithVisualization() {
                 m_physical->turn_signal_stalk().active_right());
             m_external_sim->SetDriverHazardRequest(
                 m_physical->hazard_switch().on());
-            // RSA keypad buttons (6975-6979) and mode button (6971) — tick the
+            // RSA keypad buttons (6975-6979) and mode buttons (6972-6974) — tick the
             // scheduler and consume whatever it has ready for this frame.
             // button_value encoding: 0=idle, 1=tap, 2=long-press.
             m_physical->rsa_keypad().update(render_dt);
@@ -1725,7 +1725,7 @@ int SimApp::RunWithVisualization() {
                 m_external_sim->SetDriverRsaKeypadButton3(fires.button_value[2]);
                 m_external_sim->SetDriverRsaKeypadButton4(fires.button_value[3]);
                 m_external_sim->SetDriverRsaKeypadButton5(fires.button_value[4]);
-                m_external_sim->SetDriverRsaModeButton(fires.mode_button);
+                m_external_sim->SetDriverRsaModeSwitches(fires.mode_switches);
             }
             // IPC trip-reset (6952): consume one-shot event and publish.
             m_external_sim->SetDriverIpcTripReset(
@@ -2272,7 +2272,7 @@ int SimApp::RunHeadless() {
                 m_external_sim->SetDriverRsaKeypadButton3(fires.button_value[2]);
                 m_external_sim->SetDriverRsaKeypadButton4(fires.button_value[3]);
                 m_external_sim->SetDriverRsaKeypadButton5(fires.button_value[4]);
-                m_external_sim->SetDriverRsaModeButton(fires.mode_button);
+                m_external_sim->SetDriverRsaModeSwitches(fires.mode_switches);
             }
             // IPC trip-reset (6952) + cruise stalk cavities (4047-4049), wiper.
             // Headless: no keyboard/UI input; evolve the cruise model with both
@@ -2621,7 +2621,7 @@ void SimApp::ExteriorKeypadCode() {
     // emitter fires one digit per ~100 ms; the headless publish block ticks
     // update()/consume_sequence_fire() every frame, so the RSA sees five
     // separate button pulses rather than one merged press.
-    if (m_physical) m_physical->rsa_exterior_keypad().enter_code_sequence("111111");
+    if (m_physical) m_physical->rsa_exterior_keypad().enter_code_sequence("11111");
 }
 
 void SimApp::DoorHandleDriver() {

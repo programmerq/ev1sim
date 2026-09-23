@@ -183,10 +183,16 @@ constexpr std::uint32_t kSigDriverRsaKeypadButton2 = 6976U;  // "3/4" button (ta
 constexpr std::uint32_t kSigDriverRsaKeypadButton3 = 6977U;  // "5/6" button (tap=5)
 constexpr std::uint32_t kSigDriverRsaKeypadButton4 = 6978U;  // "7/8" button (tap=7)
 constexpr std::uint32_t kSigDriverRsaKeypadButton5 = 6979U;  // "9/0" button (tap=9)
-// RSA mode button press — momentary 1-tick uint8 enum.
-// 0=NONE, 1=OFF, 2=ACC, 3=RUN, 4=START.
-// Locked in lockstep with external sim kSigDriverRsaModeButton = 6971.
-constexpr std::uint32_t kSigDriverRsaModeButton    = 6971U;
+// RSA mode-selection buttons — one momentary uint8 bool per press area.
+// Locked in lockstep with the external sim's kSigDriverRsaModeSw{Lock,OffAcc,Run}
+// = 6972/6973/6974 (wire cells DRIVER_RSA_MODE_SW_*).  These replace the byte
+// press-enum 6971 (0=NONE,1=OFF,2=ACC,3=RUN,4=START), which ev1sim no longer
+// publishes: one value cannot carry two buttons pressed together.
+// @source ESM electrical ELPD 441 (LOCK, OFF/ACC, RUN), ELPD 45-46 (the RSA's
+// RUN / OFF/ACC / LOCK MODE SW inputs).
+constexpr std::uint32_t kSigDriverRsaModeSwLock    = 6972U;
+constexpr std::uint32_t kSigDriverRsaModeSwOffAcc  = 6973U;
+constexpr std::uint32_t kSigDriverRsaModeSwRun     = 6974U;
 // IPC trip-reset (ID 6952), locked in lockstep with external sim
 // kSigDriverIpcTripResetButton = 6952.  (The cruise stalk formerly published
 // pre-decoded pulses 6953-6957 here; it now publishes the raw chassis cavities
@@ -239,14 +245,14 @@ constexpr int           kNumExteriorKeypadInputs             = 7;  // 5 buttons 
 
 // Number of driver-input endpoints on the main harness segment.
 // 6900, 6901, 6902, 6903, 6904, 6964, 6965,
-// 6971, 6975, 6976, 6977, 6978, 6979,
+// 6972, 6973, 6974, 6975, 6976, 6977, 6978, 6979,
 // 6952,
 // 6980, 6981, 6982, 6983,
-// 6985, 6986, 6987, 6988, 6989, 6990, 6991 = 25 total.
+// 6985, 6986, 6987, 6988, 6989, 6990, 6991 = 27 total.
 // (6970 is reserved; not registered as an endpoint.  Turn/hazard 6944/6948/6949,
 //  wiper 6958/6959, and cruise 6953-6957 moved to chassis switch cavities.)
 constexpr int kNumPassengerSeatbelt = 1;  // passenger seatbelt (6965)
-constexpr int kNumDriverInputs = 12 + kNumNewDriverInputs + kNumPowerWindowInputs + kNumExteriorKeypadInputs + kNumPassengerSeatbelt;  // 12 base: turn/hazard (6944/6948/6949) + cruise (6953-6957) moved to chassis cavities
+constexpr int kNumDriverInputs = 14 + kNumNewDriverInputs + kNumPowerWindowInputs + kNumExteriorKeypadInputs + kNumPassengerSeatbelt;  // 14 base (3 RSA mode buttons): turn/hazard (6944/6948/6949) + cruise (6953-6957) moved to chassis cavities
 
 // Motor state signals on the chassis segment (ev1sim → external sim, float32 LE).
 //   4070  vehicle.dynamics.motor_rpm          motor shaft RPM
@@ -760,8 +766,8 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 //   6900 brake_pedal_q8, 6901 steering_deg_q8, 6902 gear_selector,
 //   6903 throttle_q8, 6904 brake_switch, 6944 hazard_request,
 //   6948 turn_signal_left, 6949 turn_signal_right, 6964 seatbelt_buckled,
-//   6971 rsa_mode_button,
-//   6975 rsa_keypad_button1, 6976..6979 (buttons 2-5)  (15 total).
+//   6972-6974 rsa_mode_sw_{lock,off_acc,run},
+//   6975 rsa_keypad_button1, 6976..6979 (buttons 2-5)  (17 total).
 //   + 1 new: 6952 ipc_trip_reset.  (Cruise 6953-6957 and wiper 6958/6959 moved
 //     to the chassis switch cavities below.)
 //   + 4 new: 6980-6983 power window switches (driver up/down, passenger up/down).
@@ -1079,8 +1085,12 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.driver.turn_right_contact", "turn_right_contact", false};
     out[i++] = {kSigTurnHazSw_HornOut,
                 "vehicle.driver.horn_contact", "horn_contact", false};
-    out[i++] = {kSigDriverRsaModeButton,
-                "vehicle.driver.rsa_mode_button", "driver_rsa_mode_button", false};
+    out[i++] = {kSigDriverRsaModeSwLock,
+                "vehicle.driver.rsa_mode_sw_lock", "driver_rsa_mode_sw_lock", false};
+    out[i++] = {kSigDriverRsaModeSwOffAcc,
+                "vehicle.driver.rsa_mode_sw_off_acc", "driver_rsa_mode_sw_off_acc", false};
+    out[i++] = {kSigDriverRsaModeSwRun,
+                "vehicle.driver.rsa_mode_sw_run", "driver_rsa_mode_sw_run", false};
     out[i++] = {kSigDriverRsaKeypadButton1,
                 "vehicle.driver.rsa_keypad_button1", "driver_rsa_keypad_button1", false};
     out[i++] = {kSigDriverRsaKeypadButton2,
@@ -1339,14 +1349,14 @@ struct ExternalSimConnector::State {
     std::int8_t   driver_hazard_pub       = -1;
     std::int8_t   driver_horn_out_pub     = -1;   // kSigTurnHazSw_HornOut (4046)
 
-    // RSA per-digit keypad buttons (IDs 6975-6979) and mode button (ID 6971).
+    // RSA per-digit keypad buttons (IDs 6975-6979) and mode buttons (6972-6974).
     // driver_rsa_buttons[0..4] encode Option A: 0=idle, 1=tap, 2=long-press.
     // Corresponds to kSigDriverRsaKeypadButton[1..5].
     std::uint8_t  driver_rsa_buttons[5]   = {};
-    std::uint8_t  driver_rsa_mode_button  = 0;
+    std::uint8_t  driver_rsa_mode_switches = 0;  // kModeSw* mask
     // Published sentinels: use -1 to force first publish.
     std::int8_t   driver_rsa_btn_pub[5]   = {-1,-1,-1,-1,-1};
-    std::int8_t   driver_rsa_mode_btn_pub = -1;
+    std::int8_t   driver_rsa_mode_sw_pub[3] = {-1,-1,-1};  // LOCK, OFF/ACC, RUN
 
     // New driver input: IPC trip-reset (6952) — momentary bool.  The wiper
     // detent is held as a uint8 enum (driver_wiper_switch) and PUBLISHED as the
@@ -2288,8 +2298,8 @@ void ExternalSimConnector::SetDriverRsaKeypadButton5(std::uint8_t value) {
     m_state->driver_rsa_buttons[4] = value;
 }
 
-void ExternalSimConnector::SetDriverRsaModeButton(std::uint8_t button_enum) {
-    m_state->driver_rsa_mode_button = button_enum;
+void ExternalSimConnector::SetDriverRsaModeSwitches(std::uint8_t mask) {
+    m_state->driver_rsa_mode_switches = static_cast<std::uint8_t>(mask & 0x07u);
 }
 
 void ExternalSimConnector::SetDriverIpcTripReset(bool pressed) {
@@ -3175,7 +3185,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             st.driver_turn_right_pub       = -1;
             st.driver_hazard_pub           = -1;
             for (int bi = 0; bi < 5; ++bi) st.driver_rsa_btn_pub[bi] = -1;
-            st.driver_rsa_mode_btn_pub      = -1;
+            for (int mi = 0; mi < 3; ++mi) st.driver_rsa_mode_sw_pub[mi] = -1;
             st.driver_pw_driver_up_pub      = -1;
             st.driver_pw_driver_down_pub    = -1;
             st.driver_pw_passenger_up_pub   = -1;
@@ -3655,14 +3665,6 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                 }
             }
         }
-        // RSA mode button (ID 6971) — one-shot: publish current value.
-        {
-            const std::int8_t mode_val = static_cast<std::int8_t>(st.driver_rsa_mode_button);
-            if (st.driver_rsa_mode_btn_pub < 0 || mode_val != st.driver_rsa_mode_btn_pub) {
-                drv.push_back(MakeU8Delta(kSigDriverRsaModeButton, st.driver_rsa_mode_button));
-                st.driver_rsa_mode_btn_pub = mode_val;
-            }
-        }
         // IPC trip-reset (6952), cruise switch cavities (4047-4049), wiper.
         // Momentary/level bools: publish on change only (sentinel -1 forces first publish).
         auto publish_bool_change = [&](std::uint32_t sig_id, bool cur_val, std::int8_t& pub) {
@@ -3674,6 +3676,18 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         };
         publish_bool_change(kSigDriverIpcTripResetButton, st.driver_ipc_trip_reset,
                             st.driver_ipc_trip_reset_pub);
+        // RSA mode buttons (6972-6974) — one bool per press area, published on
+        // change.  All three are evaluated in the same pass, so a mask with two
+        // bits set lands on the wire in one tick.
+        publish_bool_change(kSigDriverRsaModeSwLock,
+                            (st.driver_rsa_mode_switches & 0x01u) != 0u,
+                            st.driver_rsa_mode_sw_pub[0]);
+        publish_bool_change(kSigDriverRsaModeSwOffAcc,
+                            (st.driver_rsa_mode_switches & 0x02u) != 0u,
+                            st.driver_rsa_mode_sw_pub[1]);
+        publish_bool_change(kSigDriverRsaModeSwRun,
+                            (st.driver_rsa_mode_switches & 0x04u) != 0u,
+                            st.driver_rsa_mode_sw_pub[2]);
         // Wiper switch — published as the three raw contact cavities computed
         // from the detent enum, matching RHJB's WSW decoder (ESM p.511):
         // OFF=000, INT=110, LOW=010, HIGH=011.  Washer on its own cavity (4057).

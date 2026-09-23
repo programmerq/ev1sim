@@ -37,10 +37,13 @@
  * before the next step() if they need to outlive that boundary). Single-
  * threaded; one Gm8192RxFramer per producer cell per consumer thread.
  *
- * Capacity choice: a single GM-8192 frame is at most 68 bytes (ID + Length +
- * 65 payload + SumCheck — gm8192_frame.h §GM8192_MAX_FRAME_LEN). The
- * 512-byte buffer is ~7.5× margin so a coarse host tick that decodes several
- * back-to-back frames in one step() still has headroom. Overruns drop the
+ * Capacity choice: a single GM-8192 frame is at most 173 bytes (ID + Length +
+ * 170 payload + SumCheck — gm8192_frame.h §GM8192_MAX_FRAME_LEN, widened
+ * 2026-09-08 from 68 when real hardware produced an N=68 $F1). The 512-byte
+ * buffer is ~3× that ceiling, so a coarse host tick that decodes several
+ * back-to-back frames in one step() still has headroom; the EV1 periodic set
+ * tops out at N=11 (14 bytes), so in practice the margin is far larger than
+ * 3×. Overruns drop the
  * OLDEST buffered bytes (so the framer always tries to recover on the
  * freshest data the wire has produced), bumping bytes_dropped() so a
  * diagnostic loop can spot persistent drops.
@@ -65,10 +68,11 @@ namespace electricsim::io {
 
 class Gm8192RxFramer {
  public:
-  // Buffer cap chosen as ~7.5× the GM8192_MAX_FRAME_LEN ceiling (68 bytes).
-  // A coarse host tick that decodes a small burst of back-to-back frames still
-  // fits comfortably; overrun is treated as a diagnostic event, not a routine
-  // condition. @design 2026-06-14 claude.
+  // Buffer cap chosen as ~3× the GM8192_MAX_FRAME_LEN ceiling (173 bytes since
+  // the 2026-09-08 widen; was ~7.5× the old 68). A coarse host tick that decodes
+  // a small burst of back-to-back frames still fits comfortably — the EV1
+  // periodic set's largest frame is 14 bytes — and overrun is treated as a
+  // diagnostic event, not a routine condition. @design 2026-06-14 claude.
   static constexpr std::size_t kBufferCapBytes = 512;
 
   // Construct a framer that drains `tx_cell` (a kBitStream cell) in `table` at

@@ -2,7 +2,9 @@
  * WireTable implementation. See wire_table.hpp for design notes.
  *
  * Segment layout:
- *   Offset 0:    Header (64 bytes — magic, version, hash, sizes, atomic cell_count)
+ *   Offset 0:    Header (64 bytes — magic, version, hash, sizes, atomic
+ *                cell_count, and in the reserved tail the co-sim barrier state
+ *                plus the creator-liveness OwnerMarker the shm clean reads)
  *   Offset 64:   Directory (max_cells × 16-byte CellDescriptor)
  *   Offset N:    Cell area (aligned up to 64; each cell occupies a 64-aligned
  *                block — one 64-byte slot for the scalar types, several for
@@ -36,6 +38,7 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <new>
 #include <string>
@@ -190,6 +193,155 @@ inline BarrierState* barrier_of(Header* h) {
 }
 inline const BarrierState* barrier_of(const Header* h) {
   return reinterpret_cast<const BarrierState*>(h->reserved);
+}
+
+// ── Creator-liveness marker (owner-scoped shm clean) ────────────────────────
+// Overlaid on Header::reserved[12..27] (byte offsets 48..63) — the 16 bytes
+// BarrierState leaves free. Same ABI-invisibility rationale as BarrierState:
+// reserved[] is NOT part of kTopologyHash, so no kFormatVersion bump, and the
+// creator zero-fills reserved[] before writing anything, so a segment minted by
+// a pre-marker build reads as owner_pid == 0 ("owner unknown").
+//
+// @design 2026-09-09 claude — `scripts/run_ev1_vehicle.sh clean` (which
+// `make test` runs first) used to finish with a blanket `rm -f /dev/shm/esct_*`.
+// /dev/shm is MACHINE-GLOBAL, so a suite starting in one worktree unlinked the
+// LIVE per-test segments of every other worktree's in-flight suite — spurious
+// reds in lanes that changed nothing, observed with six worktrees testing
+// concurrently. The sweep is now scoped to segments whose CREATOR IS GONE, and
+// that needs the creator identifiable FROM THE SEGMENT: the per-run names are
+// unique but their trailing numbers are not reliably a pid (some are hex pids,
+// some are plain counters, a few names are fixed), so the owner is recorded
+// here rather than parsed out of the name.
+//
+// THE READER'S CONTRACT is stated here rather than as a pointer to the reader,
+// because this file is published byte-identical into a public sibling where a
+// path named here need not exist, and a reader who cannot open the pointer is
+// left with nothing. Any sweeper that unlinks these segments must read these
+// 16 bytes and unlink only when the recorded owner is PROVABLY gone — no
+// process with that pid, or one whose start time differs from
+// owner_start_ticks (a recycled pid). Anything it cannot read, reads short, or
+// reads differently twice in a row, it must KEEP: an extra file left behind
+// costs disk, unlinking a live process's segment costs that process.
+//
+// owner_start_ticks defeats PID REUSE. This host's /proc/sys/kernel/pid_max is
+// 32768 and a full suite forks thousands of processes, so a recycled pid is a
+// realistic way for a DEAD creator to read as alive — which would strand the
+// leaked segment forever and quietly weaken the promise the sweep exists to
+// keep: whatever a killed or timed-out run left behind is gone before the next
+// test suite starts. Linux only (field 22 of /proc/<pid>/stat,
+// starttime in clock ticks since boot); 0 elsewhere means "not recorded" and
+// the sweeper falls back to the bare pid-alive test.
+struct OwnerMarker {
+  std::atomic<std::uint32_t> owner_pid;          // reserved[12..15], offset 48
+  std::uint32_t              marker_version;     // reserved[16..19], offset 52
+  std::uint64_t              owner_start_ticks;  // reserved[20..27], offset 56
+};
+static_assert(sizeof(OwnerMarker) == 16, "OwnerMarker must be 16 bytes");
+static_assert(sizeof(BarrierState) + sizeof(OwnerMarker)
+                  <= sizeof(Header::reserved),
+              "BarrierState + OwnerMarker must fit in Header::reserved[]");
+// reserved[] starts at header offset 36, which is 4- but not 8-byte aligned;
+// reserved[12] lands at 48 and reserved[20] at 56, so both the 32-bit and the
+// 64-bit member are naturally aligned. Keep this offset if reserved[] moves.
+constexpr std::size_t kOwnerMarkerOffsetInReserved = sizeof(BarrierState);
+constexpr std::uint32_t kOwnerMarkerVersion = 1;
+
+inline OwnerMarker* owner_of(Header* h) {
+  return reinterpret_cast<OwnerMarker*>(h->reserved
+                                        + kOwnerMarkerOffsetInReserved);
+}
+
+// Read a process's start time in clock ticks since boot (field 22 of
+// /proc/<pid>/stat). Returns 0 when unavailable — the sweeper treats 0 as
+// "not recorded" and degrades to the bare pid-alive test, never to a
+// blanket unlink. Field 2 (comm) is parenthesised and may itself contain
+// spaces and parens, so parsing starts after the LAST ')'.
+std::uint64_t start_ticks_of(const char* stat_path) {
+#if defined(__linux__)
+  std::FILE* f = std::fopen(stat_path, "re");
+  if (f == nullptr) return 0;
+  char buf[1024];
+  const std::size_t n = std::fread(buf, 1, sizeof(buf) - 1, f);
+  std::fclose(f);
+  if (n == 0) return 0;
+  buf[n] = '\0';
+  const char* close_paren = std::strrchr(buf, ')');
+  if (close_paren == nullptr) return 0;
+  // After ')' the next field is (3) state; starttime is field 22, i.e. the
+  // 20th whitespace-separated token following the close paren.
+  const char* p = close_paren + 1;
+  for (int field = 3; field < 22; ++field) {
+    while (*p == ' ') ++p;
+    if (*p == '\0') return 0;
+    while (*p != '\0' && *p != ' ') ++p;
+  }
+  while (*p == ' ') ++p;
+  if (*p == '\0') return 0;
+  return std::strtoull(p, nullptr, 10);
+#else
+  (void)stat_path;
+  return 0;
+#endif
+}
+
+std::uint64_t self_start_ticks() { return start_ticks_of("/proc/self/stat"); }
+
+// This process's pid, portably (Windows has no ::getpid()).
+std::uint32_t current_pid() {
+#if defined(_WIN32)
+  return static_cast<std::uint32_t>(::GetCurrentProcessId());
+#else
+  return static_cast<std::uint32_t>(::getpid());
+#endif
+}
+
+// The pid recorded in `m` when it names a process that is running RIGHT NOW
+// and is not us; 0 otherwise. Used only for the adopt() diagnostic below, so it
+// is deliberately one-sided: it answers a pid only on POSITIVE evidence (a
+// /proc entry that exists and, where a start time was recorded, matches), and
+// 0 whenever it cannot tell. A false 0 costs a missing warning; a false pid
+// would cry wolf on every ordinary orphan recovery, which is how a diagnostic
+// gets ignored.
+std::uint32_t another_live_owner_pid(const OwnerMarker* m) {
+#if defined(__linux__)
+  const std::uint32_t pid = m->owner_pid.load(std::memory_order_acquire);
+  if (pid == 0 || m->marker_version != kOwnerMarkerVersion) return 0;
+  if (pid == current_pid()) return 0;
+  char path[64];
+  std::snprintf(path, sizeof(path), "/proc/%u/stat", pid);
+  const std::uint64_t ticks = start_ticks_of(path);
+  if (ticks == 0) return 0;  // no such process, or its stat is unreadable
+  const std::uint64_t recorded = m->owner_start_ticks;
+  if (recorded != 0 && recorded != ticks) return 0;  // recycled pid: gone
+  return pid;
+#else
+  (void)m;
+  return 0;
+#endif
+}
+
+// Stamp this process as the segment's owner. Called by create() before the
+// magic is written (so "magic present" implies "marker present") and by
+// adopt() when it takes lifecycle ownership of an orphan. owner_pid is stored
+// LAST, with release ordering, so it publishes marker_version and
+// owner_start_ticks; the sweeper reads the 16 marker bytes twice and keeps the
+// segment if the two reads disagree.
+//
+// owner_pid is deliberately NOT cleared first, and the reader closes the same
+// window from its side: a momentary 0 sitting next to a marker_version the
+// reader knows is not "unmarked" but "unreadable", which keeps the segment.
+// Residual race, narrower than what it replaces and knowingly left: a sweep
+// landing between adopt()'s two stores can still see the ORPHAN's (dead) pid —
+// a marker that parses cleanly and says the owner is gone — and unlink a
+// segment that is being adopted. It takes a `clean` and an
+// orphan-recovery in the same instant, the adopter's own mapping survives
+// (unlink does not unmap), and the blanket `rm` this replaced lost that race
+// unconditionally rather than in a several-instruction window.
+void stamp_owner(Header* h) {
+  OwnerMarker* m = owner_of(h);
+  m->marker_version = kOwnerMarkerVersion;
+  m->owner_start_ticks = self_start_ticks();
+  m->owner_pid.store(current_pid(), std::memory_order_release);
 }
 
 // ── Advisory cross-process wake for the barrier ─────────────────────────────
@@ -871,6 +1023,20 @@ std::unique_ptr<WireTable> WireTable::create(
       static_cast<std::uint32_t>(opts.cell_area_bytes);
   impl->header->cell_count.store(0, std::memory_order_relaxed);
   std::memset(impl->header->reserved, 0, sizeof(impl->header->reserved));
+  // Record the creating process BEFORE the magic goes in, so a sweeper that
+  // sees kMagic is guaranteed to also see a populated OwnerMarker (it decides
+  // "unlink" only on a marker that says the owner is gone).
+  //
+  // The fence is what makes that sentence true. stamp_owner()'s release store
+  // orders the writes BEFORE it; it says nothing about the magic write AFTER
+  // it, which the compiler or the CPU is otherwise free to make visible first
+  // — leaving a window where a reader sees a valid segment with an empty
+  // marker. The reader is a separate process doing a plain read() of the file
+  // rather than an acquire load, so this is store ordering, not a handshake:
+  // it is why the reader must also read the marker twice and keep anything it
+  // cannot read cleanly.
+  stamp_owner(impl->header);
+  std::atomic_thread_fence(std::memory_order_release);
   std::memcpy(impl->header->magic, kMagic, sizeof(kMagic));
 
   // Set up directory + cell_area pointers BEFORE running the optional
@@ -1141,6 +1307,38 @@ std::unique_ptr<WireTable> WireTable::attach_impl(const WireTableOptions& opts,
   // Validation passed — confer ownership now (adopt path) so the dtor
   // unlinks on clean shutdown. attach path leaves this false.
   impl->is_creator = take_ownership;
+  if (take_ownership) {
+    // adopt() only: the orphan's recorded owner is by definition gone (that is
+    // why we are adopting), so re-stamp — otherwise the owner-scoped shm sweep
+    // would unlink the segment out from under the process that just took it
+    // over. A plain attach() takes no ownership and leaves the marker alone.
+    //
+    // "By definition gone" is the PREMISE, and this is where it gets checked
+    // out loud. adopt() is reached from the creator path after create() lost
+    // the race for the name; if the marker we are about to overwrite names a
+    // process that is still running, the premise is false and two live
+    // processes now believe they own this segment's lifecycle — whichever
+    // exits first unlinks it under the other. Diagnostic, not refusal:
+    // returning nullptr here would send the caller down its "unlink the
+    // unusable orphan and recreate" recovery, which unlinks the live owner's
+    // segment and is strictly worse than adopting it. The refusal, and the
+    // paired change to that recovery it requires, are tracked separately.
+    const std::uint32_t live_owner =
+        another_live_owner_pid(owner_of(impl->header));
+    if (live_owner != 0) {
+      std::fprintf(stderr,
+                   "WireTable::adopt: WARNING segment %s records owner pid %u, "
+                   "which is STILL RUNNING and is not this process (pid %u). "
+                   "Taking lifecycle ownership anyway: both processes now "
+                   "believe they own it, and the first to exit unlinks it "
+                   "under the other. If that other process is a live vehicle "
+                   "or test, stop it instead of adopting its segment.\n",
+                   impl->segment_name.c_str(),
+                   static_cast<unsigned>(live_owner),
+                   static_cast<unsigned>(current_pid()));
+    }
+    stamp_owner(impl->header);
+  }
   return table;
 }
 

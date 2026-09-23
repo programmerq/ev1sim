@@ -102,7 +102,7 @@ std::wstring FormatRsaShiftBlockedLabel(bool blocked, bool ever_received);
 // RSA run-mode status label helper (display-only, not a button).
 /// Format RSA run-mode label from the kSigRunModeBroadcast (5711) uint8 value.
 /// mode: 0=OFF, 1=ACC, 2=RUN (per rsa_scan.h; the broadcast signal does not
-/// carry START — that enum value exists only on the mode-button input (6971)).
+/// carry START, which is an internal RSA phase, not a console button).
 /// ever_received: false if no frame has arrived yet (shows "Mode: ---").
 /// Unknown enum values show "Mode: ?(N)" where N is the raw byte.
 std::wstring FormatRsaRunModeLabel(std::uint8_t mode, bool ever_received);

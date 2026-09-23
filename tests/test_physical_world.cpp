@@ -822,7 +822,7 @@ TEST_CASE("test_power_windows_independent_per_window", "[PhysicalWorld][PowerWin
 namespace {
 
 // Drives the keypad scheduler for `ticks` updates of `dt`, collecting the
-// ordered list of mode-button pulses (1=OFF, 2=ACC, 3=RUN) and the total digit
+// ordered list of mode-button presses (kModeSw* masks) and the total digit
 // pulses emitted.  Mirrors the SimApp publish path: update() then
 // consume_fires_now() each tick.
 struct KeypadTrace {
@@ -837,7 +837,7 @@ KeypadTrace drain_keypad(RsaKeypadDriver& kp, double dt, int ticks) {
         auto fires = kp.consume_fires_now();
         for (int b = 0; b < 5; ++b)
             if (fires.button_value[b] != 0) ++tr.digit_pulses;
-        if (fires.mode_button != 0) tr.mode_presses.push_back(fires.mode_button);
+        if (fires.mode_switches != 0) tr.mode_presses.push_back(fires.mode_switches);
     }
     return tr;
 }
@@ -857,24 +857,27 @@ TEST_CASE("test_rsa_keypad_cold_start_reaches_RUN_in_two_cycles",
     kp.cycle_k();
     CHECK(kp.expected_state() == RsaKeypadDriver::ExpectedState::RUN);
 
-    // Drain the scheduler (100 ms ticks; plenty for 6 digits + 2 mode presses).
+    // Drain the scheduler (100 ms ticks; plenty for 5 digits + 2 mode presses).
     const auto tr = drain_keypad(kp, 0.10, 20);
 
-    // The default code "111111" is six taps of button 0 → six digit pulses,
+    // The default code "11111" is five taps of button 0 → five digit pulses,
     // entered exactly once (on the OFF→ACC transition, opening the auth window).
-    CHECK(tr.digit_pulses == 6);
+    CHECK(tr.digit_pulses == 5);
 
-    // Mode presses, in order: ACC (2) then RUN (3) — never an ACC press AFTER
+    // Each press is ONE button (the driver serialises detents; see the class
+    // comment), never a superposed mask.
+    for (auto m : tr.mode_presses) CHECK((m != 0 && (m & (m - 1)) == 0));
+    // Mode presses, in order: ACC then RUN — never an ACC press AFTER
     // RUN, and never a spurious OFF.
     REQUIRE(tr.mode_presses.size() == 2);
-    CHECK(tr.mode_presses[0] == 2);  // ACC
-    CHECK(tr.mode_presses[1] == 3);  // RUN
+    CHECK(tr.mode_presses[0] == RsaKeypadDriver::kModeSwOffAcc);  // ACC
+    CHECK(tr.mode_presses[1] == RsaKeypadDriver::kModeSwRun);
 }
 
 TEST_CASE("test_rsa_keypad_RUN_press_follows_the_code_not_races_it",
           "[PhysicalWorld][RsaKeypadDriver][C2]") {
-    // The co-sim recipe cycles ~300 ms apart, faster than the 600 ms code
-    // emission.  RUN must still be pressed AFTER all six digits — otherwise the
+    // The co-sim recipe cycles ~300 ms apart, faster than the 500 ms code
+    // emission.  RUN must still be pressed AFTER all five digits — otherwise the
     // external sim RSA rejects it (RUN is gated on the auth window being open).
     RsaKeypadDriver kp;
     KeypadTrace tr;
@@ -886,7 +889,7 @@ TEST_CASE("test_rsa_keypad_RUN_press_follows_the_code_not_races_it",
         kp.update(0.10);
         auto f = kp.consume_fires_now();
         for (int b = 0; b < 5; ++b) if (f.button_value[b]) ++tr.digit_pulses;
-        if (f.mode_button) tr.mode_presses.push_back(f.mode_button);
+        if (f.mode_switches) tr.mode_presses.push_back(f.mode_switches);
     }
     // ...then cycle 2 (ACC→RUN) arrives mid-sequence (~t=300 ms).
     kp.cycle_k();
@@ -897,12 +900,12 @@ TEST_CASE("test_rsa_keypad_RUN_press_follows_the_code_not_races_it",
     tr.digit_pulses += rest.digit_pulses;
     for (auto m : rest.mode_presses) tr.mode_presses.push_back(m);
 
-    // All six digits emitted; ACC then RUN, in order; RUN never arrives before
+    // All five digits emitted; ACC then RUN, in order; RUN never arrives before
     // the code completes (the FIFO serialises it behind the in-flight digits).
-    CHECK(tr.digit_pulses == 6);
+    CHECK(tr.digit_pulses == 5);
     REQUIRE(tr.mode_presses.size() == 2);
-    CHECK(tr.mode_presses[0] == 2);  // ACC
-    CHECK(tr.mode_presses[1] == 3);  // RUN
+    CHECK(tr.mode_presses[0] == RsaKeypadDriver::kModeSwOffAcc);  // ACC
+    CHECK(tr.mode_presses[1] == RsaKeypadDriver::kModeSwRun);
 }
 
 TEST_CASE("test_rsa_keypad_cycle_never_downgrades_RUN_to_ACC",
@@ -917,7 +920,7 @@ TEST_CASE("test_rsa_keypad_cycle_never_downgrades_RUN_to_ACC",
     CHECK(kp.expected_state() == RsaKeypadDriver::ExpectedState::OFF);
     const auto tr = drain_keypad(kp, 0.10, 5);
     REQUIRE(tr.mode_presses.size() == 1);
-    CHECK(tr.mode_presses[0] == 1);  // OFF
+    CHECK(tr.mode_presses[0] == RsaKeypadDriver::kModeSwLock);  // LOCK -> OFF
     CHECK(tr.digit_pulses == 0);     // no re-entry of the code going to OFF
 }
 
@@ -931,35 +934,35 @@ TEST_CASE("test_rsa_keypad_full_loop_OFF_ACC_RUN_OFF",
     // key_on_cycle events are always ≥100 ms apart).
     kp.cycle_k(); CHECK(kp.expected_state() == S::ACC);
     auto t1 = drain_keypad(kp, 0.10, 20);
-    CHECK(t1.digit_pulses == 6);              // code entered, then ACC
+    CHECK(t1.digit_pulses == 5);              // code entered, then ACC
     REQUIRE(t1.mode_presses.size() == 1);
-    CHECK(t1.mode_presses[0] == 2);           // ACC
+    CHECK(t1.mode_presses[0] == RsaKeypadDriver::kModeSwOffAcc);
 
     kp.cycle_k(); CHECK(kp.expected_state() == S::RUN);
     auto t2 = drain_keypad(kp, 0.10, 5);
     CHECK(t2.digit_pulses == 0);              // no re-entry going ACC→RUN
     REQUIRE(t2.mode_presses.size() == 1);
-    CHECK(t2.mode_presses[0] == 3);           // RUN
+    CHECK(t2.mode_presses[0] == RsaKeypadDriver::kModeSwRun);
 
     kp.cycle_k(); CHECK(kp.expected_state() == S::OFF);
     auto t3 = drain_keypad(kp, 0.10, 5);
     CHECK(t3.digit_pulses == 0);              // no re-entry going RUN→OFF
     REQUIRE(t3.mode_presses.size() == 1);
-    CHECK(t3.mode_presses[0] == 1);           // OFF
+    CHECK(t3.mode_presses[0] == RsaKeypadDriver::kModeSwLock);
 
     // Wraps: OFF → ACC again, re-entering the code.
     kp.cycle_k(); CHECK(kp.expected_state() == S::ACC);
     auto t4 = drain_keypad(kp, 0.10, 20);
-    CHECK(t4.digit_pulses == 6);              // code re-entered on the wrap
+    CHECK(t4.digit_pulses == 5);              // code re-entered on the wrap
     REQUIRE(t4.mode_presses.size() == 1);
-    CHECK(t4.mode_presses[0] == 2);           // ACC
+    CHECK(t4.mode_presses[0] == RsaKeypadDriver::kModeSwOffAcc);
 }
 
 TEST_CASE("test_rsa_keypad_custom_code_is_emitted",
           "[PhysicalWorld][RsaKeypadDriver][C2]") {
     RsaKeypadDriver kp;
-    // "246802" mixes taps and long-presses across several buttons.
-    kp.set_code_string("246802");
+    // "24680" mixes taps and long-presses across several buttons.
+    kp.set_code_string("24680");
     kp.cycle_k();  // OFF → ACC: schedules these digits.
 
     // Count tap vs long-press pulses across the drain.
@@ -972,10 +975,10 @@ TEST_CASE("test_rsa_keypad_custom_code_is_emitted",
             else if (f.button_value[b] == 2) ++longs;
         }
     }
-    // "246802": 2(long) 4(long) 6(long) 8(long) 0(long) 2(long) → all long-press
-    // digits.  Six digit pulses total, all long.
+    // "24680": 2(long) 4(long) 6(long) 8(long) 0(long) → all long-press
+    // digits.  Five digit pulses total, all long.
     CHECK(taps == 0);
-    CHECK(longs == 6);
+    CHECK(longs == 5);
 }
 
 // ---------------------------------------------------------------------------
@@ -1022,8 +1025,8 @@ TEST_CASE("test_rsa_exterior_keypad_long_press", "[PhysicalWorld][RsaExteriorKey
 TEST_CASE("test_rsa_exterior_keypad_enter_code_sequence", "[PhysicalWorld][RsaExteriorKeypad]") {
     RsaExteriorKeypad kp;
 
-    // "111111" = six taps of button 0.
-    kp.enter_code_sequence("111111");
+    // "11111" = five taps of button 0.
+    kp.enter_code_sequence("11111");
     CHECK(kp.sequence_in_progress());
 
     // First fire: timer=0, should fire immediately.
@@ -1034,11 +1037,11 @@ TEST_CASE("test_rsa_exterior_keypad_enter_code_sequence", "[PhysicalWorld][RsaEx
     CHECK(kp.button_value(0) == 1);
     kp.clear_oneshots();
 
-    // Sequence still in progress (5 more digits).
+    // Sequence still in progress (4 more digits).
     CHECK(kp.sequence_in_progress());
 
-    // Advance through remaining 5 digits.
-    for (int i = 0; i < 5; ++i) {
+    // Advance through remaining 4 digits.
+    for (int i = 0; i < 4; ++i) {
         // Advance time past 100ms interval.
         kp.update(0.11);
         bool f = kp.consume_sequence_fire();
@@ -1046,7 +1049,7 @@ TEST_CASE("test_rsa_exterior_keypad_enter_code_sequence", "[PhysicalWorld][RsaEx
         kp.clear_oneshots();
     }
 
-    // All 6 digits consumed — sequence done.
+    // All 5 digits consumed — sequence done.
     CHECK_FALSE(kp.sequence_in_progress());
 }
 
