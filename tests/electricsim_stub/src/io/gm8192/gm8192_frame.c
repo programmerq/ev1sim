@@ -128,8 +128,12 @@ gm8192_status_t gm8192_decode_next(const uint8_t* ring,
     return GM8192_ERR_NULL;
   }
 
-  size_t i = 0u;
-  while (i < ring_len) {
+  /* Offset of the FIRST candidate header that could still become a frame if
+   * more bytes arrive; ring_len means "none seen". Scanning does not stop
+   * there — see the contract note in gm8192_frame.h. */
+  size_t first_truncated = ring_len;
+
+  for (size_t i = 0u; i < ring_len; ++i) {
     gm8192_frame_t candidate;
     size_t consumed = 0u;
     const gm8192_status_t s = gm8192_decode(&ring[i], ring_len - i, &candidate, &consumed);
@@ -138,18 +142,15 @@ gm8192_status_t gm8192_decode_next(const uint8_t* ring,
       *bytes_consumed = i + consumed;
       return GM8192_OK;
     }
-    if (s == GM8192_ERR_TRUNCATED) {
-      /* Plausible frame start, but not enough bytes yet. Caller should keep
-       * the (ring_len - i) trailing bytes and wait for more. */
-      *bytes_consumed = i;
-      return GM8192_ERR_TRUNCATED;
+    if (s == GM8192_ERR_TRUNCATED && first_truncated == ring_len) {
+      first_truncated = i;
     }
-    /* BAD_ID / BAD_LENGTH / BAD_SUMCHECK -> drop one byte and rescan. */
-    ++i;
+    /* BAD_ID / BAD_LENGTH / BAD_SUMCHECK / TRUNCATED -> try the next offset. */
   }
 
-  /* Walked off the end without finding a valid header. Caller can drop
-   * everything. */
-  *bytes_consumed = ring_len;
+  /* No complete, checksum-valid frame anywhere in the ring. Hand back the
+   * earliest offset that could still become one (== ring_len when there is
+   * none, i.e. the caller may drop everything). */
+  *bytes_consumed = first_truncated;
   return GM8192_ERR_TRUNCATED;
 }

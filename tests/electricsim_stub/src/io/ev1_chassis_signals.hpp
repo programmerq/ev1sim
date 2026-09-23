@@ -939,11 +939,24 @@ inline constexpr std::uint32_t kSigChassisLhjbParkLampsOn = 4190U;
 // The PIM measures this waveform and uses it as one leg of the DTC 042 correlation
 // (discrete duty > 20.7 % AND serial duty < 19.1 % for 2 s → DTC 042 set).
 //
-// Derivation from sup.regen_rtd_req_dc (uint8 0-255):
-//   duty_q8 = (uint16_t)((uint32_t)regen_rtd_req_dc * 25600u / 255u)
-// This gives 0 at idle (no regen request) and 25600 (100 % Q8) at full request.
-// The serial shadow follows the same source via retard_request_count in the 0x5A
-// frame; both move together in healthy operation so DTC 042 stays clear.
+// Derivation from sup.regen_rtd_req_dc (uint8 0-255, a request MAGNITUDE):
+// see ev1/btcm/btcm_retard_request.h, which owns this line's one encoding.
+// The magnitude becomes the serial count (btcm_retard_count_from_request_dc)
+// and the published duty is derived FROM that count
+// (btcm_retard_duty_q8_from_request_dc), so prop-210's "serial data copy of
+// the discrete lines" is equal by construction rather than by two mappings
+// agreeing — which is what keeps DTC 042 structurally unable to false-fire on
+// a legitimate request.
+//
+// THE PRINTED ANCHORS, not a zero-based ratio: prop-210's band runs 10 %..90 %
+// with 18 % as "No retard or regen request", so an idle module publishes
+// 4608 Q8 (18.00 %) and a full request 23040 Q8 (90.00 %). This comment used
+// to give the derivation as duty_q8 = dc * 25600 / 255, "0 at idle" — the
+// zero-based mapping btcm_retard_request.h explicitly retires, because 0 %
+// is a level the real line cannot carry and one the propulsion module's own
+// out-of-range predicate (DTC 107, below 5 %) calls a fault with no debounce
+// and no auto-clear. Corrected 2026-09-09; the id and the encoding width are
+// unchanged.
 //
 // Before this signal, PIM held a static healthy idle default (18 % / 128 Hz / 6 V)
 // for J1-18. Publishing the live value from the BTCM supervisor closes the deferred
@@ -1075,24 +1088,31 @@ inline constexpr std::uint32_t kSigChassisApmTwelveVoltOutputMa = 4197U;
 // Signal IDs 4198–4204.  Encoding: uint8 bool per branch — 1 = branch hot.
 //
 // The Trunk Junction Block distributes the LHJB's rear lighting feeds (park /
-// turn-left / turn-right / brake, all under RUN1) to the physical rear-lamp
-// branches: LR/RR tail, license, LR/RR turn, LR/RR stop.
+// turn-left / turn-right / brake) to the physical rear-lamp branches: LR/RR
+// tail, license, LR/RR turn, LR/RR stop. NOT "all under RUN1": the trunk box
+// has no RUN1 cavity across its four connectors, and the four feeds are not
+// alike. The park feed is switched upstream at the LHJB, behind ITS RUN-1
+// return, where the park switch is; the two turn feeds ride the hazard B+
+// bypass and are deliberately unswitched; the stop feed rides the always-hot
+// mechanical brake switch straight off B+, so the rear stops light with the
+// ignition off.
 // @source:manual EV1 Electrical Service Manual, trunk junction block chapter
 //   (rear lamp + license branch distribution from LHJB feeds) — the branch
 //   set mirrors ev1_tjb_outputs_t (ev1/junction_boxes/junction_boxes.h).
 //
-// Before these cells the TJB had NO live process at all — ev1_tjb_tick and
-// its 13 route_* families were unit-tested dormant code, now wired into a
-// live process for the first time.
-// ex_tjb_controller consumes RUN1 + the LHJB feed cells and publishes these
-// seven branches. Observational today (consumers: []); candidates for the
-// ev1sim rear-lamp contract — a possible future migration is TJB taking over
-// rear-lamp production from the LHJB-written BULB_FEED_LINE_* cells, which is
-// a cross-repo contract change (docs/3d_sim_contract.md) deliberately NOT
-// done here.
+// ex_tjb_controller publishes NONE of them. It reads them back — these seven
+// plus the per-side backup pair, nine cells in all — and the one thing it
+// writes is not a branch at all but a CAUSE the solver consumes: the rear-defog
+// module's low-side contact. Observational today (consumers: []); candidates
+// for the ev1sim rear-lamp contract — a possible future migration is these
+// cells taking over rear-lamp production from the LHJB-written
+// BULB_FEED_LINE_* cells, which is a cross-repo contract change
+// (docs/3d_sim_contract.md) deliberately NOT done here.
 //
-// Publisher: ex_tjb_controller (ev1/tjb/tjb_host.cpp).
-// Consumers: none in-repo (observational; ev1sim candidate).
+// Publisher: the SOLVER (electricsim_net_host), from the element graph in
+//   config/nets/tjb.yaml.
+// Consumers: ex_tjb_controller reads all of them back for its periodic log;
+//   none in ev1sim (observational; ev1sim candidate).
 // @design 2026-07-05 — ID allocation 4198–4204, next free chassis block.
 // ---------------------------------------------------------------------------
 inline constexpr std::uint32_t kSigChassisTjbLrTailLamp   = 4198U;
@@ -1102,5 +1122,30 @@ inline constexpr std::uint32_t kSigChassisTjbLrTurnLamp   = 4201U;
 inline constexpr std::uint32_t kSigChassisTjbRrTurnLamp   = 4202U;
 inline constexpr std::uint32_t kSigChassisTjbLrStopLamp   = 4203U;
 inline constexpr std::uint32_t kSigChassisTjbRrStopLamp   = 4204U;
+
+// ---------------------------------------------------------------------------
+// PIM retard-ACHIEVED PWM duty (PIM -> chassis bus, -> BTCM RETARD ACHIEVED IN).
+// Signal ID 4205.  Encoding: uint16 little-endian, Q8 percent (0..25600).
+//
+// prop-210 (INPUTS AND OUTPUTS), verbatim: "Retard Achieved:  This line is used
+// by the PCM to report to the BTCM the amount of retard/regen achieved by the
+// Drive Motor."  The answering half of 4191 (the BTCM's retard REQUEST); the
+// pair is the regen handshake the BTCM polices with DTC 141 / 167 / 168.
+//
+// The value is the fraction of the propulsion torque that was AVAILABLE to
+// remove which the request actually removed (prop-209: "the maximum retard
+// available is equal to the propulsion torque at the time of retard request"),
+// encoded across a 6 %..95 % duty band that sits inside the range the
+// consumer's own out-of-range diagnostic declares valid (5 %..95 %), with the
+// floor moved one percent in so a healthy zero-achieved report is not one
+// integer count from that check.  Derivation + provenance:
+// ev1/pim/pim_retard_achieved.h.
+//
+// Publisher: the PIM controller (ev1/pim/controller.cpp).
+// Consumer: the BTCM controller (ev1/btcm/controller.cpp) -> btcm_regen_rx_achieved().
+// @source:manual EV1 propulsion system manual prop-209 / prop-210.
+// @design 2026-09-08 claude -- ID allocation 4205, next free chassis id.
+// ---------------------------------------------------------------------------
+inline constexpr std::uint32_t kSigChassisPimRetardAchievedDutyQ8 = 4205U;
 
 }  // namespace electricsim::io
