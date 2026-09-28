@@ -49,6 +49,8 @@ struct CountingHooks : public ev1sim::ScenarioHooks {
     int exterior_keypad_code = 0, door_handle_driver = 0;
     int flash_to_pass_on = 0, flash_to_pass_off = 0;
     int fail_throttle = 0, restore_throttle = 0;
+    int hv_iso_calls = 0, hv_iso_lead = -1;
+    double hv_iso_kohm = -1.0;
 
     void KeyOnCycle()        override { ++key_on_cycle; }
     void HeadlightCycle()    override { ++headlight_cycle; }
@@ -76,6 +78,11 @@ struct CountingHooks : public ev1sim::ScenarioHooks {
     }
     void FailThrottleInput(bool fail) override {
         if (fail) ++fail_throttle; else ++restore_throttle;
+    }
+    void HvIsolationFault(int lead, double leak_kohm) override {
+        ++hv_iso_calls;
+        hv_iso_lead = lead;
+        hv_iso_kohm = leak_kohm;
     }
 };
 
@@ -1202,6 +1209,37 @@ TEST_CASE("Scenario: fail_throttle_input dispatches with fail/restore value",
     CHECK(hooks.restore_throttle == 1);
 }
 
+
+TEST_CASE("Scenario: hv_isolation_fault dispatches lead + leak, and clears",
+          "[Scenario]") {
+    using ev1sim::Scenario;
+
+    Scenario s;
+    s.set_events({
+        {1.00, "hv_isolation_fault", 100.0, 1.0},   // 100 kOhm, HV+ lead
+        {2.00, "hv_isolation_fault", 0.0,   2.0},   // dead short, HV- lead
+        {3.00, "hv_isolation_fault", -1.0,  1.0},   // negative value clears
+    });
+
+    CountingHooks hooks;
+    DriverCommand cmd{};
+
+    s.Tick(0.50, VehicleState{}, hooks, cmd);
+    CHECK(hooks.hv_iso_calls == 0);
+
+    s.Tick(1.10, VehicleState{}, hooks, cmd);
+    CHECK(hooks.hv_iso_calls == 1);
+    CHECK(hooks.hv_iso_lead == 1);
+    CHECK(hooks.hv_iso_kohm == 100.0);
+
+    s.Tick(2.10, VehicleState{}, hooks, cmd);
+    CHECK(hooks.hv_iso_lead == 2);
+    CHECK(hooks.hv_iso_kohm == 0.0);
+
+    s.Tick(3.10, VehicleState{}, hooks, cmd);
+    CHECK(hooks.hv_iso_calls == 3);
+    CHECK(hooks.hv_iso_lead == 0);
+}
 
 // ---------------------------------------------------------------------------
 // The brake has to fire AFTER the car has settled, not on the barrier tick.

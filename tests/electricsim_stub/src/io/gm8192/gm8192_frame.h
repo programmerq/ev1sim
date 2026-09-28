@@ -149,13 +149,14 @@ extern "C" {
 /* ALDL ID block                                                              */
 /* ------------------------------------------------------------------------- */
 
-/* All ALDL (scan-tool session) traffic lives on the 0xF0–0xF8 ID block so
- * consumers can distinguish it from mode-less periodic traffic by ID alone.
+/* All ALDL (scan-tool session) traffic lives on the 0xF0–0xF7 ID block plus
+ * the SDM's $FA, so consumers can distinguish it from mode-less periodic
+ * traffic by ID alone (gm8192_is_aldl_id below).
  * The EV1 frame spec defines $F0 (master presence check) and $F1 (tester
  * data response); @source:redux bus/messages/uart/f0_aldl_presence_check.yaml,
  * f1_aldl_data_response.yaml.
  *
- * The per-slave session IDs below are ours: how a real tester addressed an
+ * The per-slave session IDs 0xF2-0xF7 are ours: how a real tester addressed an
  * individual EV1 ECU is not documented in the spec material we have.
  * @design 2026-06-09 claude — one ID per slave (request and response share
  * the ID; direction is implied by bus mastership). Revisit if a better
@@ -169,15 +170,21 @@ extern "C" {
 #define GM8192_ALDL_ID_CCU           0xF5u  /* RSA in this codebase */
 #define GM8192_ALDL_ID_HTCM          0xF6u
 #define GM8192_ALDL_ID_DSCM          0xF7u  /* IPC in this codebase */
-/* @inferred 2026-06-20 claude — the SIR/SDM diagnostic-mode spec (XDE-5024) is
- * not bundled, so the SDM's wire identity is an engineered choice: 0xF8 extends
- * the ALDL session-ID block by one past DSCM (0xF7). SDM is the first module
- * added beyond the original spec set, so the F0–F7 range checks in
- * aldl_responder.c (observe_tester_traffic) and scan_tool_aldl.c
- * (decode_response) were widened to F0–F8 to match. Request and response share
- * the ID, as for the 0xF2–0xF7 slaves.
+/* SDM (SIR/airbag): $FA, the ALDL id of every Delco SIR module in GM's own
+ * datastream specs (A242/A252/A295/A296/A300: "FA 57 01 00 AE" = mode $01
+ * message $00). A '97 Delco SDM on the bench answers that exact request, and
+ * the EV1 SIR manual puts the SDM's serial data on DLC terminal 9 (SIR
+ * md:474), the Delco SIR serial line. Request and response share the ID.
+ * @source:manual SIR md:474 + GM Delco SIR datastream specs;
  * notes/manual_supplements.yaml#2026-06-20-sdm-aldl-id-and-responder */
-#define GM8192_ALDL_ID_SDM           0xF8u  /* SDM (SIR/airbag); @inferred */
+#define GM8192_ALDL_ID_SDM           0xFAu  /* SDM (SIR/airbag), Delco SIR id */
+
+/* True for every ID in the ALDL session space: the 0xF0-0xF7 block plus the
+ * SDM's $FA. 0xF8/0xF9 are NOT ALDL ids. */
+static inline bool gm8192_is_aldl_id(uint8_t id) {
+  return (id >= GM8192_ALDL_ID_PRESENCE && id <= GM8192_ALDL_ID_DSCM) ||
+         id == GM8192_ALDL_ID_SDM;
+}
 
 /* ------------------------------------------------------------------------- */
 /* ALDL Mode Numbers (payload[0] of ALDL-block frames; not envelope fields)   */
@@ -212,7 +219,7 @@ extern "C" {
  *        120/960 ms; $F0/$F1 ALDL presence + mastership handover),
  *        decodable by period-correct tools (Peter Ohler's Palm EV1
  *        Dash). The v3 broadcasts and Mode 0x10/0x11 markers are gone;
- *        ALDL sessions ride per-slave IDs 0xF2-0xF8 with the Mode
+ *        ALDL sessions ride per-slave IDs 0xF2-0xF7 + $FA with the Mode
  *        number as payload[0]. See docs/gm8192_protocol.md.
  * The envelope itself is mode-less; ALDL frames spend payload[0] on
  * their Mode number, which is byte-identical on the wire to the old

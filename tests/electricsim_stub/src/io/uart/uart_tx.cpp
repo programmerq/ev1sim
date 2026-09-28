@@ -54,6 +54,23 @@ void UartTx::enqueue(const std::uint8_t* data, std::size_t len) {
 
 void UartTx::enqueue(std::uint8_t byte) { queue_.push_back(byte); }
 
+void UartTx::enqueue_at(std::uint8_t byte, std::uint64_t at_ns) {
+  // First bring the line up to the instant just before the byte exists: the
+  // byte in flight finishes and its Idle-Line tail runs exactly as if nothing
+  // were waiting. Queuing the byte BEFORE this step is wrong in a way that is
+  // easy to miss: tick() chains a waiting byte straight onto the Stop bit of
+  // the one in flight, so a byte released 12 bit times after the previous
+  // Stop would be sent back-to-back with it and the Idle Line that belongs in
+  // front of it would land behind it instead.
+  if (at_ns > 0u) tick(at_ns - 1u);
+  // Then tick() applies its rule for a byte arriving at `at_ns`: a completed
+  // tail re-seeds the bit clock so the Start bit lands at `at_ns` (a frame
+  // boundary), an incomplete one is cut short (a gap under an Idle Line), and
+  // a byte still shifting out is followed back-to-back.
+  queue_.push_back(byte);
+  tick(at_ns);
+}
+
 bool UartTx::idle() const noexcept {
   return (state_ == State::kIdle || state_ == State::kIdleTail) &&
          queue_.empty();

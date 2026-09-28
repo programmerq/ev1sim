@@ -168,6 +168,12 @@ public:
     // consuming controller. fail=false restores it (next heartbeat
     // republishes).
     virtual void FailThrottleInput(bool fail) = 0;
+    // Vehicle-plant fault injection (scenario action "hv_isolation_fault"):
+    // an insulation fault from ONE HV lead to chassis. lead 1 = HV+, 2 = HV-,
+    // 0 = none (clears); leak_kohm = the fault path's resistance (0 = dead
+    // short). The EV1's Auto Disconnect detects it as an imbalance of the
+    // chassis-to-lead voltages (batt-685 ISOLATION DETECTION).
+    virtual void HvIsolationFault(int lead, double leak_kohm) = 0;
 };
 
 class Scenario {

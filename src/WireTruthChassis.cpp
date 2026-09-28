@@ -95,6 +95,8 @@ static const std::unordered_map<std::uint32_t, ProducerCell>& ProducerRegistry()
         {4051U, {kWirePRND_SELECTOR_B,              WireType::kBit}},
         {4052U, {kWirePRND_SELECTOR_C,              WireType::kBit}},
         {4053U, {kWirePRND_SELECTOR_D,              WireType::kBit}},
+        // PRND switch PARK SELECT contact (circuit 275) -> BPM
+        {5142U, {kWireBPM_PARK_SELECT,              WireType::kBit}},
         // Wiper switch outputs (bit)
         {4054U, {kWireWIPER_SW_DELAY_OUT,           WireType::kBit}},
         {4055U, {kWireWIPER_SW_REQUEST_OUT,         WireType::kBit}},
@@ -744,6 +746,41 @@ std::optional<std::uint32_t> WireTruthChassis::ad_state_enum() const {
     }
 }
 
+std::optional<std::uint32_t> WireTruthChassis::ad_isolation_chassis_ref_permille() const {
+    return read_uint32(electricsim::topology::kWireAD_ISOLATION_CHASSIS_REF_PERMILLE);
+}
+std::optional<std::uint32_t> WireTruthChassis::ad_active_dtc_bitmap() const {
+    return read_uint32(electricsim::topology::kWireCHASSIS_AD_ACTIVE_DTC_BITMAP);
+}
+std::optional<std::uint16_t> WireTruthChassis::bpm_ad_dtc_bitmap() const {
+    return read_uint16(electricsim::topology::kWireCHASSIS_BPM_AD_DTC_BITMAP);
+}
+std::optional<bool> WireTruthChassis::ipc_service_soon_telltale() const {
+    return read_bit(ReadOnlyWireId(
+        electricsim::topology::kWireCHASSIS_IPC_SERVICE_SOON_TELLTALE));
+}
+std::optional<bool> WireTruthChassis::ipc_wait_telltale() const {
+    return read_bit(ReadOnlyWireId(
+        electricsim::topology::kWireCHASSIS_IPC_WAIT_TELLTALE));
+}
+std::optional<bool> WireTruthChassis::ipc_wait_drive() const {
+    if (!attached()) return std::nullopt;
+    electricsim::io::WireTable::Sample<bool> s;
+    if (!impl_->table->read_bit_sample(
+            electricsim::topology::kWireIPC_ES_WAIT_TT_DRV, &s) ||
+        !s.written()) {
+        return std::nullopt;
+    }
+    return s.value;
+}
+bool WireTruthChassis::publish_hv_isolation_fault(std::uint8_t lead,
+                                                  std::uint32_t kohm) {
+    if (!attached()) return false;
+    const bool a = write_byte(electricsim::topology::kWireHV_ISOLATION_FAULT_LEAD, lead);
+    const bool b = write_uint32(electricsim::topology::kWireHV_ISOLATION_FAULT_KOHM, kohm);
+    return a && b;
+}
+
 std::optional<std::uint64_t> WireTruthChassis::btcm_tx_total_bits() const {
     if (!attached()) return std::nullopt;
     std::uint64_t total = 0;
@@ -880,6 +917,27 @@ std::optional<bool> WireTruthChassis::ad_main_contactor_closed() const {
 }
 std::optional<std::uint32_t> WireTruthChassis::ad_state_enum() const {
     return std::nullopt;
+}
+std::optional<std::uint32_t> WireTruthChassis::ad_isolation_chassis_ref_permille() const {
+    return std::nullopt;
+}
+std::optional<std::uint32_t> WireTruthChassis::ad_active_dtc_bitmap() const {
+    return std::nullopt;
+}
+std::optional<std::uint16_t> WireTruthChassis::bpm_ad_dtc_bitmap() const {
+    return std::nullopt;
+}
+std::optional<bool> WireTruthChassis::ipc_service_soon_telltale() const {
+    return std::nullopt;
+}
+std::optional<bool> WireTruthChassis::ipc_wait_telltale() const {
+    return std::nullopt;
+}
+std::optional<bool> WireTruthChassis::ipc_wait_drive() const {
+    return std::nullopt;
+}
+bool WireTruthChassis::publish_hv_isolation_fault(std::uint8_t, std::uint32_t) {
+    return false;
 }
 std::optional<std::uint64_t> WireTruthChassis::btcm_tx_total_bits() const {
     return std::nullopt;
