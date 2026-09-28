@@ -1140,13 +1140,13 @@ void SimApp::ApplyRearEmbBrake(double time, double /*local_rear_brake*/) {
         m_rear_rr_was_fresh = cmd.rr_fresh;
     }
 
-    // Convert the [-1, +1] motor command to a clamping force.  +1 = full apply
-    // (max shoe force), 0 or negative = no force (motor idling or retracting).
+    // The [-1, +1] motor command drives each corner's clamp: +1 applies,
+    // -1 releases, and 0 is the BTCM's anti-lock HOLD, which KEEPS the clamp
+    // force (RearEmbClamp.h has the reasoning). A stale command is zero
+    // force: the rear has no hydraulic fallback path.
     const ev1sim::BrakeDrum::Params drum;
-    auto cmd_to_force = [&drum](float c) {
-        const double clipped = c < 0.0f ? 0.0 : (c > 1.0f ? 1.0 : double{c});
-        return clipped * drum.max_shoe_force_n;
-    };
+    const double force_rl = m_rear_clamp_rl.Update(cmd.lr, cmd.lr_fresh, drum);
+    const double force_rr = m_rear_clamp_rr.Update(cmd.rr, cmd.rr_fresh, drum);
 
     // Wheel angular velocity needed for the self-energizing factor.
     // VehicleState.wheel_omega is indexed FL, FR, RL, RR.
@@ -1159,18 +1159,12 @@ void SimApp::ApplyRearEmbBrake(double time, double /*local_rear_brake*/) {
         return ratio < 0.0 ? 0.0 : (ratio > 1.0 ? 1.0 : ratio);
     };
 
-    // Per-wheel: BTCM command if fresh, else 0 (rear has no hydraulic
-    // fallback path).  Always call ApplyRearBrakePerWheel so we actively
-    // zero the rear when BTCM is off — otherwise Chrono would carry the
-    // last value forever.
-    const double rl_ratio = cmd.lr_fresh
-        ? torque_to_ratio(ev1sim::BrakeDrum::torque_magnitude_nm(
-              cmd_to_force(cmd.lr), omega_rl, drum))
-        : 0.0;
-    const double rr_ratio = cmd.rr_fresh
-        ? torque_to_ratio(ev1sim::BrakeDrum::torque_magnitude_nm(
-              cmd_to_force(cmd.rr), omega_rr, drum))
-        : 0.0;
+    // Always call ApplyRearBrakePerWheel so the rear is actively zeroed when
+    // the BTCM is off — otherwise Chrono would carry the last value forever.
+    const double rl_ratio = torque_to_ratio(
+        ev1sim::BrakeDrum::torque_magnitude_nm(force_rl, omega_rl, drum));
+    const double rr_ratio = torque_to_ratio(
+        ev1sim::BrakeDrum::torque_magnitude_nm(force_rr, omega_rr, drum));
     m_world->ApplyRearBrakePerWheel(time, rl_ratio, rr_ratio);
 }
 
