@@ -36,7 +36,8 @@
  * The state machine is driven by an external monotonic timestamp (`now_ns`)
  * supplied by the caller's tick loop — it owns no thread or real-time clock,
  * keeping it decoupled from scheduling policy (synthetic time in tests, the
- * fleet wall clock in production).
+ * fleet wall clock for host-built frames, the emulated core's own clock for
+ * an emulated MCU's USART — see enqueue_at()).
  * @design 2026-06-13 claude — docs/wire_truth_gm8192_step4.md §"Sub-PR 4-B".
  *
  * Host-side only. No simavr dependency, no module controller changes. Wire
@@ -67,6 +68,30 @@ class UartTx {
   // and tick() must not be called concurrently without external synchronisation.
   void enqueue(const std::uint8_t* data, std::size_t len);
   void enqueue(std::uint8_t byte);
+
+  // Enqueue ONE byte that its producer put on the line at `at_ns`, on the same
+  // clock tick() is driven by, and advance the line to that instant.
+  //
+  // enqueue() treats a byte as handed over at the next tick(), so the gap in
+  // front of it is set by how the caller batches its enqueues: a burst split
+  // across two calls gets a spurious Idle Line at the split, and two frames in
+  // one call lose the Idle Line between them. A producer whose bytes carry
+  // their own timestamps (an emulated MCU's USART, whose shift register runs
+  // on the emulated core's cycle clock) calls this per byte instead, and the
+  // line reproduces the producer's own timeline:
+  //   - the line idle >= kIdleLineBits bit times since the last Stop bit ->
+  //     the full Idle-Line tail went out first and the Start bit goes at
+  //     `at_ns` (a frame boundary);
+  //   - idle for fewer bit times -> the tail is cut short at `at_ns`, the gap
+  //     is under an Idle Line, and the byte follows (inside a frame);
+  //   - a byte still shifting out -> this one chains back-to-back after it.
+  // Calls must come in non-decreasing `at_ns` order; tick() with the producer's
+  // current time then emits whatever tail is due after the last byte.
+  // @source:manual; docs/gm8192_protocol.md §"Physical layer" (Idle Line =
+  // continuous logic 1 >= 10 bit times; frames sit between Idle Lines).
+  // @design 2026-09-27 claude — btcm_live_wiring fix (the BTCM re-serialised
+  // its firmware's USART bytes on the host wall clock).
+  void enqueue_at(std::uint8_t byte, std::uint64_t at_ns);
 
   // Advance to `now_ns`, emitting every bit whose boundary falls at or before
   // it. One call may emit several bits if `now_ns` jumped multiple bit periods
