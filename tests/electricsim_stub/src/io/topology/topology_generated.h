@@ -27,16 +27,16 @@
 namespace electricsim::topology {
 
 inline constexpr std::uint32_t kFormatVersion = 2U;
-inline constexpr std::uint32_t kTopologyHash = 0xBC1BEBE5U;
-inline constexpr std::size_t kWireCount = 444;
+inline constexpr std::uint32_t kTopologyHash = 0xC6BB1A23U;
+inline constexpr std::size_t kWireCount = 451;
 
 // Per-class cell counts. Emitted so a
 // receipt can print the classification without re-parsing YAML,
 // and so a test can assert against them. The legacy count is held
 // by a DECREASING ratchet in the generator that fails on !=.
-inline constexpr std::size_t kConductorCellCount = 90;
-inline constexpr std::size_t kElementStateCellCount = 69;
-inline constexpr std::size_t kSemanticCellCount = 95;
+inline constexpr std::size_t kConductorCellCount = 92;
+inline constexpr std::size_t kElementStateCellCount = 71;
+inline constexpr std::size_t kSemanticCellCount = 98;
 inline constexpr std::size_t kUnclassifiedLegacyCellCount = 190;
 
 // Named cell ids. Sequential by YAML key order; changing that
@@ -493,6 +493,13 @@ inline constexpr ::electricsim::io::ElementStateId kWireAD_ES_POWER_SUPPLY_OUT{4
 inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_MODE_SW_LOCK = 442U;
 inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_MODE_SW_OFF_ACC = 443U;
 inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_MODE_SW_RUN = 444U;
+inline constexpr ::electricsim::io::WireId kWireHV_ISOLATION_FAULT_LEAD = 445U;
+inline constexpr ::electricsim::io::WireId kWireHV_ISOLATION_FAULT_KOHM = 446U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_BPM_AD_DTC_BITMAP = 447U;
+inline constexpr ::electricsim::io::ElementStateId kWirePIM_ES_SERVICE_SOON_TT_DRV{448U};
+inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_IPC_SERVICE_SOON_TELLTALE{449U};
+inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_WAIT_TT_DRV{450U};
+inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_IPC_WAIT_TELLTALE{451U};
 
 // Per-net default + init_policy constants.
 // Used by consumers that opt into the kDefault policy — see
@@ -1387,6 +1394,20 @@ inline constexpr auto kWireDRIVER_RSA_MODE_SW_OFF_ACC_Default = false;
 inline constexpr InitPolicy kWireDRIVER_RSA_MODE_SW_OFF_ACC_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireDRIVER_RSA_MODE_SW_RUN_Default = false;
 inline constexpr InitPolicy kWireDRIVER_RSA_MODE_SW_RUN_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireHV_ISOLATION_FAULT_LEAD_Default = static_cast<std::uint8_t>(0x0U);
+inline constexpr InitPolicy kWireHV_ISOLATION_FAULT_LEAD_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireHV_ISOLATION_FAULT_KOHM_Default = 0x0U;
+inline constexpr InitPolicy kWireHV_ISOLATION_FAULT_KOHM_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_BPM_AD_DTC_BITMAP_Default = static_cast<std::uint16_t>(0x0U);
+inline constexpr InitPolicy kWireCHASSIS_BPM_AD_DTC_BITMAP_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWirePIM_ES_SERVICE_SOON_TT_DRV_Default = false;
+inline constexpr InitPolicy kWirePIM_ES_SERVICE_SOON_TT_DRV_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_IPC_SERVICE_SOON_TELLTALE_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_IPC_SERVICE_SOON_TELLTALE_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireIPC_ES_WAIT_TT_DRV_Default = false;
+inline constexpr InitPolicy kWireIPC_ES_WAIT_TT_DRV_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_IPC_WAIT_TELLTALE_Default = false;
+inline constexpr InitPolicy kWireCHASSIS_IPC_WAIT_TELLTALE_InitPolicy = InitPolicy::kHold;
 
 // Declare every wire in this topology on the given (creator)
 // table. Returns true iff all declarations succeed.
@@ -1836,6 +1857,13 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(kWireDRIVER_RSA_MODE_SW_LOCK, ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(kWireDRIVER_RSA_MODE_SW_OFF_ACC, ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(kWireDRIVER_RSA_MODE_SW_RUN, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireHV_ISOLATION_FAULT_LEAD, ::electricsim::io::WireType::kByte) && ok;
+  ok = table.declare(kWireHV_ISOLATION_FAULT_KOHM, ::electricsim::io::WireType::kUint32) && ok;
+  ok = table.declare(kWireCHASSIS_BPM_AD_DTC_BITMAP, ::electricsim::io::WireType::kUint16) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWirePIM_ES_SERVICE_SOON_TT_DRV), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireCHASSIS_IPC_SERVICE_SOON_TELLTALE), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireIPC_ES_WAIT_TT_DRV), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireCHASSIS_IPC_WAIT_TELLTALE), ::electricsim::io::WireType::kBit) && ok;
   return ok;
 }
 
@@ -2288,6 +2316,13 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case kWireDRIVER_RSA_MODE_SW_LOCK: return "DRIVER_RSA_MODE_SW_LOCK";
     case kWireDRIVER_RSA_MODE_SW_OFF_ACC: return "DRIVER_RSA_MODE_SW_OFF_ACC";
     case kWireDRIVER_RSA_MODE_SW_RUN: return "DRIVER_RSA_MODE_SW_RUN";
+    case kWireHV_ISOLATION_FAULT_LEAD: return "HV_ISOLATION_FAULT_LEAD";
+    case kWireHV_ISOLATION_FAULT_KOHM: return "HV_ISOLATION_FAULT_KOHM";
+    case kWireCHASSIS_BPM_AD_DTC_BITMAP: return "CHASSIS_BPM_AD_DTC_BITMAP";
+    case static_cast<::electricsim::io::WireId>(kWirePIM_ES_SERVICE_SOON_TT_DRV): return "PIM_ES_SERVICE_SOON_TT_DRV";
+    case static_cast<::electricsim::io::WireId>(kWireCHASSIS_IPC_SERVICE_SOON_TELLTALE): return "CHASSIS_IPC_SERVICE_SOON_TELLTALE";
+    case static_cast<::electricsim::io::WireId>(kWireIPC_ES_WAIT_TT_DRV): return "IPC_ES_WAIT_TT_DRV";
+    case static_cast<::electricsim::io::WireId>(kWireCHASSIS_IPC_WAIT_TELLTALE): return "CHASSIS_IPC_WAIT_TELLTALE";
     default: return ::std::string_view{};
   }
 }
@@ -2745,6 +2780,13 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case kWireDRIVER_RSA_MODE_SW_LOCK: return "";
     case kWireDRIVER_RSA_MODE_SW_OFF_ACC: return "";
     case kWireDRIVER_RSA_MODE_SW_RUN: return "";
+    case kWireHV_ISOLATION_FAULT_LEAD: return "";
+    case kWireHV_ISOLATION_FAULT_KOHM: return "";
+    case kWireCHASSIS_BPM_AD_DTC_BITMAP: return "";
+    case static_cast<::electricsim::io::WireId>(kWirePIM_ES_SERVICE_SOON_TT_DRV): return "pim_ecu";
+    case static_cast<::electricsim::io::WireId>(kWireCHASSIS_IPC_SERVICE_SOON_TELLTALE): return "";
+    case static_cast<::electricsim::io::WireId>(kWireIPC_ES_WAIT_TT_DRV): return "ipc_ecu";
+    case static_cast<::electricsim::io::WireId>(kWireCHASSIS_IPC_WAIT_TELLTALE): return "";
     default: return ::std::string_view{};
   }
 }
@@ -3206,6 +3248,13 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(kWireDRIVER_RSA_MODE_SW_LOCK, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_RSA_MODE_SW_LOCK"}, kWireDRIVER_RSA_MODE_SW_LOCK); ++count; }
   if (table.write_gen(kWireDRIVER_RSA_MODE_SW_OFF_ACC, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_RSA_MODE_SW_OFF_ACC"}, kWireDRIVER_RSA_MODE_SW_OFF_ACC); ++count; }
   if (table.write_gen(kWireDRIVER_RSA_MODE_SW_RUN, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_RSA_MODE_SW_RUN"}, kWireDRIVER_RSA_MODE_SW_RUN); ++count; }
+  if (table.write_gen(kWireHV_ISOLATION_FAULT_LEAD, &gen) && gen == 0) { visitor(::std::string_view{"HV_ISOLATION_FAULT_LEAD"}, kWireHV_ISOLATION_FAULT_LEAD); ++count; }
+  if (table.write_gen(kWireHV_ISOLATION_FAULT_KOHM, &gen) && gen == 0) { visitor(::std::string_view{"HV_ISOLATION_FAULT_KOHM"}, kWireHV_ISOLATION_FAULT_KOHM); ++count; }
+  if (table.write_gen(kWireCHASSIS_BPM_AD_DTC_BITMAP, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_BPM_AD_DTC_BITMAP"}, kWireCHASSIS_BPM_AD_DTC_BITMAP); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWirePIM_ES_SERVICE_SOON_TT_DRV), &gen) && gen == 0) { visitor(::std::string_view{"PIM_ES_SERVICE_SOON_TT_DRV"}, static_cast<::electricsim::io::WireId>(kWirePIM_ES_SERVICE_SOON_TT_DRV)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireCHASSIS_IPC_SERVICE_SOON_TELLTALE), &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_IPC_SERVICE_SOON_TELLTALE"}, static_cast<::electricsim::io::WireId>(kWireCHASSIS_IPC_SERVICE_SOON_TELLTALE)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireIPC_ES_WAIT_TT_DRV), &gen) && gen == 0) { visitor(::std::string_view{"IPC_ES_WAIT_TT_DRV"}, static_cast<::electricsim::io::WireId>(kWireIPC_ES_WAIT_TT_DRV)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireCHASSIS_IPC_WAIT_TELLTALE), &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_IPC_WAIT_TELLTALE"}, static_cast<::electricsim::io::WireId>(kWireCHASSIS_IPC_WAIT_TELLTALE)); ++count; }
   return count;
 }
 
@@ -3663,6 +3712,13 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case kWireDRIVER_RSA_MODE_SW_LOCK: return ::electricsim::io::CellClass::kSemantic;
     case kWireDRIVER_RSA_MODE_SW_OFF_ACC: return ::electricsim::io::CellClass::kSemantic;
     case kWireDRIVER_RSA_MODE_SW_RUN: return ::electricsim::io::CellClass::kSemantic;
+    case kWireHV_ISOLATION_FAULT_LEAD: return ::electricsim::io::CellClass::kSemantic;
+    case kWireHV_ISOLATION_FAULT_KOHM: return ::electricsim::io::CellClass::kSemantic;
+    case kWireCHASSIS_BPM_AD_DTC_BITMAP: return ::electricsim::io::CellClass::kSemantic;
+    case static_cast<::electricsim::io::WireId>(kWirePIM_ES_SERVICE_SOON_TT_DRV): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireCHASSIS_IPC_SERVICE_SOON_TELLTALE): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireIPC_ES_WAIT_TT_DRV): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireCHASSIS_IPC_WAIT_TELLTALE): return ::electricsim::io::CellClass::kConductor;
     default: return ::electricsim::io::CellClass::kUnknown;
   }
 }
