@@ -27,7 +27,7 @@
 namespace electricsim::topology {
 
 inline constexpr std::uint32_t kFormatVersion = 2U;
-inline constexpr std::uint32_t kTopologyHash = 0x3838F87BU;
+inline constexpr std::uint32_t kTopologyHash = 0xC6BB1A23U;
 inline constexpr std::size_t kWireCount = 451;
 
 // Per-class cell counts. Emitted so a
@@ -486,13 +486,13 @@ inline constexpr ::electricsim::io::WireId kWireTJB_DEFOG_COMMAND_193B = 434U;
 inline constexpr ::electricsim::io::ElementStateId kWireTJB_ES_DEFOG_MODULE_LO_CLOSED{435U};
 inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_TJB_PRI_DEFOG_LO{436U};
 inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_TJB_SEC_DEFOG_LO{437U};
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_MODE_SW_LOCK = 438U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_MODE_SW_OFF_ACC = 439U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_MODE_SW_RUN = 440U;
-inline constexpr ::electricsim::io::ElementStateId kWireAD_ES_STATE_A_RELEASED{441U};
-inline constexpr ::electricsim::io::ElementStateId kWireAD_ES_STATE_B_RELEASED{442U};
-inline constexpr ::electricsim::io::ElementStateId kWireAD_ES_STATE_C_RELEASED{443U};
-inline constexpr ::electricsim::io::ElementStateId kWireAD_ES_POWER_SUPPLY_OUT{444U};
+inline constexpr ::electricsim::io::ElementStateId kWireAD_ES_STATE_A_RELEASED{438U};
+inline constexpr ::electricsim::io::ElementStateId kWireAD_ES_STATE_B_RELEASED{439U};
+inline constexpr ::electricsim::io::ElementStateId kWireAD_ES_STATE_C_RELEASED{440U};
+inline constexpr ::electricsim::io::ElementStateId kWireAD_ES_POWER_SUPPLY_OUT{441U};
+inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_MODE_SW_LOCK = 442U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_MODE_SW_OFF_ACC = 443U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_MODE_SW_RUN = 444U;
 inline constexpr ::electricsim::io::WireId kWireHV_ISOLATION_FAULT_LEAD = 445U;
 inline constexpr ::electricsim::io::WireId kWireHV_ISOLATION_FAULT_KOHM = 446U;
 inline constexpr ::electricsim::io::WireId kWireCHASSIS_BPM_AD_DTC_BITMAP = 447U;
@@ -1380,12 +1380,6 @@ inline constexpr auto kWireCHASSIS_TJB_PRI_DEFOG_LO_Default = false;
 inline constexpr InitPolicy kWireCHASSIS_TJB_PRI_DEFOG_LO_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireCHASSIS_TJB_SEC_DEFOG_LO_Default = false;
 inline constexpr InitPolicy kWireCHASSIS_TJB_SEC_DEFOG_LO_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_RSA_MODE_SW_LOCK_Default = false;
-inline constexpr InitPolicy kWireDRIVER_RSA_MODE_SW_LOCK_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_RSA_MODE_SW_OFF_ACC_Default = false;
-inline constexpr InitPolicy kWireDRIVER_RSA_MODE_SW_OFF_ACC_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_RSA_MODE_SW_RUN_Default = false;
-inline constexpr InitPolicy kWireDRIVER_RSA_MODE_SW_RUN_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireAD_ES_STATE_A_RELEASED_Default = false;
 inline constexpr InitPolicy kWireAD_ES_STATE_A_RELEASED_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireAD_ES_STATE_B_RELEASED_Default = false;
@@ -1394,6 +1388,12 @@ inline constexpr auto kWireAD_ES_STATE_C_RELEASED_Default = false;
 inline constexpr InitPolicy kWireAD_ES_STATE_C_RELEASED_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireAD_ES_POWER_SUPPLY_OUT_Default = false;
 inline constexpr InitPolicy kWireAD_ES_POWER_SUPPLY_OUT_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireDRIVER_RSA_MODE_SW_LOCK_Default = false;
+inline constexpr InitPolicy kWireDRIVER_RSA_MODE_SW_LOCK_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireDRIVER_RSA_MODE_SW_OFF_ACC_Default = false;
+inline constexpr InitPolicy kWireDRIVER_RSA_MODE_SW_OFF_ACC_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireDRIVER_RSA_MODE_SW_RUN_Default = false;
+inline constexpr InitPolicy kWireDRIVER_RSA_MODE_SW_RUN_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireHV_ISOLATION_FAULT_LEAD_Default = static_cast<std::uint8_t>(0x0U);
 inline constexpr InitPolicy kWireHV_ISOLATION_FAULT_LEAD_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireHV_ISOLATION_FAULT_KOHM_Default = 0x0U;
@@ -1850,13 +1850,13 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireTJB_ES_DEFOG_MODULE_LO_CLOSED), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireCHASSIS_TJB_PRI_DEFOG_LO), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireCHASSIS_TJB_SEC_DEFOG_LO), ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(kWireDRIVER_RSA_MODE_SW_LOCK, ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(kWireDRIVER_RSA_MODE_SW_OFF_ACC, ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(kWireDRIVER_RSA_MODE_SW_RUN, ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_A_RELEASED), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_B_RELEASED), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_C_RELEASED), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireAD_ES_POWER_SUPPLY_OUT), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireDRIVER_RSA_MODE_SW_LOCK, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireDRIVER_RSA_MODE_SW_OFF_ACC, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireDRIVER_RSA_MODE_SW_RUN, ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(kWireHV_ISOLATION_FAULT_LEAD, ::electricsim::io::WireType::kByte) && ok;
   ok = table.declare(kWireHV_ISOLATION_FAULT_KOHM, ::electricsim::io::WireType::kUint32) && ok;
   ok = table.declare(kWireCHASSIS_BPM_AD_DTC_BITMAP, ::electricsim::io::WireType::kUint16) && ok;
@@ -2309,13 +2309,13 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case static_cast<::electricsim::io::WireId>(kWireTJB_ES_DEFOG_MODULE_LO_CLOSED): return "TJB_ES_DEFOG_MODULE_LO_CLOSED";
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_TJB_PRI_DEFOG_LO): return "CHASSIS_TJB_PRI_DEFOG_LO";
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_TJB_SEC_DEFOG_LO): return "CHASSIS_TJB_SEC_DEFOG_LO";
-    case kWireDRIVER_RSA_MODE_SW_LOCK: return "DRIVER_RSA_MODE_SW_LOCK";
-    case kWireDRIVER_RSA_MODE_SW_OFF_ACC: return "DRIVER_RSA_MODE_SW_OFF_ACC";
-    case kWireDRIVER_RSA_MODE_SW_RUN: return "DRIVER_RSA_MODE_SW_RUN";
     case static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_A_RELEASED): return "AD_ES_STATE_A_RELEASED";
     case static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_B_RELEASED): return "AD_ES_STATE_B_RELEASED";
     case static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_C_RELEASED): return "AD_ES_STATE_C_RELEASED";
     case static_cast<::electricsim::io::WireId>(kWireAD_ES_POWER_SUPPLY_OUT): return "AD_ES_POWER_SUPPLY_OUT";
+    case kWireDRIVER_RSA_MODE_SW_LOCK: return "DRIVER_RSA_MODE_SW_LOCK";
+    case kWireDRIVER_RSA_MODE_SW_OFF_ACC: return "DRIVER_RSA_MODE_SW_OFF_ACC";
+    case kWireDRIVER_RSA_MODE_SW_RUN: return "DRIVER_RSA_MODE_SW_RUN";
     case kWireHV_ISOLATION_FAULT_LEAD: return "HV_ISOLATION_FAULT_LEAD";
     case kWireHV_ISOLATION_FAULT_KOHM: return "HV_ISOLATION_FAULT_KOHM";
     case kWireCHASSIS_BPM_AD_DTC_BITMAP: return "CHASSIS_BPM_AD_DTC_BITMAP";
@@ -2773,13 +2773,13 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case static_cast<::electricsim::io::WireId>(kWireTJB_ES_DEFOG_MODULE_LO_CLOSED): return "tjb_defog_module";
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_TJB_PRI_DEFOG_LO): return "";
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_TJB_SEC_DEFOG_LO): return "";
-    case kWireDRIVER_RSA_MODE_SW_LOCK: return "";
-    case kWireDRIVER_RSA_MODE_SW_OFF_ACC: return "";
-    case kWireDRIVER_RSA_MODE_SW_RUN: return "";
     case static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_A_RELEASED): return "ad_ecu";
     case static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_B_RELEASED): return "ad_ecu";
     case static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_C_RELEASED): return "ad_ecu";
     case static_cast<::electricsim::io::WireId>(kWireAD_ES_POWER_SUPPLY_OUT): return "ad_ecu";
+    case kWireDRIVER_RSA_MODE_SW_LOCK: return "";
+    case kWireDRIVER_RSA_MODE_SW_OFF_ACC: return "";
+    case kWireDRIVER_RSA_MODE_SW_RUN: return "";
     case kWireHV_ISOLATION_FAULT_LEAD: return "";
     case kWireHV_ISOLATION_FAULT_KOHM: return "";
     case kWireCHASSIS_BPM_AD_DTC_BITMAP: return "";
@@ -3241,13 +3241,13 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireTJB_ES_DEFOG_MODULE_LO_CLOSED), &gen) && gen == 0) { visitor(::std::string_view{"TJB_ES_DEFOG_MODULE_LO_CLOSED"}, static_cast<::electricsim::io::WireId>(kWireTJB_ES_DEFOG_MODULE_LO_CLOSED)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireCHASSIS_TJB_PRI_DEFOG_LO), &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_TJB_PRI_DEFOG_LO"}, static_cast<::electricsim::io::WireId>(kWireCHASSIS_TJB_PRI_DEFOG_LO)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireCHASSIS_TJB_SEC_DEFOG_LO), &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_TJB_SEC_DEFOG_LO"}, static_cast<::electricsim::io::WireId>(kWireCHASSIS_TJB_SEC_DEFOG_LO)); ++count; }
-  if (table.write_gen(kWireDRIVER_RSA_MODE_SW_LOCK, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_RSA_MODE_SW_LOCK"}, kWireDRIVER_RSA_MODE_SW_LOCK); ++count; }
-  if (table.write_gen(kWireDRIVER_RSA_MODE_SW_OFF_ACC, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_RSA_MODE_SW_OFF_ACC"}, kWireDRIVER_RSA_MODE_SW_OFF_ACC); ++count; }
-  if (table.write_gen(kWireDRIVER_RSA_MODE_SW_RUN, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_RSA_MODE_SW_RUN"}, kWireDRIVER_RSA_MODE_SW_RUN); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_A_RELEASED), &gen) && gen == 0) { visitor(::std::string_view{"AD_ES_STATE_A_RELEASED"}, static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_A_RELEASED)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_B_RELEASED), &gen) && gen == 0) { visitor(::std::string_view{"AD_ES_STATE_B_RELEASED"}, static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_B_RELEASED)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_C_RELEASED), &gen) && gen == 0) { visitor(::std::string_view{"AD_ES_STATE_C_RELEASED"}, static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_C_RELEASED)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireAD_ES_POWER_SUPPLY_OUT), &gen) && gen == 0) { visitor(::std::string_view{"AD_ES_POWER_SUPPLY_OUT"}, static_cast<::electricsim::io::WireId>(kWireAD_ES_POWER_SUPPLY_OUT)); ++count; }
+  if (table.write_gen(kWireDRIVER_RSA_MODE_SW_LOCK, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_RSA_MODE_SW_LOCK"}, kWireDRIVER_RSA_MODE_SW_LOCK); ++count; }
+  if (table.write_gen(kWireDRIVER_RSA_MODE_SW_OFF_ACC, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_RSA_MODE_SW_OFF_ACC"}, kWireDRIVER_RSA_MODE_SW_OFF_ACC); ++count; }
+  if (table.write_gen(kWireDRIVER_RSA_MODE_SW_RUN, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_RSA_MODE_SW_RUN"}, kWireDRIVER_RSA_MODE_SW_RUN); ++count; }
   if (table.write_gen(kWireHV_ISOLATION_FAULT_LEAD, &gen) && gen == 0) { visitor(::std::string_view{"HV_ISOLATION_FAULT_LEAD"}, kWireHV_ISOLATION_FAULT_LEAD); ++count; }
   if (table.write_gen(kWireHV_ISOLATION_FAULT_KOHM, &gen) && gen == 0) { visitor(::std::string_view{"HV_ISOLATION_FAULT_KOHM"}, kWireHV_ISOLATION_FAULT_KOHM); ++count; }
   if (table.write_gen(kWireCHASSIS_BPM_AD_DTC_BITMAP, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_BPM_AD_DTC_BITMAP"}, kWireCHASSIS_BPM_AD_DTC_BITMAP); ++count; }
@@ -3705,13 +3705,13 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case static_cast<::electricsim::io::WireId>(kWireTJB_ES_DEFOG_MODULE_LO_CLOSED): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_TJB_PRI_DEFOG_LO): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_TJB_SEC_DEFOG_LO): return ::electricsim::io::CellClass::kConductor;
-    case kWireDRIVER_RSA_MODE_SW_LOCK: return ::electricsim::io::CellClass::kSemantic;
-    case kWireDRIVER_RSA_MODE_SW_OFF_ACC: return ::electricsim::io::CellClass::kSemantic;
-    case kWireDRIVER_RSA_MODE_SW_RUN: return ::electricsim::io::CellClass::kSemantic;
     case static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_A_RELEASED): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_B_RELEASED): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_C_RELEASED): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireAD_ES_POWER_SUPPLY_OUT): return ::electricsim::io::CellClass::kElementState;
+    case kWireDRIVER_RSA_MODE_SW_LOCK: return ::electricsim::io::CellClass::kSemantic;
+    case kWireDRIVER_RSA_MODE_SW_OFF_ACC: return ::electricsim::io::CellClass::kSemantic;
+    case kWireDRIVER_RSA_MODE_SW_RUN: return ::electricsim::io::CellClass::kSemantic;
     case kWireHV_ISOLATION_FAULT_LEAD: return ::electricsim::io::CellClass::kSemantic;
     case kWireHV_ISOLATION_FAULT_KOHM: return ::electricsim::io::CellClass::kSemantic;
     case kWireCHASSIS_BPM_AD_DTC_BITMAP: return ::electricsim::io::CellClass::kSemantic;
