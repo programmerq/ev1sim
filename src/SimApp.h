@@ -9,6 +9,7 @@
 #include "SounderAudio.h"
 #include "KeyboardInputController.h"
 #include "PhysicalWorld.h"
+#include "RearEmbClamp.h"
 #include "SdlContext.h"
 #include "Scenario.h"
 #include "ScriptedDriver.h"
@@ -254,11 +255,15 @@ private:
 
     // Rear EMB drum brake state (BTCM rear-motor integration).
     // The ApplyRearEmbBrake helper consumes kSigRearMotorLR/RR (5014/5015),
-    // converts the float command to a shoe force, computes torque via the
+    // converts the float command to a shoe force (holding it through an
+    // anti-lock HOLD), computes torque via the
     // BrakeDrum self-energizing model, and applies per-wheel rear brake
     // ratio against the BrakeSimple max torque.
     bool m_rear_lr_was_fresh = false;
     bool m_rear_rr_was_fresh = false;
+    /// Per-corner clamp state: a HOLD (command 0) keeps the last force.
+    ev1sim::RearEmbClamp m_rear_clamp_rl;
+    ev1sim::RearEmbClamp m_rear_clamp_rr;
     /// Rear brake "Maximum Torque" (N·m) — converts the physical drum torque
     /// from the BrakeDrum model into the [0,1] ratio Chrono's brake takes.
     /// MUST equal data/vehicle/ev1/brake/EV1_BrakeSimple_Rear.json's
