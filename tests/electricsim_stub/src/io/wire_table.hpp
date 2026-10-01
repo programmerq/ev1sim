@@ -510,6 +510,25 @@ class WireTable {
   // elsewhere): the shm counters are source-of-truth, so a lost/absent wake only
   // costs latency. Every wait is bounded by timeout_ms; on a crashed peer the
   // wait returns false (never wedges) so the caller can abort the run.
+  //
+  // SERIALIZED TURNS (intra-tick order). The protocol above orders only tick
+  // BOUNDARIES: within a tick every consumer runs whenever the OS schedules it,
+  // so a cell one consumer writes and another reads lands before or after the
+  // read depending on the run. A consumer that is given a unique turn k in
+  // 0..N-1 (out-of-band: ELECTRICSIM_BARRIER_TURN="k/N", set by vat/fleet.py)
+  // closes that by waiting, after the tick opens, until the ack counter reaches
+  // k — barrier_await_turn(k) — and only then doing its tick work and acking.
+  // The ack counter therefore doubles as the turn counter: the leader already
+  // resets it to 0 before bumping the generation, and exactly k acks precede
+  // consumer k's start. No two consumers ever do tick work at once, so every
+  // cell read lands at the same point relative to every write, run after run.
+  // No new header bytes (reserved[] has no room to spare), no kFormatVersion
+  // bump, and no leader change: the new calls are consumer-only, and the
+  // undeclared protocol above is untouched.
+  //   turn consumer: barrier_await_tick(&prev_gen); barrier_await_turn(k);
+  //                  [ barrier_ack_count() == k ]; work; barrier_ack().
+  // @design 2026-10-01 claude — owner ruling 2026-10-01 (serialized turns,
+  // solver last); docs/proposals/barrier_intra_tick_ordering_2026-08-12.md.
 
   // Leader: arm the barrier (idempotent). After this, consumers that are
   // sim-time masters will block-and-ack.
@@ -534,6 +553,18 @@ class WireTable {
   // Current publish generation (the tick the leader has opened). Consumers use
   // it to seed *prev_gen when joining mid-stream. 0 before the first tick.
   std::uint32_t barrier_publish_gen() const;
+  // Turn consumer: block until the current tick's ack counter reaches `turn`
+  // (i.e. consumers 0..turn-1 have all acked), or until timeout_ms. Same
+  // futex slice and wall deadline as barrier_await_acks. Returns true once the
+  // counter is >= turn (the caller checks for == turn — more means a stray ack
+  // landed), false on timeout (an earlier turn holder or the leader is gone).
+  // Call only after barrier_await_tick() returned this tick: the leader zeroes
+  // the counter before it bumps the generation, so a counter read after the
+  // generation read never belongs to the previous tick. @design 2026-10-01.
+  bool barrier_await_turn(std::uint32_t turn, int timeout_ms) const;
+  // The current tick's ack count — under serialized turns, the turn being
+  // served. Read-only; used for the turn-start / pre-ack invariant checks.
+  std::uint32_t barrier_ack_count() const;
 
   // ── TEST-ONLY fault-injection hooks ──────────────────────────────
   //
