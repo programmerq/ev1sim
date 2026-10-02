@@ -1907,6 +1907,32 @@ void WireTable::barrier_ack() {
   barrier_futex_wake(&b->ack_count);
 }
 
+// Serialized turns: the ack counter doubles as the turn counter (see the
+// barrier doc block in wire_table.hpp). Same shape as barrier_await_acks —
+// re-read the atomic, check the wall deadline, block one bounded futex slice
+// on the ack word — because it is the same wait on the same word, only for a
+// smaller count. barrier_ack()'s FUTEX_WAKE(INT_MAX) wakes every waiter on
+// the word, so the leader and each queued turn holder all re-check; a waiter
+// whose turn has not come goes straight back to sleep. @design 2026-10-01
+// claude.
+bool WireTable::barrier_await_turn(std::uint32_t turn, int timeout_ms) const {
+  BarrierState* b = barrier_of(impl_->header);
+  const auto deadline =
+      std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
+  for (;;) {
+    const std::uint32_t acked = b->ack_count.load(std::memory_order_acquire);
+    if (acked >= turn) return true;
+    if (std::chrono::steady_clock::now() >= deadline) {
+      return b->ack_count.load(std::memory_order_acquire) >= turn;
+    }
+    barrier_futex_wait_slice(&b->ack_count, acked);
+  }
+}
+
+std::uint32_t WireTable::barrier_ack_count() const {
+  return barrier_of(impl_->header)->ack_count.load(std::memory_order_acquire);
+}
+
 bool WireTable::has_cell(WireId id) const {
   std::uint32_t idx = 0;
   return impl_->resolve_index(id, &idx);
