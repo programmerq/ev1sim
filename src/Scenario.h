@@ -286,6 +286,9 @@ private:
     // hand lag filters from here (see LaneHoldSteering).
     double                     m_lane_out = 0.0;
     std::optional<double>      m_lane_out_t;
+    // Lane-hold output when the test driver took the wheel: its steering
+    // budget is measured from here.
+    double                     m_lane_base = 0.0;
     // Lane-keeping steering command in [-1, 1] for the current state; see
     // the definition for the law and the gain provenance.  Updates
     // m_lane_prev and the hand-lag state.

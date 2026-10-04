@@ -192,12 +192,16 @@ void Scenario::Tick(double sim_time, const VehicleState& state,
         } else if (e.action == "lane_hold") {
             m_lane_hold_y = e.value;
             m_lane_profile = (e.value2 == 1.0) ? 1 : 0;
+            // The test driver's budget is wheel ROTATION from where it
+            // takes over (R13-H counts rotation), not wheel position.
+            m_lane_base = m_lane_out;
             m_lane_prev.reset();
         } else if (e.action == "lane_release") {
             m_lane_hold_y.reset();
             m_lane_profile = 0;
             m_lane_out = 0.0;
             m_lane_out_t.reset();
+            m_lane_base = 0.0;
             m_held_steering = 0.0;
         } else {
             std::cerr << "[Scenario] unknown action '" << e.action
@@ -270,7 +274,8 @@ void Scenario::Tick(double sim_time, const VehicleState& state,
 //   kCourseGain  4.0     twice the settle driver's.
 //   kYawRateGain 0.6     twice the settle driver's, to damp the ~1 Hz
 //                        split-stop yaw mode.
-//   kSteerLimit  0.727   120 deg of steering wheel: 7.27 deg road-wheel on
+//   kSteerLimit  0.727   120 deg of steering-wheel ROTATION from the wheel
+//                        position at handover: 7.27 deg road-wheel on
 //                        this rack x the EV1's 16.5:1 overall ratio (GM's
 //                        published EV1 specification).
 //   kHandLagS    0.2 s   a first-order lag on the command: hands, not a
@@ -300,7 +305,8 @@ double Scenario::LaneHoldSteering(const VehicleState& state, double sim_time) {
     const double e_y     = state.pos_y - *m_lane_hold_y;
     const double psi_des = -std::atan2(e_y, kLookAheadM);
     const double steer   = kCourseGain * (psi_des - course) - kYawRateGain * state.yaw_rate;
-    const double demand  = std::clamp(steer, -kSteerLimit, kSteerLimit);
+    const double base    = test ? m_lane_base : 0.0;
+    const double demand  = std::clamp(steer, base - kSteerLimit, base + kSteerLimit);
 
     // The test driver's hands lag the demand; the settle driver's do not
     // (its command is already gentle).  Tracking the output in both keeps
