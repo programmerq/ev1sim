@@ -74,6 +74,11 @@ class PhysicalWorld;
 //       +0.47 m from a spawn 1.15 m to the right).
 //       Overrides any set_steering while engaged.  Steers on the measured
 //       course, not the body heading: see Scenario::LaneHoldSteering.
+//       value2 picks the driver: 0 (default) the gentle coast-settle driver
+//       above; 1 the split-stop TEST DRIVER, who keeps the car on the seam
+//       through a braked stop with the steering budget UN ECE R13-H Annex 6
+//       sec. 5.3.7 allows (120 deg of steering wheel).  Re-issue lane_hold
+//       with value2 1 on the brake tick to hand over.
 //   lane_release:  disengage lane_hold and centre the wheel (steering held
 //       at 0 until a later set_steering).  Schedule it on the brake tick
 //       so the stop itself is open-loop: what the car does under the
@@ -269,6 +274,9 @@ private:
     std::optional<double>      m_held_steering;
     // lane_hold target (world y, metres); disengaged when empty.
     std::optional<double>      m_lane_hold_y;
+    // Which lane-hold driver: 0 the coast-settle driver, 1 the split-stop
+    // test driver (lane_hold value2; see LaneHoldSteering).
+    int                        m_lane_profile = 0;
     // Previous-tick chassis position, from which the lane hold derives the
     // COURSE (direction of travel) — see LaneHoldSteering for why it steers
     // on course rather than on body heading.  Empty on the first tick.

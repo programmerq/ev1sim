@@ -191,9 +191,11 @@ void Scenario::Tick(double sim_time, const VehicleState& state,
             hooks.HvIsolationFault(lead, e.value < 0.0 ? 0.0 : e.value);
         } else if (e.action == "lane_hold") {
             m_lane_hold_y = e.value;
+            m_lane_profile = (e.value2 == 1.0) ? 1 : 0;
             m_lane_prev.reset();
         } else if (e.action == "lane_release") {
             m_lane_hold_y.reset();
+            m_lane_profile = 0;
             m_held_steering = 0.0;
         } else {
             std::cerr << "[Scenario] unknown action '" << e.action
@@ -251,11 +253,30 @@ void Scenario::Tick(double sim_time, const VehicleState& state,
 //                       writes a yaw story into a directional-stability test.
 // Measured on abs_split_mu: see config/scenarios/abs_split_mu.json's header
 // for the brake-entry position this delivers against the open-loop drift.
+//
+// THE SPLIT-STOP TEST DRIVER (lane_hold value2 = 1).  The settle driver above
+// is deliberately gentle, and on the driver-corrected split stop that is the
+// wrong driver: measured 2026-10-04 (electricsim abs_split_mu_hands_on), it
+// used 31 deg of steering wheel and let the car drift 0.74 m onto the
+// asphalt, so the ice-side wheels crossed the seam.  A proving-ground driver
+// on that test (UN ECE R13-H Annex 6 sec. 5.3.7) may use 120 deg of steering
+// wheel in the first 2 s and must keep every tyre on its own side.  Same law,
+// sharper gains, and the limit set to that budget:
+// @design 2026-10-04 claude
+//   kLookAheadM  6 m     ≈ 0.3 s at the stop's entry speed: answers the
+//                        offset before it reaches the half-track.
+//   kCourseGain  4.0     twice the settle driver's.
+//   kYawRateGain 0.6     twice the settle driver's, to damp the ~1 Hz
+//                        split-stop yaw mode.
+//   kSteerLimit  0.727   120 deg of steering wheel: 7.27 deg road-wheel on
+//                        this rack x the EV1's 16.5:1 overall ratio (GM's
+//                        published EV1 specification).
 double Scenario::LaneHoldSteering(const VehicleState& state) {
-    constexpr double kLookAheadM  = 15.0;
-    constexpr double kCourseGain  = 2.0;
-    constexpr double kYawRateGain = 0.3;
-    constexpr double kSteerLimit  = 0.3;
+    const bool test = (m_lane_profile == 1);
+    const double kLookAheadM  = test ? 6.0 : 15.0;
+    const double kCourseGain  = test ? 4.0 : 2.0;
+    const double kYawRateGain = test ? 0.6 : 0.3;
+    const double kSteerLimit  = test ? 0.727 : 0.3;
     constexpr double kMinStepM    = 1e-3;
     constexpr double kDegToRad    = M_PI / 180.0;
 

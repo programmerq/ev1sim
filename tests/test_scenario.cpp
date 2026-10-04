@@ -355,6 +355,65 @@ TEST_CASE("Scenario: lane_hold wins over a held set_steering while engaged",
     CHECK(cmd.steering < 0.0);
 }
 
+TEST_CASE("Scenario: lane_hold value2 1 hands the wheel to the split-stop "
+          "test driver, clamped at the R13-H 120 deg budget",
+          "[Scenario][LaneHold]") {
+    using ev1sim::Scenario;
+    // Same course error, two drivers: the settle driver (value2 0) and the
+    // test driver (value2 1) re-issued on the brake tick, then released.
+    auto demand = [](double value2, VehicleState a, VehicleState b) {
+        Scenario s;
+        s.set_events({{1.00, "lane_hold", 0.0, value2}});
+        CountingHooks hooks;
+        DriverCommand cmd{};
+        s.Tick(1.5, a, hooks, cmd);
+        s.Tick(1.6, b, hooks, cmd);
+        return cmd.steering;
+    };
+    // Travelling straight 0.3 m left of the line: both steer right, the
+    // test driver harder (shorter look-ahead, doubled course gain).
+    VehicleState a{};
+    a.pos_y = 0.3;
+    VehicleState b = a;
+    b.pos_x = 0.3;
+    const double settle = demand(0.0, a, b);
+    const double test   = demand(1.0, a, b);
+    CHECK(settle < 0.0);
+    CHECK(test < settle);
+
+    // A gross error clamps each driver at its own limit: the settle driver
+    // at 0.3, the test driver at 0.727 = 7.27 deg road-wheel = 120 deg of
+    // steering wheel at the EV1's 16.5:1.
+    VehicleState far = b;
+    far.pos_y = 100.0;
+    far.pos_x = b.pos_x + 0.3;
+    CHECK(demand(0.0, b, far) == Catch::Approx(-0.3));
+    CHECK(demand(1.0, b, far) == Catch::Approx(-0.727));
+
+    // lane_release drops the profile: a later plain lane_hold is the
+    // settle driver again.
+    Scenario s;
+    s.set_events({
+        {1.00, "lane_hold",    0.0, 1.0},
+        {2.00, "lane_release", 0.0, 0.0},
+        {3.00, "lane_hold",    0.0, 0.0},
+    });
+    CountingHooks hooks;
+    DriverCommand cmd{};
+    s.Tick(1.5, b, hooks, cmd);
+    s.Tick(1.6, far, hooks, cmd);
+    CHECK(cmd.steering == Catch::Approx(-0.727));
+    s.Tick(2.5, far, hooks, cmd);
+    CHECK(cmd.steering == 0.0);
+    VehicleState far2 = far;
+    far2.pos_x += 0.3;
+    s.Tick(3.5, far, hooks, cmd);
+    s.Tick(3.6, far2, hooks, cmd);
+    // Same direction of travel (straight), now 100 m off: hard right,
+    // clamped at the settle driver's 0.3.
+    CHECK(cmd.steering == Catch::Approx(-0.3));
+}
+
 TEST_CASE("Scenario: the shipped split-mu scenario holds the lane for the "
           "whole coast and releases on the brake tick", "[Scenario][LaneHold]") {
     const std::filesystem::path source_root(EV1SIM_SOURCE_DIR);
