@@ -8,6 +8,7 @@
 //   - Stats CSV writes the requested fields with the expected period
 //   - IsDone() vs max_time_s
 
+#include <memory>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
 
@@ -356,62 +357,61 @@ TEST_CASE("Scenario: lane_hold wins over a held set_steering while engaged",
 }
 
 TEST_CASE("Scenario: lane_hold value2 1 hands the wheel to the split-stop "
-          "test driver, clamped at the R13-H 120 deg budget",
-          "[Scenario][LaneHold]") {
+          "test driver: sharper, lagged like hands, clamped at the R13-H "
+          "120 deg budget", "[Scenario][LaneHold]") {
     using ev1sim::Scenario;
-    // Same course error, two drivers: the settle driver (value2 0) and the
-    // test driver (value2 1) re-issued on the brake tick, then released.
-    auto demand = [](double value2, VehicleState a, VehicleState b) {
-        Scenario s;
-        s.set_events({{1.00, "lane_hold", 0.0, value2}});
+    // Drive straight along +x, `off` metres left of the line, for `secs`
+    // in 10 ms ticks; returns the last steering command.
+    auto drive = [](Scenario& s, double t0, double off, double secs) {
         CountingHooks hooks;
         DriverCommand cmd{};
-        s.Tick(1.5, a, hooks, cmd);
-        s.Tick(1.6, b, hooks, cmd);
+        VehicleState st{};
+        st.pos_y = off;
+        const int n = static_cast<int>(secs / 0.01);
+        for (int i = 0; i <= n; ++i) {
+            st.pos_x = 0.2 * i;   // 20 m/s
+            s.Tick(t0 + 0.01 * i, st, hooks, cmd);
+        }
         return cmd.steering;
     };
-    // Travelling straight 0.3 m left of the line: both steer right, the
-    // test driver harder (shorter look-ahead, doubled course gain).
-    VehicleState a{};
-    a.pos_y = 0.3;
-    VehicleState b = a;
-    b.pos_x = 0.3;
-    const double settle = demand(0.0, a, b);
-    const double test   = demand(1.0, a, b);
+    auto fresh = [](double value2) {
+        auto s = std::make_unique<Scenario>();
+        s->set_events({{1.00, "lane_hold", 0.0, value2}});
+        return s;
+    };
+
+    // 0.3 m left of the line, settled: both steer right, the test driver
+    // harder (6 m look-ahead and doubled course gain against 15 m / 1x).
+    const double settle = drive(*fresh(0.0), 1.0, 0.3, 2.0);
+    const double test   = drive(*fresh(1.0), 1.0, 0.3, 2.0);
     CHECK(settle < 0.0);
     CHECK(test < settle);
 
-    // A gross error clamps each driver at its own limit: the settle driver
-    // at 0.3, the test driver at 0.727 = 7.27 deg road-wheel = 120 deg of
-    // steering wheel at the EV1's 16.5:1.
-    VehicleState far = b;
-    far.pos_y = 100.0;
-    far.pos_x = b.pos_x + 0.3;
-    CHECK(demand(0.0, b, far) == Catch::Approx(-0.3));
-    CHECK(demand(1.0, b, far) == Catch::Approx(-0.727));
+    // Hands, not a servo: one 10 ms tick into a step demand the test
+    // driver has moved dt / (0.2 + dt) of the way; the settle driver is
+    // there at once.
+    const double test_1tick   = drive(*fresh(1.0), 1.0, 0.3, 0.01);
+    const double settle_1tick = drive(*fresh(0.0), 1.0, 0.3, 0.01);
+    CHECK(settle_1tick == Catch::Approx(settle));
+    CHECK(std::abs(test_1tick) < 0.1 * std::abs(test));
 
-    // lane_release drops the profile: a later plain lane_hold is the
-    // settle driver again.
+    // A gross error clamps each driver at its own limit once settled: the
+    // settle driver at 0.3, the test driver at 0.727 = 7.27 deg road-wheel
+    // = 120 deg of steering wheel at the EV1's 16.5:1.
+    CHECK(drive(*fresh(0.0), 1.0, 100.0, 2.0) == Catch::Approx(-0.3));
+    CHECK(drive(*fresh(1.0), 1.0, 100.0, 3.0) == Catch::Approx(-0.727).margin(1e-3));
+
+    // lane_release centres the wheel and drops the profile: a later plain
+    // lane_hold is the unlagged settle driver again.
     Scenario s;
     s.set_events({
         {1.00, "lane_hold",    0.0, 1.0},
-        {2.00, "lane_release", 0.0, 0.0},
-        {3.00, "lane_hold",    0.0, 0.0},
+        {5.00, "lane_release", 0.0, 0.0},
+        {6.00, "lane_hold",    0.0, 0.0},
     });
-    CountingHooks hooks;
-    DriverCommand cmd{};
-    s.Tick(1.5, b, hooks, cmd);
-    s.Tick(1.6, far, hooks, cmd);
-    CHECK(cmd.steering == Catch::Approx(-0.727));
-    s.Tick(2.5, far, hooks, cmd);
-    CHECK(cmd.steering == 0.0);
-    VehicleState far2 = far;
-    far2.pos_x += 0.3;
-    s.Tick(3.5, far, hooks, cmd);
-    s.Tick(3.6, far2, hooks, cmd);
-    // Same direction of travel (straight), now 100 m off: hard right,
-    // clamped at the settle driver's 0.3.
-    CHECK(cmd.steering == Catch::Approx(-0.3));
+    CHECK(drive(s, 1.0, 100.0, 3.0) == Catch::Approx(-0.727).margin(1e-3));
+    CHECK(drive(s, 5.0, 100.0, 0.5) == 0.0);
+    CHECK(drive(s, 6.0, 100.0, 0.02) == Catch::Approx(-0.3));
 }
 
 TEST_CASE("Scenario: the shipped split-mu scenario holds the lane for the "

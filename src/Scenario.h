@@ -282,10 +282,14 @@ private:
     // on course rather than on body heading.  Empty on the first tick.
     struct LanePoint { double x, y; };
     std::optional<LanePoint>   m_lane_prev;
+    // Last lane-hold steering output and its sim time: the test driver's
+    // hand lag filters from here (see LaneHoldSteering).
+    double                     m_lane_out = 0.0;
+    std::optional<double>      m_lane_out_t;
     // Lane-keeping steering command in [-1, 1] for the current state; see
     // the definition for the law and the gain provenance.  Updates
-    // m_lane_prev.
-    double LaneHoldSteering(const VehicleState& state);
+    // m_lane_prev and the hand-lag state.
+    double LaneHoldSteering(const VehicleState& state, double sim_time);
     // Horn contact, held like the pedals: set_horn value != 0 closes the
     // single driver horn contact (circuit 28) until the next set_horn 0.
     std::optional<bool>        m_held_horn;

@@ -196,6 +196,8 @@ void Scenario::Tick(double sim_time, const VehicleState& state,
         } else if (e.action == "lane_release") {
             m_lane_hold_y.reset();
             m_lane_profile = 0;
+            m_lane_out = 0.0;
+            m_lane_out_t.reset();
             m_held_steering = 0.0;
         } else {
             std::cerr << "[Scenario] unknown action '" << e.action
@@ -206,7 +208,7 @@ void Scenario::Tick(double sim_time, const VehicleState& state,
     if (m_held_throttle) cmd.throttle    = *m_held_throttle;
     if (m_held_brake)    cmd.front_brake = cmd.rear_brake = *m_held_brake;
     if (m_held_steering) cmd.steering    = *m_held_steering;
-    if (m_lane_hold_y)   cmd.steering    = LaneHoldSteering(state);
+    if (m_lane_hold_y)   cmd.steering    = LaneHoldSteering(state, sim_time);
     // One physical horn contact (circuit 28); SimApp ORs low||high into
     // HornButton::set_held, so driving both mirrors a closed contact.
     if (m_held_horn)     cmd.horn_low    = cmd.horn_high = *m_held_horn;
@@ -271,7 +273,14 @@ void Scenario::Tick(double sim_time, const VehicleState& state,
 //   kSteerLimit  0.727   120 deg of steering wheel: 7.27 deg road-wheel on
 //                        this rack x the EV1's 16.5:1 overall ratio (GM's
 //                        published EV1 specification).
-double Scenario::LaneHoldSteering(const VehicleState& state) {
+//   kHandLagS    0.2 s   a first-order lag on the command: hands, not a
+//                        servo.  Without it the yaw-rate term answers every
+//                        anti-lock pressure cycle and the wheel saws +-10 deg
+//                        at ~8 Hz, which no driver does.  0.2 s (~0.8 Hz) is
+//                        @inferred from the driver-model literature (McRuer's
+//                        crossover model: an attentive driver's effective
+//                        delay is 0.1-0.3 s), not measured on a person.
+double Scenario::LaneHoldSteering(const VehicleState& state, double sim_time) {
     const bool test = (m_lane_profile == 1);
     const double kLookAheadM  = test ? 6.0 : 15.0;
     const double kCourseGain  = test ? 4.0 : 2.0;
@@ -291,7 +300,20 @@ double Scenario::LaneHoldSteering(const VehicleState& state) {
     const double e_y     = state.pos_y - *m_lane_hold_y;
     const double psi_des = -std::atan2(e_y, kLookAheadM);
     const double steer   = kCourseGain * (psi_des - course) - kYawRateGain * state.yaw_rate;
-    return std::clamp(steer, -kSteerLimit, kSteerLimit);
+    const double demand  = std::clamp(steer, -kSteerLimit, kSteerLimit);
+
+    // The test driver's hands lag the demand; the settle driver's do not
+    // (its command is already gentle).  Tracking the output in both keeps
+    // the handover on the brake tick continuous.
+    constexpr double kHandLagS = 0.2;
+    double out = demand;
+    if (test) {
+        const double dt = m_lane_out_t ? std::max(0.0, sim_time - *m_lane_out_t) : 0.0;
+        out = m_lane_out + (demand - m_lane_out) * dt / (kHandLagS + dt);
+    }
+    m_lane_out   = out;
+    m_lane_out_t = sim_time;
+    return out;
 }
 
 void Scenario::OpenStats() {
