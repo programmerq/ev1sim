@@ -123,6 +123,43 @@ TEST_CASE("WireTruthChassis: horn drive lines round-trip external sim -> ev1sim"
     REQUIRE(wire->horn_high_drive() == std::optional<bool>(true));
 }
 
+TEST_CASE("WireTruthChassis: HV rail sag witnesses decode, and read nullopt until written",
+          "[wire_truth][hv_sag]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("hvsag");
+    auto producer = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(producer != nullptr);
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+
+    // Nothing published yet: every witness says "no data", never a zero.
+    REQUIRE(wire->hv_bus_voltage_mv() == std::nullopt);
+    REQUIRE(wire->hv_bus_pack_current_ma() == std::nullopt);
+    REQUIRE(wire->bpm_pack_voltage_v() == std::nullopt);
+    REQUIRE(wire->bpm_pack_current_a() == std::nullopt);
+    REQUIRE(wire->pim_active_dtc_bitmap_lo() == std::nullopt);
+    REQUIRE(wire->pim_active_dtc_bitmap_hi() == std::nullopt);
+
+    REQUIRE(producer->write_uint32(topo::kWireHV_BUS_VOLTAGE_MV, 248900u));
+    // Signed values ride uint32 cells as bit patterns: regen is negative.
+    REQUIRE(producer->write_uint32(topo::kWireHV_BUS_PACK_CURRENT_MA,
+                                   static_cast<std::uint32_t>(std::int32_t{-60000})));
+    REQUIRE(producer->write_uint32(topo::kWireBPM_PACK_VOLTAGE, 249u * 256u + 128u));
+    REQUIRE(producer->write_uint32(topo::kWireBPM_PACK_CURRENT,
+                                   static_cast<std::uint32_t>(std::int32_t{-335 * 256})));
+    REQUIRE(producer->write_uint64(topo::kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO,
+                                   UINT64_C(1) << 52));  // DTC 053
+    REQUIRE(producer->write_uint64(topo::kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI,
+                                   UINT64_C(1) << 32));  // DTC 097
+
+    REQUIRE(wire->hv_bus_voltage_mv() == std::optional<std::uint32_t>(248900u));
+    REQUIRE(wire->hv_bus_pack_current_ma() == std::optional<std::int32_t>(-60000));
+    REQUIRE(wire->bpm_pack_voltage_v() == std::optional<float>(249.5f));
+    REQUIRE(wire->bpm_pack_current_a() == std::optional<float>(-335.0f));
+    REQUIRE(wire->pim_active_dtc_bitmap_lo() == std::optional<std::uint64_t>(UINT64_C(1) << 52));
+    REQUIRE(wire->pim_active_dtc_bitmap_hi() == std::optional<std::uint64_t>(UINT64_C(1) << 32));
+}
+
 TEST_CASE("WireTruthChassis: never-written cell reads as nullopt (fallback)",
           "[wire_truth]") {
     const std::string seg = unique_segment("fresh");

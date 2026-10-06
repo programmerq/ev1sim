@@ -748,6 +748,26 @@ public:
     ///  - BPM AUTO DISCONNECT family bitmap (CHASSIS_BPM_AD_DTC_BITMAP, bit
     ///    code-272); DTC 279 = AD isolation fault (batt-714).
     std::uint16_t GetBpmAdDtcBitmap() const;
+
+    /// HV rail sag witnesses (electricsim weak-pack HV sag VAT case). Each
+    /// value is 0 until first received; HasReceived* says whether it has been.
+    ///  - HV_BUS_VOLTAGE_MV: the DC-link rail at the PIM, mV.
+    std::uint32_t GetHvBusVoltageMv() const;
+    bool          HasReceivedHvBusVoltageMv() const;
+    ///  - HV_BUS_PACK_CURRENT_MA: current leaving the pack through the AD
+    ///    contactors, signed mA (discharge positive, regen/charge negative).
+    std::int32_t  GetHvBusPackCurrentMa() const;
+    bool          HasReceivedHvBusPackCurrentMa() const;
+    ///  - BPM_PACK_VOLTAGE / BPM_PACK_CURRENT: the pack's own terminal voltage
+    ///    (V) and shunt current (A, signed), decoded from Q8.
+    float         GetBpmPackVoltageV() const;
+    bool          HasReceivedBpmPackVoltageV() const;
+    float         GetBpmPackCurrentA() const;
+    bool          HasReceivedBpmPackCurrentA() const;
+    ///  - CHASSIS_PIM_ACTIVE_DTC_BITMAP_LO/HI: whether PIM DTC `code`
+    ///    (1..128) is active. false for any other code or before first receipt.
+    bool          IsPimDtcActive(unsigned code) const;
+    bool          HasReceivedPimActiveDtcBitmap() const;
     ///  - SERVICE SOON telltale (CHASSIS_IPC_SERVICE_SOON_TELLTALE, circuit
     ///    1885, PCM-grounded — elec-296).
     bool          GetIpcServiceSoonTelltale() const;
