@@ -306,7 +306,11 @@ double Scenario::LaneHoldSteering(const VehicleState& state, double sim_time) {
     const double psi_des = -std::atan2(e_y, kLookAheadM);
     const double steer   = kCourseGain * (psi_des - course) - kYawRateGain * state.yaw_rate;
     const double base    = test ? m_lane_base : 0.0;
-    const double demand  = std::clamp(steer, base - kSteerLimit, base + kSteerLimit);
+    // The budget is rotation from the handover position, but the command
+    // itself never leaves the -1..1 range DriverCommand.steering promises
+    // (a handover at the settle driver's -0.3 would otherwise reach -1.027).
+    const double demand  = std::clamp(steer, std::max(base - kSteerLimit, -1.0),
+                                             std::min(base + kSteerLimit,  1.0));
 
     // The test driver's hands lag the demand; the settle driver's do not
     // (its command is already gentle).  Tracking the output in both keeps

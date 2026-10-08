@@ -412,6 +412,16 @@ TEST_CASE("Scenario: lane_hold value2 1 hands the wheel to the split-stop "
     CHECK(drive(h, 1.0, 100.0, 1.5) == Catch::Approx(-0.3));
     CHECK(drive(h, 3.0, -100.0, 3.0) == Catch::Approx(-0.3 + 0.727).margin(1e-3));
 
+    // ...and a demand the same way stops at the -1.0 end of the command
+    // range, not at -0.3 - 0.727 = -1.027.
+    Scenario hs;
+    hs.set_events({
+        {1.00, "lane_hold", 0.0, 0.0},
+        {3.00, "lane_hold", 0.0, 1.0},
+    });
+    CHECK(drive(hs, 1.0, 100.0, 1.5) == Catch::Approx(-0.3));
+    CHECK(drive(hs, 3.0, 100.0, 3.0) == Catch::Approx(-1.0).margin(1e-3));
+
     // lane_release centres the wheel and drops the profile: a later plain
     // lane_hold is the unlagged settle driver again.
     Scenario s;
