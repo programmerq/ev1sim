@@ -31,8 +31,10 @@ the wording here instead of being added beside it. Edit it in
 other carriers; `ev1/tools/canon_sync` checks the copies.
 
 *What CI costs:* pushing a branch that has no PR runs no CI in any of the four
-repos. Opening a PR, and every push to an open PR, runs the full PR checks (and
-the Claude PR review where that workflow listens for pushes). So pushes are
+repos. Opening a PR, and every push to an open PR, runs the full PR checks. The
+Claude PR review re-runs on every push in ev1-manual-redux and ev1sim; in
+electricsim it runs only when the PR opens or leaves draft or a review is
+requested, so after pushing fixes there, re-request the review. So pushes are
 free and PRs are not.
 
 *Commit and push:*
