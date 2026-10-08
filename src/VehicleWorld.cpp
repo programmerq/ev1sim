@@ -278,13 +278,13 @@ void VehicleWorld::LoadLevelFile(const std::string& level_file, Config& cfg) {
             "Level JSON parse error in " + level_file + ": " + e.what());
     }
 
-    // ── Spawn point (overrides config.spawn) ──
+    // ── Spawn point (the level's default; a key the config set wins) ──
     if (j.contains("spawn")) {
         auto& sp = j["spawn"];
-        if (sp.contains("x"))       cfg.spawn.x       = sp["x"].get<double>();
-        if (sp.contains("y"))       cfg.spawn.y       = sp["y"].get<double>();
-        if (sp.contains("z"))       cfg.spawn.z       = sp["z"].get<double>();
-        if (sp.contains("yaw_deg")) cfg.spawn.yaw_deg = sp["yaw_deg"].get<double>();
+        if (sp.contains("x") && !cfg.spawn.has_x)           cfg.spawn.x       = sp["x"].get<double>();
+        if (sp.contains("y") && !cfg.spawn.has_y)           cfg.spawn.y       = sp["y"].get<double>();
+        if (sp.contains("z") && !cfg.spawn.has_z)           cfg.spawn.z       = sp["z"].get<double>();
+        if (sp.contains("yaw_deg") && !cfg.spawn.has_yaw)   cfg.spawn.yaw_deg = sp["yaw_deg"].get<double>();
         std::cout << "[VehicleWorld] Level spawn: ("
                   << cfg.spawn.x << ", " << cfg.spawn.y << ", " << cfg.spawn.z
                   << ")  yaw=" << cfg.spawn.yaw_deg << " deg\n";

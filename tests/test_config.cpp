@@ -53,6 +53,11 @@ TEST_CASE("Config reads a rolling spawn speed", "[Config]") {
     CHECK_THAT(cfg.spawn.speed_mps, WithinAbs(27.7, 1e-9));
     CHECK_THAT(cfg.spawn.x, WithinAbs(-50.0, 1e-9));
     CHECK_THAT(cfg.spawn.z, WithinAbs(0.5, 1e-9));  // untouched keys keep defaults
+    // Only the keys the config set override a level file's spawn.
+    CHECK(cfg.spawn.has_x);
+    CHECK_FALSE(cfg.spawn.has_y);
+    CHECK_FALSE(cfg.spawn.has_z);
+    CHECK_FALSE(cfg.spawn.has_yaw);
 }
 
 // -----------------------------------------------------------------------

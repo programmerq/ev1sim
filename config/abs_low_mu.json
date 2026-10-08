@@ -17,6 +17,7 @@
     "headless": true
   },
   "telemetry": { "log_to_file": false, "show_hud": false },
+  "spawn": { "speed_mps": 14.0, "x": -3.0 },
   "external_sim": { "enabled": true },
   "vehicle_dynamics": { "start_propulsion_enabled": true },
   "scenario": { "path": "config/scenarios/abs_low_mu_stop.json" }
