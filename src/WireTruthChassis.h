@@ -124,6 +124,7 @@ public:
     // retard-request PWM duty (4191), the first uint16 cell ev1sim CONSUMES
     // — write_uint16 already existed for the producer side (steering 6901).
     std::optional<std::uint16_t> read_uint16(std::uint32_t wire_id) const;
+    std::optional<std::uint64_t> read_uint64(std::uint32_t wire_id) const;
 
     // Sinks for apply_consumer_overlay. Leave any sink empty (default-
     // constructed std::function) to skip that type; only non-empty sinks are
@@ -234,6 +235,23 @@ public:
     std::optional<std::uint32_t> ad_isolation_chassis_ref_permille() const;
     std::optional<std::uint32_t> ad_active_dtc_bitmap() const;
     std::optional<std::uint16_t> bpm_ad_dtc_bitmap() const;
+
+    // HV rail sag witnesses (electricsim BL-2026-07-10 VAT low-voltage HV bus
+    // sag scenario). Plain reads, nullopt until written:
+    //   HV_BUS_VOLTAGE_MV        — the DC-link rail at the PIM, mV
+    //   HV_BUS_PACK_CURRENT_MA   — current leaving the pack through the
+    //                              contactors, signed mA (discharge positive),
+    //                              an int32 riding a uint32 cell
+    //   BPM_PACK_VOLTAGE         — pack terminal voltage, Q8 V
+    //   BPM_PACK_CURRENT         — pack shunt current, signed Q8 A (int32 bits)
+    //   CHASSIS_PIM_ACTIVE_DTC_BITMAP_LO/HI — PIM active DTCs, bit (code-1)
+    //                              for 001..064 and bit (code-65) for 065..128
+    std::optional<std::uint32_t> hv_bus_voltage_mv() const;
+    std::optional<std::int32_t>  hv_bus_pack_current_ma() const;
+    std::optional<float>         bpm_pack_voltage_v() const;
+    std::optional<float>         bpm_pack_current_a() const;
+    std::optional<std::uint64_t> pim_active_dtc_bitmap_lo() const;
+    std::optional<std::uint64_t> pim_active_dtc_bitmap_hi() const;
     std::optional<bool>          ipc_service_soon_telltale() const;
     std::optional<bool>          ipc_wait_telltale() const;  // CHASSIS_IPC_WAIT_TELLTALE
     // The IPC's COMMAND to ground circuit 2029 (IPC_ES_WAIT_TT_DRV, an

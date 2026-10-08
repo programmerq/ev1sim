@@ -471,6 +471,14 @@ std::optional<std::uint16_t> WireTruthChassis::read_uint16(std::uint32_t wire_id
     return sample.value;
 }
 
+std::optional<std::uint64_t> WireTruthChassis::read_uint64(std::uint32_t wire_id) const {
+    if (!attached()) return std::nullopt;
+    electricsim::io::WireTable::Sample<std::uint64_t> sample;
+    if (!impl_->table->read_uint64_sample(wire_id, &sample)) return std::nullopt;
+    if (!sample.written()) return std::nullopt;
+    return sample.value;
+}
+
 std::optional<float> WireTruthChassis::read_float32(std::uint32_t wire_id) const {
     if (!attached()) return std::nullopt;
     electricsim::io::WireTable::Sample<float> sample;
@@ -755,6 +763,31 @@ std::optional<std::uint32_t> WireTruthChassis::ad_active_dtc_bitmap() const {
 std::optional<std::uint16_t> WireTruthChassis::bpm_ad_dtc_bitmap() const {
     return read_uint16(electricsim::topology::kWireCHASSIS_BPM_AD_DTC_BITMAP);
 }
+std::optional<std::uint32_t> WireTruthChassis::hv_bus_voltage_mv() const {
+    return read_uint32(electricsim::topology::kWireHV_BUS_VOLTAGE_MV);
+}
+std::optional<std::int32_t> WireTruthChassis::hv_bus_pack_current_ma() const {
+    // Signed int32 riding a uint32 cell (both ends cast; parity_check.hpp).
+    const auto raw = read_uint32(electricsim::topology::kWireHV_BUS_PACK_CURRENT_MA);
+    if (!raw) return std::nullopt;
+    return static_cast<std::int32_t>(*raw);
+}
+std::optional<float> WireTruthChassis::bpm_pack_voltage_v() const {
+    const auto q8 = read_uint32(electricsim::topology::kWireBPM_PACK_VOLTAGE);
+    if (!q8) return std::nullopt;
+    return static_cast<float>(*q8) / 256.0f;
+}
+std::optional<float> WireTruthChassis::bpm_pack_current_a() const {
+    const auto q8 = read_uint32(electricsim::topology::kWireBPM_PACK_CURRENT);
+    if (!q8) return std::nullopt;
+    return static_cast<float>(static_cast<std::int32_t>(*q8)) / 256.0f;
+}
+std::optional<std::uint64_t> WireTruthChassis::pim_active_dtc_bitmap_lo() const {
+    return read_uint64(electricsim::topology::kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO);
+}
+std::optional<std::uint64_t> WireTruthChassis::pim_active_dtc_bitmap_hi() const {
+    return read_uint64(electricsim::topology::kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI);
+}
 std::optional<bool> WireTruthChassis::ipc_service_soon_telltale() const {
     return read_bit(ReadOnlyWireId(
         electricsim::topology::kWireCHASSIS_IPC_SERVICE_SOON_TELLTALE));
@@ -885,6 +918,9 @@ std::optional<std::uint8_t> WireTruthChassis::read_byte(std::uint32_t) const {
 std::optional<std::uint16_t> WireTruthChassis::read_uint16(std::uint32_t) const {
     return std::nullopt;
 }
+std::optional<std::uint64_t> WireTruthChassis::read_uint64(std::uint32_t) const {
+    return std::nullopt;
+}
 std::optional<float> WireTruthChassis::read_float32(std::uint32_t) const {
     return std::nullopt;
 }
@@ -925,6 +961,24 @@ std::optional<std::uint32_t> WireTruthChassis::ad_active_dtc_bitmap() const {
     return std::nullopt;
 }
 std::optional<std::uint16_t> WireTruthChassis::bpm_ad_dtc_bitmap() const {
+    return std::nullopt;
+}
+std::optional<std::uint32_t> WireTruthChassis::hv_bus_voltage_mv() const {
+    return std::nullopt;
+}
+std::optional<std::int32_t> WireTruthChassis::hv_bus_pack_current_ma() const {
+    return std::nullopt;
+}
+std::optional<float> WireTruthChassis::bpm_pack_voltage_v() const {
+    return std::nullopt;
+}
+std::optional<float> WireTruthChassis::bpm_pack_current_a() const {
+    return std::nullopt;
+}
+std::optional<std::uint64_t> WireTruthChassis::pim_active_dtc_bitmap_lo() const {
+    return std::nullopt;
+}
+std::optional<std::uint64_t> WireTruthChassis::pim_active_dtc_bitmap_hi() const {
     return std::nullopt;
 }
 std::optional<bool> WireTruthChassis::ipc_service_soon_telltale() const {

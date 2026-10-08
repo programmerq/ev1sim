@@ -27,8 +27,8 @@
 namespace electricsim::topology {
 
 inline constexpr std::uint32_t kFormatVersion = 2U;
-inline constexpr std::uint32_t kTopologyHash = 0xC6BB1A23U;
-inline constexpr std::size_t kWireCount = 451;
+inline constexpr std::uint32_t kTopologyHash = 0x2181D22BU;
+inline constexpr std::size_t kWireCount = 454;
 
 // Per-class cell counts. Emitted so a
 // receipt can print the classification without re-parsing YAML,
@@ -36,7 +36,7 @@ inline constexpr std::size_t kWireCount = 451;
 // by a DECREASING ratchet in the generator that fails on !=.
 inline constexpr std::size_t kConductorCellCount = 92;
 inline constexpr std::size_t kElementStateCellCount = 71;
-inline constexpr std::size_t kSemanticCellCount = 98;
+inline constexpr std::size_t kSemanticCellCount = 101;
 inline constexpr std::size_t kUnclassifiedLegacyCellCount = 190;
 
 // Named cell ids. Sequential by YAML key order; changing that
@@ -500,6 +500,9 @@ inline constexpr ::electricsim::io::ElementStateId kWirePIM_ES_SERVICE_SOON_TT_D
 inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_IPC_SERVICE_SOON_TELLTALE{449U};
 inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_WAIT_TT_DRV{450U};
 inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_IPC_WAIT_TELLTALE{451U};
+inline constexpr ::electricsim::io::WireId kWireHV_BUS_PACK_CURRENT_MA = 452U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO = 453U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI = 454U;
 
 // Per-net default + init_policy constants.
 // Used by consumers that opt into the kDefault policy — see
@@ -1408,6 +1411,12 @@ inline constexpr auto kWireIPC_ES_WAIT_TT_DRV_Default = false;
 inline constexpr InitPolicy kWireIPC_ES_WAIT_TT_DRV_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireCHASSIS_IPC_WAIT_TELLTALE_Default = false;
 inline constexpr InitPolicy kWireCHASSIS_IPC_WAIT_TELLTALE_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireHV_BUS_PACK_CURRENT_MA_Default = 0x0U;
+inline constexpr InitPolicy kWireHV_BUS_PACK_CURRENT_MA_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO_Default = 0x0ULL;
+inline constexpr InitPolicy kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI_Default = 0x0ULL;
+inline constexpr InitPolicy kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI_InitPolicy = InitPolicy::kHold;
 
 // Declare every wire in this topology on the given (creator)
 // table. Returns true iff all declarations succeed.
@@ -1864,6 +1873,9 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireCHASSIS_IPC_SERVICE_SOON_TELLTALE), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireIPC_ES_WAIT_TT_DRV), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireCHASSIS_IPC_WAIT_TELLTALE), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireHV_BUS_PACK_CURRENT_MA, ::electricsim::io::WireType::kUint32) && ok;
+  ok = table.declare(kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO, ::electricsim::io::WireType::kUint64) && ok;
+  ok = table.declare(kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI, ::electricsim::io::WireType::kUint64) && ok;
   return ok;
 }
 
@@ -2323,6 +2335,9 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_IPC_SERVICE_SOON_TELLTALE): return "CHASSIS_IPC_SERVICE_SOON_TELLTALE";
     case static_cast<::electricsim::io::WireId>(kWireIPC_ES_WAIT_TT_DRV): return "IPC_ES_WAIT_TT_DRV";
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_IPC_WAIT_TELLTALE): return "CHASSIS_IPC_WAIT_TELLTALE";
+    case kWireHV_BUS_PACK_CURRENT_MA: return "HV_BUS_PACK_CURRENT_MA";
+    case kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO: return "CHASSIS_PIM_ACTIVE_DTC_BITMAP_LO";
+    case kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI: return "CHASSIS_PIM_ACTIVE_DTC_BITMAP_HI";
     default: return ::std::string_view{};
   }
 }
@@ -2787,6 +2802,9 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_IPC_SERVICE_SOON_TELLTALE): return "";
     case static_cast<::electricsim::io::WireId>(kWireIPC_ES_WAIT_TT_DRV): return "ipc_ecu";
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_IPC_WAIT_TELLTALE): return "";
+    case kWireHV_BUS_PACK_CURRENT_MA: return "hv_bus_host";
+    case kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO: return "pim_ecu";
+    case kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI: return "pim_ecu";
     default: return ::std::string_view{};
   }
 }
@@ -3255,6 +3273,9 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireCHASSIS_IPC_SERVICE_SOON_TELLTALE), &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_IPC_SERVICE_SOON_TELLTALE"}, static_cast<::electricsim::io::WireId>(kWireCHASSIS_IPC_SERVICE_SOON_TELLTALE)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireIPC_ES_WAIT_TT_DRV), &gen) && gen == 0) { visitor(::std::string_view{"IPC_ES_WAIT_TT_DRV"}, static_cast<::electricsim::io::WireId>(kWireIPC_ES_WAIT_TT_DRV)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireCHASSIS_IPC_WAIT_TELLTALE), &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_IPC_WAIT_TELLTALE"}, static_cast<::electricsim::io::WireId>(kWireCHASSIS_IPC_WAIT_TELLTALE)); ++count; }
+  if (table.write_gen(kWireHV_BUS_PACK_CURRENT_MA, &gen) && gen == 0) { visitor(::std::string_view{"HV_BUS_PACK_CURRENT_MA"}, kWireHV_BUS_PACK_CURRENT_MA); ++count; }
+  if (table.write_gen(kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_PIM_ACTIVE_DTC_BITMAP_LO"}, kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO); ++count; }
+  if (table.write_gen(kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_PIM_ACTIVE_DTC_BITMAP_HI"}, kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI); ++count; }
   return count;
 }
 
@@ -3719,6 +3740,9 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_IPC_SERVICE_SOON_TELLTALE): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireIPC_ES_WAIT_TT_DRV): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_IPC_WAIT_TELLTALE): return ::electricsim::io::CellClass::kConductor;
+    case kWireHV_BUS_PACK_CURRENT_MA: return ::electricsim::io::CellClass::kSemantic;
+    case kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO: return ::electricsim::io::CellClass::kSemantic;
+    case kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI: return ::electricsim::io::CellClass::kSemantic;
     default: return ::electricsim::io::CellClass::kUnknown;
   }
 }

@@ -470,6 +470,35 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
         // of CHASSIS_BPM_AD_DTC_BITMAP.
         else if (f == "bpm_dtc_279_active")
             m_csv << (((bus.GetBpmAdDtcBitmap() >> 7) & 1u) ? 1 : 0);
+        // HV rail sag witnesses (electricsim hv_sag_weak_pack). Blank until
+        // the producing module has published, so "never arrived" stays
+        // distinguishable from a real zero.
+        //   hv_bus_voltage_v      — the DC-link rail at the PIM (HV_BUS_VOLTAGE_MV)
+        //   hv_bus_pack_current_a — current out of the pack through the
+        //                           contactors, discharge positive
+        //   bpm_pack_voltage_v    — pack terminal voltage (BPM_PACK_VOLTAGE)
+        //   bpm_pack_current_a    — pack shunt current (BPM_PACK_CURRENT)
+        //   pim_dtc_053_active    — PIM DTC 053 LOW BATTERY OUTPUT CAPABILITY
+        else if (f == "hv_bus_voltage_v") {
+            if (bus.HasReceivedHvBusVoltageMv())
+                m_csv << static_cast<double>(bus.GetHvBusVoltageMv()) / 1000.0;
+        }
+        else if (f == "hv_bus_pack_current_a") {
+            if (bus.HasReceivedHvBusPackCurrentMa())
+                m_csv << static_cast<double>(bus.GetHvBusPackCurrentMa()) / 1000.0;
+        }
+        else if (f == "bpm_pack_voltage_v") {
+            if (bus.HasReceivedBpmPackVoltageV())
+                m_csv << bus.GetBpmPackVoltageV();
+        }
+        else if (f == "bpm_pack_current_a") {
+            if (bus.HasReceivedBpmPackCurrentA())
+                m_csv << bus.GetBpmPackCurrentA();
+        }
+        else if (f == "pim_dtc_053_active") {
+            if (bus.HasReceivedPimActiveDtcBitmap())
+                m_csv << (bus.IsPimDtcActive(53u) ? 1 : 0);
+        }
         // The driver's warning: the SERVICE SOON lamp (batt-714 "the WAIT and
         // SERVICE SOON telltales are illuminated"; circuit 1885, elec-296).
         else if (f == "ipc_service_soon_telltale")
