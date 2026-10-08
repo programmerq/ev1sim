@@ -79,6 +79,8 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                      "(vehicle_dynamics.start_propulsion_enabled=true)\n";
     }
 
+    m_rolling_start_coast = (m_config.spawn.speed_mps != 0.0);
+
     // 1. Physics world.
     m_world = std::make_unique<VehicleWorld>(m_config);
 
@@ -1439,8 +1441,10 @@ int SimApp::RunWithVisualization() {
         // throttle so Chrono reflects the vehicle's actual "key off" state.
         if (!m_propulsion_enabled) {
             cmd.throttle    = 0.0;
-            cmd.front_brake = 1.0;
-            cmd.rear_brake  = 1.0;
+            if (!m_rolling_start_coast) {
+                cmd.front_brake = 1.0;
+                cmd.rear_brake  = 1.0;
+            }
         }
 
         // Snapshot the final post-override command for the floating-UI display rows.
@@ -1806,6 +1810,7 @@ int SimApp::RunWithVisualization() {
             const std::uint8_t run_mode = m_external_sim->GetRsaRunMode();
             // RSA run modes: 0=OFF, 1=ACC, 2=RUN (per rsa_scan.h).
             const bool new_prop = (run_mode == 2 /*RUN*/);
+            if (new_prop) m_rolling_start_coast = false;
             if (new_prop != m_propulsion_enabled) {
                 m_propulsion_enabled = new_prop;
                 const char* mode_names[] = {"OFF", "ACC", "RUN"};
@@ -2086,7 +2091,7 @@ int SimApp::RunHeadless() {
     // zeroed) so the initial SetCommand also reflects "key off".
     {
         DriverCommand init_cmd{};
-        if (!m_propulsion_enabled) {
+        if (!m_propulsion_enabled && !m_rolling_start_coast) {
             init_cmd.front_brake = 1.0;
             init_cmd.rear_brake  = 1.0;
         }
@@ -2142,8 +2147,10 @@ int SimApp::RunHeadless() {
         // Propulsion is enabled only if RSA broadcasts RUN on the bus.
         if (!m_propulsion_enabled) {
             cmd.throttle    = 0.0;
-            cmd.front_brake = 1.0;
-            cmd.rear_brake  = 1.0;
+            if (!m_rolling_start_coast) {
+                cmd.front_brake = 1.0;
+                cmd.rear_brake  = 1.0;
+            }
         }
 
         m_world->GetDriver().SetCommand(cmd);
@@ -2349,6 +2356,7 @@ int SimApp::RunHeadless() {
         if (m_external_sim->HasReceivedRunMode()) {
             const std::uint8_t run_mode = m_external_sim->GetRsaRunMode();
             const bool new_prop = (run_mode == 2 /*RUN*/);
+            if (new_prop) m_rolling_start_coast = false;
             if (new_prop != m_propulsion_enabled) {
                 m_propulsion_enabled = new_prop;
                 const char* mode_names[] = {"OFF", "ACC", "RUN"};

@@ -528,6 +528,7 @@ if(BUILD_TESTS)
     if(Chrono_FOUND)
         add_executable(ev1sim_plant_tests
             tests/test_launch_slip.cpp
+            tests/test_rolling_spawn.cpp
             src/EV1Vehicle.cpp
             src/EV1TMeasyTire.cpp
         )

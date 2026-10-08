@@ -204,6 +204,12 @@ private:
     // Brakes are clamped to 1.0 and throttle is forced to 0 while false.
     // Driven by RSA run-mode broadcast (kSigRunModeBroadcast, ID 5711).
     bool m_propulsion_enabled = false;
+    // A rolling spawn (spawn.speed_mps != 0) is a car already being driven:
+    // the KEY OFF brake clamp below stands in for a parked car, and applied
+    // to one at speed it locks the wheels for the whole electronics boot.  So
+    // a rolling start coasts instead until the RSA first reports RUN; after
+    // that the gate behaves as it always has.
+    bool m_rolling_start_coast = false;
 
     // Per-wheel front brake modulation state (BTCM ABS integration).
     // Holds the previous modulated brake torque ratio for each front wheel;

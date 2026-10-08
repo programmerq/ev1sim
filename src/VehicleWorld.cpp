@@ -99,7 +99,8 @@ void VehicleWorld::CreateEV1(const Config& cfg) {
     // Chassis, driveline, aero, powertrain and tires: one builder shared
     // with the plant tests (EV1Vehicle.cpp), so both run the same car.
     m_ev1 = ev1sim::BuildEV1Vehicle(ChCoordsys<>(m_spawn_pos, m_spawn_rot),
-                                    cfg.simulation.step_size_s);
+                                    cfg.simulation.step_size_s,
+                                    cfg.spawn.speed_mps);
 
     m_vehicle = m_ev1.get();
     m_system  = m_ev1->GetSystem();

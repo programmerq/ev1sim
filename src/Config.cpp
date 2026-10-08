@@ -133,6 +133,7 @@ Config Config::LoadFromFile(const std::string& path) {
         read_if(sp, "y",       cfg.spawn.y);
         read_if(sp, "z",       cfg.spawn.z);
         read_if(sp, "yaw_deg", cfg.spawn.yaw_deg);
+        read_if(sp, "speed_mps", cfg.spawn.speed_mps);
     }
 
     if (j.contains("camera")) {
