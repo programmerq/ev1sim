@@ -31,7 +31,12 @@
   "//29": "drivetrain still loaded and launch slip still in the tyres.  That is why",
   "//30": "a scenario's own at_time_s cannot answer the question and a measurement",
   "//31": "is needed at all.",
-
+  "//32": "",
+  "//33": "2026-10-08: the six VAT ABS stops (high_mu, low_mu, mu_jump, split_mu,",
+  "//34": "brake_and_steer, diagonal_mu) left this table.  They now start rolling",
+  "//35": "(spawn.speed_mps in their configs) and have no barrier; their brake",
+  "//36": "is guarded against the electronics boot by the [Runway] case",
+  "//37": "\"every rolling-start ABS scenario brakes after the electronics boot\".",
   "tolerances": {
     "//": "How far a re-derived number may sit from the one recorded here.",
     "//1": "The plant is deterministic — two runs of the same binary produce",
@@ -48,71 +53,7 @@
     "release_s": 0.05,
     "crossing_s": 0.05
   },
-
   "cases": [
-    {
-      "key": "mu_jump",
-      "config": "config/abs_mu_jump.json",
-      "scenario": "config/scenarios/abs_mu_jump.json",
-      "boundary": "x_of_second_patch",
-      "surface": "ice",
-      "measured_release_s": 7.718,
-      "min_settle_s": 2.0,
-      "measured_crossing_s": null,
-      "min_on_surface_s": null,
-      "//": "min_on_surface_s is null BY DESIGN, not for want of a number: the",
-      "//1": "mu transition is the subject of this test, so the car is supposed to",
-      "//2": "cross onto the ice inside the brake event.  measured_crossing_s is",
-      "//3": "null to match — a crossing under braking is not an entry condition."
-    },
-    {
-      "key": "split_mu",
-      "config": "config/abs_split_mu.json",
-      "scenario": "config/scenarios/abs_split_mu.json",
-      "boundary": "x_of_runway_end",
-      "surface": "the split",
-      "measured_release_s": 9.690,
-      "min_settle_s": 2.0,
-      "measured_crossing_s": 12.291,
-      "min_on_surface_s": 2.0
-    },
-    {
-      "key": "diagonal_mu",
-      "config": "config/abs_diagonal_mu.json",
-      "scenario": "config/scenarios/abs_diagonal_mu.json",
-      "boundary": "x_of_runway_end",
-      "surface": "the stripes",
-      "measured_release_s": 8.891,
-      "min_settle_s": 2.0,
-      "measured_crossing_s": 11.373,
-      "min_on_surface_s": 1.0
-    },
-    {
-      "key": "low_mu",
-      "config": "config/abs_low_mu.json",
-      "scenario": "config/scenarios/abs_low_mu_stop.json",
-      "boundary": "x_of_second_patch",
-      "surface": "packed snow",
-      "measured_release_s": 7.718,
-      "min_settle_s": 2.0,
-      "measured_crossing_s": 10.118,
-      "min_on_surface_s": 1.0
-    },
-    {
-      "key": "high_mu",
-      "config": "config/abs_high_mu.json",
-      "scenario": "config/scenarios/abs_high_mu_stop.json",
-      "boundary": null,
-      "surface": "dry asphalt",
-      "measured_release_s": 15.028,
-      "min_settle_s": 2.0,
-      "measured_crossing_s": null,
-      "min_on_surface_s": null,
-      "//": "Uniform surface: there is no boundary and so no crossing to time.",
-      "//1": "The settle requirement is identical and was identically violated —",
-      "//2": "this scenario's brake sat at 7.0 s behind a barrier releasing at",
-      "//3": "15.028 s until 2026-08-12."
-    },
     {
       "key": "hard_brake",
       "config": "config/abs_hard_brake.json",
@@ -123,22 +64,6 @@
       "min_settle_s": 2.0,
       "measured_crossing_s": null,
       "min_on_surface_s": null
-    },
-    {
-      "key": "brake_and_steer",
-      "config": "config/abs_brake_and_steer.json",
-      "scenario": "config/scenarios/abs_brake_and_steer.json",
-      "boundary": null,
-      "surface": "dry asphalt",
-      "measured_release_s": 12.053,
-      "min_settle_s": 2.0,
-      "measured_crossing_s": null,
-      "min_on_surface_s": null,
-      "//": "12.053, not the 12.011 that docs/TODO.md and a retired [Runway]",
-      "//1": "case both carried.  That figure cited scenario_runway_report.py, but",
-      "//2": "the report could not run this scenario until 2026-08-12, so the tool",
-      "//3": "it cited cannot have produced it.  The re-derivation this file now",
-      "//4": "carries is the answer to that class of number."
     }
   ]
 }

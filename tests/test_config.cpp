@@ -43,6 +43,21 @@ TEST_CASE("Config built-in defaults are sane", "[Config]") {
     CHECK(cfg.camera.default_mode == "chase");
     CHECK(cfg.input.steer_rate == 1.8);
     CHECK(cfg.telemetry.show_hud == true);
+    CHECK(cfg.spawn.speed_mps == 0.0);  // at rest unless a config asks to roll
+}
+
+// -----------------------------------------------------------------------
+TEST_CASE("Config reads a rolling spawn speed", "[Config]") {
+    auto path = WriteTempJson(R"({ "spawn": { "x": -50.0, "speed_mps": 27.7 } })");
+    Config cfg = Config::LoadFromFile(path);
+    CHECK_THAT(cfg.spawn.speed_mps, WithinAbs(27.7, 1e-9));
+    CHECK_THAT(cfg.spawn.x, WithinAbs(-50.0, 1e-9));
+    CHECK_THAT(cfg.spawn.z, WithinAbs(0.5, 1e-9));  // untouched keys keep defaults
+    // Only the keys the config set override a level file's spawn.
+    CHECK(cfg.spawn.has_x);
+    CHECK_FALSE(cfg.spawn.has_y);
+    CHECK_FALSE(cfg.spawn.has_z);
+    CHECK_FALSE(cfg.spawn.has_yaw);
 }
 
 // -----------------------------------------------------------------------

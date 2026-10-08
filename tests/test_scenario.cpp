@@ -373,9 +373,10 @@ TEST_CASE("Scenario: the shipped split-mu scenario holds the lane for the "
     REQUIRE(hold_at >= 0.0);
     REQUIRE(release_at >= 0.0);
     REQUIRE(brake_at >= 0.0);
-    // Engaged from the throttle release (behind the same wait_for_speed
-    // barrier, so it fires on the release tick) ...
-    CHECK(hold_at == throttle_off_at);
+    // Engaged from the first tick: the case spawns rolling (spawn.speed_mps
+    // in config/abs_split_mu.json), so the whole coast is held ...
+    (void)throttle_off_at;
+    CHECK(hold_at == 0.0);
     // ... and released ON the brake tick, not before it (a gap would let
     // the coast-drag asymmetry walk the car off the seam again) and not
     // after it (steering into the stop would write the yaw answer).
@@ -564,12 +565,14 @@ TEST_CASE("Scenario: shipped scenario JSON files parse cleanly",
         {"config/scenarios/cruise_demo_electronics.json", "electronics", 9},
         {"config/scenarios/coastdown.json",               "local",       7},
         {"config/scenarios/abs_hard_brake.json",          "local",       9},
-        {"config/scenarios/abs_high_mu_stop.json",        "local",      10},
-        {"config/scenarios/abs_low_mu_stop.json",         "local",      10},
-        {"config/scenarios/abs_mu_jump.json",             "local",      10},
-        {"config/scenarios/abs_split_mu.json",            "local",      10},
-        {"config/scenarios/abs_brake_and_steer.json",     "local",      11},
-        {"config/scenarios/abs_diagonal_mu.json",         "local",      10},
+        // The six VAT ABS stops start rolling (spawn.speed_mps), so they
+        // carry no launch: key on, shift, brake, release (+ lane hold/steer).
+        {"config/scenarios/abs_high_mu_stop.json",        "local",       7},
+        {"config/scenarios/abs_low_mu_stop.json",         "local",       7},
+        {"config/scenarios/abs_mu_jump.json",             "local",       7},
+        {"config/scenarios/abs_split_mu.json",            "local",       9},
+        {"config/scenarios/abs_brake_and_steer.json",     "local",       8},
+        {"config/scenarios/abs_diagonal_mu.json",         "local",       8},
     };
 
     for (const auto& exp : shipped) {
@@ -1434,5 +1437,46 @@ TEST_CASE("Scenario: every shipped ABS scenario with a barrier is covered by "
 
     // ...and the enumeration actually saw the directory.  Without this the
     // whole case passes vacuously if the glob or the path is ever wrong.
-    CHECK(barrier_scenarios == 7);
+    // One: abs_hard_brake.  The six VAT stops start rolling since 2026-10-08
+    // and have no barrier; the next case guards them instead.
+    CHECK(barrier_scenarios == 1);
+}
+
+// A rolling-start ABS scenario (no wait_for_speed barrier: its config sets
+// spawn.speed_mps) has a different settle to respect: the electronics boot.
+// The car spawns key-off and coasts while the scenario keys on and shifts to
+// D; the BTCM's phase columns first read live (not the -1 no-data sentinel)
+// at t=1.38 s in abs_high_mu (2026-10-08, electricsim f6d09099), 0.08 s after
+// the last prnd_up at 1.30 s.  A brake before that point is braked by
+// nothing but passthrough.  So every such scenario must shift, and must brake
+// at least 1.5 s after its last shift: 18x the measured boot lag.
+TEST_CASE("Scenario: every rolling-start ABS scenario brakes after the "
+          "electronics boot", "[Scenario][Runway]") {
+    const std::filesystem::path source_root(EV1SIM_SOURCE_DIR);
+    const std::filesystem::path dir = source_root / "config" / "scenarios";
+
+    int rolling = 0;
+    for (const auto& entry : std::filesystem::directory_iterator(dir)) {
+        const std::string name = entry.path().filename().string();
+        if (name.rfind("abs_", 0) != 0 || entry.path().extension() != ".json")
+            continue;
+        auto loaded = ev1sim::Scenario::LoadFromFile(entry.path().string());
+        REQUIRE(loaded.has_value());
+
+        bool has_barrier = false;
+        double brake_at = -1.0, last_shift = -1.0;
+        for (const auto& e : loaded->events()) {
+            if (e.action == "wait_for_speed") has_barrier = true;
+            if (e.action == "set_brake" && e.value > 0.0 && brake_at < 0.0)
+                brake_at = e.at_time_s;
+            if (e.action == "prnd_up") last_shift = std::max(last_shift, e.at_time_s);
+        }
+        if (has_barrier || brake_at < 0.0) continue;
+
+        ++rolling;
+        INFO("scenario " << name);
+        REQUIRE(last_shift >= 0.0);
+        CHECK(brake_at >= last_shift + 1.5);
+    }
+    CHECK(rolling == 6);
 }

@@ -16,6 +16,12 @@
     "headless": true
   },
   "telemetry": { "log_to_file": false, "show_hud": false },
+  "//spawn": "Rolling start: the car is created at 27.7 m/s with every wheel and",
+  "//spawn1": "driveline shaft already turning, so the case spends no sim time",
+  "//spawn2": "launching. It coasts through the electronics boot (key on, PRND to D)",
+  "//spawn3": "and reaches the brake at 25.77 m/s, matching the 25.73 m/s the old",
+  "//spawn4": "launch-then-coast schedule braked at (2026-10-01 capture).",
+  "spawn": { "speed_mps": 27.7 },
   "external_sim": { "enabled": true },
   "vehicle_dynamics": { "start_propulsion_enabled": true },
   "scenario": { "path": "config/scenarios/abs_high_mu_stop.json" }

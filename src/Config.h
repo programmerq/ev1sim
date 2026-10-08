@@ -50,6 +50,16 @@ struct Config {
         double y       = 0.0;
         double z       = 0.5;
         double yaw_deg = 0.0;
+        // Forward speed the car is created at [m/s], along its own heading.
+        // 0 = at rest (the default).  Chrono sets the chassis velocity and
+        // spins every wheel to match (WheeledVehicle::Initialize), so a case
+        // that tests braking or cruise need not spend sim time launching.
+        double speed_mps = 0.0;
+        // Which of x/y/z/yaw_deg the config file set itself.  A level file
+        // supplies a default spawn; a key the case config sets explicitly
+        // wins over it, so a rolling-start case can place the car where its
+        // brake lands on the right patch without editing the shared level.
+        bool has_x = false, has_y = false, has_z = false, has_yaw = false;
     } spawn;
 
     struct Camera {
