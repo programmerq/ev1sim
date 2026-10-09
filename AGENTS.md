@@ -112,6 +112,29 @@ branch moves and can 404 after a rebase/merge), in the `blob` form — **never**
   blurrily.
 <!-- END ev1-canon:pr-images v2 -->
 
+<!-- BEGIN ev1-canon:ci-checks v1 -->
+**What a blocking CI check may test (owner directive 2026-10-08, canonical
+across all four EV1 repos).** This program swaps its guesses out as board
+traces, ROM analysis and better manual readings arrive, so the PR gate must
+never freeze a guess in place.
+
+- **A blocking check tests syntax or structure only:** the file parses, a
+  schema holds, references resolve, a generated file matches its generator, a
+  copy matches its source, or a code-shape rule holds.
+- **Nothing blocks on a value.** A count, a designator, a part number, a page
+  number, a measured or printed number, or any reading of a source goes on
+  demand, in a non-blocking report, or in the nightly change detector, where a
+  person re-locks it after a correct change.
+- **A unit test tests code, on fixtures it builds.** A test that loads live
+  data may check only that the data loads and its references resolve.
+- **A check that blocks a correct change is a bug in the check.** Fix or demote
+  the check on the same branch. Never bend the data, rewrite a source, or add a
+  baseline or allowlist entry just to get past it.
+- **Don't add a check to prove a fix.** A test in the existing suite is the
+  proof. A new blocking check needs the owner's approval and a reason it must
+  run on nearly every change; a new check starts on demand.
+<!-- END ev1-canon:ci-checks v1 -->
+
 - If the saved body shows `&lt;img&gt;` (a proxied environment entity-escaped
   it), redo the edit from an unproxied session via
   `gh api -X PATCH repos/<owner>/<repo>/pulls/<n> -F body=@file`.
