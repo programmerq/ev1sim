@@ -1433,6 +1433,8 @@ TEST_CASE("Scenario: every shipped ABS scenario with a barrier is covered by "
     }
 
     // ...and the enumeration actually saw the directory.  Without this the
-    // whole case passes vacuously if the glob or the path is ever wrong.
-    CHECK(barrier_scenarios == 7);
+    // whole case passes vacuously if the glob or the path is ever wrong.  Not
+    // an exact count: scenarios come and go, and a count would block every
+    // correct addition (owner ruling 2026-10-08, ev1-canon:ci-checks).
+    CHECK(barrier_scenarios >= 1);
 }

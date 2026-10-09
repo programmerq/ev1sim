@@ -139,7 +139,10 @@ TEST_CASE("Launch: the EV1 tire carries its longitudinal tire dynamics",
     SetChronoDataPath(CHRONO_DATA_DIR);
     vehicle::SetDataPath(EV1SIM_VEHICLE_DATA_DIR);
     ev1sim::EV1TMeasyTire tire(GetDataFile("ev1/tire/EV1_TMeasyTire.json"));
-    // Without the block the class is plain Chrono 9 TMeasy, which rings.
-    CHECK(tire.GetLongitudinalTireStiffness() == 234900.0);
-    CHECK(tire.GetLongitudinalTireDamping() == 664.0);
+    // Without the block the class is plain Chrono 9 TMeasy, which rings.  The
+    // values are tuning and are not pinned (owner ruling 2026-10-08,
+    // ev1-canon:ci-checks) — only that the shipped JSON's block was found and
+    // loaded, which leaves both at their > 0 values instead of the 0 default.
+    CHECK(tire.GetLongitudinalTireStiffness() > 0.0);
+    CHECK(tire.GetLongitudinalTireDamping() > 0.0);
 }

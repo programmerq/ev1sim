@@ -2,8 +2,12 @@
 //
 // These tests don't boot Chrono — they read the same brake/vehicle JSON that
 // Chrono::Vehicle loads, so the front/rear split, the preserved total, and the
-// axle wiring are guarded against regressions.  The rear value also pins the
-// SimApp::kRearBrakeMaxTorqueNm coupling used by the rear-EMB torque→ratio math.
+// axle wiring are guarded against regressions.  The rear value is checked
+// against the code constant SimApp::kRearBrakeMaxTorqueNm (defined as
+// ev1sim::kRearBrakeMaxTorqueNm in RearEmbClamp.h) used by the rear-EMB
+// torque→ratio math — never against a re-typed literal.  The torque values
+// themselves are not pinned (owner ruling 2026-10-08, ev1-canon:ci-checks):
+// they are engineering choices a better source may replace.
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -11,6 +15,9 @@
 #include <fstream>
 #include <string>
 #include <nlohmann/json.hpp>
+
+#include "BrakeDrum.h"
+#include "RearEmbClamp.h"
 
 using json = nlohmann::json;
 using Catch::Matchers::WithinAbs;
@@ -39,27 +46,26 @@ TEST_CASE("Brake bias: front/rear JSONs use the BrakeSimple brake template", "[B
     CHECK(rear.at("Template")  == "BrakeSimple");
 }
 
-TEST_CASE("Brake bias: front carries ~70% and the 4-wheel total is preserved", "[Brake][Bias]") {
+TEST_CASE("Brake bias: both axles brake and the split is front-biased", "[Brake][Bias]") {
     const double front = ReadJson(kFront).at("Maximum Torque").get<double>();
     const double rear  = ReadJson(kRear).at("Maximum Torque").get<double>();
 
+    CHECK(rear > 0.0);
     CHECK(front > rear);                              // front-biased
-
-    const double total = 2.0 * front + 2.0 * rear;   // 4 wheels
-    CHECK_THAT(total, WithinAbs(3200.0, 1.0));        // preserve ~0.88g peak decel
-
-    const double front_frac = (2.0 * front) / total;
-    CHECK_THAT(front_frac, WithinAbs(0.70, 0.02));    // ~70/30 split
 }
 
-TEST_CASE("Brake bias: rear budget covers the EMB drum peak and pins the SimApp constant",
+TEST_CASE("Brake bias: rear budget covers the EMB drum peak and matches the SimApp constant",
           "[Brake][Bias]") {
-    // BrakeDrum at speed: μ0.38 · 4000 N · 0.10 m · (1 + α2.0) = 456 N·m.
-    // The rear allocation must clear that so the EMB never clips, and it must
-    // equal SimApp::kRearBrakeMaxTorqueNm for the physical-torque→ratio convert.
+    // The rear allocation must clear the BrakeDrum model's own peak torque at
+    // speed (full shoe force, well above the smoothing threshold) so the EMB
+    // never clips, and it must equal the code constant SimApp uses for the
+    // physical-torque→ratio convert.
     const double rear = ReadJson(kRear).at("Maximum Torque").get<double>();
-    CHECK(rear >= 456.0);
-    CHECK(rear == 480.0);   // keep in sync with SimApp::kRearBrakeMaxTorqueNm
+    const ev1sim::BrakeDrum::Params drum;
+    const double drum_peak_nm = ev1sim::BrakeDrum::torque_magnitude_nm(
+        drum.max_shoe_force_n, 100.0 * drum.omega_threshold_rad_s, drum);
+    CHECK(rear >= drum_peak_nm);
+    CHECK_THAT(rear, WithinAbs(ev1sim::kRearBrakeMaxTorqueNm, 1e-9));
 }
 
 TEST_CASE("Brake bias: EV1_Vehicle.json wires front→Front and rear→Rear brakes", "[Brake][Bias]") {
