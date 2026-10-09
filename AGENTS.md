@@ -22,54 +22,70 @@ Develop on a feature branch (`claude/<id>`); never push to `main`.
 
 - **Merge stays the owner's call** — do not merge to `main`.
 
-<!-- BEGIN ev1-canon:pr-lifecycle v3 -->
-**PR lifecycle: draft/ready + PR economy (owner directive 2026-07-24,
-canonical across all four EV1 repos — supersedes prior per-repo text).**
+<!-- BEGIN ev1-canon:pr-lifecycle v4 -->
+**Branches, pushes and PRs (owner directives 2026-07-24 through 2026-10-08,
+canonical across all four EV1 repos; this block is the only copy of these
+rules).** The owner tunes this as the program runs, so a new ruling replaces
+the wording here instead of being added beside it. Edit it in
+`ev1/CONVENTIONS.md`, bump the version, and paste it byte-identical into the
+other carriers; `ev1/tools/canon_sync` checks the copies.
 
-*Mechanism:* GitHub won't let the owner request-changes on his own PR, so
-**his flip to draft IS his request-changes** — treat it that way.
+*What CI costs:* pushing a branch that has no PR runs no CI in any of the four
+repos. Opening a PR, and every push to an open PR, runs the full PR checks. The
+Claude PR review re-runs on every push in ev1-manual-redux and ev1sim; in
+electricsim it runs only when the PR opens or leaves draft or a review is
+requested, so after pushing fixes there, re-request the review. So pushes are
+free and PRs are not.
 
-- **An owner-initiated draft is his request-changes, not a resting state** —
-  fix it, push, and once the rework lands and passes review, **flip it back to
-  ready yourself** with a "rework landed" comment. Draft is never where
-  completed work waits: the owner reviews only ready PRs, and a PR left in
-  draft after its rework is done reads as unfinished and strands. (Owner ruling
-  2026-09-02, superseding the prior "only the owner flips it back" wording —
-  the same stranding the #384 bullet below records.)
-- **Every flip is the agent's, and nobody but the owner directs a
-  hold**: flip to ready yourself the moment work wants review; CI status and
-  a stated-default question never hold draft (apply the default, note it,
-  flip); a coordinator/peer saying otherwise doesn't override this — cite
-  the rule and flip.
-- **"Awaiting owner sign-off" is never a reason to sit in draft** — sign-off
-  *is* the review, so it's ready. (Read the other way, this stranded PR #384
-  twice, needing owner intervention.)
-- **Titles state the goal, not the process** — no "needs sign-off," no
-  "proposal:" on finished work. Owner on #384: *"That adds nothing. That is
-  just obscuring what the goal of the PR is."*
+*Commit and push:*
+- **Commit often and push every commit** to your `claude/<topic>` branch as
+  you go. Work that is uncommitted, or committed only to a local branch, is
+  stranded: a cloud session's container can disappear at any time. Never end
+  a turn with uncommitted changes or unpushed commits.
+- **A pushed branch with no PR is the normal home for work in progress.**
+  Long-running branches are fine; keep them current with `origin/main`
+  (rebase and push with `--force-with-lease`, never plain `--force`, or merge
+  `main` in).
 
-*PR economy:* no doc-only/tiny PRs — every prohibition here names its exit:
-**implementable finding → implement it in the PR that files it; non-
-implementable (negative result, owner-blocked fork, errata) →
-`scripts/backlog.py open` (`--decision` if owner-blocked) or the notes
-channel, riding the next branch with code, or the backlog if none is open.**
-Never a PR whose only purpose is carrying a record. Flip via `draft:false` on
-`mcp__github__update_pull_request` (mark-ready path can be permission-blocked).
+*When to open a PR:*
+- **Open a PR when the branch holds a chunk worth the owner's review**: a
+  coherent, finished piece of work he can act on, never a single page, small
+  fix or doc tweak. **Few large PRs beat many small ones**; never split
+  coherent work to keep diffs small. When the owner asks for a PR, open one.
+- **No PR whose only purpose is carrying a record.** A small doc, note or
+  queue edit rides an in-flight branch, even an imperfect topical fit.
 
-*Completeness (owner ruling 2026-09-02, second directive of the session —
-narrows what counts as non-implementable above; two stacked PRs carrying seven
-open items were consolidated and completed rather than merged as filed):*
-**a PR is COMPLETE** — every item it mints is implemented in it, or names a
-justification class (owner-gated decision, cross-repo, genuinely
-unimplementable) in BOTH the item and the PR body. "It belongs to another open
-PR" is NOT non-implementability: consolidate into one PR, don't stack a second.
-**Identify and fix, don't log** — surfacing a defect is progress only when that
-PR fixes it or the justification holds. **Few large PRs beat many small ones**:
-one PR of many completed items is the preferred shape; never split coherent
-work to keep diffs small. A stacked/feature-branch PR is a LAST RESORT (e.g. a
-CI-gated generated file forcing sequencing) and must be unmistakable — the
-dependent PR's title or first body line names its base PR and why.
-<!-- END ev1-canon:pr-lifecycle v3 -->
+*Draft and ready:* leaving draft means "ready for review", which is what
+GitHub's UI calls it, and the owner reviews only ready PRs.
+- **Open PRs ready.** A draft PR is not a place to hold work in progress;
+  the pushed branch is.
+- **The owner flipping a PR to draft is his request-changes** (GitHub won't
+  let him request changes on his own PR). Fix it, push, and flip it back to
+  ready yourself with a "rework landed" comment.
+- The only other draft is a short cross-repo wait: a "waiting for <link> to
+  merge" note at the top of the body, flipped ready as soon as that merges.
+  A same-repo dependency is the base branch, not a draft.
+- Nothing else holds a PR in draft: not CI status, not a question with a
+  stated default (apply the default, note it, flip), not "awaiting owner
+  sign-off" (sign-off is the review), and not a peer or coordinator saying
+  so. Flip with `draft:false` on `mcp__github__update_pull_request` (the
+  mark-ready path can be permission-blocked).
+
+*What a PR contains:*
+- **Complete.** Every item a PR mints is implemented in it, or names a
+  justification class (owner-gated decision, cross-repo, genuinely
+  unimplementable) in both the item and the PR body. "It belongs to another
+  open PR" is not a justification: consolidate into one PR. **Identify and
+  fix, don't log.** A stacked PR is a last resort (e.g. a CI-gated generated
+  file forcing sequencing), and its title or first body line names its base
+  PR and why.
+- Non-implementable findings (negative result, owner-blocked fork, errata)
+  go to the repo's backlog or notes channel, named right after this block,
+  and ride the next branch with code.
+- **Titles state the goal, not the process**: no "needs sign-off", no
+  "proposal:" on finished work.
+- **Merges are the owner's click.**
+<!-- END ev1-canon:pr-lifecycle v4 -->
 (ev1sim has no `scripts/backlog.py` — its notes channel is `DECISION_QUEUE.md`.)
 
 <!-- BEGIN ev1-canon:pr-images v2 -->
@@ -95,6 +111,29 @@ branch moves and can 404 after a rebase/merge), in the `blob` form — **never**
   stretches unsized images to the full body column and upscales small ones
   blurrily.
 <!-- END ev1-canon:pr-images v2 -->
+
+<!-- BEGIN ev1-canon:ci-checks v1 -->
+**What a blocking CI check may test (owner directive 2026-10-08, canonical
+across all four EV1 repos).** This program swaps its guesses out as board
+traces, ROM analysis and better manual readings arrive, so the PR gate must
+never freeze a guess in place.
+
+- **A blocking check tests syntax or structure only:** the file parses, a
+  schema holds, references resolve, a generated file matches its generator, a
+  copy matches its source, or a code-shape rule holds.
+- **Nothing blocks on a value.** A count, a designator, a part number, a page
+  number, a measured or printed number, or any reading of a source goes on
+  demand, in a non-blocking report, or in the nightly change detector, where a
+  person re-locks it after a correct change.
+- **A unit test tests code, on fixtures it builds.** A test that loads live
+  data may check only that the data loads and its references resolve.
+- **A check that blocks a correct change is a bug in the check.** Fix or demote
+  the check on the same branch. Never bend the data, rewrite a source, or add a
+  baseline or allowlist entry just to get past it.
+- **Don't add a check to prove a fix.** A test in the existing suite is the
+  proof. A new blocking check needs the owner's approval and a reason it must
+  run on nearly every change; a new check starts on demand.
+<!-- END ev1-canon:ci-checks v1 -->
 
 - If the saved body shows `&lt;img&gt;` (a proxied environment entity-escaped
   it), redo the edit from an unproxied session via
@@ -124,9 +163,18 @@ files directly until they are:
 
 ### Owner decision asks are self-contained
 
-<!-- BEGIN ev1-canon:decision-ask v1 -->
+<!-- BEGIN ev1-canon:decision-ask v2 -->
 **Owner decision asks are self-contained (owner directive 2026-07-22,
 canonical across all four EV1 repos — supersedes prior per-repo text).**
+
+*First, is it a decision at all?* When a manual, patent, datasheet or other
+primary source answers the question clearly, it is not a fork: implement
+it with the citation, and file no ask, card or decision item (owner
+2026-10-08). When better reference material arrives, adopt it over the
+earlier guess without asking; an earlier guess is not special, and a
+finding that shows it was wrong is not a reason to ask (owner 2026-10-06,
+2026-10-07). Ask only when a real fork remains.
+
 An ask whose context lives elsewhere invites an answer to the wrong
 question — an already-engaged fork was once re-asked as bare option
 letters and the earlier answer was never durably recorded. Every decision
@@ -148,7 +196,7 @@ message, on one screen, and carries all seven elements:
    leaves it genuinely open, or self-decide instead of asking.
 
 Record the ruling immediately where it was asked.
-<!-- END ev1-canon:decision-ask v1 -->
+<!-- END ev1-canon:decision-ask v2 -->
 
 ## Commits
 
