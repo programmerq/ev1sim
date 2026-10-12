@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  pull-requests: write
+  pull-requests: read
   issues: write
 
 concurrency:
@@ -28,6 +28,13 @@ jobs:
             const { owner, repo } = context.repo;
             const LABEL = 'conflict';
             const sleep = ms => new Promise(r => setTimeout(r, ms));
+            // Make sure the label exists before any PR needs it (422: it already does).
+            try {
+              await github.rest.issues.createLabel({ owner, repo, name: LABEL, color: 'd73a4a',
+                description: 'Conflicts with its base branch' });
+            } catch (e) {
+              if (e.status !== 422) throw e;
+            }
             const open = await github.paginate(github.rest.pulls.list,
               { owner, repo, state: 'open', per_page: 100 });
             // GitHub computes mergeability lazily after a base push: the first
