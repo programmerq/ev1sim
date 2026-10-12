@@ -1,0 +1,57 @@
+name: Conflict label
+
+# After every push to main, label each open PR that no longer merges cleanly
+# "conflict", and take the label off a PR that merges cleanly again. Runs only
+# on push to main: a PR whose author resolves the conflict loses the label at
+# the next push to main (or a manual run), not on its own push.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: conflict-label
+  cancel-in-progress: true
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const LABEL = 'conflict';
+            const sleep = ms => new Promise(r => setTimeout(r, ms));
+            const open = await github.paginate(github.rest.pulls.list,
+              { owner, repo, state: 'open', per_page: 100 });
+            // GitHub computes mergeability lazily after a base push: the first
+            // read starts the job and returns null, so re-read until known.
+            let pending = open.map(p => p.number);
+            const known = new Map();
+            for (let attempt = 0; attempt < 8 && pending.length; attempt++) {
+              if (attempt) await sleep(10000);
+              const still = [];
+              for (const n of pending) {
+                const { data } = await github.rest.pulls.get({ owner, repo, pull_number: n });
+                if (data.mergeable === null) still.push(n); else known.set(n, data);
+              }
+              pending = still;
+            }
+            for (const n of pending) core.info(`#${n}: mergeability still unknown, left as is`);
+            for (const [n, pr] of known) {
+              const has = pr.labels.some(l => l.name === LABEL);
+              const conflicting = pr.mergeable === false && pr.mergeable_state === 'dirty';
+              if (conflicting && !has) {
+                await github.rest.issues.addLabels({ owner, repo, issue_number: n, labels: [LABEL] });
+                core.info(`#${n}: conflicts with ${pr.base.ref}, labelled`);
+              } else if (!conflicting && has && pr.mergeable === true) {
+                await github.rest.issues.removeLabel({ owner, repo, issue_number: n, name: LABEL });
+                core.info(`#${n}: merges cleanly again, label removed`);
+              }
+            }
