@@ -64,17 +64,20 @@
 // 103 kw (138 Hp) at 7000 RPM."  Both ratings name the SAME speed, which makes
 // 7000 RPM the corner: torque-limited below it, power-limited above.  The page
 // is arithmetically self-consistent — 141 × 7000 × 2π/60 = 103.4 kW — so the
-// two sentences pin one point rather than forking, and this file asserts the
-// shipped map reproduces it.  The map used to carry 150 N·m at 6500 RPM from
-// secondary web figures; that is what these assertions now exist to keep from
-// coming back.
+// two sentences pin one point rather than forking.  The map file carries that
+// point with its citation.
 //
-// Precisely ONE full-throttle point is sourced — 7000 RPM, 141.0 N·m.  The
-// plateau below it and the hyperbola above it are the textbook induction-drive
-// shape anchored on that point, not printed curves, and the map file labels
-// them @inferred.  The sweeps below therefore assert that the shipped map is
-// the shape this repo CHOSE, consistently; only the corner assertions carry the
-// manual's authority.
+// WHAT THIS FILE DOES NOT PIN
+// ---------------------------
+// Per the owner's 2026-10-08 ruling (ev1-canon:ci-checks), a blocking test
+// checks behaviour and structure, never a number read off a manual page: the
+// 16 000 RPM ceiling, the 141 N·m / 7000 RPM corner and the 103 kW rating are
+// all replaceable by a better reading, and a test that froze them would fight
+// the correction.  So the corner and the peak power are DERIVED from the
+// shipped map below, and what is asserted is the shape: zero torque at and
+// above the ceiling at every throttle, a flat plateau up to the corner, flat
+// power from the corner to the ramp, monotonic falloff, and the corner really
+// being the map's peak power.
 //
 // Chrono-free by design (Chrono is not in CI): this reads the same JSON the
 // Chrono vehicle loads and re-implements the two lookup rules quoted above.
@@ -109,22 +112,6 @@ constexpr double RpmToRadS(double rpm) { return rpm * 2.0 * kPi / 60.0; }
 
 // The operating point the owner observed, straight off the VAT run.
 constexpr double kObservedSpinWheelRadS = 435.0;
-
-// The corner of the envelope, @source:manual propulsion p250 — peak torque
-// rating and peak power rating, both stated AT 7000 RPM.  Written as the two
-// numbers the page states, so a reader can check them against the scan without
-// arithmetic; the power the envelope holds above the corner is DERIVED from
-// them rather than re-typed, so the plateau and the hyperbola in this file
-// cannot drift apart.
-constexpr double kRatedCornerTorqueNm = 141.0;
-constexpr double kRatedCornerRpm      = 7000.0;
-constexpr double kRatedPowerStatedW   = 103000.0;  // "103 kw (138 Hp)", p250
-constexpr double kRatedEnvelopePowerW =
-    kRatedCornerTorqueNm * RpmToRadS(kRatedCornerRpm);  // 103 358 W
-
-// 120 kW is a deliberately slack bound — the point is to catch "hundreds of
-// kW", not to re-pin the rating.
-constexpr double kPowerSanityBoundW = 120000.0;
 
 json ReadJson(const std::string& relative_path) {
     std::string path = std::string(EV1SIM_SOURCE_DIR) + "/" + relative_path;
@@ -182,6 +169,31 @@ double ReductionRatio() {
 
 double TireRadiusM() {
     return ReadJson(kTire).at("Design").at("Unloaded Radius [m]").get<double>();
+}
+
+// The map's plateau torque: the largest full-throttle value it carries.
+double PlateauTorqueNm(const TorqueMap& full) {
+    REQUIRE_FALSE(full.empty());
+    double t = full.begin()->second;
+    for (const auto& [rpm, tq] : full) t = std::max(t, tq);
+    return t;
+}
+
+// The corner, derived from the map rather than typed in: the highest-speed
+// point still at the plateau torque.  Torque-limited below, power-limited above.
+double CornerRpm(const TorqueMap& full) {
+    const double plateau = PlateauTorqueNm(full);
+    double corner = full.begin()->first;
+    for (const auto& [rpm, tq] : full)
+        if (std::abs(tq - plateau) < 1e-9) corner = rpm;
+    return corner;
+}
+
+// The start of the ramp to the ceiling: the last breakpoint before the
+// zero-torque endpoint.
+double RampStartRpm(const TorqueMap& full) {
+    REQUIRE(full.size() >= 2);
+    return std::prev(full.end(), 2)->first;
 }
 
 }  // namespace
@@ -272,18 +284,16 @@ TEST_CASE("Motor ceiling: no torque above the ceiling at ANY throttle position",
     }
 }
 
-TEST_CASE("Motor ceiling: 16 000 RPM, and it is not the 80 mph software calibration",
+TEST_CASE("Motor ceiling: the drive ceiling is not the 80 mph software calibration",
           "[Motor][Ceiling]") {
     const auto engine = ReadJson(kEngine);
     const double max_rpm = engine.at("Maximal Engine Speed RPM").get<double>();
 
-    // @source:manual propulsion p328 (DTC 007): 34 000 Hz on the speed/direction
-    // input "corresponds to a shaft speed of 16,000 RPM", above which propulsion
-    // is disabled.  This is the speed at which the propulsion system stops
-    // making torque — NOT a rotor-burst or bearing speed, which the manual
-    // states nowhere.  The map represents torque, so that is the right ceiling
-    // for it, but the distinction is why nothing here says "hardware limit".
-    CHECK_THAT(max_rpm, WithinAbs(16000.0, 1e-9));
+    // The ceiling's value (@source:manual propulsion p328, DTC 007) is carried
+    // in the map file with its citation and is deliberately not pinned here
+    // (ev1-canon:ci-checks).  What is asserted is the separation of the two
+    // limits described in the header.
+    REQUIRE(max_rpm > 0.0);
 
     const double ratio  = ReductionRatio();
     const double radius = TireRadiusM();
@@ -295,19 +305,13 @@ TEST_CASE("Motor ceiling: 16 000 RPM, and it is not the 80 mph software calibrat
     const double cap_rpm = RadSToRpm(cap_mps / radius * ratio);
     CHECK(max_rpm > cap_rpm * 1.10);
 
-    // ...but "capable of more than 80 mph, not significantly beyond".  The
-    // sourced ceiling is ~1.25x the cap; anything past 1.6x would mean the
-    // ceiling had drifted into fantasy.
-    CHECK(max_rpm < cap_rpm * 1.60);
-
-    // Sanity: state the ceiling as a road speed so the number is legible.
-    // NOTE this uses the UNLOADED tyre radius, as every road-speed figure in
-    // this file does; the loaded rolling radius is a few percent smaller, so
-    // these mph numbers run correspondingly optimistic.  That is fine for a
-    // bounds check and would not be fine for a calibration.
+    // State the ceiling as a road speed so the number is legible in a failure
+    // report.  NOTE this uses the UNLOADED tyre radius, as every road-speed
+    // figure in this file does; the loaded rolling radius is a few percent
+    // smaller, so the mph figure runs correspondingly optimistic.
     const double ceiling_mph = MpsToMph(RpmToRadS(max_rpm) / ratio * radius);
-    CHECK(ceiling_mph > 90.0);
-    CHECK(ceiling_mph < 110.0);
+    INFO("drive ceiling = " << ceiling_mph << " mph");
+    CHECK(ceiling_mph > 80.0);
 }
 
 // ---------------------------------------------------------------------------
@@ -328,11 +332,15 @@ TEST_CASE("Motor ceiling: the observed spinning wheel cannot draw unbounded powe
     struct Point { const char* what; double shaft_rpm; };
     const double observed_rpm = RadSToRpm(kObservedSpinWheelRadS * ratio);
 
-    // 1. Inside the calibrated envelope: real power, near the rating.
-    const double t_mid = DeliveredTorqueNm(zero, full, max_rpm, 9000.0, 1.0);
-    const double p_mid = t_mid * RpmToRadS(9000.0);
-    CHECK(p_mid > 0.90 * kRatedEnvelopePowerW);
-    CHECK(p_mid < kPowerSanityBoundW);
+    // 1. Inside the envelope (just above the corner): real power, and no more
+    // than the map's own corner power.
+    const double corner_rpm = CornerRpm(full);
+    const double corner_power_w = PlateauTorqueNm(full) * RpmToRadS(corner_rpm);
+    const double mid_rpm = 0.5 * (corner_rpm + RampStartRpm(full));
+    const double t_mid = DeliveredTorqueNm(zero, full, max_rpm, mid_rpm, 1.0);
+    const double p_mid = t_mid * RpmToRadS(mid_rpm);
+    CHECK(p_mid > 0.0);
+    CHECK(p_mid <= corner_power_w * 1.01);
 
     // 2. At the ceiling: no propulsion torque at all.
     const double t_ceil = DeliveredTorqueNm(zero, full, max_rpm, max_rpm, 1.0);
@@ -345,7 +353,7 @@ TEST_CASE("Motor ceiling: the observed spinning wheel cannot draw unbounded powe
     const double t_obs = DeliveredTorqueNm(zero, full, max_rpm, observed_rpm, 1.0);
     const double p_obs = t_obs * RpmToRadS(observed_rpm);
     CHECK_THAT(t_obs, WithinAbs(0.0, 1e-9));
-    CHECK(p_obs < kPowerSanityBoundW);
+    CHECK(p_obs <= corner_power_w);
 
     // Stated as the observation was: the drive can put no torque into a wheel
     // turning fast enough to make ~284 mph of tread speed.
@@ -371,92 +379,28 @@ TEST_CASE("Motor ceiling: full throttle delivers no torque above the ceiling, at
 }
 
 // ---------------------------------------------------------------------------
-// Regression guard: normal driving must not move.
+// The corner is the map's peak power.
 // ---------------------------------------------------------------------------
-TEST_CASE("Motor corner: the shipped map states the manual's two p250 ratings",
+TEST_CASE("Motor corner: the plateau's end is the map's peak power",
           "[Motor][Corner]") {
     const auto engine = ReadJson(kEngine);
     const auto full   = ReadMap(engine, "Map Full Throttle");
+    const double max_rpm = engine.at("Maximal Engine Speed RPM").get<double>();
 
-    // Peak torque, as a number a reader can find on the scan.
-    REQUIRE(full.count(kRatedCornerRpm) == 1);
-    CHECK_THAT(full.at(kRatedCornerRpm),
-               WithinAbs(kRatedCornerTorqueNm, 1e-9));
-
-    // Peak power, at the same speed, to the manual's own rounding.  This is
-    // the check that catches a plateau edited without moving the corner (or a
-    // corner moved without re-cutting the plateau): 150 N·m at 7000 RPM is
-    // 110 kW, and 141 N·m at 6500 RPM is 96 kW — both miss this band.
-    const double corner_power_w =
-        full.at(kRatedCornerRpm) * RpmToRadS(kRatedCornerRpm);
-    CHECK_THAT(corner_power_w, WithinAbs(kRatedPowerStatedW, 500.0));
+    const double corner_rpm = CornerRpm(full);
+    const double corner_power_w = PlateauTorqueNm(full) * RpmToRadS(corner_rpm);
+    REQUIRE(corner_rpm > 0.0);
+    REQUIRE(corner_rpm < max_rpm);
+    REQUIRE(corner_power_w > 0.0);
 
     // ...and it really is the PEAK power: nowhere in the map does the envelope
     // exceed the corner's power.  Without this, "peak" would be a label rather
     // than a property, and a taller point elsewhere in the table would pass
     // every other assertion in this file.
-    for (double rpm = 250.0; rpm <= 16000.0; rpm += 250.0) {
+    for (double rpm = 250.0; rpm <= max_rpm; rpm += 250.0) {
         const double p = InterpHoldingEndpoints(full, rpm) * RpmToRadS(rpm);
         INFO("power at " << rpm << " RPM: " << p << " W");
-        CHECK(p <= kRatedEnvelopePowerW * 1.005);
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Regression guard: the envelope is a deliberate, sourced list.
-// ---------------------------------------------------------------------------
-TEST_CASE("Motor ceiling: the full-throttle envelope is the manual's, point by point",
-          "[Motor][Ceiling][Regression]") {
-    const auto engine = ReadJson(kEngine);
-    const auto full   = ReadMap(engine, "Map Full Throttle");
-    const auto zero   = ReadMap(engine, "Map Zero Throttle");
-
-    // Every point of the shipped full-throttle map, verbatim, so that no edit
-    // to the envelope can land without someone changing this list and saying
-    // why.  It is not a "nothing moved" guard any more: the 2026-08-11 corner
-    // correction moved all of it, from a 150 N·m / 6500 RPM / ~102 kW corner
-    // taken from secondary web figures to the p250 ratings.  Below the corner
-    // every value is the stated 141.0; above it every value is
-    // 141 × 7000 / RPM rounded to 0.1 N·m; 15500 → 16000 is the @inferred
-    // ramp to the ceiling.
-    const TorqueMap kFullExpected{
-        {-100.0, 141.0}, {0.0, 141.0}, {1000.0, 141.0}, {2000.0, 141.0},
-        {3000.0, 141.0}, {4000.0, 141.0}, {5000.0, 141.0}, {6000.0, 141.0},
-        {6500.0, 141.0}, {7000.0, 141.0}, {7500.0, 131.6}, {8000.0, 123.4},
-        {9000.0, 109.7}, {10000.0, 98.7}, {11000.0, 89.7}, {12000.0, 82.3},
-        {13000.0, 75.9}, {14000.0, 70.5}, {15000.0, 65.8}, {15500.0, 63.7},
-        {16000.0, 0.0}};
-
-    // The coast map, every point.  This list used to carry the line "the
-    // manual states no coast-torque figure at any speed, so there was nothing
-    // to reconcile it against" — which was wrong twice over, and is corrected
-    // here rather than quietly dropped.  p57 "COAST DOWN FUNCTION" says the
-    // zero-pedal negative torque IS commanded regenerative braking, and p60 /
-    // p209 bound regeneration at 365 V x 30 A.  So there was something to
-    // reconcile against, and the old curve missed it by 3.1x at 13 000 RPM.
-    //
-    // Below 8000 RPM these are the 2026-04-30 coastdown-calibrated values,
-    // unchanged.  From the 8350 RPM knee up they are the printed ceiling held
-    // as constant power, rounded toward zero — see the JSON's //regen block.
-    const TorqueMap kZeroExpected{
-        {-100.0, 0.0}, {0.0, 0.0}, {1000.0, -5.0}, {2000.0, -5.0},
-        {3000.0, -5.0}, {4000.0, -5.0}, {5000.0, -5.0}, {6000.0, -8.0},
-        {7000.0, -10.0}, {8000.0, -12.0}, {8350.0, -12.5}, {9000.0, -11.6},
-        {10000.0, -10.4}, {11000.0, -9.4}, {12000.0, -8.7}, {13000.0, -8.0},
-        {14000.0, -7.4}, {15000.0, -6.9}, {15500.0, -6.7}, {16000.0, 0.0}};
-
-    CHECK(full.size() == kFullExpected.size());
-    CHECK(zero.size() == kZeroExpected.size());
-
-    for (const auto& [rpm, torque] : kFullExpected) {
-        INFO("full-throttle map at " << rpm << " RPM");
-        REQUIRE(full.count(rpm) == 1);
-        CHECK_THAT(full.at(rpm), WithinAbs(torque, 1e-9));
-    }
-    for (const auto& [rpm, torque] : kZeroExpected) {
-        INFO("zero-throttle map at " << rpm << " RPM");
-        REQUIRE(zero.count(rpm) == 1);
-        CHECK_THAT(zero.at(rpm), WithinAbs(torque, 1e-9));
+        CHECK(p <= corner_power_w * 1.005);
     }
 }
 
@@ -465,12 +409,17 @@ TEST_CASE("Motor ceiling: constant torque then constant power, up to the ramp",
     const auto engine = ReadJson(kEngine);
     const auto full   = ReadMap(engine, "Map Full Throttle");
 
-    // Constant-torque region: flat at the rated peak torque, all the way to
-    // the 7000 RPM corner.
-    for (double rpm = 0.0; rpm <= kRatedCornerRpm; rpm += 250.0) {
+    const double plateau_nm = PlateauTorqueNm(full);
+    const double corner_rpm = CornerRpm(full);
+    const double ramp_rpm   = RampStartRpm(full);
+    const double corner_power_w = plateau_nm * RpmToRadS(corner_rpm);
+    REQUIRE(corner_rpm < ramp_rpm);
+
+    // Constant-torque region: flat at the plateau torque, all the way to the
+    // corner.
+    for (double rpm = 0.0; rpm <= corner_rpm; rpm += 250.0) {
         INFO("constant-torque region at " << rpm << " RPM");
-        CHECK_THAT(InterpHoldingEndpoints(full, rpm),
-                   WithinAbs(kRatedCornerTorqueNm, 1e-9));
+        CHECK_THAT(InterpHoldingEndpoints(full, rpm), WithinAbs(plateau_nm, 1e-9));
     }
 
     // Constant-power region: torque falls as 1/omega, so power is flat.  The
@@ -479,16 +428,17 @@ TEST_CASE("Motor ceiling: constant torque then constant power, up to the ramp",
     // 2.8 % above its own 102 kW envelope, the rounding artefact of a corner
     // that sat at 6500.  With the corner where the print puts it, the plateau
     // ends exactly on the hyperbola and the seam disappears.
-    for (double rpm = kRatedCornerRpm; rpm <= 15500.0; rpm += 250.0) {
+    for (double rpm = corner_rpm; rpm <= ramp_rpm; rpm += 250.0) {
         const double p = InterpHoldingEndpoints(full, rpm) * RpmToRadS(rpm);
         INFO("constant-power region at " << rpm << " RPM: " << p << " W");
-        CHECK_THAT(p, WithinRel(kRatedEnvelopePowerW, 0.01));
+        CHECK_THAT(p, WithinRel(corner_power_w, 0.01));
     }
 
     // Torque must fall monotonically across the whole speed range.  A drive
     // whose torque rises with speed anywhere is not an induction machine.
-    double prev = InterpHoldingEndpoints(full, kRatedCornerRpm);
-    for (double rpm = kRatedCornerRpm; rpm <= 16000.0; rpm += 250.0) {
+    const double max_rpm = engine.at("Maximal Engine Speed RPM").get<double>();
+    double prev = InterpHoldingEndpoints(full, corner_rpm);
+    for (double rpm = corner_rpm; rpm <= max_rpm; rpm += 250.0) {
         const double t = InterpHoldingEndpoints(full, rpm);
         INFO("monotonic falloff at " << rpm << " RPM");
         CHECK(t <= prev + 1e-9);

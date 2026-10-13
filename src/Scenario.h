@@ -74,6 +74,11 @@ class PhysicalWorld;
 //       +0.47 m from a spawn 1.15 m to the right).
 //       Overrides any set_steering while engaged.  Steers on the measured
 //       course, not the body heading: see Scenario::LaneHoldSteering.
+//       value2 picks the driver: 0 (default) the gentle coast-settle driver
+//       above; 1 the split-stop TEST DRIVER, who keeps the car on the seam
+//       through a braked stop with the steering budget UN ECE R13-H Annex 6
+//       sec. 5.3.7 allows (120 deg of steering wheel).  Re-issue lane_hold
+//       with value2 1 on the brake tick to hand over.
 //   lane_release:  disengage lane_hold and centre the wheel (steering held
 //       at 0 until a later set_steering).  Schedule it on the brake tick
 //       so the stop itself is open-loop: what the car does under the
@@ -269,15 +274,25 @@ private:
     std::optional<double>      m_held_steering;
     // lane_hold target (world y, metres); disengaged when empty.
     std::optional<double>      m_lane_hold_y;
+    // Which lane-hold driver: 0 the coast-settle driver, 1 the split-stop
+    // test driver (lane_hold value2; see LaneHoldSteering).
+    int                        m_lane_profile = 0;
     // Previous-tick chassis position, from which the lane hold derives the
     // COURSE (direction of travel) — see LaneHoldSteering for why it steers
     // on course rather than on body heading.  Empty on the first tick.
     struct LanePoint { double x, y; };
     std::optional<LanePoint>   m_lane_prev;
+    // Last lane-hold steering output and its sim time: the test driver's
+    // hand lag filters from here (see LaneHoldSteering).
+    double                     m_lane_out = 0.0;
+    std::optional<double>      m_lane_out_t;
+    // Lane-hold output when the test driver took the wheel: its steering
+    // budget is measured from here.
+    double                     m_lane_base = 0.0;
     // Lane-keeping steering command in [-1, 1] for the current state; see
     // the definition for the law and the gain provenance.  Updates
-    // m_lane_prev.
-    double LaneHoldSteering(const VehicleState& state);
+    // m_lane_prev and the hand-lag state.
+    double LaneHoldSteering(const VehicleState& state, double sim_time);
     // Horn contact, held like the pedals: set_horn value != 0 closes the
     // single driver horn contact (circuit 28) until the next set_horn 0.
     std::optional<bool>        m_held_horn;

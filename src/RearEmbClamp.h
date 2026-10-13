@@ -4,6 +4,14 @@
 
 namespace ev1sim {
 
+/// Rear brake "Maximum Torque" (N·m) — converts the physical drum torque from
+/// the BrakeDrum model into the [0,1] ratio Chrono's brake takes.  MUST equal
+/// data/vehicle/ev1/brake/EV1_BrakeSimple_Rear.json's "Maximum Torque"
+/// (Round 4 brake bias).  Lives here, in a Chrono-free header, so the unit
+/// suite can check the JSON against the code constant itself rather than a
+/// re-typed literal; SimApp::kRearBrakeMaxTorqueNm aliases it.
+inline constexpr double kRearBrakeMaxTorqueNm = 480.0;
+
 /// Shoe clamping force held by one electromechanical (EMB) rear brake,
 /// driven by the BTCM's signed rear-motor command
 /// (CHASSIS_BTCM_EMB_MOTOR_CMD_LR / _RR).
