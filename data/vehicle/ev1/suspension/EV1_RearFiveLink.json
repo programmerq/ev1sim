@@ -91,7 +91,7 @@
       "Name":                   "Axle Tube",
       "//":                     [
         "One rigid body for the aluminum end castings, tubular centre section, hubs and",
-        "electric drums. Mass 34.0 kg = 2 x 35 kg estimated rear unsprung corner",
+        "electric drums. Mass 35.0 kg = 2 x 35 kg estimated rear unsprung corner",
         "(baseline unsprung_mass_rear_corner) - 2 x (8.0 kg wheel + 7.5 kg tyre +",
         "1.0 kg spindle, as this repo's wheel, tyre and spindle files carry them)",
         "- half the 4.0 kg of jointed links (lower links, track bar) = 35.0 kg; the",
@@ -218,7 +218,7 @@
       "//hardpoints":           ["spring_upper", "spring_lower"],
       "//": [
         "Rate 25311 N/m: the baseline's spring_rate_rear (estimated, a 1.5 Hz ride",
-        "target; the spring sits on the axle, motion ratio ~1). Free Length 0.2546 m is",
+        "target; the spring sits on the axle, motion ratio ~1). Free Length 0.2548 m is",
         "derived: installed length 0.1448 m between the two seats above plus the static",
         "load 2784 N / k, where 2784 N is half the rear-axle reaction of the chassis",
         "mass and COM in ev1/chassis/EV1_Chassis.json. So the design position above is",
