@@ -1,0 +1,21 @@
+{
+  "//": "Suspension bounce test: drop the car onto a flat plane and record the",
+  "//1": "free response.  No events; the run is the drop.  Run it through",
+  "//2": "config/bounce_test.json, whose header has the reduction recipe and the",
+  "//3": "ride frequencies the suspension files predict.",
+
+  "name": "bounce_test",
+  "driver_mode": "local",
+  "max_time_s": 6.0,
+  "events": [],
+  "stats": {
+    "output_csv": "scenario_bounce_test.csv",
+    "sample_period_s": 0.005,
+    "fields": [
+      "sim_time_s",
+      "pitch_deg",
+      "speed_mps",
+      "road_grade_pct"
+    ]
+  }
+}

@@ -7,14 +7,19 @@
   [
    {
      "Centroidal Frame":    {
-                              "Location":    [0.09, 0, 0.49],
+                              "Location":    [0.1254, 0, 0.4956],
                               "Orientation": [1, 0, 0, 0]
                             },
-     "//":                  "Target Gen 2 NiMH curb weight 1281 kg.  Chrono adds ~82 kg",
-     "//1":                 "of accessories (4× wheel 8 + 4× tire 7.5 + 4× susp ~4.5 +",
-     "//2":                 "steering 1.6).  Chassis = 1281 - 82 = 1199 kg.",
-     "//3":                 "Inertia tensor unchanged — order-of-magnitude sane (Ixx 130 / Iyy 600 / Izz 680).",
-     "Mass":                1199,
+     "//":                  "Target Gen 2 NiMH curb weight 1281 kg.  Chrono adds the",
+     "//1":                 "wheels, tyres, suspension and steering bodies on top of this:",
+     "//2":                 "4x wheel 8 + 4x tire 7.5 + front suspension 9.0 + rear",
+     "//3":                 "five-link axle 42.0 + steering 1.6.  Chassis = 1166 kg.",
+     "//4":                 "The rear went from a 9.0 kg wishbone stand-in to the 42.0 kg",
+     "//5":                 "beam axle and links in EV1_RearFiveLink.json; the 33 kg came",
+     "//6":                 "out of this body, and the COM moved from (0.09, 0, 0.49) to",
+     "//7":                 "where the whole car's mass centre stays put.  Derived, not measured.",
+     "//8":                 "Inertia tensor unchanged — order-of-magnitude sane (Ixx 130 / Iyy 600 / Izz 680).",
+     "Mass":                1166,
      "Moments of Inertia":  [130.0, 600.0, 680.0],
      "Products of Inertia": [0, 0, 0],
      "Void":                false

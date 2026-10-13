@@ -49,10 +49,10 @@ high-speed deceleration is artificially low.
 
 | Parameter | Current | Real EV1 (NiMH) | Status |
 |---|---|---|---|
-| Chassis mass | 1217 kg | ~1199 kg (target curb 1281, less ~82 kg accessories) | 🔧 1217→1199 |
+| Chassis mass | 1166 kg | target curb 1281, less ~115 kg of wheel, tyre, suspension and steering bodies | 🔧 1217→1199→1166 |
 | Curb weight (computed) | ~1299 kg | 1281 kg (NiMH) | ⚠️ off by 18 kg |
-| Centroidal Frame x | +0.09 m | unknown — likely +0.1 to +0.15 (slight front bias from motor) | ⚠️  |
-| Centroidal Frame z | 0.49 m | likely 0.40-0.45 m (T-pack batteries low in floor) | ⚠️ slightly high |
+| Centroidal Frame x | +0.1254 m | unknown — likely +0.1 to +0.15 (slight front bias from motor) | ⚠️ moved with the rear axle mass, see below |
+| Centroidal Frame z | 0.4956 m | likely 0.40-0.45 m (T-pack batteries low in floor) | ⚠️ slightly high |
 | Ixx (roll) | 130 kg·m² | rg≈0.33 m → plausible | ⚠️ |
 | Iyy (pitch) | 600 kg·m² | rg≈0.70 m → plausible | ⚠️ |
 | Izz (yaw)  | 680 kg·m² | rg≈0.75 m → plausible | ⚠️ |
@@ -60,10 +60,18 @@ high-speed deceleration is artificially low.
 **Curb-weight breakdown (Chrono adds these to chassis)**:
 - 4× wheel × 8.0 kg = 32 kg
 - 4× tire × 7.5 kg = 30 kg
-- 4× suspension (spindle 1.0 + upright 1.2 + UCA 0.9 + LCA 1.4) = ~18 kg
+- 2× front suspension (spindle 1.0 + upright 1.2 + UCA 0.9 + LCA 1.4) = 9.0 kg
+- Rear five-link axle (axle tube 34.0 + 2 spindles 1.0 + 4 links 1.0 + track
+  bar 2.0) = 42.0 kg, all estimated; see `EV1_RearFiveLink.json`
 - Steering link = 1.6 kg
-- Total non-chassis = ~82 kg
-- Target chassis = 1281 − 82 = **1199 kg** for Gen 2 NiMH
+- Total non-chassis = ~115 kg
+- Target chassis = 1281 − 115 = **1166 kg** for Gen 2 NiMH
+
+The rear axle replaced a 9.0 kg wishbone stand-in, so 33 kg moved from the
+chassis body to the axle.  The chassis COM moved from (0.09, 0, 0.49) to
+(0.1254, 0, 0.4956), the point that keeps the whole car's mass centre where
+it was; the curb weight and axle split the rest of the model was tuned on are
+unchanged.  Inertia left as it was.
 
 For PbA Gen 1 (1351 kg curb), chassis would be 1269 kg — choose NiMH as
 the canonical config since the demo scenarios are tuned around the more
@@ -603,16 +611,17 @@ realistic gradient at partial pedal.  Future improvement: split front
 | Parameter | In the JSON | Printed source | Status |
 |---|---|---|---|
 | Front template | `DoubleWishbone` | short/long arm (SLA), chassis p. 251 | ✅ right layout |
-| Rear template | `DoubleWishbone` | beam axle on five links, chassis p. 271 | ❌ wrong layout |
+| Rear template | `GenericWheeledSuspension`: rigid axle tube, two upper leading links, two lower trailing links, track bar | beam axle on five links, chassis p. 271 | ✅ right layout |
 | Front track | 1.470 m (spindle Y 0.735) | 1470 mm (57.9 in), chassis p. 62 | ✅ |
 | Rear track | 1.244 m (spindle Y 0.622) | 1244 mm (49.0 in), chassis p. 62 | ✅ |
 | Front camber | -0.10° | -0.10° nominal, chassis p. 61 | ✅ |
 | Rear camber | -0.50° | -0.50° nominal, chassis p. 61 | ✅ |
 | Front toe | -0.05° | -0.05° per wheel, chassis p. 61 | ✅ |
 | Rear toe | 0° | 0.00° per wheel, chassis p. 61 | ✅ |
-| All hardpoint coordinates | rescaled Chrono `sedan` sample | nothing published | ⚠️ template geometry, labelled as such in the files |
-| Spring rate (both axles) | 143000 N/m | nothing published | ⚠️ |
-| Damping (front / rear) | 7500 / 7000 N·s/m | nothing published | ⚠️ |
+| Front hardpoint coordinates | rescaled Chrono `sedan` sample | nothing published | ⚠️ template geometry, labelled as such in the file |
+| Rear hardpoint coordinates | ev1 suspension baseline (ev1 PR #144) | spring seat and lower link bracket printed (body p. 158), rest estimated | ⚠️ tiers carried per point in the file |
+| Spring rate (front / rear) | 143000 / 25311 N/m | nothing published | ⚠️ front unsourced; rear is the baseline's 1.5 Hz estimate |
+| Damping (front / rear) | 7500 / 1710 N·s/m | nothing published | ⚠️ front unsourced; rear derived for a 0.30 damping ratio |
 
 ### What the printed source says, and what this audit got wrong
 
@@ -637,25 +646,46 @@ the stabilizer bar.
 end castings and a tubular center section … two coil springs, two twin tube
 shock absorbers and five connecting links … two upper suspension leading links,
 two lower suspension trailing links, and a track bar."*  A one-piece beam axle
-on five links — not a twist beam, and not independent.  The `DoubleWishbone`
-template models nothing that exists back there: no control arms, no uprights, no
-tie rods, and a track bar (Panhard rod) with no counterpart in the template.
-Chrono's JSON factory does offer closer templates — `SolidAxle` carries the same
-link set but is a steered axle, and `GenericWheeledSuspension` could express the
-layout exactly — but neither can be filled in without hardpoints, so the file
-stays a stand-in and says so in its own header.
+on five links — not a twist beam, and not independent.  `EV1_RearFiveLink.json` builds the printed part list on Chrono's
+`GenericWheeledSuspension`: one rigid axle tube carrying both spindles, two
+upper links whose body pivots sit behind the axle, two lower links whose body
+pivots sit ahead of it, and a track bar across the car, with a coil spring and
+a damper per side.  `SolidAxle` was not used: it is a steered axle (knuckles,
+tie rod, drag link, bell crank) and has no track bar.  Each link is a spherical
+joint at the body and a rubber bushing at the axle, because five ideal links on
+a rigid axle lock roll; the manual's "non-replaceable bushings" are what let the
+real axle roll.
 
-**Hardpoints.**  Every coordinate in both files is Chrono's stock
+**Hardpoints.**  Every front coordinate is Chrono's stock
 `sedan/suspension/Sedan_DoubleWishbone.json` rescaled: lateral coordinates by
-1470/1595.8 = 0.921168 front and 1244/1595.8 = 0.779546 rear, longitudinal by
-about the same, vertical fitted to the ev1model wheelwells.  No EV1 suspension
-hardpoint is published anywhere this program holds — a search of both service
-manuals and all four parts-catalog sections produced a wrench size, a tap size
-and hub runout limits.  So there is nothing to replace them with, and the
-deliverable is that they are labelled instead of implied.
-`tests/test_suspension_geometry.cpp` checks each lateral coordinate against the
-sedan value times the scale the file declares, so a future track edit either
-moves all of them or fails.
+1470/1595.8 = 0.921168, longitudinal by about the same, vertical fitted to the
+ev1model wheelwells.  `tests/test_suspension_geometry.cpp` checks each lateral
+coordinate against the sedan value times the scale the file declares, so a
+future track edit either moves all of them or fails.
+
+The rear coordinates come from the ev1 repo's suspension baseline
+(`geometry/suspension/ev1_suspension_hardpoints.csv`, ev1 commit `a6ab714`, PR
+#144), which reads them out of the body repair manual's underbody datums.  Two
+are printed points: the rear spring's body seat (datum-b158-08, its 640 mm
+spacing on body p. 161) and the lower link's body bracket (datum-b158-17, whose
+role is inferred).  The upper link's body pivot is the midpoint of a printed
+two-bolt bracket, also by inferred role.  The axle-side link ends, the damper
+mounts and the track bar are estimates sized to that envelope and the p. 271
+figure.  The suspension file carries the table point by point with its tier,
+and a frame map that anchors the baseline's rear wheel centre on the spindle
+position the stand-in used, so ride height in the chassis frame did not move.
+The test recomputes every Chrono coordinate from that table.
+
+**Rear spring and damper.**  The rear spring rate is the baseline's estimate,
+25311 N/m (a 1.5 Hz ride target; the spring sits on the axle so its motion
+ratio is about 1).  The free length is derived so the spring carries the
+chassis body's share of the rear axle load at the design position, and the
+test checks that.  The damper is derived for a 0.30 ride damping ratio; the
+stand-in's 7000 N·s/m on this spring would be a ratio of about 1.3.  The front
+keeps its unsourced 143000 N/m and 7500 N·s/m; on the sedan geometry's 0.52
+motion ratio that is about 1.8 Hz, so the front now rides stiffer than the
+rear, the opposite of the usual flat-ride bias.  `config/bounce_test.json` is
+the run that measures both ends.
 
 **Alignment.**  Camber and toe are the one part of these files that is measured.
 This audit validated them against "typical" ranges; page 61 prints all four
