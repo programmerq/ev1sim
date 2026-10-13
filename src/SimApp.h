@@ -266,9 +266,9 @@ private:
     ev1sim::RearEmbClamp m_rear_clamp_rr;
     /// Rear brake "Maximum Torque" (N·m) — converts the physical drum torque
     /// from the BrakeDrum model into the [0,1] ratio Chrono's brake takes.
-    /// MUST equal data/vehicle/ev1/brake/EV1_BrakeSimple_Rear.json's
-    /// "Maximum Torque" (Round 4 brake bias: front 1120 / rear 480, 70/30).
-    static constexpr double kRearBrakeMaxTorqueNm = 480.0;
+    /// Defined in RearEmbClamp.h (Chrono-free, so tests/test_brake_bias.cpp
+    /// can check EV1_BrakeSimple_Rear.json against it).
+    static constexpr double kRearBrakeMaxTorqueNm = ev1sim::kRearBrakeMaxTorqueNm;
 
     // Throttle authority — when m_driver_mode == "electronics", subscribe
     // to PIM's commanded throttle (kSigChassisThrottleCmdQ8 = 4073) and
