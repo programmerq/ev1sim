@@ -471,6 +471,7 @@ if(BUILD_TESTS)
         tests/test_brake_pedal.cpp
         tests/test_brake_drum.cpp
         tests/test_rear_emb_clamp.cpp
+        tests/test_rear_emb_fallback.cpp
         tests/test_brake_bias.cpp
         tests/test_brake_decel.cpp
         tests/test_motor_speed_ceiling.cpp

@@ -203,17 +203,20 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   which is what makes "CdA is 1.7× spec" a claim worth acting on and the
   retracted "0.09 m², a quarter of spec" one that never was (it was
   0.088 ± 0.145 m²).
-- [ ] **EMB shoe-force integrator (refinement).**  Current model
-  treats the BTCM cmd (-1 / 0 / +1) as a proportional force command.
-  More faithful: integrate cmd × motor_speed × dt to track shoe
-  position, then derive force from spring-like compliance.  Defer
-  until measured EV1 EMB response data lands.  (Per-wheel rear
-  modulation already ships: `ApplyRearEmbBrake`, `src/SimApp.cpp:1100-1157`,
-  consumes `kSigRearMotorLR/RR` and drives each wheel via
-  `BrakeDrum::torque_magnitude_nm`; the command→force step at
-  `SimApp.cpp:1126` is still a crude linear map — this refinement replaces
-  it with a faithful clamp/shoe-position model.  This item is the surviving
-  tracker for that residual clamp/shoe-position work.)
+- [ ] **EMB shoe-force integrator: switch SimApp onto it.**  The
+  integrator ships in `src/RearEmbClamp.h`: the BTCM motor command drives
+  actuator travel (clearance take-up with no force, then force rising
+  linearly with travel to the EMB maximum where the motor stalls, release
+  back to the home stop), with HOLD keeping the travel and a stale BTCM
+  sending the actuator home.  `SimApp::ApplyRearEmbBrake` still calls
+  `RearEmbClamp::Update` without a step size, which settles within the step
+  (the old instantaneous map for the +1 / 0 / -1 the wire carries).  The
+  remaining change is passing the physics step as the fourth argument at
+  both `Update` calls there, then re-capturing the ABS baselines, since the
+  rear force then builds over ~300 ms instead of in one step.  The two
+  travel times are inferred, not EV1 facts; replace them if measured EMB
+  response data lands.  Tests: `tests/test_rear_emb_clamp.cpp`,
+  `tests/test_rear_emb_fallback.cpp`.
 - [x] **SHM transport "intermittent float corruption" — root-caused.**
   Was NOT a transport bug.  Controllers' bus-drain loops did not
   filter `FrameType::SignalDefine` frames, which carry an ASCII
