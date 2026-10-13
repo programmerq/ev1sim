@@ -67,7 +67,7 @@ import tempfile
 from pathlib import Path
 
 # Plant constants (sync with data/vehicle/ev1/chassis/EV1_Chassis.json + spec).
-MASS_KG = 1281.0       # Gen 2 NiMH curb weight (chassis 1166 + ~115 wheel, tyre, suspension, steering bodies)
+MASS_KG = 1281.0       # Gen 2 NiMH curb weight (chassis 1167 + ~114 wheel, tyre, suspension, steering bodies)
 RHO_AIR = 1.225        # kg/m^3 at sea level
 
 # EV1 published spec for comparison.

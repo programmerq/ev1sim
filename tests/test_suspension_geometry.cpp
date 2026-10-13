@@ -282,19 +282,14 @@ TEST_CASE("Rear suspension: a rigid, unsteered axle carries both spindles",
     CHECK_THAT(2.0 * HalfTrack(r), WithinAbs(r.at("//track_mm").get<double>() / 1000.0, 1e-6));
 }
 
-TEST_CASE("Rear suspension: the five links p.271 names, and nothing else",
+TEST_CASE("Rear suspension: the five links p.271 names",
           "[Suspension][Rear]") {
     const auto r = ReadJson(kRear);
-    // Two upper links and two lower links are one mirrored definition each;
-    // the track bar is one part across the car.
-    CHECK(Named(r.at("Bodies"), "Upper Link").at("Mirrored").get<bool>());
+    // The lower links are one mirrored body; the track bar is one part
+    // across the car.  Both hang from the chassis and hold the axle tube.
     CHECK(Named(r.at("Bodies"), "Lower Link").at("Mirrored").get<bool>());
     CHECK_FALSE(Named(r.at("Bodies"), "Track Bar").at("Mirrored").get<bool>());
-    CHECK(r.at("Bodies").size() == 4);
-
-    // Every link runs from the chassis to the axle tube, and only the axle
-    // ends are bushings.
-    for (const char* link : {"Lower Link", "Upper Link", "Track Bar"}) {
+    for (const char* link : {"Lower Link", "Track Bar"}) {
         CAPTURE(link);
         const auto& body_end = Named(r.at("Joints"), std::string(link) + " Body");
         const auto& axle_end = Named(r.at("Joints"), std::string(link) + " Axle");
@@ -302,10 +297,25 @@ TEST_CASE("Rear suspension: the five links p.271 names, and nothing else",
         CHECK(body_end.at("Body2").get<std::string>() == link);
         CHECK(axle_end.at("Body1").get<std::string>() == link);
         CHECK(axle_end.at("Body2").get<std::string>() == "Axle Tube");
-        CHECK_FALSE(body_end.contains("Bushing Data"));
-        CHECK(axle_end.contains("Bushing Data"));
     }
-    CHECK(r.at("Joints").size() == 6);
+
+    // The upper links are mirrored chassis-to-axle spring-dampers, stiff
+    // enough to act as links and unloaded at the design position.
+    const auto& upper = Named(r.at("TSDAs"), "Upper Link");
+    CHECK(upper.at("Mirrored").get<bool>());
+    CHECK(upper.at("Body1").get<std::string>() == "Chassis");
+    CHECK(upper.at("Body2").get<std::string>() == "Axle Tube");
+    CHECK(upper.at("Spring Coefficient").get<double>() >
+          50.0 * Named(r.at("TSDAs"), "Spring").at("Spring Coefficient").get<double>());
+    CHECK_THAT(upper.at("Free Length").get<double>(),
+               WithinAbs(Dist(V(upper.at("Point1")), V(upper.at("Point2"))), 0.001));
+
+    // Chrono's default Barzilai-Borwein solver aborts on any stiffness
+    // matrix, which is what joint bushing data creates.
+    for (const auto& j : r.at("Joints")) {
+        CAPTURE(j.at("Name").get<std::string>());
+        CHECK_FALSE(j.contains("Bushing Data"));
+    }
 }
 
 TEST_CASE("Rear suspension: every coordinate is the baseline table through the frame map",
@@ -334,7 +344,7 @@ TEST_CASE("Rear suspension: every coordinate is the baseline table through the f
     }
 
     // Each link body sits at the midpoint of its two joints.
-    for (const char* link : {"Lower Link", "Upper Link", "Track Bar"}) {
+    for (const char* link : {"Lower Link", "Track Bar"}) {
         CAPTURE(link);
         const Vec3 a = V(Named(r.at("Joints"), std::string(link) + " Body").at("Position"));
         const Vec3 b = V(Named(r.at("Joints"), std::string(link) + " Axle").at("Position"));
@@ -356,8 +366,9 @@ TEST_CASE("Rear suspension: upper links lead, lower links trail, the track bar c
     const auto& J = r.at("Joints");
     const Vec3 lb = V(Named(J, "Lower Link Body").at("Position"));
     const Vec3 la = V(Named(J, "Lower Link Axle").at("Position"));
-    const Vec3 ub = V(Named(J, "Upper Link Body").at("Position"));
-    const Vec3 ua = V(Named(J, "Upper Link Axle").at("Position"));
+    const auto& upper = Named(r.at("TSDAs"), "Upper Link");
+    const Vec3 ub = V(upper.at("Point1"));
+    const Vec3 ua = V(upper.at("Point2"));
     CHECK(lb.x > la.x);
     CHECK(ub.x < ua.x);
 

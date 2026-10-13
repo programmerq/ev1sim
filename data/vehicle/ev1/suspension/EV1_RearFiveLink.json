@@ -12,8 +12,9 @@
     "  absorbers and five connecting links with non-replaceable bushings. These five",
     "  connecting links are composed of two upper suspension leading links, two lower",
     "  suspension trailing links, and a track bar.' This file builds exactly that",
-    "  part list: one rigid Axle Tube carrying both spindles, two Upper Links, two",
-    "  Lower Links, one Track Bar, two springs and two dampers, all chassis-mounted.",
+    "  part list: one rigid Axle Tube carrying both spindles, two Lower Links and a",
+    "  Track Bar as jointed bodies, two Upper Links as stiff spring-dampers, two",
+    "  springs and two dampers, all chassis-mounted (see '//links' for why).",
     "  Chrono's SolidAxle template was not used: it is a steered axle (knuckles, tie",
     "  rod, drag link, bell crank) and has no track bar.",
     "",
@@ -41,7 +42,7 @@
     "",
     "SPRING, DAMPER, MASSES, BUSHINGS - see the '//' notes beside each. Nothing in",
     "  them is printed: the spring rate is the baseline's estimate, the free length",
-    "  and damping are derived from it, and masses and bushing rates are estimates.",
+    "  and damping are derived from it, and masses and link rates are estimates.",
     "",
     "tests/test_suspension_geometry.cpp recomputes every Chrono coordinate below",
     "from the '//hardpoints_ev1_mm' table through the frame map, so the table and",
@@ -93,14 +94,16 @@
         "electric drums. Mass 34.0 kg = 2 x 35 kg estimated rear unsprung corner",
         "(baseline unsprung_mass_rear_corner) - 2 x (8.0 kg wheel + 7.5 kg tyre +",
         "1.0 kg spindle, as this repo's wheel, tyre and spindle files carry them)",
-        "- half the 6.0 kg of links. Inertia: slender rod over the 1.244 m track,",
-        "m L^2 / 12 about X and Z; spin axis a 40 mm tube. Estimated."
+        "- half the 4.0 kg of jointed links (lower links, track bar) = 35.0 kg; the",
+        "upper links have no body (see '//links'), so their unsprung half stays in",
+        "this figure. Inertia: slender rod over the 1.244 m track, m L^2 / 12 about",
+        "X and Z; spin axis a 40 mm tube. Estimated."
       ],
       "Mirrored":               false,
       "Position":               [0.0, 0.0, -0.08],
       "Rotation":               [1, 0, 0, 0],
-      "Mass":                   34.0,
-      "Moments of Inertia":     [4.385, 0.027, 4.385],
+      "Mass":                   35.0,
+      "Moments of Inertia":     [4.514, 0.028, 4.514],
       "Products of Inertia":    [0, 0, 0],
       "Visualization": {
         "Primitives": [
@@ -124,21 +127,6 @@
       }
     },
     {
-      "Name":                   "Upper Link",
-      "//":                     "Leading link, body end behind the axle. Position = midpoint of its two joints. Mass 1.0 kg estimated; inertia isotropic m L^2 / 12, L = 0.1566 m.",
-      "Mirrored":               true,
-      "Position":               [-0.101, 0.485, -0.0691],
-      "Rotation":               [1, 0, 0, 0],
-      "Mass":                   1.0,
-      "Moments of Inertia":     [0.0020, 0.0020, 0.0020],
-      "Products of Inertia":    [0, 0, 0],
-      "Visualization": {
-        "Primitives": [
-          {"Type": "CYLINDER", "Location": [0, 0, 0], "Axis": [0.7790, 0, 0.6271], "Radius": 0.015, "Length": 0.1566}
-        ]
-      }
-    },
-    {
       "Name":                   "Track Bar",
       "//":                     "Single part across the car (not mirrored). Position = midpoint of its two joints. Mass 2.0 kg estimated; inertia isotropic m L^2 / 12, L = 0.9405 m.",
       "Mirrored":               false,
@@ -155,12 +143,16 @@
     }
   ],
 
-  "//bushings": [
-    "Each link is a kinematic spherical joint at the body and a rubber bushing at the",
-    "axle. Five ideal links on a rigid axle leave one degree of freedom and lock roll;",
-    "the real links have rubber bushings (p.271 'non-replaceable bushings') and roll",
-    "through their compliance. Rates are generic rubber link-bushing values, not EV1",
-    "data: 2 kN/mm radial, 50 N m/rad in rotation. Estimated."
+  "//links": [
+    "The lower links and the track bar are bodies on kinematic spherical joints at",
+    "both ends. Those three constraints leave the axle free to bounce, roll, and",
+    "pitch about the lower links. The upper links take out that pitch, and they do",
+    "it as stiff spring-dampers ('Upper Link' under TSDAs) rather than jointed",
+    "bodies: four rigid fore-aft links of two different lengths over-constrain a",
+    "rigid axle, which only bushing compliance lets move (p.271: 'non-replaceable",
+    "bushings'), and Chrono's default Barzilai-Borwein solver refuses joint",
+    "bushings because they carry stiffness matrices. 2 kN/mm along the link with",
+    "2 kN s/m of damping is a generic rubber-bushed link rate, not EV1 data. Estimated."
   ],
 
   "Joints": [
@@ -182,51 +174,7 @@
       "Body1":                  "Lower Link",
       "Body2":                  "Axle Tube",
       "Position":               [0.020, 0.486, -0.1850],
-      "Rotation":               [1, 0, 0, 0],
-      "Bushing Data": {
-        "Stiffness Linear":     2.0e6,
-        "Damping Linear":       2.0e3,
-        "Stiffness Rotational": 50.0,
-        "Damping Rotational":   5.0,
-        "DOF": {
-          "Stiffness Linear":     0.0,
-          "Damping Linear":       0.0,
-          "Stiffness Rotational": 50.0,
-          "Damping Rotational":   5.0
-        }
-      }
-    },
-    {
-      "Name":                   "Upper Link Body",
-      "//hardpoint":            "upper_link_body",
-      "Mirrored":               true,
-      "Type":                   "Spherical",
-      "Body1":                  "Chassis",
-      "Body2":                  "Upper Link",
-      "Position":               [-0.162, 0.485, -0.1182],
       "Rotation":               [1, 0, 0, 0]
-    },
-    {
-      "Name":                   "Upper Link Axle",
-      "//hardpoint":            "upper_link_axle",
-      "Mirrored":               true,
-      "Type":                   "Spherical",
-      "Body1":                  "Upper Link",
-      "Body2":                  "Axle Tube",
-      "Position":               [-0.040, 0.485, -0.0200],
-      "Rotation":               [1, 0, 0, 0],
-      "Bushing Data": {
-        "Stiffness Linear":     2.0e6,
-        "Damping Linear":       2.0e3,
-        "Stiffness Rotational": 50.0,
-        "Damping Rotational":   5.0,
-        "DOF": {
-          "Stiffness Linear":     0.0,
-          "Damping Linear":       0.0,
-          "Stiffness Rotational": 50.0,
-          "Damping Rotational":   5.0
-        }
-      }
     },
     {
       "Name":                   "Track Bar Body",
@@ -246,23 +194,25 @@
       "Body1":                  "Track Bar",
       "Body2":                  "Axle Tube",
       "Position":               [-0.060, -0.470, -0.0482],
-      "Rotation":               [1, 0, 0, 0],
-      "Bushing Data": {
-        "Stiffness Linear":     2.0e6,
-        "Damping Linear":       2.0e3,
-        "Stiffness Rotational": 50.0,
-        "Damping Rotational":   5.0,
-        "DOF": {
-          "Stiffness Linear":     0.0,
-          "Damping Linear":       0.0,
-          "Stiffness Rotational": 50.0,
-          "Damping Rotational":   5.0
-        }
-      }
+      "Rotation":               [1, 0, 0, 0]
     }
   ],
 
   "TSDAs": [
+    {
+      "Name":                   "Upper Link",
+      "//hardpoints":           ["upper_link_body", "upper_link_axle"],
+      "//":                     "Leading link: body end behind the axle. Free Length = the 0.1566 m between its hardpoints, so it carries no load at the design position. Rates per '//links'.",
+      "Mirrored":               true,
+      "Body1":                  "Chassis",
+      "Body2":                  "Axle Tube",
+      "Point1":                 [-0.162, 0.485, -0.1182],
+      "Point2":                 [-0.040, 0.485, -0.0200],
+      "Spring Coefficient":     2.0e6,
+      "Damping Coefficient":    2.0e3,
+      "Free Length":            0.1566,
+      "Visualization":          {"Type": "SEGMENT"}
+    },
     {
       "Name":                   "Spring",
       "//hardpoints":           ["spring_upper", "spring_lower"],
@@ -270,7 +220,7 @@
         "Rate 25311 N/m: the baseline's spring_rate_rear (estimated, a 1.5 Hz ride",
         "target; the spring sits on the axle, motion ratio ~1). Free Length 0.2546 m is",
         "derived: installed length 0.1448 m between the two seats above plus the static",
-        "load 2779 N / k, where 2779 N is half the rear-axle reaction of the chassis",
+        "load 2784 N / k, where 2784 N is half the rear-axle reaction of the chassis",
         "mass and COM in ev1/chassis/EV1_Chassis.json. So the design position above is",
         "the curb position and the stand-in's ride height carries over."
       ],
@@ -280,7 +230,7 @@
       "Point1":                 [0.003, 0.320, 0.0548],
       "Point2":                 [0.003, 0.320, -0.0900],
       "Spring Coefficient":     25311.0,
-      "Free Length":            0.2546,
+      "Free Length":            0.2548,
       "Visualization":          {"Type": "SPRING", "Radius": 0.05, "Turns": 6}
     },
     {
@@ -288,7 +238,7 @@
       "//hardpoints":           ["damper_upper", "damper_lower"],
       "//": [
         "1710 N s/m: derived for a ride damping ratio of 0.30 (estimated; passenger cars",
-        "run about 0.2 to 0.4) on the spring above and the same 283 kg sprung corner,",
+        "run about 0.2 to 0.4) on the spring above and the same 284 kg sprung corner,",
         "divided by the square of the damper's 0.969 inclination ratio. The stand-in's",
         "7000 N s/m was unsourced and would overdamp this spring (ratio ~1.3), leaving",
         "the bounce test nothing to measure."

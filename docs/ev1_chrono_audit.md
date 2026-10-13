@@ -49,10 +49,10 @@ high-speed deceleration is artificially low.
 
 | Parameter | Current | Real EV1 (NiMH) | Status |
 |---|---|---|---|
-| Chassis mass | 1166 kg | target curb 1281, less ~115 kg of wheel, tyre, suspension and steering bodies | 🔧 1217→1199→1166 |
+| Chassis mass | 1167 kg | target curb 1281, less ~114 kg of wheel, tyre, suspension and steering bodies | 🔧 1217→1199→1167 |
 | Curb weight (computed) | ~1299 kg | 1281 kg (NiMH) | ⚠️ off by 18 kg |
-| Centroidal Frame x | +0.1254 m | unknown — likely +0.1 to +0.15 (slight front bias from motor) | ⚠️ moved with the rear axle mass, see below |
-| Centroidal Frame z | 0.4956 m | likely 0.40-0.45 m (T-pack batteries low in floor) | ⚠️ slightly high |
+| Centroidal Frame x | +0.1241 m | unknown — likely +0.1 to +0.15 (slight front bias from motor) | ⚠️ moved with the rear axle mass, see below |
+| Centroidal Frame z | 0.4955 m | likely 0.40-0.45 m (T-pack batteries low in floor) | ⚠️ slightly high |
 | Ixx (roll) | 130 kg·m² | rg≈0.33 m → plausible | ⚠️ |
 | Iyy (pitch) | 600 kg·m² | rg≈0.70 m → plausible | ⚠️ |
 | Izz (yaw)  | 680 kg·m² | rg≈0.75 m → plausible | ⚠️ |
@@ -61,15 +61,15 @@ high-speed deceleration is artificially low.
 - 4× wheel × 8.0 kg = 32 kg
 - 4× tire × 7.5 kg = 30 kg
 - 2× front suspension (spindle 1.0 + upright 1.2 + UCA 0.9 + LCA 1.4) = 9.0 kg
-- Rear five-link axle (axle tube 34.0 + 2 spindles 1.0 + 4 links 1.0 + track
-  bar 2.0) = 42.0 kg, all estimated; see `EV1_RearFiveLink.json`
+- Rear five-link axle (axle tube 35.0 + 2 spindles 1.0 + 2 lower links 1.0 +
+  track bar 2.0) = 41.0 kg, all estimated; see `EV1_RearFiveLink.json`
 - Steering link = 1.6 kg
-- Total non-chassis = ~115 kg
-- Target chassis = 1281 − 115 = **1166 kg** for Gen 2 NiMH
+- Total non-chassis = ~114 kg
+- Target chassis = 1281 − 114 = **1167 kg** for Gen 2 NiMH
 
-The rear axle replaced a 9.0 kg wishbone stand-in, so 33 kg moved from the
+The rear axle replaced a 9.0 kg wishbone stand-in, so 32 kg moved from the
 chassis body to the axle.  The chassis COM moved from (0.09, 0, 0.49) to
-(0.1254, 0, 0.4956), the point that keeps the whole car's mass centre where
+(0.1241, 0, 0.4955), the point that keeps the whole car's mass centre where
 it was; the curb weight and axle split the rest of the model was tuned on are
 unchanged.  Inertia left as it was.
 
@@ -651,10 +651,12 @@ on five links — not a twist beam, and not independent.  `EV1_RearFiveLink.json
 upper links whose body pivots sit behind the axle, two lower links whose body
 pivots sit ahead of it, and a track bar across the car, with a coil spring and
 a damper per side.  `SolidAxle` was not used: it is a steered axle (knuckles,
-tie rod, drag link, bell crank) and has no track bar.  Each link is a spherical
-joint at the body and a rubber bushing at the axle, because five ideal links on
-a rigid axle lock roll; the manual's "non-replaceable bushings" are what let the
-real axle roll.
+tie rod, drag link, bell crank) and has no track bar.  The lower links and the
+track bar are jointed bodies; the upper links are stiff spring-dampers.  Four
+rigid fore-aft links of two lengths over-constrain a rigid axle, and the real
+one moves on its "non-replaceable bushings".  Joint bushings would model that,
+but Chrono's default Barzilai-Borwein solver refuses them (they carry stiffness
+matrices), so the compliance sits in the upper links instead.
 
 **Hardpoints.**  Every front coordinate is Chrono's stock
 `sedan/suspension/Sedan_DoubleWishbone.json` rescaled: lateral coordinates by
