@@ -10,7 +10,7 @@ touching a single level file.  That is exactly what happened on 2026-08-11,
 when the motor's corner point moved to the manual's rating and left
 abs_diagonal_mu's runway 1.5 m from its boundary.
 
-    scripts/scenario_runway_report.py                # all seven ABS scenarios
+    scripts/scenario_runway_report.py                # every barrier-gated ABS scenario
     scripts/scenario_runway_report.py mu_jump        # just one
     scripts/scenario_runway_report.py --update       # re-record what it measured
     scripts/scenario_runway_report.py --selftest     # no sim; prove the check fails
@@ -466,23 +466,25 @@ def selftest() -> int:
     # 4. A table row whose crossing is null while the run produced one (and
     #    the reverse) is a disagreement about the SHAPE of the scenario, not
     #    just its timing, and has to be caught too.
+    #    Since 2026-10-08 the only barrier-gated scenario left (hard_brake) is
+    #    on a uniform surface, so the table may hold no crossing at all; the
+    #    comparison is then exercised on a copy of the first row given one.
+    #    compare_to_table is pure, so a synthetic row tests it exactly.
     with_x = next((c for c in table["cases"]
                    if c["measured_crossing_s"] is not None), None)
     if with_x is None:
-        case_("a null-vs-value crossing is caught", False,
-              "no case in the table records a crossing")
-    else:
-        d = {"measured_release_s": with_x["measured_release_s"],
-             "measured_crossing_s": None}
-        msgs = compare_to_table(with_x, d, tol)
-        case_("a crossing that stopped happening is caught", bool(msgs),
-              msgs[0] if msgs else "accepted a missing crossing")
+        with_x = dict(row, measured_crossing_s=rec + 2.0, min_on_surface_s=1.0)
+    d = {"measured_release_s": with_x["measured_release_s"],
+         "measured_crossing_s": None}
+    msgs = compare_to_table(with_x, d, tol)
+    case_("a crossing that stopped happening is caught", bool(msgs),
+          msgs[0] if msgs else "accepted a missing crossing")
 
-        d = {"measured_release_s": rec, "measured_crossing_s": 5.0}
-        msgs = compare_to_table(row, d, tol)
-        case_("a crossing that started happening is caught",
-              bool(msgs) if row["measured_crossing_s"] is None else True,
-              msgs[0] if msgs else "accepted an unexpected crossing")
+    d = {"measured_release_s": rec, "measured_crossing_s": 5.0}
+    msgs = compare_to_table(row, d, tol)
+    case_("a crossing that started happening is caught",
+          bool(msgs) if row["measured_crossing_s"] is None else True,
+          msgs[0] if msgs else "accepted an unexpected crossing")
 
     # 4b. A relative --binary has to survive the cwd change.  run_scenario
     #     execs the sim with cwd set to a throwaway directory, so a path like

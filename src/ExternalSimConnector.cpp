@@ -1510,6 +1510,18 @@ struct ExternalSimConnector::State {
     bool          has_ad_iso_chassis_ref_permille = false;
     std::uint32_t ad_active_dtc_bitmap            = 0u;
     std::uint16_t bpm_ad_dtc_bitmap               = 0u;
+    // HV rail sag witnesses (electricsim weak-pack HV sag VAT case).
+    std::uint32_t hv_bus_voltage_mv               = 0u;
+    bool          has_hv_bus_voltage_mv           = false;
+    std::int32_t  hv_bus_pack_current_ma          = 0;
+    bool          has_hv_bus_pack_current_ma      = false;
+    float         bpm_pack_voltage_v              = 0.0f;
+    bool          has_bpm_pack_voltage_v          = false;
+    float         bpm_pack_current_a              = 0.0f;
+    bool          has_bpm_pack_current_a          = false;
+    std::uint64_t pim_active_dtc_bitmap_lo        = 0u;
+    std::uint64_t pim_active_dtc_bitmap_hi        = 0u;
+    bool          has_pim_active_dtc_bitmap       = false;
     bool          ipc_service_soon_telltale       = false;
     bool          ipc_wait_telltale               = false;
     bool          ipc_wait_drive                  = false;
@@ -2191,6 +2203,40 @@ std::uint32_t ExternalSimConnector::GetAdActiveDtcBitmap() const {
 }
 std::uint16_t ExternalSimConnector::GetBpmAdDtcBitmap() const {
     return m_state->bpm_ad_dtc_bitmap;
+}
+std::uint32_t ExternalSimConnector::GetHvBusVoltageMv() const {
+    return m_state->hv_bus_voltage_mv;
+}
+bool ExternalSimConnector::HasReceivedHvBusVoltageMv() const {
+    return m_state->has_hv_bus_voltage_mv;
+}
+std::int32_t ExternalSimConnector::GetHvBusPackCurrentMa() const {
+    return m_state->hv_bus_pack_current_ma;
+}
+bool ExternalSimConnector::HasReceivedHvBusPackCurrentMa() const {
+    return m_state->has_hv_bus_pack_current_ma;
+}
+float ExternalSimConnector::GetBpmPackVoltageV() const {
+    return m_state->bpm_pack_voltage_v;
+}
+bool ExternalSimConnector::HasReceivedBpmPackVoltageV() const {
+    return m_state->has_bpm_pack_voltage_v;
+}
+float ExternalSimConnector::GetBpmPackCurrentA() const {
+    return m_state->bpm_pack_current_a;
+}
+bool ExternalSimConnector::HasReceivedBpmPackCurrentA() const {
+    return m_state->has_bpm_pack_current_a;
+}
+bool ExternalSimConnector::IsPimDtcActive(unsigned code) const {
+    if (code >= 1u && code <= 64u)
+        return ((m_state->pim_active_dtc_bitmap_lo >> (code - 1u)) & 1u) != 0u;
+    if (code >= 65u && code <= 128u)
+        return ((m_state->pim_active_dtc_bitmap_hi >> (code - 65u)) & 1u) != 0u;
+    return false;
+}
+bool ExternalSimConnector::HasReceivedPimActiveDtcBitmap() const {
+    return m_state->has_pim_active_dtc_bitmap;
 }
 bool ExternalSimConnector::GetIpcServiceSoonTelltale() const {
     return m_state->ipc_service_soon_telltale;
@@ -3338,6 +3384,32 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         }
         if (auto v = st.wire->ad_active_dtc_bitmap()) st.ad_active_dtc_bitmap = *v;
         if (auto v = st.wire->bpm_ad_dtc_bitmap())    st.bpm_ad_dtc_bitmap    = *v;
+        // HV rail sag witnesses: the rail, the pack current the bus computes,
+        // the pack's own terminal voltage and shunt current, and the PIM's
+        // active DTCs (053 = low battery output capability).
+        if (auto v = st.wire->hv_bus_voltage_mv()) {
+            st.hv_bus_voltage_mv     = *v;
+            st.has_hv_bus_voltage_mv = true;
+        }
+        if (auto v = st.wire->hv_bus_pack_current_ma()) {
+            st.hv_bus_pack_current_ma     = *v;
+            st.has_hv_bus_pack_current_ma = true;
+        }
+        if (auto v = st.wire->bpm_pack_voltage_v()) {
+            st.bpm_pack_voltage_v     = *v;
+            st.has_bpm_pack_voltage_v = true;
+        }
+        if (auto v = st.wire->bpm_pack_current_a()) {
+            st.bpm_pack_current_a     = *v;
+            st.has_bpm_pack_current_a = true;
+        }
+        {
+            const auto lo = st.wire->pim_active_dtc_bitmap_lo();
+            const auto hi = st.wire->pim_active_dtc_bitmap_hi();
+            if (lo) st.pim_active_dtc_bitmap_lo = *lo;
+            if (hi) st.pim_active_dtc_bitmap_hi = *hi;
+            if (lo || hi) st.has_pim_active_dtc_bitmap = true;
+        }
         if (auto v = st.wire->ipc_service_soon_telltale()) {
             st.ipc_service_soon_telltale = *v;
         }

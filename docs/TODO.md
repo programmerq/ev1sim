@@ -11,9 +11,20 @@ as in-app displays (2D panels first, 3D later), fed by **decoding the GM-8192
 per-value chassis cells. Display-only first; interactivity later. Full plan +
 ratified decisions: [`docs/ipc_rsa_display_plan.md`](ipc_rsa_display_plan.md).
 
-- [ ] **Phase 1 — IPC cluster, 2D, snoop-fed (display-only)**: a `BusSnoop`
-  frame-decode layer → `DashSnapshot`; `InstrumentClusterPanel` + pure label
-  helpers; frame-decode + label + `[e2e]` tests.
+- [ ] **Phase 1 — IPC cluster, 2D, snoop-fed (display-only)**:
+  - [x] `BusSnoop` (`src/BusSnoop.{h,cpp}`) decodes $41 / $40 / $20 / $90 / $91 /
+    $21 off the PIM, BPM, BTCM and IPC `*_TX` cells into a freshness-gated
+    `DashSnapshot` (`src/DashSnapshot.h`); `InstrumentClusterPanel`
+    (`src/InstrumentClusterPanel.{h,cpp}`) + pure `FormatCluster*` helpers;
+    decode, label, null-driver draw and `[e2e]` tests, built by the standalone
+    `tests/cluster/` project and the `cluster-panel-tests` CI job.
+  - [ ] Wire it into the app: add the two sources to the root `ev1sim` and
+    `ev1sim_tests` targets (then retire `tests/cluster/` and its CI job), give
+    `BusSnoop::Attach()` the WireTruthChassis table, fill `DashSnapshot::lamps`
+    from the IPC lamp cells (4130-4145), and draw the panel from `SimApp`.
+    Retire `WireTruthChassis`'s own PIM `$41` framer once the panel shows speed.
+    Waits on the open PRs that own `CMakeLists.txt`, `src/SimApp.*` and
+    `src/WireTruthChassis.*`.
 - [ ] **Phase 2 — RSA console, 2D, snoop-fed (display-only)**: `RsaConsolePanel`
   mirroring electricsim `rsa_panel_catalog.yaml`.
 - [ ] **Phase 3 — 3D in-scene** cluster + console (same snapshot feed).

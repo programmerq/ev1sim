@@ -12,7 +12,9 @@ namespace ev1sim {
 /// every wheel (tire step = step_size_s).  The one place the plant is put
 /// together, so the sim app (VehicleWorld) and the plant tests run the same
 /// car.  vehicle::SetDataPath() must already point at the EV1 data root.
+/// fwd_speed_mps starts the car rolling along its heading (0 = at rest).
 std::unique_ptr<chrono::vehicle::WheeledVehicle> BuildEV1Vehicle(
-    const chrono::ChCoordsys<>& pose, double step_size_s);
+    const chrono::ChCoordsys<>& pose, double step_size_s,
+    double fwd_speed_mps = 0.0);
 
 }  // namespace ev1sim
