@@ -209,6 +209,35 @@ jobs:
       - name: Run unit tests
         run: ctest --test-dir build --output-on-failure
 
+  # IPC instrument-cluster panel (docs/ipc_rsa_display_plan.md Phase 1):
+  # BusSnoop + InstrumentClusterPanel and their tests, built as the standalone
+  # tests/cluster project until they join ev1sim_tests in the root CMakeLists
+  # (see tests/cluster/CMakeLists.txt). Two configurations: decode-only (the
+  # substrate compiled out, as the unit-tests job builds) and against the
+  # vendored stub (the TX-cell snoop path, as the integrated build). Seconds.
+  cluster-panel-tests:
+    if: github.event_name != 'schedule'   # cron only warms chrono-smoke's cache
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Irrlicht
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libirrlicht-dev
+
+      - name: Decode only (no substrate)
+        run: |
+          cmake -B build-cluster-decode -S tests/cluster -DEV1SIM_CLUSTER_WIRE_TRUTH=OFF
+          cmake --build build-cluster-decode -j"$(nproc)"
+          ctest --test-dir build-cluster-decode --output-on-failure
+
+      - name: Snoop off the TX cells (electricsim stub)
+        run: |
+          cmake -B build-cluster -S tests/cluster
+          cmake --build build-cluster -j"$(nproc)"
+          ctest --test-dir build-cluster --output-on-failure
+
   # Real sim build + headless smoke gate.  Builds the Chrono-backed ev1sim
   # executable — src/SimApp.cpp (2,500+ lines) and src/VehicleWorld.cpp, which
   # the jobs above never compile (they build the Chrono-free test target via
