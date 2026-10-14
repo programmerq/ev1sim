@@ -128,6 +128,7 @@ branch moves and can 404 after a rebase/merge), in the `blob` form — **never**
   dated anecdotes, quotes or "added on" notes; the ruling lives in its
   decision record.
 <!-- END ev1-canon:say-it-once v1 -->
+
 <!-- BEGIN ev1-canon:ci-checks v2 -->
 **What a blocking CI check may test (canonical across all four EV1 repos).**
 This program swaps its guesses out as board traces, ROM analysis and better
