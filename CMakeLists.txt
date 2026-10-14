@@ -317,6 +317,8 @@ add_executable(ev1sim
     src/WiperRenderer.cpp
     src/PhysicalWorld.cpp
     src/FloatingUiPanel.cpp
+    src/InstrumentClusterPanel.cpp
+    src/BusSnoop.cpp
     src/ExternalSimConnector.cpp
     src/WireTruthChassis.cpp
     ${EV1SIM_WHEEL_IO_SRC}
@@ -466,6 +468,8 @@ if(BUILD_TESTS)
         tests/test_physical_world.cpp
         tests/test_wiper_renderer.cpp
         tests/test_floating_ui.cpp
+        tests/test_bus_snoop.cpp
+        tests/test_instrument_cluster_panel.cpp
         tests/test_throttle_bus.cpp
         tests/test_scenario.cpp
         tests/test_brake_pedal.cpp
@@ -492,6 +496,8 @@ if(BUILD_TESTS)
         src/WiperRenderer.cpp
         src/PhysicalWorld.cpp
         src/FloatingUiPanel.cpp
+        src/InstrumentClusterPanel.cpp
+        src/BusSnoop.cpp
         src/VehiclePanels.cpp
         ${EV1SIM_WHEEL_IO_SRC}
     )

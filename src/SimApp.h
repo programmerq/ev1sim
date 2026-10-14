@@ -6,6 +6,7 @@
 #include "ExternalSimConnector.h"
 #include "FloatingUiPanel.h"
 #include "HornAudio.h"
+#include "InstrumentClusterPanel.h"
 #include "SounderAudio.h"
 #include "KeyboardInputController.h"
 #include "PhysicalWorld.h"
@@ -189,6 +190,9 @@ private:
     double ScenarioTime(double sim_t);
     std::unique_ptr<WiperRenderer>          m_wiper;
     std::unique_ptr<FloatingUiPanel>        m_floating_ui;
+    /// IPC instrument cluster (docs/ipc_rsa_display_plan.md Phase 1): drawn
+    /// bottom-centre from the connector's bus-snoop snapshot; external sim only.
+    std::unique_ptr<ev1sim::InstrumentClusterPanel> m_cluster;
 #ifdef EV1SIM_HAVE_WHEEL_IO
     std::unique_ptr<ev1sim::SdlContext>           m_sdl;
     std::unique_ptr<ev1sim::WheelInputController> m_wheel;
