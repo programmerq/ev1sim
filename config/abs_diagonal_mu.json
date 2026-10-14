@@ -17,6 +17,7 @@
     "headless": true
   },
   "telemetry": { "log_to_file": false, "show_hud": false },
+  "spawn": { "speed_mps": 16.8, "x": -22.7 },
   "external_sim": { "enabled": true },
   "vehicle_dynamics": { "start_propulsion_enabled": true },
   "scenario": { "path": "config/scenarios/abs_diagonal_mu.json" }
