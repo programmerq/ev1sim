@@ -20,8 +20,8 @@
 //   GM8192_IPC_TX   $21 DSCM Data Response  season odometer
 //
 // It decodes already-framed application bytes only: the wire's bits become
-// frames through the external sim's own gm8192_rx_framer, the same receiver
-// WireTruthChassis::snoop_step() uses. BusSnoop adds no line, UART or timing
+// frames through the external sim's own gm8192_rx_framer, one per TX cell,
+// on the connector's WireTable. BusSnoop adds no line, UART or timing
 // model of its own and never writes the bus.
 //
 // Two seams:
