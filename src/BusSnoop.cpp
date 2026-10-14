@@ -164,6 +164,7 @@ BusSnoop::BusSnoop() = default;
 BusSnoop::~BusSnoop() = default;
 
 bool BusSnoop::attached() const { return wire_ != nullptr; }
+void BusSnoop::Detach() { wire_.reset(); }
 
 bool BusSnoop::DecodeFrame(std::uint8_t id, const std::uint8_t* payload,
                            std::uint8_t n, double now_s) {

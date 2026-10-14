@@ -1797,7 +1797,9 @@ void ExternalSimConnector::Stop() {
 #if EV1SIM_HAVE_EXTERNAL_SIM
 #  if EV1SIM_HAVE_WIRE_TRUTH
     // Drop the shared WireTable; the next Tick re-attaches (wire_attach_tried
-    // is reset so OpenFromEnv runs again).
+    // is reset so OpenFromEnv runs again). The snoop's framers point into
+    // that table, so they go first.
+    m_state->bus_snoop.Detach();
     m_state->wire.reset();
     m_state->wire_attach_tried = false;
     m_state->btcm_tx_bits_last = 0;

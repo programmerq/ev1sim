@@ -918,6 +918,24 @@ TEST_CASE("Connector dash snapshot: bus frames via BusSnoop plus the IPC lamp ce
     CHECK_FALSE(snap.pcm);
     CHECK_FALSE(snap.pack);
     CHECK(snap.lamps->antilock == std::optional<bool>(true));
+
+    // Stop() drops the connector's WireTable; after Start() the next Tick opens
+    // a fresh one, and the snoop must decode from it, not the freed table.
+    c.Stop();
+    c.Start();
+    const std::uint8_t p41b[7] = {0u, static_cast<std::uint8_t>(0x15u << 3), 0u, 0u, 60u, 0u, 0u};
+    const auto f41b = encode(0x41u, p41b, 7u);
+    now += 4'000'000'000ull;
+    c.Tick(static_cast<double>(now) / 1.0e9);
+    pim.enqueue(f41b.data(), f41b.size());
+    for (int i = 0; i < 160; ++i) {
+        now += kBitPeriodNs;
+        pim.tick(now);
+        c.Tick(static_cast<double>(now) / 1.0e9);
+    }
+    snap = c.GetDashSnapshot();
+    REQUIRE(snap.pcm);
+    CHECK(snap.pcm->speed_kph == 60u);
 }
 
 TEST_CASE("WireTruthChassis::pim_cruise_active/setpoint follow the PIM cruise cells",

@@ -80,6 +80,9 @@ public:
     // the substrate is compiled out or `table` is null.
     bool Attach(electricsim::io::WireTable* table);
     bool attached() const;
+    // Drop the framers (call before the attached table is destroyed). Decoded
+    // groups stay and age out as usual.
+    void Detach();
 
     // Drain every frame the snooped cells produced since the last call. The
     // bit-stream cells self-pace, so a coarse render tick replays every bit.
