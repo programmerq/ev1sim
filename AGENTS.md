@@ -22,13 +22,12 @@ Develop on a feature branch (`claude/<id>`); never push to `main`.
 
 - **Merge stays the owner's call** — do not merge to `main`.
 
-<!-- BEGIN ev1-canon:pr-lifecycle v4 -->
-**Branches, pushes and PRs (owner directives 2026-07-24 through 2026-10-08,
-canonical across all four EV1 repos; this block is the only copy of these
-rules).** The owner tunes this as the program runs, so a new ruling replaces
-the wording here instead of being added beside it. Edit it in
-`ev1/CONVENTIONS.md`, bump the version, and paste it byte-identical into the
-other carriers; `ev1/tools/canon_sync` checks the copies.
+<!-- BEGIN ev1-canon:pr-lifecycle v5 -->
+**Branches, pushes and PRs (canonical across all four EV1 repos; this block is
+the only copy of these rules).** A new ruling replaces the wording here
+instead of being added beside it. Edit it in `ev1/CONVENTIONS.md`, bump the
+version, and paste it byte-identical into the other carriers;
+`ev1/tools/canon_sync` checks the copies.
 
 *What CI costs:* pushing a branch that has no PR runs no CI in any of the four
 repos. Opening a PR, and every push to an open PR, runs the full PR checks. The
@@ -85,11 +84,11 @@ GitHub's UI calls it, and the owner reviews only ready PRs.
 - **Titles state the goal, not the process**: no "needs sign-off", no
   "proposal:" on finished work.
 - **Merges are the owner's click.**
-<!-- END ev1-canon:pr-lifecycle v4 -->
+<!-- END ev1-canon:pr-lifecycle v5 -->
 (ev1sim has no `scripts/backlog.py` — its notes channel is `DECISION_QUEUE.md`.)
 
-<!-- BEGIN ev1-canon:pr-images v2 -->
-**PR-body images (owner directive 2026-07-22, canonical across all four EV1 repos).**
+<!-- BEGIN ev1-canon:pr-images v3 -->
+**PR-body images (canonical across all four EV1 repos).**
 Use `<img>` tags (never bare `![…]()` markdown — no size control), `src`
 pinned to a **commit SHA** (never a branch name — branch URLs re-render as the
 branch moves and can 404 after a rebase/merge), in the `blob` form — **never**
@@ -97,26 +96,42 @@ branch moves and can 404 after a rebase/merge), in the `blob` form — **never**
 
 `<img src="https://github.com/<owner>/<repo>/blob/<COMMIT_SHA>/<path>?raw=1" width="..." alt="..." />`
 
-- **Why `blob/...?raw=1` and not `raw.githubusercontent.com`, everywhere:**
-  one rule, no need to remember which repo you're in. In the three
-  **private** repos (ev1, ev1-manual-redux, electricsim) it's more than a
-  preference — `raw.githubusercontent.com` doesn't authenticate against the
-  viewer's GitHub session, so images silently fail to render (or 404) for
-  the owner there. **ev1sim is public**, so that specific failure doesn't
-  apply to it — `raw.githubusercontent.com` would technically render — but
-  `blob/...?raw=1` works identically there too, so the one rule holds
-  without exception.
+- **`blob/...?raw=1` in every repo**, because `raw.githubusercontent.com` does
+  not authenticate against the viewer's session and fails to render in the
+  private repos; one form everywhere means no per-repo exception.
 - **Always set an explicit `width`** — a percentage (`width="40%"`) for
   small images, a pixel width no larger than natural size otherwise. GitHub
   stretches unsized images to the full body column and upscales small ones
   blurrily.
-<!-- END ev1-canon:pr-images v2 -->
+<!-- END ev1-canon:pr-images v3 -->
 
-<!-- BEGIN ev1-canon:ci-checks v1 -->
-**What a blocking CI check may test (owner directive 2026-10-08, canonical
-across all four EV1 repos).** This program swaps its guesses out as board
-traces, ROM analysis and better manual readings arrive, so the PR gate must
-never freeze a guess in place.
+<!-- BEGIN ev1-canon:say-it-once v1 -->
+**Say it once, say what is true now (canonical across all four EV1 repos).**
+
+- **Code, comments, docstrings, data fields and docs describe the current
+  state.** They never say what was removed, what something used to be, when
+  it changed, or who asked. Git and the PR body hold that.
+- **One home per reason.** A rule or decision is written once: a canon block,
+  a decision record, a notes entry or a doc. Every site that follows it names
+  that home in a few words (`ev1-canon:ci-checks`, a decision file path) and
+  does not restate, date or attribute it.
+- **A change across many sites explains itself once, in the PR body.** If two
+  or more sites would carry the same sentence, the sentence belongs in the
+  home and the sites get the pointer, or nothing.
+- **A test or check says what it checks**, in a line or two. What it no longer
+  checks, and why, belongs in the commit message.
+- **A provenance tag points; it does not argue.** `@design <ref>` names the
+  record it follows; reasoning longer than one line goes in that record.
+- **Short structured fields over prose.** A field holds a name, value or
+  pointer. When a schema cannot hold a fact, extend the schema.
+- **Agent docs follow the same rule.** They state current rules, with no
+  dated anecdotes, quotes or "added on" notes; the ruling lives in its
+  decision record.
+<!-- END ev1-canon:say-it-once v1 -->
+<!-- BEGIN ev1-canon:ci-checks v2 -->
+**What a blocking CI check may test (canonical across all four EV1 repos).**
+This program swaps its guesses out as board traces, ROM analysis and better
+manual readings arrive, so the PR gate must never freeze a guess in place.
 
 - **A blocking check tests syntax or structure only:** the file parses, a
   schema holds, references resolve, a generated file matches its generator, a
@@ -133,7 +148,9 @@ never freeze a guess in place.
 - **Don't add a check to prove a fix.** A test in the existing suite is the
   proof. A new blocking check needs the owner's approval and a reason it must
   run on nearly every change; a new check starts on demand.
-<!-- END ev1-canon:ci-checks v1 -->
+- **No check requires prose.** A check may require a field to exist and
+  resolve, never a rationale, essay or docstring of some length.
+<!-- END ev1-canon:ci-checks v2 -->
 
 - If the saved body shows `&lt;img&gt;` (a proxied environment entity-escaped
   it), redo the edit from an unproxied session via
@@ -143,13 +160,10 @@ never freeze a guess in place.
   rebase that rewrites already-pushed history, push with `--force-with-lease`
   (never plain `--force`).
 
-### PR writing conduct (owner rulings 2026-07-25, chat-only)
+### PR writing conduct
 
-Not yet folded into a versioned block above — recorded in `ev1` PR #56
-(<https://github.com/programmerq/ev1/pull/56>),
-`decisions/2026-07-25-pr-body-conduct-chat-rulings.md` and
-`decisions/2026-07-25-conflict-reduction-generated-files.md`; cite those
-files directly until they are:
+Rulings: `ev1` `decisions/2026-07-25-pr-body-conduct-chat-rulings.md` and
+`decisions/2026-07-25-conflict-reduction-generated-files.md`.
 
 - **Never use the word "gate" in a PR title or body.** Say what the check
   catches, not the name of the mechanism catching it.
@@ -163,29 +177,25 @@ files directly until they are:
 
 ### Owner decision asks are self-contained
 
-<!-- BEGIN ev1-canon:decision-ask v2 -->
-**Owner decision asks are self-contained (owner directive 2026-07-22,
-canonical across all four EV1 repos — supersedes prior per-repo text).**
+<!-- BEGIN ev1-canon:decision-ask v3 -->
+**Owner decision asks are self-contained (canonical across all four EV1
+repos).**
 
 *First, is it a decision at all?* When a manual, patent, datasheet or other
 primary source answers the question clearly, it is not a fork: implement
-it with the citation, and file no ask, card or decision item (owner
-2026-10-08). When better reference material arrives, adopt it over the
-earlier guess without asking; an earlier guess is not special, and a
-finding that shows it was wrong is not a reason to ask (owner 2026-10-06,
-2026-10-07). Ask only when a real fork remains.
+it with the citation, and file no ask, card or decision item. When better
+reference material arrives, adopt it over the earlier guess without asking;
+an earlier guess is not special, and a finding that shows it was wrong is not
+a reason to ask. Ask only when a real fork remains.
 
-An ask whose context lives elsewhere invites an answer to the wrong
-question — an already-engaged fork was once re-asked as bare option
-letters and the earlier answer was never durably recorded. Every decision
-ask — chat, PR comment, or queue entry — is answerable from that one
-message, on one screen, and carries all seven elements:
+Every decision ask — chat, PR comment, or queue entry — is answerable from
+that one message, on one screen, and carries all seven elements:
 
 1. **Title/moniker**, glossed — never a bare ID, letter, or hex suffix
    (`BL-0180 (SDM driver seat-belt switch polarity)`).
 2. **Context** — why it exists, what's blocked, cited facts.
 3. **Options in prose**, each with its implication beside it — never bare
-   "A/B/C" (the owner once read option letters as motor phases).
+   "A/B/C".
 4. **Recommendation**, with a one-line reason.
 5. **Default-if-silent**, explicitly named.
 6. **Provenance** — date first asked + where it lives; check the
@@ -195,8 +205,9 @@ message, on one screen, and carries all seven elements:
    (convention, manual/provenance, prior ruling, standing preference) that
    leaves it genuinely open, or self-decide instead of asking.
 
-Record the ruling immediately where it was asked.
-<!-- END ev1-canon:decision-ask v2 -->
+Record the ruling immediately where it was asked, in one place; everything
+else points to it.
+<!-- END ev1-canon:decision-ask v3 -->
 
 ## Commits
 
