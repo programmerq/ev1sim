@@ -266,16 +266,14 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   Surfacing this as a `kSigChassisAbsActive` boolean would let a
   game-controller adapter drive a rumble motor for tactile feedback.
   Out of scope until game-controller input/FFB lands.
-- [ ] **Suspension spring/damper rate verification.**  Run
-  `./build/ev1sim --config config/bounce_test.json` (needs a Chrono
-  build): the car drops onto a flat plane, and the telemetry CSV's
-  `pos_z` with the stats CSV's `pitch_deg` give the front and rear ride
-  frequencies and damping (recipe in the config header).  Predicted from
-  the files: rear 1.50 Hz, front about 1.38 Hz, both at a 0.30 damping
-  ratio (the ev1 baseline's estimates).  A standalone Chrono 9.0.1 run
-  of the same vehicle build settled both spindles within 2 mm of design
-  and showed the coupled heave at about 1.3 Hz; the ev1sim config run
-  is still to do.  Keep until measured there.
+- [ ] **Rear ride rate is about half the rear spring's.**  The front's
+  rate, ride frequency and damping are checked by
+  `tests/test_ride_frequency.cpp`.  The rear has no such check yet: on the
+  baseline's estimated link points the axle winds up 0.2-0.35 deg per mm of
+  bump, which swings the short spring's lower seat fore and aft, and the
+  rear wheel rate measures about 12.6 kN/m against the 25.3 kN/m spring.
+  It waits on a new estimate for the rear upper link's axle end in the ev1
+  suspension baseline; then the test gains the rear.
 
 ## Outputs ev1sim could render (defer all)
 - [ ] Wiper motor visual sweep (model update needed).

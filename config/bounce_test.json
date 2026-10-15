@@ -1,7 +1,7 @@
 {
   "//": "Config wrapper for the suspension bounce test: ride frequency and damping",
-  "//1": "of each axle, the run docs/TODO.md 'Suspension spring/damper rate",
-  "//2": "verification' asks for.  Needs a Chrono build:",
+  "//1": "of each axle, in the app (tests/test_ride_frequency.cpp checks the",
+  "//2": "front on the plant).  Needs a Chrono build:",
   "//3": "",
   "//4": "  ./build/ev1sim --config config/bounce_test.json",
   "//5": "",

@@ -124,3 +124,7 @@ spring free lengths are derived from the chassis load, and the dampers for a
   the baseline commit.
 * Track equals the spindle position, the rear track is narrower than the front,
   and masses, inertias, rates and damping are positive.
+
+On the plant, `tests/test_ride_frequency.cpp` checks the front's wheel rate,
+ride frequency and damping against the front file; its header lists the
+checks.
