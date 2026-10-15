@@ -190,37 +190,16 @@ controller fleet up on the shared wire table around this checkout's
 
 ### Manual scenario run (with window, for visual debugging)
 
-To watch a scenario with the Chrono visualization open, start the
-controllers in separate terminals.  All seven ABS configs are set up
-for `realtime: true` so BTCM has wall-clock time to engage; flip
-`headless: false` in the config you're running to get a window.
+The harness reads each case's scene from this checkout's
+`config/abs_<test>.json`, so a windowed run is the same harness run with
+`"headless": false` set in that file (all seven ABS configs run
+`realtime: true`):
 
 ```sh
-# Terminal 1 — ev1sim with window
-cd ev1sim
 # Edit config/abs_<test>.json: set "headless": false
-./build/ev1sim --config config/abs_<test>.json
-
-# Terminal 2 — PIM (powertrain control)
 cd ../electricsim
-./build/ev1/pim/pim_controller
-
-# Terminal 3 — RSA (key/run-mode)
-./build/ev1/rsa/rsa_controller
-
-# Terminal 4 — BTCM (brake controller).  BTCM_CSV_LOG optional;
-# BTCM_ABS_TRACE=1 enables per-tick algorithm-state log lines.
-./build/ev1/btcm/ex_btcm_controller
+EV1SIM_DIR=../ev1sim python3 -m vat run --case abs_<test> --out /tmp/abs_window
 ```
-
-Order matters: ev1sim creates the SHM bus segments, the controllers
-attach.  Watch ev1sim's stdout for `connected to main harness bus`
-before starting the controllers, and start RSA before BTCM so the
-run-mode broadcast is live when BTCM tries to read it.
-
-The `--config <name>` form works too — leave the abs_<test>.json
-files alone and pass via env / a copy if you only want headless: false
-for a single one-off run.
 
 ### Refreshing reports
 
