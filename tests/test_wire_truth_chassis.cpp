@@ -23,16 +23,18 @@
 #include <cstring>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include <unistd.h>  // getpid, close, dup, dup2
 
 #include "WireTruthChassis.h"
 #include "ExternalSimConnector.h"  // end-to-end: wire -> overlay -> getter
+#include "BusSnoop.h"              // kDefaultStaleAfterS (dash snoop test)
 
 // external sim substrate (creator side) — same headers env_open.cpp uses.
 #include "topology/topology_generated.h"
 #include "wire_table.hpp"
-#include "gm8192/gm8192_frame.h"  // gm8192_encode (build a $41 frame for the snoop test)
+#include "gm8192/gm8192_frame.h"  // gm8192_encode (build frames for the dash snoop test)
 #include "uart/uart_tx.hpp"       // electricsim::io::UartTx (serialise onto a TX cell)
 #include "net_host/conductor_publisher.hpp"  // the publish edge for conductor cells
 
@@ -846,43 +848,94 @@ TEST_CASE("WireTruthChassis::btcm_tx_total_bits tracks the GM8192 TX bit-stream"
     REQUIRE(*t2 > *t1);  // advanced => "BTCM is transmitting" liveness proxy
 }
 
-TEST_CASE("WireTruthChassis::snoop decodes vehicle speed from the PIM $41 frame",
-          "[wire_truth][snoop]") {
+TEST_CASE("Connector dash snapshot: bus frames via BusSnoop plus the IPC lamp cells",
+          "[wire_truth][snoop][e2e]") {
     namespace topo = electricsim::topology;
-    const std::string seg = unique_segment("snoop_pim");
-    auto pim = create_fleet_table(seg, topo::kTopologyHash);
-    REQUIRE(pim != nullptr);
+    const std::string seg = unique_segment("snoop_dash");
+    auto fleet = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(fleet != nullptr);
+    ScopedEnv env("ELECTRICSIM_WIRES_NAME", seg.c_str());
 
-    auto wire = ev1sim::WireTruthChassis::Attach(seg);
-    REQUIRE(wire != nullptr);
+    ExternalSimConnector::Options opts;
+    opts.enabled = true;
+    ExternalSimConnector c(opts);
 
-    // Nothing transmitted yet -> no decoded speed.
-    wire->snoop_step(0.0);
-    REQUIRE(wire->pim_vehicle_speed_kph() == std::nullopt);
+    // Nothing transmitted and no lamp written yet: empty frame groups, every
+    // lamp unknown (not "off").
+    c.Tick(0.0);
+    auto snap = c.GetDashSnapshot();
+    REQUIRE_FALSE(snap.pcm);
+    REQUIRE_FALSE(snap.pack);
+    REQUIRE(snap.lamps);
+    REQUIRE_FALSE(snap.lamps->antilock.has_value());
 
-    // Serialise a real $41 PCM Data Response with vehicle speed = 50 km/h onto
-    // the PIM TX bit-stream cell, exactly as the PIM controller's UartTx would.
-    // payload[4] (wire byte 6) = vehicle speed (1 km/h/count); see the external sim's PIM UART-frame definition.
-    std::uint8_t payload[7] = {0u, 0u, 0u, 0u, 50u, 0u, 0u};
-    std::uint8_t frame[GM8192_MAX_FRAME_LEN] = {0u};
-    std::size_t  frame_len = 0;
-    REQUIRE(gm8192_encode(0x41u, payload, 7u, frame, sizeof(frame), &frame_len)
-            == GM8192_OK);
+    // A real $41 (Drive, 50 km/h) on the PIM TX cell and a $40 (300 V) on the
+    // BPM TX cell, serialised exactly as the controllers' UartTx would; the
+    // IPC's anti-lock lamp energised through the solver's publish edge.
+    auto encode = [](std::uint8_t id, const std::uint8_t* p, std::uint8_t n) {
+        std::vector<std::uint8_t> out(GM8192_MAX_FRAME_LEN);
+        std::size_t len = 0;
+        REQUIRE(gm8192_encode(id, p, n, out.data(), out.size(), &len) == GM8192_OK);
+        out.resize(len);
+        return out;
+    };
+    const std::uint8_t p41[7] = {0u, static_cast<std::uint8_t>(0x15u << 3), 0u, 0u, 50u, 0u, 0u};
+    const std::uint8_t p40[6] = {150u, 0x03u, 0x20u, 0u, 80u, 0u};
+    const auto f41 = encode(0x41u, p41, 7u);
+    const auto f40 = encode(0x40u, p40, 6u);
 
     constexpr std::uint64_t kBitPeriodNs = 122070;
-    electricsim::io::UartTx tx(pim.get(), topo::kWireGM8192_PIM_TX, kBitPeriodNs);
-    tx.enqueue(frame, frame_len);
+    electricsim::io::UartTx pim(fleet.get(), topo::kWireGM8192_PIM_TX, kBitPeriodNs);
+    electricsim::io::UartTx bpm(fleet.get(), topo::kWireGM8192_BPM_TX, kBitPeriodNs);
+    pim.enqueue(f41.data(), f41.size());
+    bpm.enqueue(f40.data(), f40.size());
+    REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_IPC_ANTILOCK_TELLTALE, true));
 
-    // Pump TX + snoop in lockstep, one bit period per step, until the frame
-    // (frame_len bytes × 10 UART bits) has serialised + decoded, plus slack.
+    // Pump the transmitters and the connector's tick in lockstep.
     std::uint64_t now = 1000u;
-    const int steps = static_cast<int>(frame_len) * 10 + 20;
-    for (int i = 0; i < steps; ++i) {
+    for (int i = 0; i < 160; ++i) {
         now += kBitPeriodNs;
-        tx.tick(now);
-        wire->snoop_step(static_cast<double>(now) / 1.0e9);
+        pim.tick(now);
+        bpm.tick(now);
+        c.Tick(static_cast<double>(now) / 1.0e9);
     }
-    REQUIRE(wire->pim_vehicle_speed_kph() == std::optional<std::uint8_t>(50u));
+
+    snap = c.GetDashSnapshot();
+    REQUIRE(snap.pcm);
+    CHECK(snap.pcm->speed_kph == 50u);
+    CHECK(snap.pcm->gear == ev1sim::DashGear::kDrive);
+    REQUIRE(snap.pack);
+    CHECK(snap.pack->pack_voltage_v == 300u);
+    CHECK(snap.pack->pack_soc_pct == 80u);
+    REQUIRE(snap.lamps);
+    CHECK(snap.lamps->antilock == std::optional<bool>(true));
+    CHECK_FALSE(snap.lamps->brake.has_value());
+
+    // The bus goes quiet: past the staleness horizon the frame groups blank,
+    // while the lamp keeps its cell's last written value.
+    c.Tick(static_cast<double>(now) / 1.0e9 + ev1sim::BusSnoop::kDefaultStaleAfterS + 1.0);
+    snap = c.GetDashSnapshot();
+    CHECK_FALSE(snap.pcm);
+    CHECK_FALSE(snap.pack);
+    CHECK(snap.lamps->antilock == std::optional<bool>(true));
+
+    // Stop() drops the connector's WireTable; after Start() the next Tick opens
+    // a fresh one, and the snoop must decode from it, not the freed table.
+    c.Stop();
+    c.Start();
+    const std::uint8_t p41b[7] = {0u, static_cast<std::uint8_t>(0x15u << 3), 0u, 0u, 60u, 0u, 0u};
+    const auto f41b = encode(0x41u, p41b, 7u);
+    now += 4'000'000'000ull;
+    c.Tick(static_cast<double>(now) / 1.0e9);
+    pim.enqueue(f41b.data(), f41b.size());
+    for (int i = 0; i < 160; ++i) {
+        now += kBitPeriodNs;
+        pim.tick(now);
+        c.Tick(static_cast<double>(now) / 1.0e9);
+    }
+    snap = c.GetDashSnapshot();
+    REQUIRE(snap.pcm);
+    CHECK(snap.pcm->speed_kph == 60u);
 }
 
 TEST_CASE("WireTruthChassis::pim_cruise_active/setpoint follow the PIM cruise cells",
