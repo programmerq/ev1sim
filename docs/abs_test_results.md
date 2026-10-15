@@ -167,29 +167,26 @@ either side of this branch's changes: 12.053 both times.
 ### Automated test sweep (headless)
 
 ```sh
-# All seven scenarios, BTCM-on vs BTCM-off comparison.  hard_brake and
-# diagonal_mu were absent from this loop; hard_brake could not be run at all
-# before 2026-08-12 (no config wrapper, and two name lists in
-# run_abs_compare.sh that did not know it).
-for t in high_mu low_mu mu_jump split_mu diagonal_mu brake_and_steer hard_brake; do
-    ./scripts/run_abs_compare.sh "$t"
+# The six scenarios the external sim's acceptance harness carries as cases,
+# BTCM-on vs BTCM-off.  ELECTRICSIM_DIR is a built electricsim tree.
+for t in high_mu low_mu mu_jump split_mu diagonal_mu brake_and_steer; do
+    ELECTRICSIM_DIR=../electricsim ./scripts/run_abs_compare.sh "$t"
 done
 
 # Then regenerate the engineering report:
 ./scripts/abs_report.py docs/reports/abs_scenarios.md
 ```
 
-`run_abs_compare.sh` writes per-scenario outputs to
-`/tmp/ev1sim_abs_<test>/`:
+`run_abs_compare.sh` runs the harness case `abs_<test>`, which brings the
+controller fleet up on the shared wire table around this checkout's
+`build/ev1sim`, and writes per-scenario outputs to `/tmp/ev1sim_abs_<test>/`:
 
   - `summary.txt` — distance, slip stats, ABS event counts
   - `abs_btcm_on.csv` / `abs_btcm_off.csv` — chassis-side data
   - `abs_btcm_on.btcm.csv` — **BTCM-side firmware view** (vehicle-
     speed estimator, per-wheel slip / accel / phase / locked-dwell,
-    accelerometer reading) sampled at 50 Hz wall clock.  Toggled by
-    `BTCM_CSV_LOG` env var; the script sets it automatically for
-    BTCM-on runs.
-  - `abs_btcm_*.log` — full controller stdout/stderr per process
+    accelerometer reading).
+  - `harness/` — the harness's run directory, with every module's log
 
 ### Manual scenario run (with window, for visual debugging)
 
