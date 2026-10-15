@@ -2,6 +2,11 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include "Config.h"
+#include "PhysicalWorld.h"
+
+#ifndef EV1SIM_SOURCE_DIR
+#define EV1SIM_SOURCE_DIR "."
+#endif
 
 #include <filesystem>
 #include <fstream>
@@ -372,4 +377,56 @@ TEST_CASE("Config: a named --config that cannot be opened is fatal", "[Config]")
         CHECK(Config::NamedConfigFault(path, true).empty());
         std::filesystem::remove(path);
     }
+}
+
+// -----------------------------------------------------------------------
+// environment.weather — the almanac's daily cycle (scripts/fetch_weather.py)
+// -----------------------------------------------------------------------
+TEST_CASE("Config weather defaults are the almanac's own", "[Config][Env][Weather]") {
+    const Config cfg;
+    const ev1sim::AmbientTempSensor::Config almanac;
+    const auto& w = cfg.environment.weather;
+    CHECK(w.mean_temp_c          == almanac.mean_temp_c);
+    CHECK(w.diurnal_amp_c        == almanac.diurnal_amp_c);
+    CHECK(w.mean_humidity_pct    == almanac.mean_humidity_pct);
+    CHECK(w.diurnal_humidity_amp == almanac.diurnal_humidity_amp);
+    CHECK(w.phase_offset_hours   == almanac.phase_offset_hours);
+}
+
+TEST_CASE("Config reads a weather file relative to the config that names it",
+          "[Config][Env][Weather]") {
+    // A directory of its own, named after a fresh temp file so parallel
+    // workers don't share it.
+    const auto dir = std::filesystem::temp_directory_path() /
+                     (std::filesystem::path(WriteTempJson("{}")).stem().string() + "_weather");
+    std::filesystem::create_directories(dir);
+    std::filesystem::copy_file(std::string(EV1SIM_SOURCE_DIR) + "/tests/fixtures/weather_day.json",
+                               dir / "day.json",
+                               std::filesystem::copy_options::overwrite_existing);
+    const auto cfg_path = (dir / "run.json").string();
+    std::ofstream(cfg_path) << R"({"environment":{"weather":"day.json"}})";
+
+    const auto w = Config::LoadFromFile(cfg_path).environment.weather;
+    CHECK_THAT(w.mean_temp_c,          WithinAbs(20.66, 1e-9));
+    CHECK_THAT(w.diurnal_amp_c,        WithinAbs(5.5, 1e-9));
+    CHECK_THAT(w.mean_humidity_pct,    WithinAbs(64.8, 1e-9));
+    CHECK_THAT(w.diurnal_humidity_amp, WithinAbs(22.1, 1e-9));
+    CHECK_THAT(w.phase_offset_hours,   WithinAbs(14.45, 1e-9));
+    std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("Config takes inline weather, and keeps the defaults for a missing file",
+          "[Config][Env][Weather]") {
+    const Config defaults;
+    const auto inline_cfg = Config::LoadFromFile(WriteTempJson(
+        R"({"environment":{"weather":{"mean_temp_c":-4.0,"phase_offset_hours":15.0}}})"));
+    CHECK(inline_cfg.environment.weather.mean_temp_c == -4.0);
+    CHECK(inline_cfg.environment.weather.phase_offset_hours == 15.0);
+    CHECK(inline_cfg.environment.weather.diurnal_amp_c == defaults.environment.weather.diurnal_amp_c);
+
+    const auto missing = Config::LoadFromFile(WriteTempJson(
+        R"({"environment":{"weather":"no_such_weather_file.json"}})"));
+    CHECK(missing.environment.weather.mean_temp_c == defaults.environment.weather.mean_temp_c);
+    CHECK(missing.environment.weather.phase_offset_hours ==
+          defaults.environment.weather.phase_offset_hours);
 }

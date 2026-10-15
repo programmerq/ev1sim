@@ -105,6 +105,17 @@ struct Config {
         double      ambient_b        = 0.8;
         double      sun_elevation_deg = 60.0;
         double      ambient_temp_c   = 20.0;    // stub — not yet consumed
+        // The diurnal cycle AmbientTempSensor runs on.  Defaults are the
+        // almanac's own; `environment.weather` replaces them, either inline
+        // or as the path of a file scripts/fetch_weather.py wrote (relative
+        // to the config file).  A missing or unreadable file keeps these.
+        struct Weather {
+            double mean_temp_c          = 18.0;
+            double diurnal_amp_c        = 8.0;
+            double mean_humidity_pct    = 55.0;
+            double diurnal_humidity_amp = 15.0;
+            double phase_offset_hours   = 14.0;  // hour of the daily peak temperature
+        } weather;
     } environment;
 
     struct Lights {

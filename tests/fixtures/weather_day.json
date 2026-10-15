@@ -1,0 +1,8 @@
+{
+  "//source": "Open-Meteo hourly, lat 34.05 lon -118.24, 2026-06-01 (America/Los_Angeles); scripts/fetch_weather.py output, kept as the test fixture",
+  "mean_temp_c": 20.66,
+  "diurnal_amp_c": 5.5,
+  "mean_humidity_pct": 64.8,
+  "diurnal_humidity_amp": 22.1,
+  "phase_offset_hours": 14.45
+}
