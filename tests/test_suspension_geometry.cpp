@@ -255,12 +255,20 @@ TEST_CASE("Rear suspension: the five links p.271 names",
         CHECK(axle_end.at("Body2").get<std::string>() == "Axle Tube");
     }
 
-    // The upper links are mirrored chassis-to-axle spring-dampers, stiff
-    // enough to act as links and unloaded at the design position.
-    const auto& upper = Named(r.at("TSDAs"), "Upper Link");
-    CHECK(upper.at("Mirrored").get<bool>());
+    // The upper links are one chassis-to-axle spring-damper on the
+    // centreline, unloaded at the design position, with both links' rates:
+    // in side view it is the pair, and in roll it adds no stiffness.
+    const auto& upper = Named(r.at("TSDAs"), "Upper Links");
+    CHECK_FALSE(upper.at("Mirrored").get<bool>());
     CHECK(upper.at("Body1").get<std::string>() == "Chassis");
     CHECK(upper.at("Body2").get<std::string>() == "Axle Tube");
+    CHECK(V(upper.at("Point1")).y == 0.0);
+    CHECK(V(upper.at("Point2")).y == 0.0);
+    const auto& rate = r.at("//upper_link_rate");
+    CHECK(upper.at("Spring Coefficient").get<double>() ==
+          2.0 * rate.at("k_link_N_per_m").get<double>());
+    CHECK(upper.at("Damping Coefficient").get<double>() ==
+          2.0 * rate.at("c_link_Ns_per_m").get<double>());
     CHECK(upper.at("Spring Coefficient").get<double>() >
           50.0 * Named(r.at("TSDAs"), "Spring").at("Spring Coefficient").get<double>());
     CHECK_THAT(upper.at("Free Length").get<double>(),
@@ -295,8 +303,12 @@ TEST_CASE("Rear suspension: every coordinate is the baseline table through the f
         CAPTURE(name);
         const bool mirrored = t.at("Mirrored").get<bool>();
         const auto& hp = t.at("//hardpoints");
-        CHECK(Dist(Hardpoint(r, hp[0].get<std::string>(), mirrored), V(t.at("Point1"))) < kTolM);
-        CHECK(Dist(Hardpoint(r, hp[1].get<std::string>(), mirrored), V(t.at("Point2"))) < kTolM);
+        Vec3 p1 = Hardpoint(r, hp[0].get<std::string>(), mirrored);
+        Vec3 p2 = Hardpoint(r, hp[1].get<std::string>(), mirrored);
+        if (name == "Upper Links")  // moved to the centreline, per "//links"
+            p1.y = p2.y = 0.0;
+        CHECK(Dist(p1, V(t.at("Point1"))) < kTolM);
+        CHECK(Dist(p2, V(t.at("Point2"))) < kTolM);
     }
 
     // Each link body sits at the midpoint of its two joints.
@@ -322,9 +334,8 @@ TEST_CASE("Rear suspension: upper links lead, lower links trail, the track bar c
     const auto& J = r.at("Joints");
     const Vec3 lb = V(Named(J, "Lower Link Body").at("Position"));
     const Vec3 la = V(Named(J, "Lower Link Axle").at("Position"));
-    const auto& upper = Named(r.at("TSDAs"), "Upper Link");
-    const Vec3 ub = V(upper.at("Point1"));
-    const Vec3 ua = V(upper.at("Point2"));
+    const Vec3 ub = Hardpoint(r, "upper_link_body", true);
+    const Vec3 ua = Hardpoint(r, "upper_link_axle", true);
     CHECK(lb.x > la.x);
     CHECK(ub.x < ua.x);
 

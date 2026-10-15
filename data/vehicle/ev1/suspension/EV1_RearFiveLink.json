@@ -13,7 +13,8 @@
     "  connecting links are composed of two upper suspension leading links, two lower",
     "  suspension trailing links, and a track bar.' This file builds exactly that",
     "  part list: one rigid Axle Tube carrying both spindles, two Lower Links and a",
-    "  Track Bar as jointed bodies, two Upper Links as stiff spring-dampers, two",
+    "  Track Bar as jointed bodies, the two Upper Links as one stiff spring-damper",
+    "  on the centreline (see '//links'), two",
     "  springs and two dampers, all chassis-mounted (see '//links' for why).",
     "  Chrono's SolidAxle template was not used: it is a steered axle (knuckles, tie",
     "  rod, drag link, bell crank) and has no track bar.",
@@ -146,14 +147,27 @@
   "//links": [
     "The lower links and the track bar are bodies on kinematic spherical joints at",
     "both ends. Those three constraints leave the axle free to bounce, roll, and",
-    "pitch about the lower links. The upper links take out that pitch, and they do",
-    "it as stiff spring-dampers ('Upper Link' under TSDAs) rather than jointed",
-    "bodies: four rigid fore-aft links of two different lengths over-constrain a",
-    "rigid axle, which only bushing compliance lets move (p.271: 'non-replaceable",
-    "bushings'), and Chrono's default Barzilai-Borwein solver refuses joint",
-    "bushings because they carry stiffness matrices. 2 kN/mm along the link with",
-    "2 kN s/m of damping is a generic rubber-bushed link rate, not EV1 data. Estimated."
+    "pitch (wind up) about the lower links. The upper links take out that pitch.",
+    "Here the pair is one stiff spring-damper ('Upper Links' under TSDAs) at the",
+    "upper links' side-view points but on the car's centreline, with the two",
+    "links' rate together.",
+    "",
+    "Two upper leading links and two lower trailing links on one rigid axle, not",
+    "parallel in side view, bind in roll: rolling the axle asks each end to pitch",
+    "a different way, and a rigid axle cannot. The real axle moves through bushing",
+    "and tube compliance (p.271: 'non-replaceable bushings'). Chrono's default",
+    "Barzilai-Borwein solver refuses joint bushings (stiffness matrices), and two",
+    "stiff spring-dampers at the links' own track made the bind the rear's roll",
+    "stiffness: the rear took 80 % of the car's lateral load transfer, the inside",
+    "rear tyre unloaded under split-mu braking, and the car spun.",
+    "",
+    "One link on the centreline does in side view what the pair does (same",
+    "points, so the same bounce path, wind-up stiffness and anti-squat), and in",
+    "roll its axle end only moves sideways, so it adds no roll stiffness. The",
+    "rate is a generic rubber-bushed link, 2 kN/mm and 2 kN s/m per link below;",
+    "not EV1 data, estimated."
   ],
+  "//upper_link_rate": {"k_link_N_per_m": 2.0e6, "c_link_Ns_per_m": 2.0e3},
 
   "Joints": [
     {
@@ -200,16 +214,16 @@
 
   "TSDAs": [
     {
-      "Name":                   "Upper Link",
+      "Name":                   "Upper Links",
       "//hardpoints":           ["upper_link_body", "upper_link_axle"],
-      "//":                     "Leading link: body end behind the axle. Free Length = the 0.1566 m between its hardpoints, so it carries no load at the design position. Rates per '//links'.",
-      "Mirrored":               true,
+      "//":                     "Leading links: body end behind the axle. X and Z from the hardpoints, Y = 0 per '//links'. Free Length = the 0.1566 m between its points, so it carries no load at the design position. Rates: the two links' together.",
+      "Mirrored":               false,
       "Body1":                  "Chassis",
       "Body2":                  "Axle Tube",
-      "Point1":                 [-0.162, 0.485, -0.1182],
-      "Point2":                 [-0.040, 0.485, -0.0200],
-      "Spring Coefficient":     2.0e6,
-      "Damping Coefficient":    2.0e3,
+      "Point1":                 [-0.162, 0.0, -0.1182],
+      "Point2":                 [-0.040, 0.0, -0.0200],
+      "Spring Coefficient":     4.0e6,
+      "Damping Coefficient":    4.0e3,
       "Free Length":            0.1566,
       "Visualization":          {"Type": "SEGMENT"}
     },

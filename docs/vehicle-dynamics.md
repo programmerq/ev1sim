@@ -113,7 +113,9 @@ spring free lengths are derived from the chassis load, and the dampers for a
   the points that hold them.
 * **Layout:** the front upper arm is shorter than the lower in front view and
   the coil-over lands on the lower arm; the rear axle is one rigid body, the
-  upper links lead, the lower links trail and the track bar crosses the car.
+  upper links lead, the lower links trail and the track bar crosses the car;
+  the upper links are one spring-damper on the centreline with both links'
+  rates.
 * **Each spring carries the chassis at the design position:** free length =
   installed length + static load / rate, with the load from the chassis file's
   mass and COM (through the geometry's motion ratio on the front).  A mass or

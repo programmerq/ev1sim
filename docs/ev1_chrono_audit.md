@@ -654,11 +654,10 @@ upper links whose body pivots sit behind the axle, two lower links whose body
 pivots sit ahead of it, and a track bar across the car, with a coil spring and
 a damper per side.  `SolidAxle` was not used: it is a steered axle (knuckles,
 tie rod, drag link, bell crank) and has no track bar.  The lower links and the
-track bar are jointed bodies; the upper links are stiff spring-dampers.  Four
-rigid fore-aft links of two lengths over-constrain a rigid axle, and the real
-one moves on its "non-replaceable bushings".  Joint bushings would model that,
-but Chrono's default Barzilai-Borwein solver refuses them (they carry stiffness
-matrices), so the compliance sits in the upper links instead.
+track bar are jointed bodies; the two upper links are one stiff spring-damper
+at their side-view points on the car's centreline, which is the pair in side
+view without the roll bind two stiff links at their own track would add.  Why:
+`EV1_RearFiveLink.json`'s `//links` note.
 
 **Hardpoints.**  Both axles take their coordinates from the ev1 repo's
 suspension baseline, each file carrying the points it uses with tier and
