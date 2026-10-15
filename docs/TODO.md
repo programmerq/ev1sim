@@ -247,27 +247,6 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   Surfacing this as a `kSigChassisAbsActive` boolean would let a
   game-controller adapter drive a rumble motor for tactile feedback.
   Out of scope until game-controller input/FFB lands.
-- [ ] **Suspension spring/damper rate verification.**  Run
-  `./build/ev1sim --config config/bounce_test.json` (needs a Chrono
-  build): the car drops onto a flat plane, and the telemetry CSV's
-  `pos_z` with the stats CSV's `pitch_deg` give the front and rear ride
-  frequencies and damping (recipe in the config header).  Predicted from
-  the files: rear 1.50 Hz at a 0.30 damping ratio (the ev1 baseline's
-  estimate), front about 1.8 Hz from the unsourced 143000 N/m on the
-  sedan geometry's 0.52 motion ratio.  Front stiffer than rear is the
-  opposite of the usual flat-ride bias, so the front rate is the one to
-  revisit once the run confirms it.  Keep until measured.
-- [ ] **Front suspension hardpoints are still the Chrono sedan sample.**
-  `EV1_FrontDoubleWishbone.json` is Chrono's `sedan` sample rescaled to
-  the printed track, and says so.  The rear now uses the ev1 repo's
-  suspension baseline (`geometry/suspension/`, ev1 PR #144), which also
-  carries estimated front SLA points (ball joints, arm pivots, damper
-  yoke) around the printed damper top and cradle mounts.  Moving the
-  front onto those points is the next step; the yoke between the
-  coil-over and the lower arm has no counterpart in `DoubleWishbone`, so
-  it either becomes a motion-ratio adjustment or a
-  `GenericWheeledSuspension` like the rear.
-
 ## Outputs ev1sim could render (defer all)
 - [ ] Wiper motor visual sweep (model update needed).
 - [ ] Door lock solenoid **visual** click — the audio click already plays via

@@ -1,35 +1,25 @@
 // Checks on the shipped EV1 suspension JSON.  The front is Chrono's
-// DoubleWishbone template; the rear is a GenericWheeledSuspension beam axle on
-// five links, the layout chassis manual p.271 prints.  In the front file two
-// kinds of number live side by side and only one kind came off a vehicle:
+// DoubleWishbone template, the short/long-arm layout chassis manual p.251
+// prints; the rear is a GenericWheeledSuspension beam axle on five links, the
+// layout chassis manual p.271 prints.
 //
-//   * Track, camber and toe are printed in the EV1 chassis manual (page 62 for
-//     the exterior dimensions, page 61 for the alignment specs).  Those values
-//     are NOT pinned here: per the owner's 2026-10-08 ruling
-//     (ev1-canon:ci-checks) a blocking test checks structure and behaviour,
-//     never a number read off a manual page, since a better reading replaces
-//     it.  What is checked is that the files stay self-consistent (declared
-//     track == spindle position == declared scale) and keep the rear track
-//     narrower than the front.
-//   * Every front hardpoint coordinate is Chrono's stock `sedan` sample rescaled to
-//     the printed track.  Nothing there measures an EV1, so what gets pinned is
-//     the rescale itself: each lateral coordinate must equal the sedan value
-//     times the scale the file declares in "//hardpoint_scale_y".
+// Track, camber and toe are printed in the EV1 chassis manual (page 62 for the
+// exterior dimensions, page 61 for the alignment specs).  Those values are NOT
+// pinned here: per the owner's 2026-10-08 ruling (ev1-canon:ci-checks) a
+// blocking test checks structure and behaviour, never a number read off a
+// manual page, since a better reading replaces it.  What is checked is that
+// the files stay self-consistent (declared track == spindle position) and keep
+// the rear track narrower than the front.
 //
-// That second check is the one that catches the defect these files shipped
-// with.  A 2026-04-30 commit set the declared front track to an unsourced
-// 1.496 m by adding a flat +13 mm to four outboard Y coordinates and leaving
-// the other ten at their 1.470-derived values, so the spindle claimed one track
-// while the control arms, spring mounts and body COMs encoded another.  A
-// uniform-scale check fails on that; the spindle-only check that shipped
-// alongside it passed, and made the wrong number look deliberate.
-//
-// The rear file's hardpoints come from the ev1 repo's suspension baseline and
+// Both files' hardpoints come from the ev1 repo's suspension baseline and
 // carry their own table ("//hardpoints_ev1_mm", in the body repair manual's
-// datum frame) and frame map ("//frame").  The rear checks recompute every
-// Chrono coordinate from that table, so a hand edit to either side fails, and
-// check the layout p.271 describes: which links lead, which trail, the track
-// bar crossing the car, the spindles on one rigid axle.
+// datum frame) and frame map ("//frame").  The checks recompute every Chrono
+// coordinate from that table, so a hand edit to either side fails, and check
+// the layout each manual page describes: on the front a short upper arm over a
+// long lower one with the coil-over on the lower arm; on the rear which links
+// lead, which trail, the track bar crossing the car, the spindles on one rigid
+// axle.  Each spring's free length is checked against the chassis load it has
+// to carry, so a mass or COM edit that forgets the springs fails here.
 //
 // No Chrono boot — these read the same JSON that Chrono::Vehicle loads.
 
@@ -64,35 +54,6 @@ static constexpr const char* kChassis =
 static constexpr const char* kVehicle =
     "data/vehicle/ev1/vehicle/EV1_Vehicle.json";
 
-// Lateral (Y) coordinates of Chrono 9.0.1's stock sedan double-wishbone sample,
-// <chrono>/data/vehicle/sedan/suspension/Sedan_DoubleWishbone.json.  Copied in
-// rather than read from the Chrono install so this stays a Chrono-free test,
-// and so "these are sedan coordinates" is something the suite checks instead of
-// something a comment asserts.
-struct SedanHardpoint {
-    const char* body;
-    const char* key;
-    double      y;
-};
-static const SedanHardpoint kSedanHardpoints[] = {
-    {"Spindle",           "COM",                    0.7979},
-    {"Upright",           "COM",                    0.7470},
-    {"Upper Control Arm", "COM",                    0.5972},
-    {"Upper Control Arm", "Location Chassis Front", 0.4700},
-    {"Upper Control Arm", "Location Chassis Back",  0.5100},
-    {"Upper Control Arm", "Location Upright",       0.6950},
-    {"Lower Control Arm", "COM",                    0.6112},
-    {"Lower Control Arm", "Location Chassis Front", 0.4200},
-    {"Lower Control Arm", "Location Chassis Back",  0.4700},
-    {"Lower Control Arm", "Location Upright",       0.7700},
-    {"Tierod",            "Location Chassis",       0.4200},
-    {"Tierod",            "Location Upright",       0.7700},
-    {"Spring",            "Location Chassis",       0.5200},
-    {"Spring",            "Location Arm",           0.6200},
-};
-// The sedan sample's own track, from its spindle COM.
-static constexpr double kSedanTrackM = 2.0 * 0.7979;
-
 // Half-track = the spindle COM's Y coordinate (lateral offset from centerline).
 static double HalfTrack(const json& susp) {
     return susp.at("Spindle").at("COM")[1].get<double>();
@@ -105,43 +66,14 @@ TEST_CASE("Suspension: the rear track is narrower than the front",
     CHECK(HalfTrack(ReadJson(kRear)) < HalfTrack(ReadJson(kFront)));
 }
 
-TEST_CASE("Suspension: the front declares the track its hardpoints were scaled to",
+TEST_CASE("Suspension: each file declares the track its spindle sits at",
           "[Suspension]") {
-    for (const char* file : {kFront}) {
+    for (const char* file : {kFront, kRear}) {
         const auto s = ReadJson(file);
         CAPTURE(file);
-
-        // The file declares a positive track...
         const double declared_track_m = s.at("//track_mm").get<double>() / 1000.0;
         CHECK(declared_track_m > 0.0);
-
-        // ...it is where the spindle actually sits...
         CHECK_THAT(2.0 * HalfTrack(s), WithinAbs(declared_track_m, 1e-6));
-
-        // ...and the declared sedan-template scale is derived from it.
-        CHECK_THAT(s.at("//hardpoint_scale_y").get<double>(),
-                   WithinAbs(declared_track_m / kSedanTrackM, 1e-6));
-    }
-}
-
-TEST_CASE("Suspension: every front lateral hardpoint is the sedan template at the declared scale",
-          "[Suspension]") {
-    // The hardpoints are not EV1 measurements — they are Chrono's sedan sample
-    // scaled to the printed EV1 track.  Hold them to exactly that, so a future
-    // track edit has to move all of them or fail here.  Tolerance 4 mm: the
-    // shipped values are rounded to 3 decimal places, and four front points
-    // were hand-rounded up to 3 mm off the exact scale.
-    constexpr double kToleranceM = 0.004;
-    for (const char* file : {kFront}) {
-        const auto s = ReadJson(file);
-        const double scale = s.at("//hardpoint_scale_y").get<double>();
-        CAPTURE(file);
-        for (const SedanHardpoint& hp : kSedanHardpoints) {
-            const double actual   = s.at(hp.body).at(hp.key)[1].get<double>();
-            const double expected = hp.y * scale;
-            CAPTURE(hp.body, hp.key, expected, actual);
-            CHECK_THAT(actual, WithinAbs(expected, kToleranceM));
-        }
     }
 }
 
@@ -153,14 +85,13 @@ static std::string Provenance(const json& s) {
 }
 
 TEST_CASE("Suspension: the provenance note stays with the numbers", "[Suspension]") {
-    // Strip the note and the template coordinates read as EV1 measurements
-    // again, which is how they read for the three months the front file existed.
-    const std::string front = Provenance(ReadJson(kFront));
-    CHECK(front.find("Sedan_DoubleWishbone.json") != std::string::npos);
-    CHECK(front.find("chassis manual") != std::string::npos);
-
-    // The rear names its layout source and the exact baseline commit its
+    // Each file names its layout source and the exact baseline commit its
     // hardpoints were copied from, so "which numbers?" has one answer.
+    const std::string front = Provenance(ReadJson(kFront));
+    CHECK(front.find("chassis manual, printed page 251") != std::string::npos);
+    CHECK(front.find("ev1_suspension_hardpoints.csv") != std::string::npos);
+    CHECK(front.find("a6ab7146d91dcdf4536ec2abfc72f979deb1c7d6") != std::string::npos);
+
     const std::string rear = Provenance(ReadJson(kRear));
     CHECK(rear.find("chassis manual, printed page 271") != std::string::npos);
     CHECK(rear.find("ev1_suspension_hardpoints.csv") != std::string::npos);
@@ -227,10 +158,6 @@ TEST_CASE("Suspension: front control arms angle outward (upright end past the ch
     }
 }
 
-// ---------------------------------------------------------------------------
-// Rear: beam axle on five links (GenericWheeledSuspension)
-// ---------------------------------------------------------------------------
-
 namespace {
 
 struct Vec3 { double x, y, z; };
@@ -242,20 +169,45 @@ double Dist(const Vec3& a, const Vec3& b) {
                      (a.z - b.z) * (a.z - b.z));
 }
 
+// The baseline wheel centre a file's frame map is anchored on: the one
+// "//frame" key ending in "_wheel_centre_mm".
+Vec3 WheelCentreMm(const json& susp) {
+    for (const auto& [key, value] : susp.at("//frame").items())
+        if (key.size() > 16 && key.compare(key.size() - 16, 16, "_wheel_centre_mm") == 0)
+            return V(value);
+    FAIL("no *_wheel_centre_mm key in //frame");
+    return {};
+}
+
 // The file's own frame map: baseline frame (mm; X rearward, Y right, Z up)
 // to Chrono's suspension frame (m; X forward, Y left, Z up), anchored on the
-// rear wheel centre.  `mirrored` parts are given for Chrono's left side by the
-// baseline's right-side value; a part that crosses the car keeps its side.
-Vec3 ToChrono(const json& rear, const Vec3& p_mm, bool mirrored) {
-    const Vec3 w = V(rear.at("//frame").at("ev1_rear_wheel_centre_mm"));
-    const Vec3 s = V(rear.at("//frame").at("chrono_spindle_m"));
+// axle's wheel centre.  `mirrored` parts are given for Chrono's left side by
+// the baseline's right-side value; a part that crosses the car keeps its side.
+Vec3 ToChrono(const json& susp, const Vec3& p_mm, bool mirrored) {
+    const Vec3 w = WheelCentreMm(susp);
+    const Vec3 s = V(susp.at("//frame").at("chrono_spindle_m"));
     return {s.x - (p_mm.x - w.x) / 1000.0,
             mirrored ? p_mm.y / 1000.0 : -p_mm.y / 1000.0,
             s.z + (p_mm.z - w.z) / 1000.0};
 }
 
-Vec3 Hardpoint(const json& rear, const std::string& name, bool mirrored) {
-    return ToChrono(rear, V(rear.at("//hardpoints_ev1_mm").at(name).at("xyz")), mirrored);
+Vec3 Hardpoint(const json& susp, const std::string& name, bool mirrored) {
+    return ToChrono(susp, V(susp.at("//hardpoints_ev1_mm").at(name).at("xyz")), mirrored);
+}
+
+// The chassis body's static load per side on the axle at `axle_index`, from
+// the chassis file's mass and COM and the vehicle file's axle positions.
+double ChassisLoadPerSideN(int axle_index) {
+    const auto c = ReadJson(kChassis);
+    const auto v = ReadJson(kVehicle);
+    const auto& comp = c.at("Components")[0];
+    const double m_chassis = comp.at("Mass").get<double>();
+    const double x_com = comp.at("Centroidal Frame").at("Location")[0].get<double>();
+    const double x_front = v.at("Axles")[0].at("Suspension Location")[0].get<double>();
+    const double x_rear  = v.at("Axles")[1].at("Suspension Location")[0].get<double>();
+    constexpr double g = 9.81;
+    const double share = axle_index == 0 ? (x_com - x_rear) : (x_front - x_com);
+    return m_chassis * g * share / (x_front - x_rear) / 2.0;
 }
 
 const json& Named(const json& list, const std::string& name) {
@@ -266,6 +218,10 @@ const json& Named(const json& list, const std::string& name) {
 }
 
 }  // namespace
+
+// ---------------------------------------------------------------------------
+// Rear: beam axle on five links (GenericWheeledSuspension)
+// ---------------------------------------------------------------------------
 
 TEST_CASE("Rear suspension: a rigid, unsteered axle carries both spindles",
           "[Suspension][Rear]") {
@@ -299,12 +255,20 @@ TEST_CASE("Rear suspension: the five links p.271 names",
         CHECK(axle_end.at("Body2").get<std::string>() == "Axle Tube");
     }
 
-    // The upper links are mirrored chassis-to-axle spring-dampers, stiff
-    // enough to act as links and unloaded at the design position.
-    const auto& upper = Named(r.at("TSDAs"), "Upper Link");
-    CHECK(upper.at("Mirrored").get<bool>());
+    // The upper links are one chassis-to-axle spring-damper on the
+    // centreline, unloaded at the design position, with both links' rates:
+    // in side view it is the pair, and in roll it adds no stiffness.
+    const auto& upper = Named(r.at("TSDAs"), "Upper Links");
+    CHECK_FALSE(upper.at("Mirrored").get<bool>());
     CHECK(upper.at("Body1").get<std::string>() == "Chassis");
     CHECK(upper.at("Body2").get<std::string>() == "Axle Tube");
+    CHECK(V(upper.at("Point1")).y == 0.0);
+    CHECK(V(upper.at("Point2")).y == 0.0);
+    const auto& rate = r.at("//upper_link_rate");
+    CHECK(upper.at("Spring Coefficient").get<double>() ==
+          2.0 * rate.at("k_link_N_per_m").get<double>());
+    CHECK(upper.at("Damping Coefficient").get<double>() ==
+          2.0 * rate.at("c_link_Ns_per_m").get<double>());
     CHECK(upper.at("Spring Coefficient").get<double>() >
           50.0 * Named(r.at("TSDAs"), "Spring").at("Spring Coefficient").get<double>());
     CHECK_THAT(upper.at("Free Length").get<double>(),
@@ -339,8 +303,14 @@ TEST_CASE("Rear suspension: every coordinate is the baseline table through the f
         CAPTURE(name);
         const bool mirrored = t.at("Mirrored").get<bool>();
         const auto& hp = t.at("//hardpoints");
-        CHECK(Dist(Hardpoint(r, hp[0].get<std::string>(), mirrored), V(t.at("Point1"))) < kTolM);
-        CHECK(Dist(Hardpoint(r, hp[1].get<std::string>(), mirrored), V(t.at("Point2"))) < kTolM);
+        Vec3 p1 = Hardpoint(r, hp[0].get<std::string>(), mirrored);
+        Vec3 p2 = Hardpoint(r, hp[1].get<std::string>(), mirrored);
+        if (name == "Upper Links")  // moved to the centreline, per "//links"
+            p1.y = p2.y = 0.0;
+        if (t.contains("//line_of_action_m"))  // chassis end raised along the axis
+            p1.z += t.at("//line_of_action_m").get<double>();
+        CHECK(Dist(p1, V(t.at("Point1"))) < kTolM);
+        CHECK(Dist(p2, V(t.at("Point2"))) < kTolM);
     }
 
     // Each link body sits at the midpoint of its two joints.
@@ -353,7 +323,7 @@ TEST_CASE("Rear suspension: every coordinate is the baseline table through the f
     }
 
     // The anchor itself: the baseline's wheel centre lands on the spindle.
-    const Vec3 wheel = ToChrono(r, V(r.at("//frame").at("ev1_rear_wheel_centre_mm")), true);
+    const Vec3 wheel = ToChrono(r, WheelCentreMm(r), true);
     CHECK(Dist(wheel, V(r.at("Spindle").at("COM"))) < 1e-9);
 }
 
@@ -366,9 +336,8 @@ TEST_CASE("Rear suspension: upper links lead, lower links trail, the track bar c
     const auto& J = r.at("Joints");
     const Vec3 lb = V(Named(J, "Lower Link Body").at("Position"));
     const Vec3 la = V(Named(J, "Lower Link Axle").at("Position"));
-    const auto& upper = Named(r.at("TSDAs"), "Upper Link");
-    const Vec3 ub = V(upper.at("Point1"));
-    const Vec3 ua = V(upper.at("Point2"));
+    const Vec3 ub = Hardpoint(r, "upper_link_body", true);
+    const Vec3 ua = Hardpoint(r, "upper_link_axle", true);
     CHECK(lb.x > la.x);
     CHECK(ub.x < ua.x);
 
@@ -398,19 +367,9 @@ TEST_CASE("Rear suspension: the spring carries the chassis at the design positio
     // and COM.  So a mass or COM edit that forgets the spring fails here
     // instead of silently changing the car's ride height.
     const auto r = ReadJson(kRear);
-    const auto c = ReadJson(kChassis);
-    const auto v = ReadJson(kVehicle);
-
-    const auto& comp = c.at("Components")[0];
-    const double m_chassis = comp.at("Mass").get<double>();
-    const double x_com = comp.at("Centroidal Frame").at("Location")[0].get<double>();
-    const double x_front = v.at("Axles")[0].at("Suspension Location")[0].get<double>();
-    const double x_rear  = v.at("Axles")[1].at("Suspension Location")[0].get<double>();
-    REQUIRE(v.at("Axles")[1].at("Suspension Input File").get<std::string>() ==
+    REQUIRE(ReadJson(kVehicle).at("Axles")[1].at("Suspension Input File").get<std::string>() ==
             "ev1/suspension/EV1_RearFiveLink.json");
-
-    constexpr double g = 9.81;
-    const double per_spring_n = m_chassis * g * (x_front - x_com) / (x_front - x_rear) / 2.0;
+    const double per_spring_n = ChassisLoadPerSideN(1);
 
     const auto& spring = Named(r.at("TSDAs"), "Spring");
     const double k = spring.at("Spring Coefficient").get<double>();
@@ -420,6 +379,15 @@ TEST_CASE("Rear suspension: the spring carries the chassis at the design positio
     CHECK(free_len > installed);  // compressed at rest
     // 1 mm of free length is ~25 N at this rate, under 1 % of the load.
     CHECK_THAT(free_len, WithinAbs(installed + per_spring_n / k, 0.001));
+
+    // Its line of action runs far above the chassis seat, so the axle's pitch
+    // (which sways the lower seat) barely tilts it; the drawn spring between
+    // the real seats carries nothing.
+    const auto& seats = Named(r.at("TSDAs"), "Spring Seats");
+    const double seat_gap = Dist(V(seats.at("Point1")), V(seats.at("Point2")));
+    CHECK(installed > 10.0 * seat_gap);
+    CHECK(seats.at("Spring Coefficient").get<double>() == 0.0);
+    CHECK_FALSE(seats.contains("Damping Coefficient"));
 }
 
 TEST_CASE("Rear suspension: masses, inertias and damping are physically positive",
@@ -434,4 +402,150 @@ TEST_CASE("Rear suspension: masses, inertias and damping are physically positive
     for (double i : r.at("Spindle").at("Inertia")) CHECK(i > 0.0);
     CHECK(Named(r.at("TSDAs"), "Shock").at("Damping Coefficient").get<double>() > 0.0);
     CHECK(r.at("Axle").at("Inertia").get<double>() > 0.0);
+}
+
+// ---------------------------------------------------------------------------
+// Front: short/long arm (DoubleWishbone)
+// ---------------------------------------------------------------------------
+
+namespace {
+
+Vec3 Sub(const Vec3& a, const Vec3& b) { return {a.x - b.x, a.y - b.y, a.z - b.z}; }
+Vec3 Add(const Vec3& a, const Vec3& b) { return {a.x + b.x, a.y + b.y, a.z + b.z}; }
+Vec3 Scale(const Vec3& a, double k) { return {a.x * k, a.y * k, a.z * k}; }
+double Dot(const Vec3& a, const Vec3& b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+Vec3 Cross(const Vec3& a, const Vec3& b) {
+    return {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x};
+}
+
+// `p` turned by `th` radians about the axis through `a` and `b`.
+Vec3 RotateAbout(const Vec3& p, const Vec3& a, const Vec3& b, double th) {
+    const Vec3 k = Scale(Sub(b, a), 1.0 / Dist(a, b));
+    const Vec3 v = Sub(p, a);
+    const Vec3 r = Add(Add(Scale(v, std::cos(th)), Scale(Cross(k, v), std::sin(th))),
+                       Scale(k, Dot(k, v) * (1.0 - std::cos(th))));
+    return Add(a, r);
+}
+
+Vec3 Mid(const Vec3& a, const Vec3& b) { return Scale(Add(a, b), 0.5); }
+
+Vec3 At(const json& s, const char* body, const char* key) { return V(s.at(body).at(key)); }
+
+}  // namespace
+
+TEST_CASE("Front suspension: every coordinate is the baseline table through the frame map",
+          "[Suspension][Front]") {
+    // As on the rear: the table carries provenance, the Chrono numbers are a
+    // pure function of it.  1 mm: the file rounds to 0.1 mm.
+    constexpr double kTolM = 0.001;
+    const auto f = ReadJson(kFront);
+    const auto& map = f.at("//coordinates");
+
+    // Every Location in the file is mapped, and every mapping holds.
+    for (const auto& [body, value] : f.items()) {
+        if (!value.is_object()) continue;
+        for (const auto& [key, unused] : value.items()) {
+            if (key.rfind("Location", 0) != 0) continue;
+            const std::string where = body + "/" + key;
+            CAPTURE(where);
+            REQUIRE(map.contains(where));
+            const Vec3 want = Hardpoint(f, map.at(where).get<std::string>(), true);
+            CHECK(Dist(want, V(value.at(key))) < kTolM);
+        }
+    }
+
+    // Body COMs sit at the centroid of the points that hold them.
+    auto centroid = [](const Vec3& a, const Vec3& b, const Vec3& c) {
+        return Scale(Add(Add(a, b), c), 1.0 / 3.0);
+    };
+    for (const char* arm : {"Upper Control Arm", "Lower Control Arm"}) {
+        CAPTURE(arm);
+        const Vec3 want = centroid(At(f, arm, "Location Chassis Front"),
+                                   At(f, arm, "Location Chassis Back"),
+                                   At(f, arm, "Location Upright"));
+        CHECK(Dist(want, At(f, arm, "COM")) < kTolM);
+    }
+    const Vec3 upright = centroid(At(f, "Upper Control Arm", "Location Upright"),
+                                  At(f, "Lower Control Arm", "Location Upright"),
+                                  At(f, "Spindle", "COM"));
+    CHECK(Dist(upright, At(f, "Upright", "COM")) < kTolM);
+
+    // The anchor itself: the baseline's wheel centre lands on the spindle.
+    CHECK(Dist(ToChrono(f, WheelCentreMm(f), true), At(f, "Spindle", "COM")) < 1e-9);
+}
+
+TEST_CASE("Front suspension: a short upper arm over a long lower arm, coil-over on the lower",
+          "[Suspension][Front]") {
+    // p.251: short/long arm.  In front view the upper arm is the shorter one,
+    // which is what makes the wheel gain negative camber in bump.
+    const auto f = ReadJson(kFront);
+    auto front_view_len = [&](const char* arm) {
+        const Vec3 in = Mid(At(f, arm, "Location Chassis Front"), At(f, arm, "Location Chassis Back"));
+        const Vec3 out = At(f, arm, "Location Upright");
+        return std::hypot(out.y - in.y, out.z - in.z);
+    };
+    CHECK(front_view_len("Upper Control Arm") < front_view_len("Lower Control Arm"));
+    CHECK(At(f, "Upper Control Arm", "Location Upright").z >
+          At(f, "Lower Control Arm", "Location Upright").z);
+
+    // The coil-over runs from the body down to the lower arm, landing between
+    // the arm's inner pivots and its ball joint.
+    for (const char* name : {"Spring", "Shock"}) {
+        CAPTURE(name);
+        const Vec3 top = At(f, name, "Location Chassis");
+        const Vec3 arm = At(f, name, "Location Arm");
+        CHECK(top.z > arm.z);
+        CHECK(arm.y > At(f, "Lower Control Arm", "Location Chassis Front").y);
+        CHECK(arm.y < At(f, "Lower Control Arm", "Location Upright").y);
+    }
+}
+
+TEST_CASE("Front suspension: the spring carries the chassis at the design position",
+          "[Suspension][Front]") {
+    // As on the rear, the free length is derived: installed length plus the
+    // static spring force over the rate.  Here the spring sits partway out the
+    // lower arm, so the force is the corner load over the motion ratio, which
+    // comes from the file's own geometry: spring length change per unit of
+    // lower ball joint rise as the arm turns on its pivots, carried out to the
+    // tyre by the front-view instant centre of the two arms.
+    const auto f = ReadJson(kFront);
+    REQUIRE(ReadJson(kVehicle).at("Axles")[0].at("Suspension Input File").get<std::string>() ==
+            "ev1/suspension/EV1_FrontDoubleWishbone.json");
+
+    const Vec3 pf = At(f, "Lower Control Arm", "Location Chassis Front");
+    const Vec3 pb = At(f, "Lower Control Arm", "Location Chassis Back");
+    const Vec3 lbj = At(f, "Lower Control Arm", "Location Upright");
+    const Vec3 ubj = At(f, "Upper Control Arm", "Location Upright");
+    const Vec3 top = At(f, "Spring", "Location Chassis");
+    const Vec3 seat = At(f, "Spring", "Location Arm");
+
+    constexpr double th = 1e-5;
+    const double installed = Dist(top, seat);
+    const double d_spring = Dist(top, RotateAbout(seat, pf, pb, th)) - installed;
+    const double d_lbj = RotateAbout(lbj, pf, pb, th).z - lbj.z;
+    const double ratio_at_lbj = std::abs(d_spring / d_lbj);
+
+    // Front-view instant centre: where the two arm lines cross.
+    const Vec3 ui = Mid(At(f, "Upper Control Arm", "Location Chassis Front"),
+                        At(f, "Upper Control Arm", "Location Chassis Back"));
+    const Vec3 li = Mid(pf, pb);
+    const double mu = (ubj.z - ui.z) / (ubj.y - ui.y);
+    const double ml = (lbj.z - li.z) / (lbj.y - li.y);
+    const double ic_y = (li.z - ui.z + mu * ui.y - ml * li.y) / (mu - ml);
+    const double wheel_y = HalfTrack(f);
+    const double motion_ratio = ratio_at_lbj * (lbj.y - ic_y) / (wheel_y - ic_y);
+    CHECK(motion_ratio > 0.5);
+    CHECK(motion_ratio < 1.0);
+
+    const auto& spring = f.at("Spring");
+    const double k = spring.at("Spring Coefficient").get<double>();
+    const double free_len = spring.at("Free Length").get<double>();
+    const double per_spring_n = ChassisLoadPerSideN(0) / motion_ratio;
+    CHECK(k > 0.0);
+    CHECK(free_len > installed);  // compressed at rest
+    CHECK_THAT(free_len, WithinAbs(installed + per_spring_n / k, 0.001));
+
+    // Coil-over: one line, so the damper shares the spring's two points.
+    CHECK(Dist(top, At(f, "Shock", "Location Chassis")) < 1e-9);
+    CHECK(Dist(seat, At(f, "Shock", "Location Arm")) < 1e-9);
 }

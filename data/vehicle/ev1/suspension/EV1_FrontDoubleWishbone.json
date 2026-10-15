@@ -1,48 +1,96 @@
 {
-  "Name":                       "EV1 Front SLA (DoubleWishbone; hardpoints are rescaled Chrono sedan template)",
+  "Name":                       "EV1 Front SLA (DoubleWishbone on the ev1 suspension baseline hardpoints)",
   "Type":                       "Suspension",
   "Template":                   "DoubleWishbone",
 
   "//PROVENANCE": [
     "Read this before treating any number in this file as an EV1 measurement.",
     "",
-    "MEASURED - printed in the manuals, and pinned by tests/test_suspension_geometry.cpp:",
-    "  Track 1470 mm (57.9 in) - EV1 chassis manual, printed page 62, 'Exterior",
-    "    Dimensions'. Half-track 0.735 m is the Spindle COM Y below.",
-    "  Camber -0.10 deg, Toe -0.05 deg at each wheel - EV1 chassis manual, printed",
-    "    page 61, 'ALIGNMENT SPECIFICATIONS', FRONT column nominals.",
-    "",
-    "NOT MEASURED - every hardpoint coordinate below is Chrono's stock sedan sample,",
-    "rescaled. Source: <chrono>/data/vehicle/sedan/suspension/Sedan_DoubleWishbone.json.",
-    "  Y x 0.921168 = 1470 / 1595.8, printed EV1 track over the sedan sample's track.",
-    "  X x ~0.92. Z was fitted to the ev1model wheelwells, not scaled.",
-    "  Masses, inertias and spring/damper rates are the sedan's, scaled down and",
-    "  rounded by hand; the collision radii and the axle inertia are the sedan's",
-    "  verbatim. No EV1 suspension hardpoint is published in anything this program",
-    "  holds - a search of both service manuals and all four parts-catalog sections",
-    "  turned up a wrench size, a tap size and hub runout limits, and no geometry.",
-    "  So these coordinates describe a Chrono sample car, not an EV1.",
-    "",
-    "TOPOLOGY IS CORRECT ON THIS AXLE. EV1 chassis manual, printed page 251: 'The",
-    "  short/long arm (SLA) independent front suspension used on the EV1 ... Each",
-    "  wheel is independently connected to the cradle/front suspension crossmember by",
-    "  a steering knuckle, wheel hub assembly, coil over shock assembly, upper and",
+    "LAYOUT - printed. EV1 chassis manual, printed page 251: 'The short/long arm",
+    "  (SLA) independent front suspension used on the EV1 ... Each wheel is",
+    "  independently connected to the cradle/front suspension crossmember by a",
+    "  steering knuckle, wheel hub assembly, coil over shock assembly, upper and",
     "  lower ball joint and upper and lower control arm ... steered by two front tie",
-    "  rods.' Chrono's DoubleWishbone is the right kinematic layout for that; only the",
-    "  coordinates are borrowed. Not modeled: the coil-over-shock yoke linkage that",
-    "  carries the spring load into the lower control arm, and the stabilizer bar.",
+    "  rods.' Chrono's DoubleWishbone is that layout.",
     "",
-    "The two keys below are what the test checks the geometry against, so this note",
-    "cannot drift away from the numbers it describes."
+    "HARDPOINTS - from the ev1 repo's suspension baseline, programmerq/ev1 commit",
+    "  a6ab7146d91dcdf4536ec2abfc72f979deb1c7d6 (PR #144),",
+    "  geometry/suspension/ev1_suspension_hardpoints.csv. The table under",
+    "  '//hardpoints_ev1_mm' copies each front point with its tier and source, in the",
+    "  body repair manual's datum frame (X rearward, Y to the car's right, Z up).",
+    "  Only the damper top is a printed coordinate (body repair manual p.155). Every",
+    "  arm, ball-joint, tie-rod and yoke point is the baseline's ESTIMATE, sized to",
+    "  the printed envelope and the p.251 figure. None of them is measured. The",
+    "  lower arm pivots sit on the cradle, whose own body mounts are under question",
+    "  in the ev1 repo, so treat them as the least certain points here.",
+    "",
+    "FRAME MAP - inferred, not fitted, and kept in '//frame' only. Chrono wants X",
+    "  forward, Y left, Z up, origin at the vehicle file's 'Suspension Location'.",
+    "  The map anchors the baseline's front wheel centre (1686, 735, 420.9) on the",
+    "  spindle position the sedan-template file used, (0, 0.735, -0.08), so the",
+    "  car's ride height in the chassis frame does not move:",
+    "  x = -(X - 1686)/1000, y = Y/1000, z = -0.08 + (Z - 420.9)/1000.",
+    "  '//coordinates' says which table point each Chrono coordinate is.",
+    "",
+    "COIL-OVER YOKE. The coil-over runs from the damper top down to a fork-shaped",
+    "  yoke bolted to the lower arm (chassis p.228). The yoke is rigid on the arm,",
+    "  so the Spring and Shock 'Location Arm' is the yoke-to-arm bolt and the",
+    "  coil-over line runs damper top to that bolt; no extra body is needed.",
+    "  Not modeled: the stabilizer bar.",
+    "",
+    "ALIGNMENT - printed. Camber -0.10 deg, toe -0.05 deg per wheel: chassis manual",
+    "  p.61 front nominals. Track 1470 mm: chassis p.62.",
+    "",
+    "SPRING, DAMPER, MASSES - see the '//' notes beside each. Nothing in them is",
+    "  printed: the spring rate is the baseline's estimate, the free length and",
+    "  damping are derived from it, and masses are the earlier template's.",
+    "",
+    "tests/test_suspension_geometry.cpp recomputes every Chrono coordinate below",
+    "from the '//hardpoints_ev1_mm' table through the frame map, so the table and",
+    "the coordinates cannot drift apart."
   ],
   "//track_mm":                 1470,
-  "//hardpoint_scale_y":        0.921168,
+
+  "//frame": {
+    "ev1_front_wheel_centre_mm": [1686.0, 735.0, 420.9],
+    "chrono_spindle_m":          [0.0, 0.735, -0.08],
+    "//": "fr_wheel_centre in the baseline is inferred: X = mean of the damper-top and rear-spring-seat anchors, Y = half printed front track, Z = derived ground + tyre loaded radius"
+  },
+
+  "//hardpoints_ev1_mm": {
+    "upper_ball_joint": {"xyz": [1697.8, 602.8, 780.9], "tier": "estimated", "source": "baseline: 500 mm above the lower ball joint (tall knuckle, figure PSMGCH66740AA); X and Y from printed caster 2.5 deg and an estimated 11 deg KPI"},
+    "lower_ball_joint": {"xyz": [1676.0, 700.0, 280.9], "tier": "estimated", "source": "baseline: inside the 14 in rim, 140 mm below the wheel centre, 10 mm ahead for trail"},
+    "uca_pivot_fwd":    {"xyz": [1576.0, 430.0, 750.9], "tier": "estimated", "source": "baseline: upper arm bolts to the body (chassis p.246); legs straddle the coil-over"},
+    "uca_pivot_rr":     {"xyz": [1816.0, 430.0, 760.9], "tier": "estimated", "source": "baseline: as uca_pivot_fwd, slight rise rearward for anti-dive"},
+    "lca_pivot_fwd":    {"xyz": [1646.0, 330.0, 300.0], "tier": "estimated", "source": "baseline: on the cradle (camber cam)"},
+    "lca_pivot_rr":     {"xyz": [1936.0, 330.0, 305.0], "tier": "estimated", "source": "baseline: on the cradle (caster cam), 63 mm ahead of the printed rear cradle mount X=1999"},
+    "tie_rod_inner":    {"xyz": [1821.0, 344.7, 369.0], "tier": "estimated", "source": "baseline: computed for zero bump steer from the estimated arms"},
+    "tie_rod_outer":    {"xyz": [1821.0, 640.0, 360.9], "tier": "estimated", "source": "baseline: rearward steering arm (rack behind the axle on the cradle)"},
+    "damper_top":       {"xyz": [1709.0, 438.0, 891.0], "tier": "printed",   "source": "body repair manual p.155, redux datum-b155-06; tower-to-tower span 875 mm body p.160 dim-b160-05"},
+    "yoke_to_lca_bolt": {"xyz": [1699.0, 637.1, 294.1], "tier": "estimated", "source": "baseline: yoke bolts to the top of the lower arm about 83% of the way out, under the damper top (chassis p.228)"}
+  },
+
+  "//coordinates": {
+    "Upper Control Arm/Location Chassis Front": "uca_pivot_fwd",
+    "Upper Control Arm/Location Chassis Back":  "uca_pivot_rr",
+    "Upper Control Arm/Location Upright":       "upper_ball_joint",
+    "Lower Control Arm/Location Chassis Front": "lca_pivot_fwd",
+    "Lower Control Arm/Location Chassis Back":  "lca_pivot_rr",
+    "Lower Control Arm/Location Upright":       "lower_ball_joint",
+    "Tierod/Location Chassis":                  "tie_rod_inner",
+    "Tierod/Location Upright":                  "tie_rod_outer",
+    "Spring/Location Chassis":                  "damper_top",
+    "Spring/Location Arm":                      "yoke_to_lca_bolt",
+    "Shock/Location Chassis":                   "damper_top",
+    "Shock/Location Arm":                       "yoke_to_lca_bolt"
+  },
 
   "Camber Angle (deg)":         -0.10,
   "Toe Angle (deg)":            -0.05,
 
   "Spindle":
   {
+    "//":                       "Mass, inertia and size carried over from the sedan-template file; not EV1 values.",
     "Mass":                     1.0,
     "COM":                      [0, 0.735, -0.08],
     "Inertia":                  [0.0004, 0.0004, 0.0004],
@@ -52,8 +100,9 @@
 
   "Upright":
   {
+    "//":                       "COM at the centroid of the two ball joints and the spindle. Mass and inertia from the sedan-template file.",
     "Mass":                     1.2,
-    "COM":                      [-0.02, 0.690, -0.07],
+    "COM":                      [-0.0006, 0.6793, -0.0067],
     "Moments of Inertia":       [0.010, 0.010, 0.002],
     "Products of Inertia":      [0, 0, 0],
     "Radius":                   0.025
@@ -61,47 +110,52 @@
 
   "Upper Control Arm":
   {
+    "//":                       "COM at the centroid of the arm's three points. Mass and inertia from the sedan-template file.",
     "Mass":                     0.9,
-    "COM":                      [-0.10, 0.55, 0.10],
+    "COM":                      [-0.0106, 0.4876, 0.2633],
     "Moments of Inertia":       [0.005, 0.002, 0.006],
     "Products of Inertia":      [0, 0, 0],
     "Radius":                   0.02,
-    "Location Chassis Front":   [-0.090, 0.430, 0.095],
-    "Location Chassis Back":    [-0.230, 0.470, 0.100],
-    "Location Upright":         [-0.037, 0.640, 0.095]
+    "Location Chassis Front":   [0.1100, 0.4300, 0.2500],
+    "Location Chassis Back":    [-0.1300, 0.4300, 0.2600],
+    "Location Upright":         [-0.0118, 0.6028, 0.2800]
   },
 
   "Lower Control Arm":
   {
+    "//":                       "COM at the centroid of the arm's three points. Mass and inertia from the sedan-template file.",
     "Mass":                     1.4,
-    "COM":                      [0.005, 0.563, -0.250],
+    "COM":                      [-0.0667, 0.4533, -0.2056],
     "Moments of Inertia":       [0.012, 0.016, 0.028],
     "Products of Inertia":      [0, 0, 0],
     "Radius":                   0.03,
-    "Location Chassis Front":   [0.185, 0.387, -0.240],
-    "Location Chassis Back":    [-0.185, 0.433, -0.235],
-    "Location Upright":         [0.0, 0.710, -0.280]
+    "Location Chassis Front":   [0.0400, 0.3300, -0.2009],
+    "Location Chassis Back":    [-0.2500, 0.3300, -0.1959],
+    "Location Upright":         [0.0100, 0.7000, -0.2200]
   },
 
   "Tierod":
   {
-    "Location Chassis":         [-0.185, 0.387, -0.100],
-    "Location Upright":         [-0.138, 0.710, -0.100]
+    "Location Chassis":         [-0.1350, 0.3447, -0.1319],
+    "Location Upright":         [-0.1350, 0.6400, -0.1400]
   },
 
   "Spring":
   {
-    "Location Chassis":         [-0.037, 0.479, 0.210],
-    "Location Arm":             [0.0, 0.571, -0.240],
-    "Free Length":              0.48,
-    "Spring Coefficient":       143000.0
+    "//rate":                   "37826 N/m: the baseline's spring_rate_front estimate (1.35 Hz ride target on its corner mass, through its 0.786 motion ratio). Not printed.",
+    "//free_length":            "Derived: installed length (damper top to yoke bolt) plus the static spring force over the rate. Static force = the chassis body's share of the front axle load per side (EV1_Chassis.json mass and COM, EV1_Vehicle.json axle positions) over this geometry's motion ratio at the tyre; the test recomputes it.",
+    "Location Chassis":         [-0.0230, 0.4380, 0.3901],
+    "Location Arm":             [-0.0130, 0.6371, -0.2068],
+    "Free Length":              0.7302,
+    "Spring Coefficient":       37826.0
   },
 
   "Shock":
   {
-    "Location Chassis":         [-0.037, 0.479, 0.210],
-    "Location Arm":             [0.0, 0.571, -0.240],
-    "Damping Coefficient":      7500.0
+    "//":                       "Derived for a 0.30 ride damping ratio at the wheel: 2 x 0.30 x sqrt(wheel rate x sprung corner mass), over the motion ratio squared. Not printed.",
+    "Location Chassis":         [-0.0230, 0.4380, 0.3901],
+    "Location Arm":             [-0.0130, 0.6371, -0.2068],
+    "Damping Coefficient":      2620.0
   },
 
   "Axle":
