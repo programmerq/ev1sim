@@ -109,6 +109,8 @@ struct DashLamps {
     std::optional<bool> battery_life;        // 4143
     std::optional<bool> reduced_perf;        // 4144
     std::optional<bool> check_tire;          // 4145
+    std::optional<bool> service_soon;        // CHASSIS_IPC_SERVICE_SOON_TELLTALE
+    std::optional<bool> wait;                // CHASSIS_IPC_WAIT_TELLTALE
 };
 
 struct DashSnapshot {
@@ -119,6 +121,7 @@ struct DashSnapshot {
     std::optional<DashBrakeStatus> brake;      // $91
     std::optional<DashOdometer>   odometer;    // $21
     std::optional<DashLamps>      lamps;       // IPC lamp cells, not a frame
+    std::optional<float>          trip_m;      // IPC trip cell 4132 (metres), not a frame
 };
 
 }  // namespace ev1sim

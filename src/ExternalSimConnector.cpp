@@ -1523,7 +1523,9 @@ struct ExternalSimConnector::State {
     std::uint64_t pim_active_dtc_bitmap_hi        = 0u;
     bool          has_pim_active_dtc_bitmap       = false;
     bool          ipc_service_soon_telltale       = false;
+    bool          has_ipc_service_soon_telltale   = false;
     bool          ipc_wait_telltale               = false;
+    bool          has_ipc_wait_telltale           = false;
     bool          ipc_wait_drive                  = false;
     // Injected insulation fault (scenario action hv_isolation_fault).
     bool          hv_iso_fault_armed              = false;
@@ -2186,7 +2188,10 @@ ev1sim::DashSnapshot ExternalSimConnector::GetDashSnapshot() const {
     l.battery_life       = lamp(st.has_ipc_battery_life_telltale, st.ipc_battery_life_telltale);
     l.reduced_perf       = lamp(st.has_ipc_reduced_perf_telltale, st.ipc_reduced_perf_telltale);
     l.check_tire         = lamp(st.has_ipc_check_tire_press_telltale, st.ipc_check_tire_press_telltale);
+    l.service_soon       = lamp(st.has_ipc_service_soon_telltale, st.ipc_service_soon_telltale);
+    l.wait               = lamp(st.has_ipc_wait_telltale, st.ipc_wait_telltale);
     snap.lamps = l;
+    if (st.has_ipc_trip_distance_m) snap.trip_m = st.ipc_trip_distance_m;
     return snap;
 }
 
@@ -3430,9 +3435,13 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             if (lo || hi) st.has_pim_active_dtc_bitmap = true;
         }
         if (auto v = st.wire->ipc_service_soon_telltale()) {
-            st.ipc_service_soon_telltale = *v;
+            st.ipc_service_soon_telltale     = *v;
+            st.has_ipc_service_soon_telltale = true;
         }
-        if (auto v = st.wire->ipc_wait_telltale()) st.ipc_wait_telltale = *v;
+        if (auto v = st.wire->ipc_wait_telltale()) {
+            st.ipc_wait_telltale     = *v;
+            st.has_ipc_wait_telltale = true;
+        }
         if (auto v = st.wire->ipc_wait_drive())    st.ipc_wait_drive    = *v;
 
         // BTCM liveness (was the kSigBtcmUartFrame 5050 heartbeat). The full

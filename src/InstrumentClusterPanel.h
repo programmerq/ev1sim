@@ -56,6 +56,9 @@ std::wstring FormatClusterCharge(const std::optional<DashPackStatus>& pack,
 /// "ODO 1234.5 km" / "ODO 767.1 mi" from the IPC's own $21, "ODO FAULT" when
 /// the frame flags the odometer faulted, or "ODO ---".
 std::wstring FormatClusterOdometer(const std::optional<DashOdometer>& odo, ClusterUnits units);
+/// "TRIP 12.3 km" / "TRIP 7.6 mi" from the IPC trip cell, or "TRIP ---"
+/// before it is written (or for a negative value).
+std::wstring FormatClusterTrip(const std::optional<float>& trip_m, ClusterUnits units);
 /// Which modules are being heard: "Bus: PIM ok  BPM ok  BTCM --  IPC ok".
 std::wstring FormatClusterBusLine(const DashSnapshot& snap);
 
@@ -76,6 +79,7 @@ struct ClusterView {
     std::wstring pack;
     std::wstring charge;    // empty = not charging; the row is not drawn
     std::wstring odometer;
+    std::wstring trip;      // drawn on the odometer row, right half
     std::wstring bus;
     std::vector<ClusterLamp> lamps;  // fixed order, one entry per DashLamps member
 };

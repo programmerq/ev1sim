@@ -118,7 +118,7 @@ TEST_CASE("Cluster bus line says which modules are being heard", "[cluster]") {
 
 TEST_CASE("Cluster view: lamps are unknown until their cells are written", "[cluster]") {
     const ClusterView empty = BuildClusterView(DashSnapshot{}, ClusterUnits::kMetric);
-    REQUIRE(empty.lamps.size() == 13u);
+    REQUIRE(empty.lamps.size() == 15u);
     for (const auto& lamp : empty.lamps) {
         REQUIRE_FALSE(lamp.known);
         REQUIRE_FALSE(lamp.lit);
@@ -136,6 +136,30 @@ TEST_CASE("Cluster view: lamps are unknown until their cells are written", "[clu
     REQUIRE(v.lamps[2].known);
     REQUIRE(v.lamps[2].lit);
     REQUIRE_FALSE(v.lamps[1].known);  // PARK BRAKE cell never written
+}
+
+TEST_CASE("Cluster view: SERVICE SOON and WAIT lamps follow their cells", "[cluster]") {
+    DashSnapshot snap;
+    snap.lamps = DashLamps{};
+    snap.lamps->wait = true;
+    const ClusterView v = BuildClusterView(snap, ClusterUnits::kMetric);
+    REQUIRE(std::wstring(v.lamps[13].name) == L"SERVICE SOON");
+    REQUIRE_FALSE(v.lamps[13].known);
+    REQUIRE(std::wstring(v.lamps[14].name) == L"WAIT");
+    REQUIRE(v.lamps[14].known);
+    REQUIRE(v.lamps[14].lit);
+}
+
+TEST_CASE("Cluster trip label: metres to km or miles, blank until written", "[cluster]") {
+    REQUIRE(FormatClusterTrip(std::nullopt, ClusterUnits::kMetric) == L"TRIP ---");
+    REQUIRE(FormatClusterTrip(-1.0f, ClusterUnits::kMetric) == L"TRIP ---");
+    REQUIRE(FormatClusterTrip(0.0f, ClusterUnits::kMetric) == L"TRIP 0.0 km");
+    REQUIRE(FormatClusterTrip(12345.0f, ClusterUnits::kMetric) == L"TRIP 12.3 km");
+    REQUIRE(FormatClusterTrip(16093.44f, ClusterUnits::kImperial) == L"TRIP 10.0 mi");
+
+    DashSnapshot snap;
+    snap.trip_m = 2500.0f;
+    REQUIRE(BuildClusterView(snap, ClusterUnits::kMetric).trip == L"TRIP 2.5 km");
 }
 
 TEST_CASE("Cluster panel: the charging row changes the height; draws on a null driver", "[cluster]") {
