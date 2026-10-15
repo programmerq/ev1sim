@@ -1133,10 +1133,12 @@ void SimApp::ApplyRearEmbBrake(double time, double /*local_rear_brake*/) {
     // The [-1, +1] motor command drives each corner's clamp: +1 applies,
     // -1 releases, and 0 is the BTCM's anti-lock HOLD, which KEEPS the clamp
     // force (RearEmbClamp.h has the reasoning). A stale command is zero
-    // force: the rear has no hydraulic fallback path.
+    // force: the rear has no hydraulic fallback path. Each call advances the
+    // actuator by one physics step, so the force builds over its travel time.
     const ev1sim::BrakeDrum::Params drum;
-    const double force_rl = m_rear_clamp_rl.Update(cmd.lr, cmd.lr_fresh, drum);
-    const double force_rr = m_rear_clamp_rr.Update(cmd.rr, cmd.rr_fresh, drum);
+    const double dt = m_config.simulation.step_size_s;
+    const double force_rl = m_rear_clamp_rl.Update(cmd.lr, cmd.lr_fresh, drum, dt);
+    const double force_rr = m_rear_clamp_rr.Update(cmd.rr, cmd.rr_fresh, drum, dt);
 
     // Wheel angular velocity needed for the self-energizing factor.
     // VehicleState.wheel_omega is indexed FL, FR, RL, RR.

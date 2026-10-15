@@ -76,8 +76,7 @@ public:
     /// Advance with this step's command over dt_s seconds and return the shoe
     /// force (N).  Without dt_s the actuator settles within the step: an APPLY
     /// reaches the maximum force, a RELEASE reaches home, and a HOLD keeps
-    /// where it is.  That is the instantaneous map SimApp::ApplyRearEmbBrake
-    /// uses until it passes its step size.
+    /// where it is.  SimApp::ApplyRearEmbBrake passes the physics step.
     double Update(float cmd, bool fresh, const BrakeDrum::Params& p,
                   double dt_s = kSettleWithinStep) {
         if (!fresh) {
