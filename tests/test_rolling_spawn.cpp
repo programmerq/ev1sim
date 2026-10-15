@@ -16,11 +16,11 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "EV1Vehicle.h"
-#include "SlipRatio.h"
 
 #include "chrono/core/ChGlobal.h"
 #include "chrono_vehicle/ChVehicleModelData.h"
 #include "chrono_vehicle/terrain/RigidTerrain.h"
+#include "chrono_vehicle/wheeled_vehicle/ChTire.h"
 
 #include <algorithm>
 #include <cmath>
@@ -75,8 +75,8 @@ TEST_CASE("Rolling spawn: the car starts at speed with its wheels already turnin
                 speed_at_settle = ev1->GetSpeed();
             for (int a = 0; a < 2; ++a)
                 for (auto side : {LEFT, RIGHT})
-                    max_slip = std::max(max_slip, std::abs(ev1sim::SlipRatio::longitudinal(
-                        ev1->GetSpeed(), ev1->GetSpindleOmega(a, side), kTireRadius)));
+                    max_slip = std::max(max_slip, std::abs(
+                        ev1->GetAxle(a)->GetWheel(side)->GetTire()->GetLongitudinalSlip()));
         }
     }
 
@@ -86,7 +86,11 @@ TEST_CASE("Rolling spawn: the car starts at speed with its wheels already turnin
     // Still at (nearly) the spawn speed: a coast loses well under 1 m/s here.
     CHECK(speed_at_settle > kSpawnSpeed - 1.0);
     CHECK(speed_at_settle <= kSpawnSpeed + 0.1);
-    // And moving forward along +x, not skidding: free-rolling wheels.
+    // And moving forward along +x, not skidding: free-rolling wheels.  The
+    // slip is the tyre model's own, taken against its loaded rolling radius.
+    // Omega times the unloaded radius reads 1-3 % "slip" on a free-rolling
+    // wheel that swings with the tyre's deflection while the body is still
+    // pitching from the drop, which says nothing about skidding.
     CHECK(ev1->GetChassis()->GetPos().x() > 0.9 * kSpawnSpeed * kEnd);
     CHECK(max_slip < 0.02);
 }
