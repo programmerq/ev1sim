@@ -139,8 +139,14 @@ def main():
         source = "Open-Meteo hourly, lat %s lon %s, %s (%s)" % (
             args.lat, args.lon, args.date.isoformat(), response.get("timezone", "?"))
 
+    try:
+        series = hourly_series(response)
+    except (KeyError, TypeError, ValueError) as e:
+        print("fetch_weather: cannot use the response (%s); no file written, "
+              "so the almanac keeps its defaults" % e, file=sys.stderr)
+        return 1
     out = {"//source": source}
-    out.update(fit(*hourly_series(response)))
+    out.update(fit(*series))
     text = json.dumps(out, indent=2) + "\n"
     if args.output:
         with open(args.output, "w") as f:
