@@ -63,7 +63,7 @@
     "uca_pivot_fwd":    {"xyz": [1576.0, 430.0, 750.9], "tier": "estimated", "source": "baseline: upper arm bolts to the body (chassis p.246); legs straddle the coil-over"},
     "uca_pivot_rr":     {"xyz": [1816.0, 430.0, 760.9], "tier": "estimated", "source": "baseline: as uca_pivot_fwd, slight rise rearward for anti-dive"},
     "lca_pivot_fwd":    {"xyz": [1646.0, 330.0, 300.0], "tier": "estimated", "source": "baseline: on the cradle (camber cam)"},
-    "lca_pivot_rr":     {"xyz": [1936.0, 330.0, 305.0], "tier": "estimated", "source": "baseline: on the cradle (caster cam), 50 mm ahead of the printed rear cradle mount X=1999"},
+    "lca_pivot_rr":     {"xyz": [1936.0, 330.0, 305.0], "tier": "estimated", "source": "baseline: on the cradle (caster cam), 63 mm ahead of the printed rear cradle mount X=1999"},
     "tie_rod_inner":    {"xyz": [1821.0, 344.7, 369.0], "tier": "estimated", "source": "baseline: computed for zero bump steer from the estimated arms"},
     "tie_rod_outer":    {"xyz": [1821.0, 640.0, 360.9], "tier": "estimated", "source": "baseline: rearward steering arm (rack behind the axle on the cradle)"},
     "damper_top":       {"xyz": [1709.0, 438.0, 891.0], "tier": "printed",   "source": "body repair manual p.155, redux datum-b155-06; tower-to-tower span 875 mm body p.160 dim-b160-05"},
