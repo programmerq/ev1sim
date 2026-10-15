@@ -46,18 +46,6 @@ future-UI input on one side, chassis-segment signal publishing on the other.
 
 ## Powertrain
 
-- [ ] **Reverse is not modelled, so 4070 is never negative.**  The printed
-  speed limits (@source:manual propulsion p57, p250: 129 km/h forward, 48 km/h
-  reverse) are the PIM's, applied as a taper on its torque command keyed to
-  shaft speed; electricsim's `ev1/pim/pim_speed_limit.h` carries them, and
-  ev1sim sees the result as the PIM's throttle on 4073.  The forward limit has
-  an honest signal to act on (4070 publishes the unclamped shaft speed, see
-  `SimApp::PublishMotorState`).  The reverse limit does not: the Chrono
-  transmission stays in forward gear (nothing calls `SetDriveMode`) and
-  `ChAutomaticTransmissionSimpleMap` takes `std::abs(driveshaft_speed)`, while
-  the chassis-signal contract describes 4070 as signed with negative meaning
-  reverse.  A reverse gear and a signed 4070 come first.
-
 - [ ] **electricsim's PIM plant clamps torque at 150 N·m.**
   `ev1/pim/pim_drive_plant.h` `PIM_DP_MOTOR_MAX_TORQUE_MNM` is an `@design`
   figure; this repo's map carries the 141 N·m propulsion p250 prints, so the
