@@ -19,7 +19,7 @@
     },
 
     {
-      "Suspension Input File": "ev1/suspension/EV1_RearDoubleWishbone.json",
+      "Suspension Input File": "ev1/suspension/EV1_RearFiveLink.json",
       "Suspension Location": [ -1.166, 0, 0.37 ],
       "Left Wheel Input File": "ev1/wheel/EV1_Wheel.json",
       "Right Wheel Input File": "ev1/wheel/EV1_Wheel.json",

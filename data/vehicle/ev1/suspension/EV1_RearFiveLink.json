@@ -1,0 +1,261 @@
+{
+  "Name":                       "EV1 Rear (beam axle on five links)",
+  "Type":                       "Suspension",
+  "Template":                   "GenericWheeledSuspension",
+
+  "//PROVENANCE": [
+    "Read this before treating any number in this file as an EV1 measurement.",
+    "",
+    "LAYOUT - printed. EV1 chassis manual, printed page 271: 'The rear suspension on",
+    "  the EV1 consists of a rear axle assembly with aluminum end castings and a",
+    "  tubular center section. There are two coil springs, two twin tube shock",
+    "  absorbers and five connecting links with non-replaceable bushings. These five",
+    "  connecting links are composed of two upper suspension leading links, two lower",
+    "  suspension trailing links, and a track bar.' This file builds exactly that",
+    "  part list: one rigid Axle Tube carrying both spindles, two Lower Links and a",
+    "  Track Bar as jointed bodies, two Upper Links as stiff spring-dampers, two",
+    "  springs and two dampers, all chassis-mounted (see '//links' for why).",
+    "  Chrono's SolidAxle template was not used: it is a steered axle (knuckles, tie",
+    "  rod, drag link, bell crank) and has no track bar.",
+    "",
+    "HARDPOINTS - from the ev1 repo's suspension baseline, programmerq/ev1 commit",
+    "  a6ab7146d91dcdf4536ec2abfc72f979deb1c7d6 (PR #144),",
+    "  geometry/suspension/ev1_suspension_hardpoints.csv. The table under",
+    "  '//hardpoints_ev1_mm' copies each rear point with its tier and source, in the",
+    "  body repair manual's datum frame (X rearward, Y to the car's right, Z up).",
+    "  Only the rear spring's body seat and the lower link's body bracket are",
+    "  printed coordinates (body repair manual p.158), and the lower bracket's ROLE",
+    "  is inferred. The upper link body pivot is the midpoint of a printed two-bolt",
+    "  bracket whose role is also inferred. Every other point is an estimate sized",
+    "  to the printed envelope and the p.271 figure. None of them is measured.",
+    "",
+    "FRAME MAP - inferred, not fitted. Chrono wants X forward, Y left, Z up, origin",
+    "  at the vehicle file's 'Suspension Location'. The map anchors the baseline's",
+    "  rear wheel centre (4198, 622, 408.2) on the spindle position the stand-in",
+    "  file used, (0, 0.622, -0.08), so the car's ride height in the chassis frame",
+    "  does not move: x = -(X - 4198)/1000, z = -0.08 + (Z - 408.2)/1000, and",
+    "  y = +Y/1000 for mirrored parts (Chrono gives the left side, the baseline the",
+    "  right) and y = -Y/1000 for the one part that crosses the car, the track bar.",
+    "",
+    "ALIGNMENT - printed. Camber -0.50 deg, toe 0.00 deg per wheel: chassis manual",
+    "  p.61 rear nominals, fixed by the end castings. Track 1244 mm: chassis p.62.",
+    "",
+    "SPRING, DAMPER, MASSES, BUSHINGS - see the '//' notes beside each. Nothing in",
+    "  them is printed: the spring rate is the baseline's estimate, the free length",
+    "  and damping are derived from it, and masses and link rates are estimates.",
+    "",
+    "tests/test_suspension_geometry.cpp recomputes every Chrono coordinate below",
+    "from the '//hardpoints_ev1_mm' table through the frame map, so the table and",
+    "the coordinates cannot drift apart."
+  ],
+  "//track_mm":                 1244,
+
+  "//frame": {
+    "ev1_rear_wheel_centre_mm": [4198.0, 622.0, 408.2],
+    "chrono_spindle_m":         [0.0, 0.622, -0.08],
+    "//": "rr_wheel_centre in the baseline is inferred: X = front wheel centre + printed 2512 wheelbase, Y = half printed rear track, Z = derived ground + tyre loaded radius"
+  },
+
+  "//hardpoints_ev1_mm": {
+    "lower_link_body":  {"xyz": [3920.0, 486.0, 332.0], "tier": "printed point, inferred role", "source": "body repair manual p.158, redux datum-b158-17; baseline reads it as the lower trailing-link bracket (280 mm ahead of the axle)"},
+    "lower_link_axle":  {"xyz": [4178.0, 486.0, 303.2], "tier": "estimated", "source": "baseline: under the axle tube on the end casting, same Y as the body pivot"},
+    "upper_link_body":  {"xyz": [4360.0, 485.0, 370.0], "tier": "inferred",  "source": "baseline: midpoint of printed bracket holes datum-b158-06/07 (body p.158), read as the upper leading-link bracket"},
+    "upper_link_axle":  {"xyz": [4238.0, 485.0, 468.2], "tier": "estimated", "source": "baseline: on top of the end casting, above the lower link"},
+    "spring_upper":     {"xyz": [4195.0, 320.0, 543.0], "tier": "printed",   "source": "body repair manual p.158, redux datum-b158-08; 640 mm spacing body p.161 dim-b161-06"},
+    "spring_lower":     {"xyz": [4195.0, 320.0, 398.2], "tier": "estimated", "source": "baseline: spring pad on the axle straight below the body seat"},
+    "damper_upper":     {"xyz": [4308.0, 470.0, 600.0], "tier": "estimated", "source": "baseline: twin-tube damper beside the spring; body mount not printed"},
+    "damper_lower":     {"xyz": [4268.0, 520.0, 348.2], "tier": "estimated", "source": "baseline: on the end casting behind the axle tube"},
+    "track_bar_body":   {"xyz": [4258.0, -470.0, 470.0], "tier": "estimated", "source": "baseline: single track bar 22145314; which side carries the body bracket is not printed, shown on the LEFT"},
+    "track_bar_axle":   {"xyz": [4258.0, 470.0, 440.0], "tier": "estimated", "source": "baseline: axle end on the RIGHT casting, near level with the body end"}
+  },
+
+  "Steerable":                  false,
+  "Independent":                false,
+
+  "Camber Angle (deg)":         -0.50,
+  "Toe Angle (deg)":            0.00,
+
+  "Spindle":
+  {
+    "//":                       "Mass, inertia and size carried over from the DoubleWishbone stand-in; not EV1 values.",
+    "Mass":                     1.0,
+    "COM":                      [0, 0.622, -0.08],
+    "Inertia":                  [0.0004, 0.0004, 0.0004],
+    "Radius":                   0.1,
+    "Width":                    0.02,
+    "Attachment Body":          "Axle Tube"
+  },
+
+  "Bodies": [
+    {
+      "Name":                   "Axle Tube",
+      "//":                     [
+        "One rigid body for the aluminum end castings, tubular centre section, hubs and",
+        "electric drums. Mass 35.0 kg = 2 x 35 kg estimated rear unsprung corner",
+        "(baseline unsprung_mass_rear_corner) - 2 x (8.0 kg wheel + 7.5 kg tyre +",
+        "1.0 kg spindle, as this repo's wheel, tyre and spindle files carry them)",
+        "- half the 4.0 kg of jointed links (lower links, track bar) = 35.0 kg; the",
+        "upper links have no body (see '//links'), so their unsprung half stays in",
+        "this figure. Inertia: slender rod over the 1.244 m track, m L^2 / 12 about",
+        "X and Z; spin axis a 40 mm tube. Estimated."
+      ],
+      "Mirrored":               false,
+      "Position":               [0.0, 0.0, -0.08],
+      "Rotation":               [1, 0, 0, 0],
+      "Mass":                   35.0,
+      "Moments of Inertia":     [4.514, 0.028, 4.514],
+      "Products of Inertia":    [0, 0, 0],
+      "Visualization": {
+        "Primitives": [
+          {"Type": "CYLINDER", "Location": [0, 0, 0], "Axis": [0, 1, 0], "Radius": 0.04, "Length": 1.144}
+        ]
+      }
+    },
+    {
+      "Name":                   "Lower Link",
+      "//":                     "Trailing link, body end ahead of the axle. Position = midpoint of its two joints. Mass 1.0 kg estimated; inertia isotropic m L^2 / 12, L = 0.2596 m.",
+      "Mirrored":               true,
+      "Position":               [0.149, 0.486, -0.1706],
+      "Rotation":               [1, 0, 0, 0],
+      "Mass":                   1.0,
+      "Moments of Inertia":     [0.0056, 0.0056, 0.0056],
+      "Products of Inertia":    [0, 0, 0],
+      "Visualization": {
+        "Primitives": [
+          {"Type": "CYLINDER", "Location": [0, 0, 0], "Axis": [0.9938, 0, 0.1110], "Radius": 0.015, "Length": 0.2596}
+        ]
+      }
+    },
+    {
+      "Name":                   "Track Bar",
+      "//":                     "Single part across the car (not mirrored). Position = midpoint of its two joints. Mass 2.0 kg estimated; inertia isotropic m L^2 / 12, L = 0.9405 m.",
+      "Mirrored":               false,
+      "Position":               [-0.06, 0.0, -0.0332],
+      "Rotation":               [1, 0, 0, 0],
+      "Mass":                   2.0,
+      "Moments of Inertia":     [0.1474, 0.1474, 0.1474],
+      "Products of Inertia":    [0, 0, 0],
+      "Visualization": {
+        "Primitives": [
+          {"Type": "CYLINDER", "Location": [0, 0, 0], "Axis": [0, 0.9995, 0.0319], "Radius": 0.015, "Length": 0.9405}
+        ]
+      }
+    }
+  ],
+
+  "//links": [
+    "The lower links and the track bar are bodies on kinematic spherical joints at",
+    "both ends. Those three constraints leave the axle free to bounce, roll, and",
+    "pitch about the lower links. The upper links take out that pitch, and they do",
+    "it as stiff spring-dampers ('Upper Link' under TSDAs) rather than jointed",
+    "bodies: four rigid fore-aft links of two different lengths over-constrain a",
+    "rigid axle, which only bushing compliance lets move (p.271: 'non-replaceable",
+    "bushings'), and Chrono's default Barzilai-Borwein solver refuses joint",
+    "bushings because they carry stiffness matrices. 2 kN/mm along the link with",
+    "2 kN s/m of damping is a generic rubber-bushed link rate, not EV1 data. Estimated."
+  ],
+
+  "Joints": [
+    {
+      "Name":                   "Lower Link Body",
+      "//hardpoint":            "lower_link_body",
+      "Mirrored":               true,
+      "Type":                   "Spherical",
+      "Body1":                  "Chassis",
+      "Body2":                  "Lower Link",
+      "Position":               [0.278, 0.486, -0.1562],
+      "Rotation":               [1, 0, 0, 0]
+    },
+    {
+      "Name":                   "Lower Link Axle",
+      "//hardpoint":            "lower_link_axle",
+      "Mirrored":               true,
+      "Type":                   "Spherical",
+      "Body1":                  "Lower Link",
+      "Body2":                  "Axle Tube",
+      "Position":               [0.020, 0.486, -0.1850],
+      "Rotation":               [1, 0, 0, 0]
+    },
+    {
+      "Name":                   "Track Bar Body",
+      "//hardpoint":            "track_bar_body",
+      "Mirrored":               false,
+      "Type":                   "Spherical",
+      "Body1":                  "Chassis",
+      "Body2":                  "Track Bar",
+      "Position":               [-0.060, 0.470, -0.0182],
+      "Rotation":               [1, 0, 0, 0]
+    },
+    {
+      "Name":                   "Track Bar Axle",
+      "//hardpoint":            "track_bar_axle",
+      "Mirrored":               false,
+      "Type":                   "Spherical",
+      "Body1":                  "Track Bar",
+      "Body2":                  "Axle Tube",
+      "Position":               [-0.060, -0.470, -0.0482],
+      "Rotation":               [1, 0, 0, 0]
+    }
+  ],
+
+  "TSDAs": [
+    {
+      "Name":                   "Upper Link",
+      "//hardpoints":           ["upper_link_body", "upper_link_axle"],
+      "//":                     "Leading link: body end behind the axle. Free Length = the 0.1566 m between its hardpoints, so it carries no load at the design position. Rates per '//links'.",
+      "Mirrored":               true,
+      "Body1":                  "Chassis",
+      "Body2":                  "Axle Tube",
+      "Point1":                 [-0.162, 0.485, -0.1182],
+      "Point2":                 [-0.040, 0.485, -0.0200],
+      "Spring Coefficient":     2.0e6,
+      "Damping Coefficient":    2.0e3,
+      "Free Length":            0.1566,
+      "Visualization":          {"Type": "SEGMENT"}
+    },
+    {
+      "Name":                   "Spring",
+      "//hardpoints":           ["spring_upper", "spring_lower"],
+      "//": [
+        "Rate 25311 N/m: the baseline's spring_rate_rear (estimated, a 1.5 Hz ride",
+        "target; the spring sits on the axle, motion ratio ~1). Free Length 0.2548 m is",
+        "derived: installed length 0.1448 m between the two seats above plus the static",
+        "load 2784 N / k, where 2784 N is half the rear-axle reaction of the chassis",
+        "mass and COM in ev1/chassis/EV1_Chassis.json. So the design position above is",
+        "the curb position and the stand-in's ride height carries over."
+      ],
+      "Mirrored":               true,
+      "Body1":                  "Chassis",
+      "Body2":                  "Axle Tube",
+      "Point1":                 [0.003, 0.320, 0.0548],
+      "Point2":                 [0.003, 0.320, -0.0900],
+      "Spring Coefficient":     25311.0,
+      "Free Length":            0.2548,
+      "Visualization":          {"Type": "SPRING", "Radius": 0.05, "Turns": 6}
+    },
+    {
+      "Name":                   "Shock",
+      "//hardpoints":           ["damper_upper", "damper_lower"],
+      "//": [
+        "1710 N s/m: derived for a ride damping ratio of 0.30 (estimated; passenger cars",
+        "run about 0.2 to 0.4) on the spring above and the same 284 kg sprung corner,",
+        "divided by the square of the damper's 0.969 inclination ratio. The stand-in's",
+        "7000 N s/m was unsourced and would overdamp this spring (ratio ~1.3), leaving",
+        "the bounce test nothing to measure."
+      ],
+      "Mirrored":               true,
+      "Body1":                  "Chassis",
+      "Body2":                  "Axle Tube",
+      "Point1":                 [-0.110, 0.470, 0.1118],
+      "Point2":                 [-0.070, 0.520, -0.1400],
+      "Damping Coefficient":    1710.0,
+      "Visualization":          {"Type": "SEGMENT"}
+    }
+  ],
+
+  "Axle":
+  {
+    "//":                       "Driveline shaft inertia, carried over from the stand-in; the rear is undriven.",
+    "Inertia":                  0.4
+  }
+}
