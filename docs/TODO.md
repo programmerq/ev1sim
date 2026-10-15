@@ -266,15 +266,6 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   Surfacing this as a `kSigChassisAbsActive` boolean would let a
   game-controller adapter drive a rumble motor for tactile feedback.
   Out of scope until game-controller input/FFB lands.
-- [ ] **Rear ride rate is about half the rear spring's.**  The front's
-  rate, ride frequency and damping are checked by
-  `tests/test_ride_frequency.cpp`.  The rear has no such check yet: on the
-  baseline's estimated link points the axle winds up 0.2-0.35 deg per mm of
-  bump, which swings the short spring's lower seat fore and aft, and the
-  rear wheel rate measures about 12.6 kN/m against the 25.3 kN/m spring.
-  It waits on a new estimate for the rear upper link's axle end in the ev1
-  suspension baseline; then the test gains the rear.
-
 ## Outputs ev1sim could render (defer all)
 - [ ] Wiper motor visual sweep (model update needed).
 - [ ] Door lock solenoid **visual** click — the audio click already plays via

@@ -752,8 +752,8 @@ These probably explain the cruise-hold steady-state error:
 2. **Spring/damper rates are estimates.**  Each axle's spring and damper
    rates are the ev1 suspension baseline's estimates for its ride target,
    in `EV1_FrontDoubleWishbone.json` and `EV1_RearFiveLink.json`; none is
-   printed.  `tests/test_ride_frequency.cpp` checks the front rides at its
-   file's rate; the rear's open item is in `docs/TODO.md`.
+   printed.  `tests/test_ride_frequency.cpp` checks each axle rides at its
+   file's rate.
 3. **No drivetrain parasitic torque.**  Real motor + inverter has ~5-15%
    loss across the operating range; currently this only shows up in the
    coast-torque map, which only fires at zero throttle.  (That map read

@@ -307,6 +307,8 @@ TEST_CASE("Rear suspension: every coordinate is the baseline table through the f
         Vec3 p2 = Hardpoint(r, hp[1].get<std::string>(), mirrored);
         if (name == "Upper Links")  // moved to the centreline, per "//links"
             p1.y = p2.y = 0.0;
+        if (t.contains("//line_of_action_m"))  // chassis end raised along the axis
+            p1.z += t.at("//line_of_action_m").get<double>();
         CHECK(Dist(p1, V(t.at("Point1"))) < kTolM);
         CHECK(Dist(p2, V(t.at("Point2"))) < kTolM);
     }
@@ -377,6 +379,15 @@ TEST_CASE("Rear suspension: the spring carries the chassis at the design positio
     CHECK(free_len > installed);  // compressed at rest
     // 1 mm of free length is ~25 N at this rate, under 1 % of the load.
     CHECK_THAT(free_len, WithinAbs(installed + per_spring_n / k, 0.001));
+
+    // Its line of action runs far above the chassis seat, so the axle's pitch
+    // (which sways the lower seat) barely tilts it; the drawn spring between
+    // the real seats carries nothing.
+    const auto& seats = Named(r.at("TSDAs"), "Spring Seats");
+    const double seat_gap = Dist(V(seats.at("Point1")), V(seats.at("Point2")));
+    CHECK(installed > 10.0 * seat_gap);
+    CHECK(seats.at("Spring Coefficient").get<double>() == 0.0);
+    CHECK_FALSE(seats.contains("Damping Coefficient"));
 }
 
 TEST_CASE("Rear suspension: masses, inertias and damping are physically positive",
