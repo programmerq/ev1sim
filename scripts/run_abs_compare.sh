@@ -85,7 +85,9 @@ for leg in on off; do
     fi
     cp "$csv" "$OUT/abs_btcm_${leg}.csv"
 done
-[[ -f "$run_dir/on/btcm.csv" ]] && cp "$run_dir/on/btcm.csv" "$OUT/abs_btcm_on.btcm.csv"
+if [[ -f "$run_dir/on/btcm.csv" ]]; then
+    cp "$run_dir/on/btcm.csv" "$OUT/abs_btcm_on.btcm.csv"
+fi
 
 echo
 echo "[abs] === comparison: $TEST ==="
