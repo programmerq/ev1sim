@@ -749,9 +749,11 @@ These probably explain the cruise-hold steady-state error:
    load comes from tire ground forces.  In reality the gearbox + differential
    bleed several kW.  EV1 manuals cite ~92% drivetrain efficiency; that
    missing 8% is currently unaccounted.
-2. **Spring/damper rates are guesses.**  Identical front/rear spring
-   coefficients (143000 N/m) is implausible — no engineer would design a
-   FWD car with a 50/50 spring-rate split given the front-bias mass.
+2. **Spring/damper rates are estimates.**  Each axle's spring and damper
+   rates are the ev1 suspension baseline's estimates for its ride target,
+   in `EV1_FrontDoubleWishbone.json` and `EV1_RearFiveLink.json`; none is
+   printed.  `tests/test_ride_frequency.cpp` checks the front rides at its
+   file's rate; the rear's open item is in `docs/TODO.md`.
 3. **No drivetrain parasitic torque.**  Real motor + inverter has ~5-15%
    loss across the operating range; currently this only shows up in the
    coast-torque map, which only fires at zero throttle.  (That map read
