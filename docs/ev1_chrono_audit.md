@@ -618,10 +618,10 @@ realistic gradient at partial pedal.  Future improvement: split front
 | Rear camber | -0.50° | -0.50° nominal, chassis p. 61 | ✅ |
 | Front toe | -0.05° | -0.05° per wheel, chassis p. 61 | ✅ |
 | Rear toe | 0° | 0.00° per wheel, chassis p. 61 | ✅ |
-| Front hardpoint coordinates | rescaled Chrono `sedan` sample | nothing published | ⚠️ template geometry, labelled as such in the file |
+| Front hardpoint coordinates | ev1 suspension baseline (ev1 PR #144) | damper top printed (body p. 155), rest estimated | ⚠️ tiers carried per point in the file |
 | Rear hardpoint coordinates | ev1 suspension baseline (ev1 PR #144) | spring seat and lower link bracket printed (body p. 158), rest estimated | ⚠️ tiers carried per point in the file |
-| Spring rate (front / rear) | 143000 / 25311 N/m | nothing published | ⚠️ front unsourced; rear is the baseline's 1.5 Hz estimate |
-| Damping (front / rear) | 7500 / 1710 N·s/m | nothing published | ⚠️ front unsourced; rear derived for a 0.30 damping ratio |
+| Spring rate (front / rear) | 37826 / 25311 N/m | nothing published | ⚠️ the baseline's 1.35 Hz / 1.5 Hz estimates |
+| Damping (front / rear) | 2620 / 1710 N·s/m | nothing published | ⚠️ derived for a 0.30 damping ratio |
 
 ### What the printed source says, and what this audit got wrong
 
@@ -639,8 +639,10 @@ independent front suspension used on the EV1 … a steering knuckle, wheel hub
 assembly, coil over shock assembly, upper and lower ball joint and upper and
 lower control arm … steered by two front tie rods."*  SLA is a double wishbone,
 so the front template is the right kinematic layout.  This audit's "MacPherson
-strut" was wrong.  Unmodeled on that axle: the coil-over-shock yoke linkage and
-the stabilizer bar.
+strut" was wrong.  The coil-over clamps into a yoke bolted to the lower arm
+(chassis p. 228); the yoke is rigid on the arm, so the file runs the coil-over
+from the damper top to the yoke bolt.  Unmodeled on that axle: the stabilizer
+bar.
 
 **Rear layout.**  Chassis manual page 271: *"a rear axle assembly with aluminum
 end castings and a tubular center section … two coil springs, two twin tube
@@ -658,12 +660,15 @@ one moves on its "non-replaceable bushings".  Joint bushings would model that,
 but Chrono's default Barzilai-Borwein solver refuses them (they carry stiffness
 matrices), so the compliance sits in the upper links instead.
 
-**Hardpoints.**  Every front coordinate is Chrono's stock
-`sedan/suspension/Sedan_DoubleWishbone.json` rescaled: lateral coordinates by
-1470/1595.8 = 0.921168, longitudinal by about the same, vertical fitted to the
-ev1model wheelwells.  `tests/test_suspension_geometry.cpp` checks each lateral
-coordinate against the sedan value times the scale the file declares, so a
-future track edit either moves all of them or fails.
+**Hardpoints.**  Both axles take their coordinates from the ev1 repo's
+suspension baseline, each file carrying the points it uses with tier and
+source and one frame map anchored on that axle's wheel centre.  On the front
+only the damper top is printed (body p. 155, datum-b155-06); the ball joints,
+arm pivots, tie rods and yoke bolt are the baseline's estimates around it and
+the p. 251 figure.  The lower arm pivots sit on the cradle, and the ev1 repo
+has the cradle's own body mounts under question, so those two are the least
+certain points.  The front used to be Chrono's stock `sedan` sample rescaled to
+the printed track.
 
 The rear coordinates come from the ev1 repo's suspension baseline
 (`geometry/suspension/ev1_suspension_hardpoints.csv`, ev1 commit `a6ab714`, PR
@@ -683,11 +688,18 @@ The test recomputes every Chrono coordinate from that table.
 ratio is about 1).  The free length is derived so the spring carries the
 chassis body's share of the rear axle load at the design position, and the
 test checks that.  The damper is derived for a 0.30 ride damping ratio; the
-stand-in's 7000 N·s/m on this spring would be a ratio of about 1.3.  The front
-keeps its unsourced 143000 N/m and 7500 N·s/m; on the sedan geometry's 0.52
-motion ratio that is about 1.8 Hz, so the front now rides stiffer than the
-rear, the opposite of the usual flat-ride bias.  `config/bounce_test.json` is
-the run that measures both ends.
+stand-in's 7000 N·s/m on this spring would be a ratio of about 1.3.
+
+**Front spring and damper.**  The rate is the baseline's estimate, 37826 N/m
+(a 1.35 Hz ride target through its 0.786 motion ratio).  On this file's
+geometry the motion ratio at the tyre is about 0.77, from the lower arm's
+lever and the front-view instant centre, and the free length is derived from
+it so the spring carries the chassis body's share of the front load at the
+design position; the test recomputes both.  The damper is derived for a 0.30
+damping ratio at the wheel.  The sedan template's 143000 N/m on its 0.52
+motion ratio was about 1.8 Hz, stiffer than the rear; the front is now the
+softer end, the usual flat-ride bias.  `config/bounce_test.json` is the run
+that measures both ends.
 
 **Alignment.**  Camber and toe are the one part of these files that is measured.
 This audit validated them against "typical" ranges; page 61 prints all four
@@ -703,8 +715,14 @@ nominals and all four match.  They are now pinned to the printed values.
 | Steering link length | 0.46 m | unknown | ⚠️ |
 | Rack-to-wheel ratio (effective) | 1.35:1 | unknown | ⚠️ |
 
-Steering geometry is consistent end-to-end (13.5° max wheel angle ≈ 11 m
-turning radius given the 2.512 m wheelbase).  Internal pinion parameters
+`EV1_Vehicle.json` declares a 13.5° maximum steering angle (≈ 11 m turning
+radius on the 2.512 m wheelbase), but that key is metadata for drivers and path
+followers, not kinematics.  The rack's 0.3 m × 10° travel through the
+suspension's steering arms gives more at full lock: in a standalone Chrono
+9.0.1 run the road wheels reach about 24° inside / 20.5° outside on the
+baseline front geometry (the sedan template gave 24.6° / 23.2°).  The
+published 9.9 m turning diameter needs about 30° outside, so the rack travel
+is the number to revisit, not the geometry.  Internal pinion parameters
 are tuning surface, not physical specs.  Leave alone.
 
 ## 9. Aerodynamics
