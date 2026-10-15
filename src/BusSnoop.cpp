@@ -116,8 +116,7 @@ DashGear DecodePrndCode(std::uint8_t code5) {
 #if defined(EV1SIM_HAVE_WIRE_TRUTH) && EV1SIM_HAVE_WIRE_TRUTH
 
 struct BusSnoop::Wire {
-    // GM-8192 physical layer: 8192 baud → 122.07 µs/bit, the same period
-    // WireTruthChassis::snoop_step() gives its framer. @source:manual.
+    // GM-8192 physical layer: 8192 baud → 122.07 µs/bit. @source:manual.
     static constexpr std::uint64_t kBitPeriodNs = 122070;
 
     explicit Wire(electricsim::io::WireTable* table)
@@ -165,6 +164,7 @@ BusSnoop::BusSnoop() = default;
 BusSnoop::~BusSnoop() = default;
 
 bool BusSnoop::attached() const { return wire_ != nullptr; }
+void BusSnoop::Detach() { wire_.reset(); }
 
 bool BusSnoop::DecodeFrame(std::uint8_t id, const std::uint8_t* payload,
                            std::uint8_t n, double now_s) {

@@ -34,6 +34,8 @@
 #include <optional>
 #include <string>
 
+namespace electricsim::io { class WireTable; }  // opaque here; see table()
+
 namespace ev1sim {
 
 class WireTruthChassis {
@@ -276,15 +278,11 @@ public:
     // never appended.  @inferred 2026-06-17 — total-bits-advancing ≈ alive.
     std::optional<std::uint64_t> btcm_tx_total_bits() const;
 
-    // GM-8192 frame snoop (IPC-cluster Phase 1) — decode module TX frames off
-    // the wire to feed the dashboard, rather than a dedicated chassis cell per
-    // display value (docs/ipc_rsa_display_plan.md). snoop_step() drains the
-    // per-module bit-stream TX cells through gm8192_rx_framer once per render
-    // tick; the bit-stream self-paces, so a coarse tick replays every missed bit.
-    void snoop_step(double now_s);
-    // Latest vehicle speed (km/h) decoded from the PIM $41 PCM Data Response
-    // (GM8192_PIM_TX, payload[4] = wire byte 6, 1 km/h/count; see the external sim's PIM UART-frame definition). nullopt until a $41 frame has been decoded.
-    std::optional<std::uint8_t> pim_vehicle_speed_kph() const;
+    // The attached WireTable, for passive readers that drain cells on their own
+    // schedule (BusSnoop's GM-8192 frame snoop for the instrument cluster,
+    // docs/ipc_rsa_display_plan.md). nullptr when not attached or compiled out.
+    // The table lives as long as this WireTruthChassis.
+    electricsim::io::WireTable* table() const;
 
     // PIM cruise-control state — the external sim declared these cells
     // (was kSigPimCruiseActive/SetpointMps 5360/5361). Read off PIM_CRUISE_ACTIVE

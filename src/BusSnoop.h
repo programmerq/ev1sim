@@ -20,8 +20,8 @@
 //   GM8192_IPC_TX   $21 DSCM Data Response  season odometer
 //
 // It decodes already-framed application bytes only: the wire's bits become
-// frames through the external sim's own gm8192_rx_framer, the same receiver
-// WireTruthChassis::snoop_step() uses. BusSnoop adds no line, UART or timing
+// frames through the external sim's own gm8192_rx_framer, one per TX cell,
+// on the connector's WireTable. BusSnoop adds no line, UART or timing
 // model of its own and never writes the bus.
 //
 // Two seams:
@@ -80,6 +80,9 @@ public:
     // the substrate is compiled out or `table` is null.
     bool Attach(electricsim::io::WireTable* table);
     bool attached() const;
+    // Drop the framers (call before the attached table is destroyed). Decoded
+    // groups stay and age out as usual.
+    void Detach();
 
     // Drain every frame the snooped cells produced since the last call. The
     // bit-stream cells self-pace, so a coarse render tick replays every bit.

@@ -837,18 +837,6 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                     return FormatSteeringAngleLabel(deg);
                 },
                 []() {});   // no-op: display-only row
-
-            // --- Instrument cluster: bus speed (Phase 1, display-only) ---
-            // Decoded from the PIM $41 frame snooped off GM8192_PIM_TX — what
-            // the cluster reads, distinct from ev1sim's own physics speed.
-            m_floating_ui->AddButton(
-                [this]() -> std::wstring {
-                    if (!m_external_sim) return L"Cluster: n/a";
-                    return FormatBusSpeedLabel(
-                        m_external_sim->HasBusVehicleSpeed(),
-                        m_external_sim->GetBusVehicleSpeedKph());
-                },
-                []() {});   // no-op: display-only row
         }
     }
 
@@ -1917,6 +1905,20 @@ int SimApp::RunWithVisualization() {
         m_lights->DrawHUD(m_vis->GetDevice());
         m_panels->DrawHUD(m_vis->GetDevice());
         m_wiper->DrawHUD(m_vis->GetDevice());
+
+        // IPC instrument cluster, bottom-centre: what the modules put on the
+        // GM-8192 bus plus the IPC's lamp cells. Drawn only with the external
+        // sim on, since nothing else drives a cluster.
+        if (m_external_sim && m_external_sim->GetOptions().enabled) {
+            if (!m_cluster)
+                m_cluster = std::make_unique<ev1sim::InstrumentClusterPanel>();
+            auto* drv = m_vis->GetDevice()->getVideoDriver();
+            m_cluster->Update(m_external_sim->GetDashSnapshot());
+            const auto dim = drv->getScreenSize();
+            m_cluster->SetAnchor(static_cast<int>(dim.Width) / 2 - m_cluster->Width() / 2,
+                                 static_cast<int>(dim.Height) - m_cluster->Height() - 10);
+            m_cluster->Draw(drv, m_vis->GetDevice()->getGUIEnvironment()->getBuiltInFont());
+        }
         m_physical->DrawHUD(m_vis->GetDevice(),
                             m_external_sim->GetRsaRunMode(),
                             m_external_sim->HasReceivedRunMode());

@@ -93,6 +93,9 @@ public:
                                     int width = 300);
 
     void SetVisible(bool visible) { visible_ = visible; }
+    // Move the panel (e.g. to follow a window resize); width is fixed.
+    void SetAnchor(int x, int y) { x_ = x; y_ = y; }
+    int Width() const { return w_; }
     bool IsVisible() const { return visible_; }
 
     // Rebuild the view from this tick's snapshot (cheap; strings only).
