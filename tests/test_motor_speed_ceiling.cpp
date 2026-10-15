@@ -3,8 +3,8 @@
 // WHY THIS TEST EXISTS
 // --------------------
 // In the low-mu ABS scenario a spinning front wheel reached ~435 rad/s — about
-// 127 m/s of tread speed (~284 mph) on a 0.2915 m tire.  Through the 10.946:1
-// reduction that is ~4761 rad/s at the motor, ~45 500 RPM: three and a half
+// 127 m/s of tread speed (~284 mph) on a 0.2915 m tire.  Through the 10.95:1
+// reduction that is ~4763 rad/s at the motor, ~45 500 RPM: three and a half
 // times the RPM the car sees at its own top speed.  A real EV1 cannot do that
 // at any throttle on any surface.
 //
@@ -46,16 +46,18 @@
 //     The manual gives no rotor-burst or bearing speed anywhere.  What 16 000
 //     RPM is, exactly, is the speed above which the propulsion system makes no
 //     torque — which is all a torque map can represent, and enough.
-//   * The ~80 mph top speed is a SOFTWARE calibration and does NOT belong here.
-//     @source:manual propulsion p250: "The PIM will limit vehicle speed in the
+//   * The 129 km/h top speed is a SOFTWARE calibration and does NOT belong
+//     here.  @source:manual propulsion p57, repeated on p250: "The PIM will limit vehicle speed in the
 //     forward direction to 129 km/h (80 mph) and in the reverse direction to
 //     48 km/h (30 mph)", enforced by decreasing the torque current.  That is
 //     the propulsion controller's job.  (The same page also has the PIM
 //     decreasing torque current "to limit drive motor shaft speed" — so
 //     shaft-speed limiting is a PIM function on the real car.  This map is not
 //     that limiter; it is the envelope the limiter would act inside.)
-// So the ceiling asserted below must sit ABOVE the 80 mph equivalent — if it
-// ever equals it, the calibration has been baked back into the physics.
+// So the ceiling asserted below must sit ABOVE the 129 km/h equivalent — if it
+// ever equals it, the calibration has been baked back into the physics — and
+// the map must still make torque at that speed, or the PIM's limit could never
+// be the one that binds.
 //
 // THE CORNER POINT, ALSO OFF THE PRINT
 // ------------------------------------
@@ -284,7 +286,16 @@ TEST_CASE("Motor ceiling: no torque above the ceiling at ANY throttle position",
     }
 }
 
-TEST_CASE("Motor ceiling: the drive ceiling is not the 80 mph software calibration",
+// The printed forward speed limit (@source:manual propulsion p57, p250), as a
+// motor shaft speed through this repo's own driveline and tyre.  The PIM keys
+// its limiter to shaft speed, so this is the speed it acts at in this plant.
+constexpr double kPrintedForwardLimitKph = 129.0;
+
+static double ForwardLimitShaftRpm() {
+    return RadSToRpm(kPrintedForwardLimitKph / 3.6 / TireRadiusM() * ReductionRatio());
+}
+
+TEST_CASE("Motor ceiling: the drive ceiling is not the printed speed limit",
           "[Motor][Ceiling]") {
     const auto engine = ReadJson(kEngine);
     const double max_rpm = engine.at("Maximal Engine Speed RPM").get<double>();
@@ -298,11 +309,11 @@ TEST_CASE("Motor ceiling: the drive ceiling is not the 80 mph software calibrati
     const double ratio  = ReductionRatio();
     const double radius = TireRadiusM();
 
-    // The ~80 mph software cap (@source:manual propulsion p250) expressed as
-    // motor RPM.  The ceiling must sit clearly ABOVE it: the moment the two
-    // coincide, a software calibration has been re-encoded as motor physics.
-    const double cap_mps = 80.0 / 2.2369362920544;
-    const double cap_rpm = RadSToRpm(cap_mps / radius * ratio);
+    // The ceiling must sit clearly ABOVE the printed limit's shaft speed: the
+    // moment the two coincide, a software calibration has been re-encoded as
+    // motor physics.
+    const double cap_rpm = ForwardLimitShaftRpm();
+    INFO("printed forward limit = " << cap_rpm << " RPM at the shaft");
     CHECK(max_rpm > cap_rpm * 1.10);
 
     // State the ceiling as a road speed so the number is legible in a failure
@@ -311,7 +322,25 @@ TEST_CASE("Motor ceiling: the drive ceiling is not the 80 mph software calibrati
     // smaller, so the mph figure runs correspondingly optimistic.
     const double ceiling_mph = MpsToMph(RpmToRadS(max_rpm) / ratio * radius);
     INFO("drive ceiling = " << ceiling_mph << " mph");
-    CHECK(ceiling_mph > 80.0);
+    CHECK(ceiling_mph * 1.609344 > kPrintedForwardLimitKph);
+}
+
+TEST_CASE("Motor ceiling: the drive still makes torque at the printed speed limit",
+          "[Motor][Ceiling]") {
+    const auto engine = ReadJson(kEngine);
+    const auto full   = ReadMap(engine, "Map Full Throttle");
+    const auto zero   = ReadMap(engine, "Map Zero Throttle");
+    const double max_rpm = engine.at("Maximal Engine Speed RPM").get<double>();
+
+    // The PIM withholds motoring torque as the shaft approaches the printed
+    // limit; ev1sim only applies the throttle the PIM sends.  For that limit
+    // to be the one that sets top speed, the map must still be delivering
+    // real torque there, short of its own ramp to the ceiling.  If the ramp
+    // started at or below the limit, the map would be doing the PIM's job.
+    const double cap_rpm = ForwardLimitShaftRpm();
+    INFO("printed forward limit = " << cap_rpm << " RPM at the shaft");
+    CHECK(cap_rpm < RampStartRpm(full));
+    CHECK(DeliveredTorqueNm(zero, full, max_rpm, cap_rpm, 1.0) > 0.0);
 }
 
 // ---------------------------------------------------------------------------

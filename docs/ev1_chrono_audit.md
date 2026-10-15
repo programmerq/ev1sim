@@ -122,7 +122,7 @@ field-weakening region is not an exact hyperbola.  Neither is modelled, and
 `EV1_EngineSimpleMap.json` labels the plateau and the hyperbola `@inferred`
 accordingly.
 
-What that did to the drive, by road speed (10.946:1, 0.2915 m tyre):
+What that did to the drive, by road speed (10.95:1, 0.2915 m tyre):
 
 | shaft RPM | ≈ mph | torque before | torque after | Δ |
 |---|---|---|---|---|
@@ -171,8 +171,8 @@ Two things that do **not** move, measured rather than assumed:
 table used to call that "✅".  It was neither correct nor a ceiling.
 
 It was not correct because 13 000 RPM is not a property of the motor — it is the
-~80 mph **software** top-speed calibration restated in RPM (80 mph ÷ 0.2915 m
-tire × 10.946 = 12 824 RPM).  @source:manual propulsion p250: "The PIM will
+129 km/h **software** top-speed limit restated in RPM (129 km/h ÷ 0.2915 m
+tire × 10.95 = 12 854 RPM).  @source:manual propulsion p57, p250: "The PIM will
 limit vehicle speed in the forward direction to 129 km/h (80 mph)", enforced by
 decreasing the torque current.  That is the propulsion controller's calibration,
 not the drive's capability, and encoding it as physics made a software choice
@@ -260,7 +260,7 @@ but it is worth recording what else was checked and found not to be the cause:
   its traction-control derate — was bypassed entirely.
 * **The tyre is not a contributor.**  TMeasy behaves correctly: at µ 0.10 with
   ~4 kN on the wheel it resists roughly 0.10 × 4 kN × 0.2915 m ≈ 117 N·m, while
-  the held 74.9 N·m through the 10.946:1 reduction delivers roughly 410 N·m
+  the held 74.9 N·m through the 10.95:1 reduction delivers roughly 410 N·m
   *per front wheel*.  The tyre saturates at the friction limit, which is what it
   should do; it simply cannot remove drive torque.  Nothing in the slip-force
   computation keeps torque applied — the torque was applied by the engine map.
@@ -457,13 +457,13 @@ What's also still missing:
 | Parameter | Current | Real EV1 | Status |
 |---|---|---|---|
 | Transmission type | single forward gear, ratio 1.0 | single-speed reduction | ✅ |
-| Final drive (Conical Gear) | 0.1 → **10.0:1 reduction** | **10.946:1 reduction** | 🔧 0.1 → 0.0913 |
+| Final drive (Conical Gear) | 0.1 → **10.0:1 reduction** | **10.95:1 reduction** (@source:manual propulsion p250) | 🔧 0.1 → 0.0913 |
 | Driveline | FWD (`ShaftsDriveline2WD`) | FWD | ✅ |
 | Driveshaft inertia | 0.03 kg·m² | no manual figure — @inferred 0.013–0.035 kg·m² | 🔧 0.5 → 0.03 |
 | Differential box inertia | 0.6 kg·m² | unknown — typical | ⚠️  |
 | Differential lock limit | 100 N·m | open differential, no LSD on EV1 | ✅ (open at this limit) |
 
-The 10.0 vs 10.946 final drive change is small (~9% off) and shifts the
+The 10.0 vs 10.95 final drive change is small (~9% off) and shifts the
 operating RPM at a given speed slightly.  At 13 m/s with current ratio:
 motor RPM = 4250.  After fix: 4651 RPM — still well within flat-torque
 region, so peak-torque behavior is unchanged.
@@ -748,7 +748,7 @@ Track this as a future TODO.
 
 ## 11. Empirical evidence — coastdown shows 2× excess dissipation
 
-After applying the audit fixes (final drive 10.946, mass 1199, track widths),
+After applying the audit fixes (final drive 10.95, mass 1199, track widths),
 the `coastdown` scenario (`config/scenarios/coastdown.json`) produced these
 data points after throttle release at t=13.55 s, v=30 m/s:
 

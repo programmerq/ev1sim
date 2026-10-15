@@ -46,57 +46,23 @@ future-UI input on one side, chassis-segment signal publishing on the other.
 
 ## Powertrain
 
-- [ ] **No top-speed limiter anywhere (the ~80 mph software cap).**
-  ev1sim's plant has no speed limiter at all, and it should not have one —
-  @source:manual propulsion p250 puts the cap in the PIM: "The PIM will limit
-  vehicle speed in the forward direction to 129 km/h (80 mph)", enforced by
-  decreasing the torque current (48 km/h / 30 mph in reverse).  So the work is
-  on the **electricsim PIM** side, not here: a torque-command taper keyed on
-  **motor shaft speed**, which is what the real PCM watches (prop p326 — the
-  speed/direction sensor is "attached to the end of the rotor shaft"; p336 —
-  the PCM "uses and monitors the motor shaft speed signal … including vehicle
-  speed signal generation, torque control, and cruise control").  Not road
-  speed: the BTCM owns true road speed and reaches the PCM as a torque retard
-  request, not a speed feed.
-  ev1sim's side of that is mostly done — 4070 now publishes the unclamped
-  shaft speed (`SimApp::PublishMotorState`), so a PIM-side limiter has an
-  honest signal to act on.  Still open on this side: 4070 can never go
-  negative, because the Chrono transmission is permanently in forward gear
-  (nothing calls `SetDriveMode`) and `ChAutomaticTransmissionSimpleMap` takes
-  `std::abs(driveshaft_speed)` anyway, while the chassis-signal contract
-  describes 4070 as signed with negative meaning reverse.  Reverse is not
-  modelled at all today, so nothing is wrong yet — but a reverse limiter
-  (30 mph, same p250 sentence) needs a signed 4070 first.
+- [ ] **Reverse is not modelled, so 4070 is never negative.**  The printed
+  speed limits (@source:manual propulsion p57, p250: 129 km/h forward, 48 km/h
+  reverse) are the PIM's, applied as a taper on its torque command keyed to
+  shaft speed; electricsim's `ev1/pim/pim_speed_limit.h` carries them, and
+  ev1sim sees the result as the PIM's throttle on 4073.  The forward limit has
+  an honest signal to act on (4070 publishes the unclamped shaft speed, see
+  `SimApp::PublishMotorState`).  The reverse limit does not: the Chrono
+  transmission stays in forward gear (nothing calls `SetDriveMode`) and
+  `ChAutomaticTransmissionSimpleMap` takes `std::abs(driveshaft_speed)`, while
+  the chassis-signal contract describes 4070 as signed with negative meaning
+  reverse.  A reverse gear and a signed 4070 come first.
 
-- [ ] **Two contradictory drive ceilings across the two repos.**  This repo now
-  carries 16 000 RPM, sourced from propulsion p328, as the speed above which the
-  propulsion system makes no torque.  electricsim still carries 13 000 RPM in
-  `ev1/pim/pim_drive_plant.h` labelled "redline guard", with a header note that
-  "the vehicle's top speed is road-load-limited, not rev-limited".  Both halves
-  of that note are now contradicted: 13 000 RPM is the ~80 mph *software cap*
-  restated in RPM, not a redline, and top speed is set by that cap rather than
-  by road load.  The number wants reclassifying rather than deleting — it is a
-  reasonable stand-in for the software cap, just mislabelled.  Related:
-  `electricsim/docs/pim_hv_inverter_research_brief.md` records as an open
-  question that "'~13,000 rpm' is not confirmed by any authoritative source …
-  treat any >10,000 rpm redline as [EV1-INFER] unless a manual page says
-  otherwise" — propulsion p328 is that page, so the question can be closed.
-  **Same file, same shape, second number (2026-08-11):** `pim_drive_plant.h`
-  also carries a **150 N·m** torque clamp.  That is the secondary-web-figure
-  peak this repo has now replaced with the 141 N·m propulsion p250 states, so
-  the two repos' drives now disagree about peak torque by 6 % as well as about
-  the speed ceiling.  Both halves are one reclassification pass on that one
-  header; recorded here rather than reached across repos.
-  **Third number (2026-08-12):** that clamp is **symmetric** —
-  `cmd_torque_mnm` is clamped to `±PIM_DP_MOTOR_MAX_TORQUE_MNM` in `_tick`, so
-  the *regen* side is bounded at 150 N·m and by no power limit at all.  At
-  10 000 RPM that permits ~157 kW of regeneration against the 10 950 W
-  propulsion p60/p209 states ("The maximum allowed regeneration is 365 volts
-  DC and 30 amps DC") — ~14×, and on the repo that models the PIM, which is
-  the module the manual attributes the limit to.  It is the same defect §3.1
-  fixes here, one repo over and larger.  Note the ev1sim fix does not
-  propagate: this file is electricsim's own plant.  Still recorded rather than
-  reached across.
+- [ ] **electricsim's PIM plant clamps torque at 150 N·m.**
+  `ev1/pim/pim_drive_plant.h` `PIM_DP_MOTOR_MAX_TORQUE_MNM` is an `@design`
+  figure; this repo's map carries the 141 N·m propulsion p250 prints, so the
+  two drives disagree about peak torque by 6 %.  The fix is in electricsim's
+  header, not here.
 
 ## ABS scenarios
 

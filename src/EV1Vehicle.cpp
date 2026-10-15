@@ -37,7 +37,7 @@ namespace {
 //   spindle body:    +w about its local y (the axle)
 //   axle shafts:     -w (each suspension's ChShaft, both axles)
 //   differential box:-w (open differential, both driven axles at -w)
-//   driveshaft:      +w / conical ratio (motor side of the 10.946:1 reduction)
+//   driveshaft:      +w / conical ratio (motor side of the 10.95:1 reduction)
 // The two driveline shafts are private to ChShaftsDriveline2WD, so they are
 // found among the system's shafts by the inertias the driveline JSON gives
 // them; a JSON that made them indistinguishable fails loudly.

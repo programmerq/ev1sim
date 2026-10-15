@@ -87,9 +87,9 @@
 
   "Gear Ratio":
   {
-    "//":                       "Real EV1 single-speed reduction is 10.946:1 (output/input).",
-    "//1":                      "Conical Gear = 1 / 10.946 ≈ 0.09135.",
-    "Conical Gear":             0.09135
+    "//":                       "@source:manual propulsion p250: \"a direct drive assembly",
+    "//1":                      "with a 10.95:1 gear ratio\".  Conical Gear = 1 / 10.95.",
+    "Conical Gear":             0.0913242
   },
 
   "Axle Differential Locking Limit":  100

@@ -52,7 +52,7 @@
   "//ceiling26": "wiring/supply faults — so the page does not attribute it solely",
   "//ceiling27": "to over-speed, it allows over-speed as a genuine cause.",
   "//ceiling28": "@inferred: that a torque map should terminate where propulsion is",
-  "//ceiling29": "commanded off.  16000 RPM / 10.946 / 0.2915 m tyre ~= 100 mph at",
+  "//ceiling29": "commanded off.  16000 RPM / 10.95 / 0.2915 m tyre ~= 100 mph at",
   "//ceiling30": "the road: above the 80 mph software cap, 1.25x it, not",
   "//ceiling31": "significantly beyond.",
   "//ceiling32": "NOTE the same p250 also says the PIM decreases torque current",
