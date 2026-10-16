@@ -1,5 +1,7 @@
 #pragma once
 
+#include <limits>
+
 #include "BrakeDrum.h"
 
 namespace ev1sim {
@@ -16,45 +18,111 @@ inline constexpr double kRearBrakeMaxTorqueNm = 480.0;
 /// driven by the BTCM's signed rear-motor command
 /// (CHASSIS_BTCM_EMB_MOTOR_CMD_LR / _RR).
 ///
-/// The command is an H-bridge direction, not a force: the BTCM drives two
-/// output pins per corner (apply, release) and electricsim publishes them as
-/// +1, -1 or 0. What each means for the brake:
+/// The rear brake is a drum whose shoes are pushed by "an electric motor pack
+/// (motor and gear assembly) ... rather than a hydraulic wheel cylinder"
+/// (@source:manual brakes-312 REAR BRAKE APPLY SYSTEM).  So the BTCM command
+/// is a motor drive, not a force: the BTCM drives two output pins per corner
+/// (apply, release) and electricsim publishes them as +1, -1 or 0.  The model
+/// integrates that drive into actuator travel and derives the shoe force from
+/// where the actuator is:
 ///
-///   +1  motor drives the shoes on: clamp force goes to the commanded level
-///       (full scale here, since the wire carries direction only);
-///   -1  motor backs the shoes off: the brake releases;
-///    0  motor not driven. In the BTCM's anti-lock HOLD this is the pawl
+///   +1  motor drives the shoes out.  From home the actuator first takes up
+///       the running clearance with no force (the motor runs against "little
+///       or no mechanical resistance", @source:manual brakes-254 DTC 147),
+///       then the shoes meet the drum and force rises with further travel
+///       until it reaches the EMB's maximum, where the motor stalls.
+///   -1  motor backs the shoes off: travel and force fall at the same rate
+///       until the actuator is at home, the stop the scan tool reports as
+///       "RELEASE when motor in home position" (@source:manual brakes-73
+///       LR/RR MOTOR).
+///    0  motor not driven.  In the BTCM's anti-lock HOLD this is the pawl
 ///       latch holding the actuator where it is (btcm_rear.c
 ///       regulation_motor_cmd_: inlet closed -> command 0, latch asserted),
-///       so the clamp force is KEPT, not dropped.
+///       so the travel, and with it the clamp force, is KEPT, not dropped.
+///       Reading the 0 as "no force" would release the rear axle every time
+///       the anti-lock kernel holds it, which on a low-grip stop is most of
+///       the stop.
 ///
-/// Until 2026-09-28 SimApp::ApplyRearEmbBrake mapped every command at or
-/// below 0 to zero shoe force, so a rear anti-lock HOLD released the rear
-/// axle outright. On a low-grip stop, where the rears spend most of the stop
-/// in HOLD, that took the whole rear axle out of the stop.
+/// A fractional command scales the motor speed; the wire carries direction
+/// only, so in the car it is always a full-speed drive.
 ///
-/// A stale or absent BTCM still means zero force: the EV1 rear brake has no
-/// hydraulic backup, and a module that is not commanding the motors is not
-/// holding a latch either (SimApp's BTCM-failure model).
+/// A stale or absent BTCM means the actuator is at home and the force is zero:
+/// the EV1 rear brake has no hydraulic backup, and a module that is not
+/// commanding the motors is not holding a latch either (SimApp's BTCM-failure
+/// model).  When the BTCM comes back, the clearance has to be taken up again
+/// before the rear brakes.
+///
+/// Travel is measured in seconds of full-speed motor drive from home, so the
+/// two Travel values are the times the motor needs for each phase.  Both are
+/// inferred (the manual gives no stroke or apply time), chosen so a full
+/// stroke at full drive takes the same 300 ms as BrakeActuator's rear
+/// rate limit; they are not EV1 facts.  The force rises linearly with
+/// travel past contact (one spring-like compliance for shoes, drum and gear
+/// train), also an inference.
 class RearEmbClamp {
 public:
-    /// Advance with this step's command and return the shoe force (N).
-    double Update(float cmd, bool fresh, const BrakeDrum::Params& p) {
+    struct Travel {
+        /// Full-speed drive time to take up the running clearance from home
+        /// to shoe-on-drum contact (s).  Inferred.
+        double clearance_s = 0.050;
+        /// Full-speed drive time from contact to the EMB's maximum shoe
+        /// force, where the motor stalls (s).  Inferred.
+        double rise_s = 0.250;
+    };
+
+    RearEmbClamp() = default;
+    explicit RearEmbClamp(const Travel& travel) : m_travel(travel) {}
+
+    /// Advance with this step's command over dt_s seconds and return the shoe
+    /// force (N).  Without dt_s the actuator settles within the step: an APPLY
+    /// reaches the maximum force, a RELEASE reaches home, and a HOLD keeps
+    /// where it is.  That is the instantaneous map SimApp::ApplyRearEmbBrake
+    /// uses until it passes its step size.
+    double Update(float cmd, bool fresh, const BrakeDrum::Params& p,
+                  double dt_s = kSettleWithinStep) {
         if (!fresh) {
-            m_force_n = 0.0;
-        } else if (cmd > 0.0f) {
-            const double c = cmd > 1.0f ? 1.0 : double{cmd};
-            m_force_n = c * p.max_shoe_force_n;
-        } else if (cmd < 0.0f) {
-            m_force_n = 0.0;
+            m_travel_s = 0.0;
+        } else if (cmd != 0.0f) {
+            const double speed =
+                cmd > 1.0f ? 1.0 : (cmd < -1.0f ? -1.0 : double{cmd});
+            m_travel_s += speed * dt_s;
+            const double stall = m_travel.clearance_s + m_travel.rise_s;
+            if (!(m_travel_s > 0.0)) m_travel_s = 0.0;  // home stop
+            if (m_travel_s > stall) m_travel_s = stall;  // motor stall
         }
-        // cmd == 0 on a fresh BTCM: hold. The force is whatever it was.
+        // cmd == 0 on a fresh BTCM: hold. The travel is whatever it was.
+        m_force_n = ForceAtTravel(p);
         return m_force_n;
     }
 
     double ForceN() const { return m_force_n; }
 
+    /// Actuator travel from home, in seconds of full-speed drive.
+    double TravelS() const { return m_travel_s; }
+
+    /// True once the shoes are against the drum.
+    bool InContact() const { return m_travel_s > m_travel.clearance_s; }
+
+    /// True when the actuator is at its home (released) stop.
+    bool AtHome() const { return m_travel_s <= 0.0; }
+
+    const Travel& TravelParams() const { return m_travel; }
+
+    static constexpr double kSettleWithinStep =
+        std::numeric_limits<double>::infinity();
+
 private:
+    double ForceAtTravel(const BrakeDrum::Params& p) const {
+        const double past_contact = m_travel_s - m_travel.clearance_s;
+        if (past_contact <= 0.0) return 0.0;
+        if (m_travel.rise_s <= 0.0 || past_contact >= m_travel.rise_s) {
+            return p.max_shoe_force_n;
+        }
+        return p.max_shoe_force_n * (past_contact / m_travel.rise_s);
+    }
+
+    Travel m_travel;
+    double m_travel_s = 0.0;
     double m_force_n = 0.0;
 };
 

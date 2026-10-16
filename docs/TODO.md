@@ -11,20 +11,12 @@ as in-app displays (2D panels first, 3D later), fed by **decoding the GM-8192
 per-value chassis cells. Display-only first; interactivity later. Full plan +
 ratified decisions: [`docs/ipc_rsa_display_plan.md`](ipc_rsa_display_plan.md).
 
-- [ ] **Phase 1 — IPC cluster, 2D, snoop-fed (display-only)**:
-  - [x] `BusSnoop` (`src/BusSnoop.{h,cpp}`) decodes $41 / $40 / $20 / $90 / $91 /
-    $21 off the PIM, BPM, BTCM and IPC `*_TX` cells into a freshness-gated
-    `DashSnapshot` (`src/DashSnapshot.h`); `InstrumentClusterPanel`
-    (`src/InstrumentClusterPanel.{h,cpp}`) + pure `FormatCluster*` helpers;
-    decode, label, null-driver draw and `[e2e]` tests, built by the standalone
-    `tests/cluster/` project and the `cluster-panel-tests` CI job.
-  - [ ] Wire it into the app: add the two sources to the root `ev1sim` and
-    `ev1sim_tests` targets (then retire `tests/cluster/` and its CI job), give
-    `BusSnoop::Attach()` the WireTruthChassis table, fill `DashSnapshot::lamps`
-    from the IPC lamp cells (4130-4145), and draw the panel from `SimApp`.
-    Retire `WireTruthChassis`'s own PIM `$41` framer once the panel shows speed.
-    Waits on the open PRs that own `CMakeLists.txt`, `src/SimApp.*` and
-    `src/WireTruthChassis.*`.
+- [x] **Phase 1 — IPC cluster, 2D, snoop-fed (display-only)**: `BusSnoop`
+  (`src/BusSnoop.{h,cpp}`) decodes $41 / $40 / $20 / $90 / $91 / $21 off the PIM,
+  BPM, BTCM and IPC `*_TX` cells into a freshness-gated `DashSnapshot`;
+  `ExternalSimConnector::GetDashSnapshot()` adds the IPC lamp cells (4130-4145);
+  `SimApp` draws `InstrumentClusterPanel` bottom-centre when the external sim
+  is on. Decode, label, null-driver draw and `[e2e]` tests.
 - [ ] **Phase 2 — RSA console, 2D, snoop-fed (display-only)**: `RsaConsolePanel`
   mirroring electricsim `rsa_panel_catalog.yaml`.
 - [ ] **Phase 3 — 3D in-scene** cluster + console (same snapshot feed).
@@ -168,17 +160,20 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   which is what makes "CdA is 1.7× spec" a claim worth acting on and the
   retracted "0.09 m², a quarter of spec" one that never was (it was
   0.088 ± 0.145 m²).
-- [ ] **EMB shoe-force integrator (refinement).**  Current model
-  treats the BTCM cmd (-1 / 0 / +1) as a proportional force command.
-  More faithful: integrate cmd × motor_speed × dt to track shoe
-  position, then derive force from spring-like compliance.  Defer
-  until measured EV1 EMB response data lands.  (Per-wheel rear
-  modulation already ships: `ApplyRearEmbBrake`, `src/SimApp.cpp:1100-1157`,
-  consumes `kSigRearMotorLR/RR` and drives each wheel via
-  `BrakeDrum::torque_magnitude_nm`; the command→force step at
-  `SimApp.cpp:1126` is still a crude linear map — this refinement replaces
-  it with a faithful clamp/shoe-position model.  This item is the surviving
-  tracker for that residual clamp/shoe-position work.)
+- [ ] **EMB shoe-force integrator: switch SimApp onto it.**  The
+  integrator ships in `src/RearEmbClamp.h`: the BTCM motor command drives
+  actuator travel (clearance take-up with no force, then force rising
+  linearly with travel to the EMB maximum where the motor stalls, release
+  back to the home stop), with HOLD keeping the travel and a stale BTCM
+  sending the actuator home.  `SimApp::ApplyRearEmbBrake` still calls
+  `RearEmbClamp::Update` without a step size, which settles within the step
+  (the old instantaneous map for the +1 / 0 / -1 the wire carries).  The
+  remaining change is passing the physics step as the fourth argument at
+  both `Update` calls there, then re-capturing the ABS baselines, since the
+  rear force then builds over ~300 ms instead of in one step.  The two
+  travel times are inferred, not EV1 facts; replace them if measured EMB
+  response data lands.  Tests: `tests/test_rear_emb_clamp.cpp`,
+  `tests/test_rear_emb_fallback.cpp`.
 - [x] **SHM transport "intermittent float corruption" — root-caused.**
   Was NOT a transport bug.  Controllers' bus-drain loops did not
   filter `FrameType::SignalDefine` frames, which carry an ASCII
@@ -220,27 +215,6 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   Surfacing this as a `kSigChassisAbsActive` boolean would let a
   game-controller adapter drive a rumble motor for tactile feedback.
   Out of scope until game-controller input/FFB lands.
-- [ ] **Suspension spring/damper rate verification.**  Run
-  `./build/ev1sim --config config/bounce_test.json` (needs a Chrono
-  build): the car drops onto a flat plane, and the telemetry CSV's
-  `pos_z` with the stats CSV's `pitch_deg` give the front and rear ride
-  frequencies and damping (recipe in the config header).  Predicted from
-  the files: rear 1.50 Hz at a 0.30 damping ratio (the ev1 baseline's
-  estimate), front about 1.8 Hz from the unsourced 143000 N/m on the
-  sedan geometry's 0.52 motion ratio.  Front stiffer than rear is the
-  opposite of the usual flat-ride bias, so the front rate is the one to
-  revisit once the run confirms it.  Keep until measured.
-- [ ] **Front suspension hardpoints are still the Chrono sedan sample.**
-  `EV1_FrontDoubleWishbone.json` is Chrono's `sedan` sample rescaled to
-  the printed track, and says so.  The rear now uses the ev1 repo's
-  suspension baseline (`geometry/suspension/`, ev1 PR #144), which also
-  carries estimated front SLA points (ball joints, arm pivots, damper
-  yoke) around the printed damper top and cradle mounts.  Moving the
-  front onto those points is the next step; the yoke between the
-  coil-over and the lower arm has no counterpart in `DoubleWishbone`, so
-  it either becomes a motion-ratio adjustment or a
-  `GenericWheeledSuspension` like the rear.
-
 ## Outputs ev1sim could render (defer all)
 - [ ] Wiper motor visual sweep (model update needed).
 - [ ] Door lock solenoid **visual** click — the audio click already plays via

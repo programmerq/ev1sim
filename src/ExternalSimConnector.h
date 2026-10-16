@@ -1,5 +1,6 @@
 #pragma once
 
+#include "DashSnapshot.h"
 #include "VehicleLights.h"
 #include "VehiclePanels.h"
 #include "VehicleState.h"
@@ -699,12 +700,13 @@ public:
     float GetPimCruiseSetpointMps() const;
     bool  HasReceivedPimCruiseSetpointMps() const;
 
-    /// Instrument-cluster vehicle speed (km/h) decoded from the PIM $41 frame
-    /// snooped off the GM-8192 bus (GM8192_PIM_TX) — what the cluster reports,
-    /// distinct from ev1sim's own physics speed (GetVehicleSpeedMps). 0 / false
-    /// until a $41 frame is decoded.
-    std::uint8_t GetBusVehicleSpeedKph() const;
-    bool         HasBusVehicleSpeed() const;
+    /// What the instrument cluster shows (docs/ipc_rsa_display_plan.md Phase 1):
+    /// the GM-8192 frames BusSnoop decoded off the module TX cells, fresh as of
+    /// the current sim time, plus the IPC's own lamps (4130-4145) copied from
+    /// the telltale cells this connector already consumes. A lamp whose cell
+    /// was never written stays nullopt; frame groups are empty without the
+    /// substrate or before their first frame.
+    ev1sim::DashSnapshot GetDashSnapshot() const;
 
     /// Incoming Auto Disconnect main HV contactor state (ID 5224, main
     /// harness segment).  Published by the AD controller on change.
