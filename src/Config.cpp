@@ -87,6 +87,49 @@ std::string Config::NamedConfigFault(const std::string& path, bool was_named) {
 }
 
 // ---------------------------------------------------------------------------
+namespace {
+
+// environment.weather: an object with the Weather fields, or the path of a
+// JSON file holding one (as scripts/fetch_weather.py writes it), resolved
+// against the directory of the config file that names it.
+void parse_weather(const json& w, const std::string& config_path,
+                   Config::Environment::Weather& out) {
+    json obj = w;
+    if (w.is_string()) {
+        std::filesystem::path p = w.get<std::string>();
+        if (p.is_relative())
+            p = std::filesystem::path(config_path).parent_path() / p;
+        std::ifstream f(p);
+        if (!f) {
+            std::cerr << "[Config] weather file " << p.string()
+                      << " not found: keeping the almanac defaults.\n";
+            return;
+        }
+        try {
+            obj = json::parse(f, nullptr, true, true);
+        } catch (const json::parse_error& e) {
+            std::cerr << "[Config] JSON parse error in weather file " << p.string()
+                      << ": " << e.what() << " (keeping the almanac defaults)\n";
+            return;
+        }
+    }
+    if (!obj.is_object()) {
+        std::cerr << "[Config] environment.weather is neither an object nor a path: "
+                     "keeping the almanac defaults.\n";
+        return;
+    }
+    Config::Environment::Weather parsed = out;
+    read_if(obj, "mean_temp_c",          parsed.mean_temp_c);
+    read_if(obj, "diurnal_amp_c",        parsed.diurnal_amp_c);
+    read_if(obj, "mean_humidity_pct",    parsed.mean_humidity_pct);
+    read_if(obj, "diurnal_humidity_amp", parsed.diurnal_humidity_amp);
+    read_if(obj, "phase_offset_hours",   parsed.phase_offset_hours);
+    out = parsed;
+}
+
+}  // namespace
+
+// ---------------------------------------------------------------------------
 Config Config::LoadFromFile(const std::string& path) {
     Config cfg;
 
@@ -202,6 +245,8 @@ Config Config::LoadFromFile(const std::string& path) {
         }
         read_if(e, "sun_elevation_deg", cfg.environment.sun_elevation_deg);
         read_if(e, "ambient_temp_c",    cfg.environment.ambient_temp_c);
+        if (e.contains("weather"))
+            parse_weather(e["weather"], path, cfg.environment.weather);
     }
 
     if (j.contains("lights") && j["lights"].contains("demo_mode")) {

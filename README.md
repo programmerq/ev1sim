@@ -314,11 +314,19 @@ For interactive (keyboard) inspection:
   "time_of_day": "day",           // "day" | "dusk" | "night" — ambient + sun preset
   "ambient":     [0.4, 0.4, 0.4], // RGB override, wins over preset
   "sun_elevation_deg": 55.0,      // override, wins over preset
-  "ambient_temp_c": 20.0          // stub — no consumer yet (see TODO)
+  "ambient_temp_c": 20.0,         // stub — no consumer yet (see TODO)
+  "weather": "weather/la_june.json" // ambient almanac; or an inline object
 }
 ```
 
-Headless runs ignore this block.
+Headless runs ignore this block except `weather`, which sets the ambient
+temperature and humidity cycle in every run.  It is a path relative to the
+config, or an inline object with the same keys: `mean_temp_c`,
+`diurnal_amp_c`, `mean_humidity_pct`, `diurnal_humidity_amp`,
+`phase_offset_hours`.  `scripts/fetch_weather.py` writes such a file from one
+real day's hourly readings; the sim reads it once at startup and never
+touches the network.  Without it, or if it cannot be read, the almanac keeps
+its defaults.
 
 ### Planned scenarios (TODO)
 

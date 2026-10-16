@@ -283,7 +283,7 @@ constexpr int           kNumSimTimeSignals = 1;
 // Ambient environment sensors (ev1sim → external sim, chassis segment, float32 LE).
 //   4090  vehicle.environment.ambient_temp_c          ambient air temperature (°C)
 //   4091  vehicle.environment.ambient_humidity_pct    ambient relative humidity (%)
-// Publisher: ev1sim AmbientTempSensor (naive diurnal sinusoid; no live weather API).
+// Publisher: ev1sim AmbientTempSensor (diurnal sinusoid, from environment.weather).
 // Consumers: HTCM (heat-pump), BPM (battery thermal) — wiring deferred to future round.
 constexpr std::uint32_t kSigAmbientTempC       = 4090U;
 constexpr std::uint32_t kSigAmbientHumidityPct = 4091U;

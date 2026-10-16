@@ -125,6 +125,12 @@ SimApp::SimApp(const Config& config) : m_config(config) {
     //     floating-UI panel lambdas can safely dereference m_physical during
     //     their initial label evaluation in AddButton().
     m_physical = std::make_unique<ev1sim::PhysicalWorld>();
+    {
+        const auto& w = m_config.environment.weather;
+        m_physical->ambient_temp_sensor().set_config(
+            {w.mean_temp_c, w.diurnal_amp_c, w.mean_humidity_pct,
+             w.diurnal_humidity_amp, w.phase_offset_hours, 0.0});
+    }
     // Optional initial-state config: start with the cabin locked (DoorLocks
     // otherwise defaults UNLOCKED).  Applied once, here at init.
     if (m_config.body.door_locks_locked_at_start)

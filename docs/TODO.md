@@ -29,8 +29,13 @@ The `PhysicalWorld` pattern landed with `CombinationSwitch` as the first
 instance.  Each item below is a new component that joins it — keyboard or
 future-UI input on one side, chassis-segment signal publishing on the other.
 
-- [ ] **Live weather API integration** (free service, with naive-almanac fallback
-  if API is down) — current implementation is naive-almanac only.
+- [x] **Live weather for the ambient almanac.**  `scripts/fetch_weather.py`
+  fits a real day's hourly temperature and humidity (Open-Meteo) to the
+  almanac's daily cycle and writes a weather file; a config names it under
+  `environment.weather` (see `Config::Environment::Weather`).  The sim reads it
+  at startup only and stays on sim time (`AmbientTempSensor::hour_of_day`);
+  without a file, or when the script cannot reach the service, the almanac
+  keeps its defaults.
 - [ ] **`power_steering_pump_motor` per-phase BLDC model (optional).**  The pump
   plant (`ev1sim::PowerSteeringPumpMotor`, chassis 4097 in / 4098 interlock-closed
   out) is currently a lumped-motor model; a per-phase BLDC model on `molex.A/B/C`
