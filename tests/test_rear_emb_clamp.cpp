@@ -33,7 +33,7 @@ double drive(RearEmbClamp& c, float cmd, double seconds,
 }  // namespace
 
 // ---------------------------------------------------------------------------
-// Settled map (no step size): what SimApp::ApplyRearEmbBrake gets today.
+// Settled map (no step size): the actuator settles within each call.
 // ---------------------------------------------------------------------------
 
 TEST_CASE("RearEmbClamp: HOLD keeps the clamp force an APPLY built",
