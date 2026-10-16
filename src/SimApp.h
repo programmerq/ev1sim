@@ -156,6 +156,10 @@ private:
     // Safe to call when m_external_sim is null (no-op).
     void PublishMotorState();
 
+    // Point the plant motor's torque the way the PRND lever says (R =
+    // backward).  Both loops call it once per tick.
+    void ApplyMotorDirection();
+
     Config m_config;
 
     std::unique_ptr<VehicleWorld>           m_world;
