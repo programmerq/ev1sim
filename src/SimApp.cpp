@@ -1,5 +1,6 @@
 #include "SimApp.h"
 #include "BrakeDrum.h"
+#include "EV1Vehicle.h"
 #include "MacOSPlatform.h"
 
 #include "chrono_vehicle/ChEngine.h"
@@ -1212,6 +1213,19 @@ void SimApp::ApplyElectronicsSteering(DriverCommand& cmd) {
 }
 
 // ---------------------------------------------------------------------------
+// The selector lever is the one input the motor's torque direction follows:
+// R turns it backward, every other position leaves it forward (in P and N the
+// PIM commands no torque, and the motor stays coupled to the wheels).  Both
+// loops call this once per tick, before the physics substeps.
+void SimApp::ApplyMotorDirection() {
+    const bool reverse = m_physical->prnd_selector().position() ==
+                         ev1sim::PrndSelector::Position::R;
+    ev1sim::SetMotorDirection(m_world->GetVehicle(),
+                              reverse ? ev1sim::MotorDirection::kReverse
+                                      : ev1sim::MotorDirection::kForward);
+}
+
+// ---------------------------------------------------------------------------
 // Publish the motor operating point on the chassis bus (4070 RPM, 4071 torque).
 //
 // The RPM source matters.  ChEngine::GetMotorSpeed() returns the speed AFTER
@@ -1225,19 +1239,18 @@ void SimApp::ApplyElectronicsSteering(DriverCommand& cmd) {
 // fault (DTC 007 above 16 000 RPM — propulsion manual p328, "SERVICE NOW … and
 // propulsion is disabled") was structurally unable to observe an over-speed.
 // The transmission's output-motorshaft speed is the honest, unclamped shaft
-// state, so publish that and let the electronics decide what is a fault.
+// state, signed by the driveshaft's direction (ev1sim::SignedMotorShaftSpeed),
+// so publish that and let the electronics decide what is a fault.
 void SimApp::PublishMotorState() {
     if (!m_external_sim) return;
 
     float motor_rpm    = 0.0f;
     float motor_torque = 0.0f;
 
-    // Speed: unclamped shaft state from the transmission output.
-    if (auto transmission = m_world->GetVehicle().GetTransmission()) {
-        // GetOutputMotorshaftSpeed() returns rad/s; convert to RPM.
-        const double omega = transmission->GetOutputMotorshaftSpeed();
-        motor_rpm = static_cast<float>(omega * 60.0 / (2.0 * 3.14159265358979323846));
-    }
+    // Speed: unclamped shaft state, signed (negative = turning the car
+    // backward), in RPM.
+    const double omega = ev1sim::SignedMotorShaftSpeed(m_world->GetVehicle());
+    motor_rpm = static_cast<float>(omega * 60.0 / (2.0 * 3.14159265358979323846));
 
     // Torque: what the drive is actually delivering to the shaft.  Above the
     // drive ceiling the engine map holds its last point, which the powertrain
@@ -1575,6 +1588,7 @@ int SimApp::RunWithVisualization() {
             std::cout << "[SimApp] Turn signal: AUTO-CANCEL\n";
 
         // --- Physics sub-stepping (skipped when paused) ---
+        ApplyMotorDirection();
         if (!m_paused) {
             for (int i = 0; i < steps_per_frame; ++i) {
                 double t = m_world->GetSimTime();
@@ -2172,6 +2186,7 @@ int SimApp::RunHeadless() {
             std::cout << "[SimApp] Turn signal: AUTO-CANCEL\n";
 
         // --- Physics sub-stepping (no pause control in headless) ---
+        ApplyMotorDirection();
         for (int i = 0; i < steps_per_tick; ++i) {
             const double t = m_world->GetSimTime();
             m_world->Synchronize(t);

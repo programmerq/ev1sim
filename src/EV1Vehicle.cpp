@@ -4,6 +4,7 @@
 #include "EV1TMeasyTire.h"
 
 #include "chrono_vehicle/ChPowertrainAssembly.h"
+#include "chrono_vehicle/ChTransmission.h"
 #include "chrono_vehicle/ChVehicleModelData.h"
 #include "chrono_vehicle/utils/ChUtilsJSON.h"
 
@@ -37,7 +38,7 @@ namespace {
 //   spindle body:    +w about its local y (the axle)
 //   axle shafts:     -w (each suspension's ChShaft, both axles)
 //   differential box:-w (open differential, both driven axles at -w)
-//   driveshaft:      +w / conical ratio (motor side of the 10.946:1 reduction)
+//   driveshaft:      +w / conical ratio (motor side of the 10.95:1 reduction)
 // The two driveline shafts are private to ChShaftsDriveline2WD, so they are
 // found among the system's shafts by the inertias the driveline JSON gives
 // them; a JSON that made them indistinguishable fails loudly.
@@ -136,6 +137,24 @@ std::unique_ptr<WheeledVehicle> BuildEV1Vehicle(const ChCoordsys<>& pose,
         SpinUpRotatingParts(*ev1, fwd_speed_mps, radius, driveline_json);
     }
     return ev1;
+}
+
+void SetMotorDirection(ChWheeledVehicle& vehicle, MotorDirection dir) {
+    auto transmission =
+        std::dynamic_pointer_cast<ChAutomaticTransmission>(vehicle.GetTransmission());
+    if (!transmission) return;
+    const auto mode = dir == MotorDirection::kReverse
+                          ? ChAutomaticTransmission::DriveMode::REVERSE
+                          : ChAutomaticTransmission::DriveMode::FORWARD;
+    if (transmission->GetDriveMode() != mode) transmission->SetDriveMode(mode);
+}
+
+double SignedMotorShaftSpeed(const ChWheeledVehicle& vehicle) {
+    const auto transmission = vehicle.GetTransmission();
+    const auto driveline    = vehicle.GetDriveline();
+    if (!transmission || !driveline) return 0.0;
+    return std::copysign(std::abs(transmission->GetOutputMotorshaftSpeed()),
+                         driveline->GetOutputDriveshaftSpeed());
 }
 
 }  // namespace ev1sim
