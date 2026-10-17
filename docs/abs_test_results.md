@@ -167,63 +167,39 @@ either side of this branch's changes: 12.053 both times.
 ### Automated test sweep (headless)
 
 ```sh
-# All seven scenarios, BTCM-on vs BTCM-off comparison.  hard_brake and
-# diagonal_mu were absent from this loop; hard_brake could not be run at all
-# before 2026-08-12 (no config wrapper, and two name lists in
-# run_abs_compare.sh that did not know it).
-for t in high_mu low_mu mu_jump split_mu diagonal_mu brake_and_steer hard_brake; do
-    ./scripts/run_abs_compare.sh "$t"
+# The six scenarios the external sim's acceptance harness carries as cases,
+# BTCM-on vs BTCM-off.  ELECTRICSIM_DIR is a built electricsim tree.
+for t in high_mu low_mu mu_jump split_mu diagonal_mu brake_and_steer; do
+    ELECTRICSIM_DIR=../electricsim ./scripts/run_abs_compare.sh "$t"
 done
 
 # Then regenerate the engineering report:
 ./scripts/abs_report.py docs/reports/abs_scenarios.md
 ```
 
-`run_abs_compare.sh` writes per-scenario outputs to
-`/tmp/ev1sim_abs_<test>/`:
+`run_abs_compare.sh` runs the harness case `abs_<test>`, which brings the
+controller fleet up on the shared wire table around this checkout's
+`build/ev1sim`, and writes per-scenario outputs to `/tmp/ev1sim_abs_<test>/`:
 
   - `summary.txt` — distance, slip stats, ABS event counts
   - `abs_btcm_on.csv` / `abs_btcm_off.csv` — chassis-side data
   - `abs_btcm_on.btcm.csv` — **BTCM-side firmware view** (vehicle-
     speed estimator, per-wheel slip / accel / phase / locked-dwell,
-    accelerometer reading) sampled at 50 Hz wall clock.  Toggled by
-    `BTCM_CSV_LOG` env var; the script sets it automatically for
-    BTCM-on runs.
-  - `abs_btcm_*.log` — full controller stdout/stderr per process
+    accelerometer reading).
+  - `harness/` — the harness's run directory, with every module's log
 
 ### Manual scenario run (with window, for visual debugging)
 
-To watch a scenario with the Chrono visualization open, start the
-controllers in separate terminals.  All seven ABS configs are set up
-for `realtime: true` so BTCM has wall-clock time to engage; flip
-`headless: false` in the config you're running to get a window.
+The harness reads each case's scene from this checkout's
+`config/abs_<test>.json`, so a windowed run is the same harness run with
+`"headless": false` set in that file (all seven ABS configs run
+`realtime: true`):
 
 ```sh
-# Terminal 1 — ev1sim with window
-cd ev1sim
 # Edit config/abs_<test>.json: set "headless": false
-./build/ev1sim --config config/abs_<test>.json
-
-# Terminal 2 — PIM (powertrain control)
 cd ../electricsim
-./build/ev1/pim/pim_controller
-
-# Terminal 3 — RSA (key/run-mode)
-./build/ev1/rsa/rsa_controller
-
-# Terminal 4 — BTCM (brake controller).  BTCM_CSV_LOG optional;
-# BTCM_ABS_TRACE=1 enables per-tick algorithm-state log lines.
-./build/ev1/btcm/ex_btcm_controller
+EV1SIM_DIR=../ev1sim python3 -m vat run --case abs_<test> --out /tmp/abs_window
 ```
-
-Order matters: ev1sim creates the SHM bus segments, the controllers
-attach.  Watch ev1sim's stdout for `connected to main harness bus`
-before starting the controllers, and start RSA before BTCM so the
-run-mode broadcast is live when BTCM tries to read it.
-
-The `--config <name>` form works too — leave the abs_<test>.json
-files alone and pass via env / a copy if you only want headless: false
-for a single one-off run.
 
 ### Refreshing reports
 

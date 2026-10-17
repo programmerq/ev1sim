@@ -1,34 +1,17 @@
 # ev1sim ABS regression baseline — headline BTCM-on metrics per scenario.
 # Consumed by scripts/abs_regression.sh via `compare_abs_runs.py --check`.
 #
-# electricsim-commit: 77e2a1f9   (controllers MUST be built at/near this commit;
-#                                 phase counts and absolute metrics drift with
-#                                 the BTCM/PIM/RSA version — that is why this is
-#                                 pinned.  Re-capture if you bump electricsim.)
-# ev1sim: tau_dump = 0.030 s (src/SimApp.cpp), captured 2026-05-21
-#
-# STALE as of 2026-08-12 — do not read these numbers as current.  Four changes
-# since the capture move the trajectories these were measured on, and none of
-# them is a regression:
-#   1. the motor torque map's corner point moved to the propulsion p250 rating
-#      (141 N.m at 7000 RPM), which slows every launch ~3 % and so shifts every
-#      scenario's entry-speed time;
-#   2. abs_mu_jump / abs_split_mu / abs_diagonal_mu runways were lengthened so
-#      the launch finishes before the surface under test, which moves their
-#      brake-on position and stop distance by design;
-#   3. abs_high_mu_stop / abs_hard_brake / abs_brake_and_steer brakes moved past
-#      their measured barrier releases (7.0/7.0/6.0 -> 18.0/18.0/15.0 s), so the
-#      brake event starts from a settled entry instead of the tick the throttle
-#      dropped.  Brake values, mu and hold durations unchanged; entry speed and
-#      stop distance move by design;
-#   4. the coast map was re-cut to the propulsion p60/p209 regeneration ceiling
-#      (365 V x 30 A).  It lowers coast drag above 52 mph ONLY, so it moves the
-#      entry speed of any scenario that settles from above that speed.
-# Re-capture with a built electricsim at the pinned commit before treating any
-# comparison against this file as meaningful.
-# capture method: single-pass 6-scenario BTCM-on/off sweep, controllers rebuilt
-#                 at HEAD.  Margins are wide enough that run-to-run timing jitter
-#                 does not flip any rule; bump to a 3x median if that changes.
+# electricsim-commit: 7157b25   (controllers built at this commit; phase counts
+#                                and absolute metrics move with the BTCM/PIM/RSA
+#                                version, so re-capture when electricsim moves)
+# ev1sim: built from the rear-shoe step-integrator change (src/SimApp.cpp
+#         ApplyRearEmbBrake passes the physics step) on current main.
+# capture method: scripts/run_abs_compare.sh per scenario (electricsim VAT
+#                 harness on the wire-table bus), single pass.  The ~ rows hold
+#                 that capture's values.  The lock ceilings and phase floors are
+#                 ABS-quality targets, not captured values: low_mu and mu_jump
+#                 exceed them and split_mu yaws, which is the ABS stand-in's
+#                 open retune, so this file fails on those rows until it lands.
 #
 # Rule shapes (deliberate):
 #   - stopping distance: two-sided +/-10% (both directions matter).
@@ -43,7 +26,7 @@
 #   op: ~ (within +/-tol of value, default 0.10) | < | <= | > | >=
 
 # high_mu — dry asphalt straight stop; ABS barely needed, must not lock.
-high_mu          stop_distance_m   ~   149.35  0.10
+high_mu          stop_distance_m   ~   38.44  0.10
 high_mu          fl_locked_pct     <   10
 high_mu          fr_locked_pct     <   10
 
@@ -59,18 +42,18 @@ mu_jump          fr_locked_pct     <   50
 mu_jump          fl_phases         >   25
 
 # split_mu — left/right different grip; straight stop, minimal yaw.
-split_mu         stop_distance_m   ~   73.44   0.10
+split_mu         stop_distance_m   ~   18.84   0.10
 split_mu         yaw_deg           <   0.50
 split_mu         yaw_deg           >   -0.50
 split_mu         fl_locked_pct     <   15
 
 # brake_and_steer — brake while steering; heading preserved (large yaw expected).
-brake_and_steer  stop_distance_m   ~   60.81   0.10
-brake_and_steer  yaw_deg           ~   176.30  0.10
+brake_and_steer  stop_distance_m   ~   36.15   0.10
+brake_and_steer  yaw_deg           ~   60.13  0.10
 brake_and_steer  fl_locked_pct     <   10
 
 # diagonal_mu — diagonal grip pattern; ABS active, low lock.
-diagonal_mu      stop_distance_m   ~   100.68  0.10
+diagonal_mu      stop_distance_m   ~   38.69  0.10
 diagonal_mu      fl_locked_pct     <   25
 diagonal_mu      fr_locked_pct     <   25
 diagonal_mu      fl_phases         >   20
