@@ -22,3 +22,6 @@ compile_commands.json
 # Scenario/co-sim stats CSVs are run artifacts (ev1sim writes
 # scenario_<name>.csv to cwd per --scenario stats.output_csv).
 scenario_*.csv
+
+# Engineering reports are generated from local sweeps (scripts/abs_report.py).
+docs/reports/

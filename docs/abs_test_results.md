@@ -1,11 +1,11 @@
 # ABS validation — overview
 
 This is the high-level narrative for the EV1 ABS validation suite.
-For raw numbers, charts, and per-scenario engineering data, see the
-auto-generated [**ABS engineering report**](reports/abs_scenarios.md)
-— that's the data artifact you'd flip through to evaluate behavior.
-The companion [**tone-ring validation report**](reports/tone_ring_validation.md)
-isolates the simavr edge-counting plumbing from the chassis side.
+For raw numbers, charts and per-scenario engineering data, generate the
+engineering report locally from a sweep (see "How to run" below);
+`scripts/abs_report.py` writes it outside the tree.  The tone-ring
+validation memo comes from electricsim's
+`test_btcm_tone_ring_validation` the same way.
 
 ## The four standard scenarios
 
@@ -173,8 +173,8 @@ for t in high_mu low_mu mu_jump split_mu diagonal_mu brake_and_steer; do
     ELECTRICSIM_DIR=../electricsim ./scripts/run_abs_compare.sh "$t"
 done
 
-# Then regenerate the engineering report:
-./scripts/abs_report.py docs/reports/abs_scenarios.md
+# Then generate the engineering report (markdown plus a .charts/ directory):
+./scripts/abs_report.py /tmp/ev1sim_abs_report/abs_scenarios.md
 ```
 
 `run_abs_compare.sh` runs the harness case `abs_<test>`, which brings the
@@ -204,13 +204,13 @@ EV1SIM_DIR=../ev1sim python3 -m vat run --case abs_<test> --out /tmp/abs_window
 ### Refreshing reports
 
 ```sh
-# Engineering report (runs all 4 scenarios should be done first):
-./scripts/abs_report.py docs/reports/abs_scenarios.md
+# Engineering report (run the six-scenario sweep above first):
+./scripts/abs_report.py /tmp/ev1sim_abs_report/abs_scenarios.md
 
-# Tone-ring validation memo (one-off):
-./build/ev1/btcm/test_btcm_tone_ring_validation \
+# Tone-ring validation memo:
+../electricsim/build/ev1/btcm/test_btcm_tone_ring_validation \
     ../electricsim/build/firmware/btcm_firmware.elf \
-    docs/reports/tone_ring_validation.md
+    /tmp/ev1sim_abs_report/tone_ring_validation.md
 ```
 
 ### Why `realtime: true` matters
@@ -255,7 +255,7 @@ still visible in scan-tool logs and traces.
 
 ### Tone-ring chain has documented compensations
 
-`test_btcm_tone_ring_validation` (see report) shows the firmware's
+`test_btcm_tone_ring_validation` (its memo: "Refreshing reports" above) shows the firmware's
 reported wheel rps lands at ~0.61 × the analytical expected value
 on sustained drives, even though direct edge-count probes show the
 simavr → ISR plumbing is 1:1.  Two pieces account for the gap:
