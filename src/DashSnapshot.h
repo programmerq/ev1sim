@@ -113,6 +113,25 @@ struct DashLamps {
     std::optional<bool> wait;                // CHASSIS_IPC_WAIT_TELLTALE
 };
 
+// The RSA console's outputs (docs/ipc_rsa_display_plan.md Phase 2). Like the
+// lamps these are the RSA's own output cells, not a frame: the same cells the
+// external sim's wire-mode RSA panel reads (examples/ev1_rsa_panel/
+// wire_panel_sink.cpp), so the two front-ends show the same state. Each is
+// nullopt until its cell has been written.
+struct DashRsaConsole {
+    std::optional<bool> run;            // RSA_RUN1_OUT
+    std::optional<bool> acc;            // CHASSIS_RSA_ACC_OUT
+    std::optional<bool> valid_code;     // CHASSIS_RSA_VALID_CODE
+    std::optional<bool> security;       // CHASSIS_RSA_SECURITY_INDICATOR
+    std::optional<bool> shift_blocked;  // CHASSIS_RSA_SHIFT_BLOCKED
+    std::optional<bool> btsi_solenoid;  // CHASSIS_RSA_BTSI_SOLENOID
+    std::optional<bool> led_park;       // CHASSIS_RSA_SELECTOR_LED_PARK
+    std::optional<bool> led_reverse;    // CHASSIS_RSA_SELECTOR_LED_REVERSE
+    std::optional<bool> led_neutral;    // CHASSIS_RSA_SELECTOR_LED_NEUTRAL
+    std::optional<bool> led_drive;      // CHASSIS_RSA_SELECTOR_LED_DRIVE
+    std::optional<std::uint8_t> dim_step;  // CHASSIS_RSA_DIM_LEVEL_STEP, 0..10
+};
+
 struct DashSnapshot {
     std::optional<DashPcmStatus>  pcm;         // $41
     std::optional<DashPackStatus> pack;        // $40
@@ -122,6 +141,7 @@ struct DashSnapshot {
     std::optional<DashOdometer>   odometer;    // $21
     std::optional<DashLamps>      lamps;       // IPC lamp cells, not a frame
     std::optional<float>          trip_m;      // IPC trip cell 4132 (metres), not a frame
+    std::optional<DashRsaConsole> rsa;         // RSA output cells, not a frame
 };
 
 }  // namespace ev1sim

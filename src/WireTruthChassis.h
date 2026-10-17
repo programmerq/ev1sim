@@ -28,6 +28,8 @@
 #ifndef EV1SIM_WIRE_TRUTH_CHASSIS_H
 #define EV1SIM_WIRE_TRUTH_CHASSIS_H
 
+#include "DashSnapshot.h"
+
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -256,6 +258,11 @@ public:
     std::optional<std::uint64_t> pim_active_dtc_bitmap_hi() const;
     std::optional<bool>          ipc_service_soon_telltale() const;
     std::optional<bool>          ipc_wait_telltale() const;  // CHASSIS_IPC_WAIT_TELLTALE
+
+    // The RSA console's output cells in one read (RSA_RUN1_OUT, CHASSIS_RSA_ACC_OUT,
+    // _VALID_CODE, _SECURITY_INDICATOR, _SHIFT_BLOCKED, _BTSI_SOLENOID, the four
+    // _SELECTOR_LED_* and _DIM_LEVEL_STEP). Unwritten cells stay nullopt.
+    ev1sim::DashRsaConsole rsa_console() const;
     // The IPC's COMMAND to ground circuit 2029 (IPC_ES_WAIT_TT_DRV, an
     // element_state cause the IPC writes). Read-only here, as every cell ev1sim
     // consumes. Separate from the lamp because the lamp also needs its bank's

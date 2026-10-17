@@ -893,6 +893,10 @@ TEST_CASE("Connector dash snapshot: bus frames via BusSnoop plus the IPC lamp ce
     REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_IPC_ANTILOCK_TELLTALE, true));
     REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_IPC_WAIT_TELLTALE, true));
     REQUIRE(fleet->write_float32(topo::kWireCHASSIS_IPC_TRIP_DISTANCE_M, 2500.0f));
+    // The RSA's console outputs: ACC on, RUN off, the PARK selector LED lit.
+    REQUIRE(fleet->write_bit(topo::kWireCHASSIS_RSA_ACC_OUT, true));
+    REQUIRE(fleet->write_bit(topo::kWireRSA_RUN1_OUT, false));
+    REQUIRE(fleet->write_bit(topo::kWireCHASSIS_RSA_SELECTOR_LED_PARK, true));
 
     // Pump the transmitters and the connector's tick in lockstep.
     std::uint64_t now = 1000u;
@@ -917,6 +921,12 @@ TEST_CASE("Connector dash snapshot: bus frames via BusSnoop plus the IPC lamp ce
     CHECK_FALSE(snap.lamps->brake.has_value());
     REQUIRE(snap.trip_m);
     CHECK(*snap.trip_m == 2500.0f);
+    REQUIRE(snap.rsa);
+    CHECK(snap.rsa->acc == std::optional<bool>(true));
+    CHECK(snap.rsa->run == std::optional<bool>(false));
+    CHECK(snap.rsa->led_park == std::optional<bool>(true));
+    CHECK_FALSE(snap.rsa->led_drive.has_value());
+    CHECK_FALSE(snap.rsa->dim_step.has_value());
 
     // The bus goes quiet: past the staleness horizon the frame groups blank,
     // while the lamp keeps its cell's last written value.
