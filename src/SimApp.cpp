@@ -1612,6 +1612,8 @@ int SimApp::RunWithVisualization() {
 
         // --- Camera override ---
         m_camera->Update(m_world->GetPose());
+        if (m_dash3d)
+            m_dash3d->Place(m_world->GetPose());
 
         // --- Floating UI panel label refresh ---
         if (m_floating_ui)
@@ -1943,6 +1945,15 @@ int SimApp::RunWithVisualization() {
             m_rsa_console->SetAnchor(static_cast<int>(dim.Width) / 2 + m_cluster->Width() / 2 + 10,
                                      static_cast<int>(dim.Height) - m_rsa_console->Height() - 10);
             m_rsa_console->Draw(drv, m_vis->GetDevice()->getGUIEnvironment()->getBuiltInFont());
+
+            // The same two panels as screens on the dash in the 3D scene
+            // (Cabin camera). Textures redrawn here, shown next frame.
+            if (!m_dash3d) {
+                m_dash3d = std::make_unique<ev1sim::DashScreens3D>(m_vis->GetDevice());
+                m_dash3d->Place(m_world->GetPose());
+            }
+            m_dash3d->Update(snap);
+            m_dash3d->Refresh(m_vis->GetDevice()->getGUIEnvironment()->getBuiltInFont());
         }
         m_physical->DrawHUD(m_vis->GetDevice(),
                             m_external_sim->GetRsaRunMode(),

@@ -1,5 +1,7 @@
 #include "CameraManager.h"
 
+#include "DashScreens3D.h"
+
 #include <algorithm>
 #include <cmath>
 
@@ -38,6 +40,7 @@ std::string CameraManager::GetModeName() const {
         case CameraMode::Rear:     return "Rear";
         case CameraMode::TopDown:  return "Top-Down";
         case CameraMode::FreeLook: return "Free-Look";
+        case CameraMode::Cabin:    return "Cabin";
         default:                   return "Unknown";
     }
 }
@@ -52,6 +55,7 @@ void CameraManager::SetModeFromString(const std::string& name) {
     else if (name == "rear")     m_mode = CameraMode::Rear;
     else if (name == "topdown")  m_mode = CameraMode::TopDown;
     else if (name == "freelook") m_mode = CameraMode::FreeLook;
+    else if (name == "cabin")    m_mode = CameraMode::Cabin;
     // else keep default
 }
 
@@ -63,6 +67,7 @@ void CameraManager::Update(const VehiclePose& pose) {
         case CameraMode::Rear:     ApplyRear(pose);     break;
         case CameraMode::TopDown:  ApplyTopDown(pose);  break;
         case CameraMode::FreeLook: ApplyFreeLook(pose); break;
+        case CameraMode::Cabin:    ApplyCabin(pose);    break;
         default: break;
     }
 }
@@ -157,6 +162,16 @@ void CameraManager::ApplyFreeLook(const VehiclePose& p) {
     m_camera->setPosition(pos);
     m_camera->setTarget(tgt);
     m_camera->setUpVector(up);
+}
+
+void CameraManager::ApplyCabin(const VehiclePose& p) {
+    // Driver's seat, looking down at the dash screens (DashScreens3D). No zoom.
+    const ev1sim::DashVec3 eye = ev1sim::ChassisToWorld(p, ev1sim::kDriverEye);
+    const ev1sim::DashVec3 tgt = ev1sim::ChassisToWorld(p, ev1sim::CabinLookPoint());
+
+    m_camera->setPosition(v3(eye.x, eye.y, eye.z));
+    m_camera->setTarget(v3(tgt.x, tgt.y, tgt.z));
+    m_camera->setUpVector(v3(p.ux, p.uy, p.uz));
 }
 
 // ---------------------------------------------------------------------------
