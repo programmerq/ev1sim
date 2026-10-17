@@ -319,6 +319,7 @@ add_executable(ev1sim
     src/FloatingUiPanel.cpp
     src/InstrumentClusterPanel.cpp
     src/RsaConsolePanel.cpp
+    src/DashScreens3D.cpp
     src/BusSnoop.cpp
     src/ExternalSimConnector.cpp
     src/WireTruthChassis.cpp
@@ -472,6 +473,7 @@ if(BUILD_TESTS)
         tests/test_bus_snoop.cpp
         tests/test_instrument_cluster_panel.cpp
         tests/test_rsa_console_panel.cpp
+        tests/test_dash_screens_3d.cpp
         tests/test_throttle_bus.cpp
         tests/test_scenario.cpp
         tests/test_brake_pedal.cpp
@@ -501,6 +503,7 @@ if(BUILD_TESTS)
         src/FloatingUiPanel.cpp
         src/InstrumentClusterPanel.cpp
         src/RsaConsolePanel.cpp
+        src/DashScreens3D.cpp
         src/BusSnoop.cpp
         src/VehiclePanels.cpp
         ${EV1SIM_WHEEL_IO_SRC}

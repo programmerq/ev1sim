@@ -6,7 +6,7 @@
 
 #include <string>
 
-enum class CameraMode { Chase, Hood, Rear, TopDown, FreeLook, COUNT };
+enum class CameraMode { Chase, Hood, Rear, TopDown, FreeLook, Cabin, COUNT };
 
 class CameraManager : public irr::IEventReceiver {
 public:
@@ -61,4 +61,5 @@ private:
     void ApplyRear(const VehiclePose& p);
     void ApplyTopDown(const VehiclePose& p);
     void ApplyFreeLook(const VehiclePose& p);
+    void ApplyCabin(const VehiclePose& p);
 };

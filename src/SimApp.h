@@ -2,6 +2,7 @@
 
 #include "CameraManager.h"
 #include "Config.h"
+#include "DashScreens3D.h"
 #include "DriverCommand.h"
 #include "ExternalSimConnector.h"
 #include "FloatingUiPanel.h"
@@ -206,6 +207,9 @@ private:
 #endif
 
     std::shared_ptr<chrono::vehicle::ChWheeledVehicleVisualSystemIrrlicht> m_vis;
+    /// Cluster + console as screens in the 3D scene (display plan Phase 3).
+    /// Declared after m_vis so it is destroyed while the Irrlicht device lives.
+    std::unique_ptr<ev1sim::DashScreens3D> m_dash3d;
     chrono::ChRealtimeStepTimer m_realtime_timer;
     bool m_paused = false;
 
