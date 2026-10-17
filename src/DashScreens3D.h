@@ -98,7 +98,6 @@ public:
     /// Move both quads to follow the chassis.
     void Place(const VehiclePose& pose);
 
-    void SetVisible(bool visible);
     bool HasTextures() const { return cluster_tex_ != nullptr && console_tex_ != nullptr; }
 
     irr::scene::IMeshSceneNode* cluster_node() const { return cluster_node_; }

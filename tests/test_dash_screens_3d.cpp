@@ -119,9 +119,6 @@ TEST_CASE("Screens are real scene nodes placed on the chassis (null driver)", "[
         snap.rsa->shift_blocked = true;
         screens.Update(snap);
         REQUIRE(screens.console_panel().view().shift_lock == L"Shift lock: BLOCKED");
-
-        screens.SetVisible(false);
-        REQUIRE_FALSE(node->isVisible());
     }
     // Destructor removed both nodes from the scene.
     REQUIRE(dev->getSceneManager()->getRootSceneNode()->getChildren().getSize() == 0u);
@@ -133,5 +130,4 @@ TEST_CASE("Screens tolerate a missing device", "[dash3d]") {
     REQUIRE(screens.cluster_node() == nullptr);
     screens.Place(VehiclePose{});
     screens.Refresh(nullptr);
-    screens.SetVisible(true);
 }

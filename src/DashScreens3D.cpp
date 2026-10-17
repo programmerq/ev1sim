@@ -173,9 +173,4 @@ void DashScreens3D::Place(const VehiclePose& pose) {
     PlaceNode(console_node_, PlaceDashScreen(pose, kConsoleMount));
 }
 
-void DashScreens3D::SetVisible(bool visible) {
-    if (cluster_node_ != nullptr) cluster_node_->setVisible(visible);
-    if (console_node_ != nullptr) console_node_->setVisible(visible);
-}
-
 }  // namespace ev1sim
