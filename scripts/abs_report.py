@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import csv
 import datetime
+import json
 import re
 import sys
 from pathlib import Path
@@ -744,22 +745,19 @@ def chart_btcm_accel(btcm_rows: list[dict], title: str) -> str:
 # Animated HTML replay — top-down view with scrubbable timeline
 # ---------------------------------------------------------------------------
 
-# Map test name → level JSON path so the replay can render surface
-# patches as a colored background (asphalt grey, ice light blue).
-LEVEL_FILES = {
-    "high_mu":         "level/flat_asphalt.json",
-    "low_mu":          "level/flat_ice.json",
-    "mu_jump":         "level/flat_ice_transition.json",
-    "split_mu":        "level/flat_split_mu.json",
-    "brake_and_steer": "level/flat_asphalt.json",
-    "diagonal_mu":     "level/flat_diagonal_mu.json",
-}
+def scene_terrain(t: str, repo_root: Path) -> dict:
+    """The `terrain` block of config/abs_<t>.json: a level file or a rigid plane."""
+    cfg = repo_root / "config" / f"abs_{t}.json"
+    try:
+        return json.loads(cfg.read_text()).get("terrain") or {}
+    except (OSError, ValueError):
+        return {}
 
 
 def make_replay_html(t: str,
                      on_rows: list[dict],
                      off_rows: list[dict],
-                     level_path) -> str:
+                     level_path, plane: Optional[dict] = None) -> str:
     """Self-contained HTML+SVG+JS top-down replay of a scenario.
 
     Top-down view of the chassis with surface patches, car body
@@ -820,17 +818,11 @@ def make_replay_html(t: str,
         except Exception:
             pass
 
-    # If no level file (high_mu and low_mu use a rigid_plane in the
-    # config rather than a level), synthesize a single patch covering
-    # the full traveled extent so the replay still shows surface
-    # context.  Friction and surface name from the test ID.
+    # A rigid-plane scene has no level file: one patch covering the
+    # traveled extent, with the plane's surface and friction.
     if not patches:
-        single = {
-            "high_mu":  {"surface": "asphalt", "friction": 0.9},
-            "low_mu":   {"surface": "ice",     "friction": 0.10},
-            "mu_jump":  {"surface": "asphalt", "friction": 0.9},
-            "split_mu": {"surface": "asphalt", "friction": 0.9},
-        }.get(t, {"surface": "asphalt", "friction": 0.9})
+        single = {"surface":  (plane or {}).get("surface", "asphalt"),
+                  "friction": (plane or {}).get("friction", 0.9)}
         patches.append({
             "cx": (x_min + x_max) / 2,
             "cy": (y_min + y_max) / 2,
@@ -1177,10 +1169,13 @@ def write_scenario_section(t: str, d: dict,
     # directly from their filesystem.  Carried as a sibling of the
     # SVG charts so the report's link resolves.
     repo_root  = Path(__file__).resolve().parent.parent
-    level_path = repo_root / LEVEL_FILES.get(t, "")
+    terrain    = scene_terrain(t, repo_root)
+    level_path = (repo_root / terrain["level_file"]
+                  if terrain.get("level_file") else None)
     replay_path = charts_dir / f"{t}_replay.html"
     replay_path.parent.mkdir(parents=True, exist_ok=True)
-    replay_path.write_text(make_replay_html(t, on_rows, off_rows, level_path))
+    replay_path.write_text(make_replay_html(t, on_rows, off_rows, level_path,
+                                             plane=terrain))
     replay_rel = replay_path.relative_to(out_md_dir)
 
     speed_svg     = write_svg("speed",
