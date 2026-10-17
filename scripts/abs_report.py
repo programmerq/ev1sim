@@ -1176,7 +1176,7 @@ def write_scenario_section(t: str, d: dict,
     # frame data + JS + SVG in one file so the user can open it
     # directly from their filesystem.  Carried as a sibling of the
     # SVG charts so the report's link resolves.
-    repo_root  = out_md_dir.parent.parent  # docs/reports → repo root
+    repo_root  = Path(__file__).resolve().parent.parent
     level_path = repo_root / LEVEL_FILES.get(t, "")
     replay_path = charts_dir / f"{t}_replay.html"
     replay_path.parent.mkdir(parents=True, exist_ok=True)
