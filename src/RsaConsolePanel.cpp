@@ -106,7 +106,8 @@ void RsaConsolePanel::Update(const DashSnapshot& snap) {
 }
 
 int RsaConsolePanel::Height() const {
-    return kPad + kTextRows * kRowH + kPad + kLedRows * (kLedH + kLedGap) + kPad;
+    // The last LED row's gap folds into the pad before the text rows (Draw).
+    return kPad + kTextRows * kRowH + kPad + kLedRows * (kLedH + kLedGap) - kLedGap + kPad;
 }
 
 void RsaConsolePanel::Draw(irr::video::IVideoDriver* driver,

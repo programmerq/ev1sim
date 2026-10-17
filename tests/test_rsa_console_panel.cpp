@@ -82,7 +82,9 @@ TEST_CASE("RSA console selector and keypad LEDs follow their cells", "[rsa_conso
 
 TEST_CASE("RSA console panel: updates from a snapshot; draws on a null driver", "[rsa_console]") {
     RsaConsolePanel panel(10, 10, 220);
-    REQUIRE(panel.Height() > 0);
+    // Box ends one pad below the last text row: 3 pads, 5 text rows, 3 LED rows
+    // with the gap between them (8*3 + 16*5 + 16*3 + 3*2).
+    REQUIRE(panel.Height() == 158);
 
     DashSnapshot snap;
     snap.rsa = DashRsaConsole{};
