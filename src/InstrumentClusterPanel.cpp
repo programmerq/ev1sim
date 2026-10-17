@@ -106,6 +106,15 @@ std::wstring FormatClusterOdometer(const std::optional<DashOdometer>& odo, Clust
     return buf;
 }
 
+std::wstring FormatClusterTrip(const std::optional<float>& trip_m, ClusterUnits units) {
+    if (!trip_m || !(*trip_m >= 0.0f)) return L"TRIP ---";
+    double v = static_cast<double>(*trip_m) / 1000.0;  // km
+    if (units == ClusterUnits::kImperial) v /= kKmPerMile;
+    wchar_t buf[48];
+    std::swprintf(buf, sizeof(buf) / sizeof(buf[0]), L"TRIP %.1f %ls", v, UnitsDistance(units));
+    return buf;
+}
+
 std::wstring FormatClusterBusLine(const DashSnapshot& snap) {
     const bool bpm = snap.pack || snap.display || snap.power_bars;
     std::wstring s = L"Bus:";
@@ -126,6 +135,7 @@ ClusterView BuildClusterView(const DashSnapshot& snap, ClusterUnits units) {
     v.pack      = FormatClusterPack(snap.pack);
     v.charge    = FormatClusterCharge(snap.pack, snap.display);
     v.odometer  = FormatClusterOdometer(snap.odometer, units);
+    v.trip      = FormatClusterTrip(snap.trip_m, units);
     v.bus       = FormatClusterBusLine(snap);
 
     const DashLamps none;
@@ -147,6 +157,8 @@ ClusterView BuildClusterView(const DashSnapshot& snap, ClusterUnits units) {
         lamp(L"BATTERY LIFE", l.battery_life),
         lamp(L"REDUCED PERF", l.reduced_perf),
         lamp(L"CHECK TIRE", l.check_tire),
+        lamp(L"SERVICE SOON", l.service_soon),
+        lamp(L"WAIT", l.wait),
     };
     return v;
 }
@@ -178,7 +190,7 @@ int LampRows(const ClusterView& v) {
 }
 
 int TextRows(const ClusterView& v) {
-    // soc+range, power bar, pack, [charge], odometer, bus
+    // soc+range, power bar, pack, [charge], odometer+trip, bus
     return 5 + (v.charge.empty() ? 0 : 1);
 }
 
@@ -232,7 +244,8 @@ void InstrumentClusterPanel::Draw(irr::video::IVideoDriver* driver,
         text(view_.charge, x_ + kPad, y, inner, kRowH, kText);
         y += kRowH;
     }
-    text(view_.odometer, x_ + kPad, y, inner, kRowH, kText);
+    text(view_.odometer, x_ + kPad, y, half, kRowH, kText);
+    text(view_.trip, x_ + kPad + half, y, half, kRowH, kText);
     y += kRowH;
     text(view_.bus, x_ + kPad, y, inner, kRowH, kDimText);
     y += kRowH + kPad;

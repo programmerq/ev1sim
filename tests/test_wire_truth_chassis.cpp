@@ -868,6 +868,7 @@ TEST_CASE("Connector dash snapshot: bus frames via BusSnoop plus the IPC lamp ce
     REQUIRE_FALSE(snap.pack);
     REQUIRE(snap.lamps);
     REQUIRE_FALSE(snap.lamps->antilock.has_value());
+    REQUIRE_FALSE(snap.trip_m);
 
     // A real $41 (Drive, 50 km/h) on the PIM TX cell and a $40 (300 V) on the
     // BPM TX cell, serialised exactly as the controllers' UartTx would; the
@@ -890,6 +891,8 @@ TEST_CASE("Connector dash snapshot: bus frames via BusSnoop plus the IPC lamp ce
     pim.enqueue(f41.data(), f41.size());
     bpm.enqueue(f40.data(), f40.size());
     REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_IPC_ANTILOCK_TELLTALE, true));
+    REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_IPC_WAIT_TELLTALE, true));
+    REQUIRE(fleet->write_float32(topo::kWireCHASSIS_IPC_TRIP_DISTANCE_M, 2500.0f));
 
     // Pump the transmitters and the connector's tick in lockstep.
     std::uint64_t now = 1000u;
@@ -909,7 +912,11 @@ TEST_CASE("Connector dash snapshot: bus frames via BusSnoop plus the IPC lamp ce
     CHECK(snap.pack->pack_soc_pct == 80u);
     REQUIRE(snap.lamps);
     CHECK(snap.lamps->antilock == std::optional<bool>(true));
+    CHECK(snap.lamps->wait == std::optional<bool>(true));
+    CHECK_FALSE(snap.lamps->service_soon.has_value());
     CHECK_FALSE(snap.lamps->brake.has_value());
+    REQUIRE(snap.trip_m);
+    CHECK(*snap.trip_m == 2500.0f);
 
     // The bus goes quiet: past the staleness horizon the frame groups blank,
     // while the lamp keeps its cell's last written value.
