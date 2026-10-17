@@ -2192,6 +2192,9 @@ ev1sim::DashSnapshot ExternalSimConnector::GetDashSnapshot() const {
     l.wait               = lamp(st.has_ipc_wait_telltale, st.ipc_wait_telltale);
     snap.lamps = l;
     if (st.has_ipc_trip_distance_m) snap.trip_m = st.ipc_trip_distance_m;
+#if EV1SIM_HAVE_WIRE_TRUTH
+    if (st.wire) snap.rsa = st.wire->rsa_console();
+#endif
     return snap;
 }
 

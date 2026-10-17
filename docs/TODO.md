@@ -17,8 +17,13 @@ ratified decisions: [`docs/ipc_rsa_display_plan.md`](ipc_rsa_display_plan.md).
   `ExternalSimConnector::GetDashSnapshot()` adds the IPC lamp cells (4130-4145);
   `SimApp` draws `InstrumentClusterPanel` bottom-centre when the external sim
   is on. Decode, label, null-driver draw and `[e2e]` tests.
-- [ ] **Phase 2 — RSA console, 2D, snoop-fed (display-only)**: `RsaConsolePanel`
-  mirroring electricsim `rsa_panel_catalog.yaml`.
+- [x] **Phase 2 — RSA console, 2D (display-only)**: `RsaConsolePanel`
+  (`src/RsaConsolePanel.{h,cpp}`) draws the console indicators the external sim
+  drives (OFF/ACC + RUN mode LEDs, P R N D, VALID CODE / keypad lamp, security,
+  shift lock, BTSI solenoid, backlight) from the RSA output cells via
+  `WireTruthChassis::rsa_console()`, with the external sim's wire-mode panel
+  derivations. The catalog's `stub` HVAC/fan/clock/trip LEDs are left out.
+  Drawn right of the cluster when the external sim is on.
 - [ ] **Phase 3 — 3D in-scene** cluster + console (same snapshot feed).
 - [ ] **Phase 4 — interactivity**: clickable RSA inputs; resolve multi-writer
   arbitration with electricsim's RSA controller first.
@@ -40,14 +45,6 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   plant (`ev1sim::PowerSteeringPumpMotor`, chassis 4097 in / 4098 interlock-closed
   out) is currently a lumped-motor model; a per-phase BLDC model on `molex.A/B/C`
   is an optional future refinement.
-
-## Powertrain
-
-- [ ] **electricsim's PIM plant clamps torque at 150 N·m.**
-  `ev1/pim/pim_drive_plant.h` `PIM_DP_MOTOR_MAX_TORQUE_MNM` is an `@design`
-  figure; this repo's map carries the 141 N·m propulsion p250 prints, so the
-  two drives disagree about peak torque by 6 %.  The fix is in electricsim's
-  header, not here.
 
 ## ABS scenarios
 

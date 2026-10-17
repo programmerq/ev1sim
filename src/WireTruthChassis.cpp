@@ -791,6 +791,22 @@ std::optional<bool> WireTruthChassis::ipc_wait_telltale() const {
     return read_bit(ReadOnlyWireId(
         electricsim::topology::kWireCHASSIS_IPC_WAIT_TELLTALE));
 }
+ev1sim::DashRsaConsole WireTruthChassis::rsa_console() const {
+    using namespace electricsim::topology;
+    ev1sim::DashRsaConsole c;
+    c.run           = read_bit(kWireRSA_RUN1_OUT);
+    c.acc           = read_bit(kWireCHASSIS_RSA_ACC_OUT);
+    c.valid_code    = read_bit(kWireCHASSIS_RSA_VALID_CODE);
+    c.security      = read_bit(kWireCHASSIS_RSA_SECURITY_INDICATOR);
+    c.shift_blocked = read_bit(kWireCHASSIS_RSA_SHIFT_BLOCKED);
+    c.btsi_solenoid = read_bit(kWireCHASSIS_RSA_BTSI_SOLENOID);
+    c.led_park      = read_bit(kWireCHASSIS_RSA_SELECTOR_LED_PARK);
+    c.led_reverse   = read_bit(kWireCHASSIS_RSA_SELECTOR_LED_REVERSE);
+    c.led_neutral   = read_bit(kWireCHASSIS_RSA_SELECTOR_LED_NEUTRAL);
+    c.led_drive     = read_bit(kWireCHASSIS_RSA_SELECTOR_LED_DRIVE);
+    c.dim_step      = read_byte(kWireCHASSIS_RSA_DIM_LEVEL_STEP);
+    return c;
+}
 std::optional<bool> WireTruthChassis::ipc_wait_drive() const {
     if (!attached()) return std::nullopt;
     electricsim::io::WireTable::Sample<bool> s;
@@ -959,6 +975,7 @@ std::optional<bool> WireTruthChassis::ipc_service_soon_telltale() const {
 std::optional<bool> WireTruthChassis::ipc_wait_telltale() const {
     return std::nullopt;
 }
+ev1sim::DashRsaConsole WireTruthChassis::rsa_console() const { return {}; }
 std::optional<bool> WireTruthChassis::ipc_wait_drive() const {
     return std::nullopt;
 }

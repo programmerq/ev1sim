@@ -1929,11 +1929,20 @@ int SimApp::RunWithVisualization() {
             if (!m_cluster)
                 m_cluster = std::make_unique<ev1sim::InstrumentClusterPanel>();
             auto* drv = m_vis->GetDevice()->getVideoDriver();
-            m_cluster->Update(m_external_sim->GetDashSnapshot());
+            const ev1sim::DashSnapshot snap = m_external_sim->GetDashSnapshot();
+            m_cluster->Update(snap);
             const auto dim = drv->getScreenSize();
             m_cluster->SetAnchor(static_cast<int>(dim.Width) / 2 - m_cluster->Width() / 2,
                                  static_cast<int>(dim.Height) - m_cluster->Height() - 10);
             m_cluster->Draw(drv, m_vis->GetDevice()->getGUIEnvironment()->getBuiltInFont());
+
+            // RSA center console, to the right of the cluster, bottoms aligned.
+            if (!m_rsa_console)
+                m_rsa_console = std::make_unique<ev1sim::RsaConsolePanel>();
+            m_rsa_console->Update(snap);
+            m_rsa_console->SetAnchor(static_cast<int>(dim.Width) / 2 + m_cluster->Width() / 2 + 10,
+                                     static_cast<int>(dim.Height) - m_rsa_console->Height() - 10);
+            m_rsa_console->Draw(drv, m_vis->GetDevice()->getGUIEnvironment()->getBuiltInFont());
         }
         m_physical->DrawHUD(m_vis->GetDevice(),
                             m_external_sim->GetRsaRunMode(),
