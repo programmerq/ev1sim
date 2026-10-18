@@ -51,16 +51,22 @@ struct DashScreenFrame {
     DashVec3 normal;
 };
 
-// Mount points. @inferred 2026-10-17 claude: no EV1 interior dimensions are
-// in hand, so these are placed relative to the chassis "Driver Position"
-// (data/vehicle/ev1/chassis/EV1_Chassis.json, [0.8, 0.35, 1.0]): the cluster
-// is the EV1's centre-mounted display at the base of the windshield, the
-// console sits low between the seats, ahead of the driver's hip.
-inline constexpr DashScreenMount kClusterMount{1.45, 0.0, 0.95, 20.0, 0.24, 0.24};
-inline constexpr DashScreenMount kConsoleMount{1.20, 0.0, 0.62, 50.0, 0.18, 0.18};
+// Mount points and eye. @inferred 2026-10-18 claude: no EV1 interior
+// dimensions are in hand, so these are read off the visual mesh
+// (data/vehicle/ev1/ev1_chassis_vis.obj, its "interior" and "windowglass"
+// parts): windshield base at x ~1.09, dash top z ~0.85-0.88 at x 0.7-1.1,
+// steering wheel rim at x ~0.5 on the driver's side (y +0.35, left-hand
+// drive), driver's seat back topping out at z ~1.09 around x -0.45. The
+// cluster is the EV1's centre-mounted display on the dash top below the
+// windshield; the console sits low between the seats ahead of the shifter
+// area. The chassis JSON's "Driver Position" ([0.8, 0.35, 1.0]) is not used:
+// on this mesh it lands at the windshield glass.
+inline constexpr DashScreenMount kClusterMount{0.85, 0.0, 0.94, 35.0, 0.24, 0.24};
+inline constexpr DashScreenMount kConsoleMount{0.45, 0.0, 0.58, 45.0, 0.18, 0.18};
 
-// Driver eye point in the chassis frame: the chassis JSON's driver position.
-inline constexpr DashVec3 kDriverEye{0.8, 0.35, 1.0};
+// Driver's eye point in the chassis frame: seated head height in front of
+// the seat back, on the steering-wheel line.
+inline constexpr DashVec3 kDriverEye{-0.30, 0.35, 1.12};
 
 /// World-space placement of `mount` on a chassis at `pose`. Pure.
 DashScreenFrame PlaceDashScreen(const VehiclePose& pose, const DashScreenMount& mount);

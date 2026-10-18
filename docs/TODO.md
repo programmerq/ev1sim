@@ -27,8 +27,8 @@ ratified decisions: [`docs/ipc_rsa_display_plan.md`](ipc_rsa_display_plan.md).
 - [x] **Phase 3 — 3D in-scene** cluster + console (same snapshot feed):
   `DashScreens3D` (`src/DashScreens3D.{h,cpp}`) draws the two 2D panels into
   render-target textures on quads fixed to the chassis frame (cluster at the
-  windshield base, console low between the seats; positions inferred from the
-  chassis JSON's driver position, no interior dimensions in hand). The new
+  dash top below the windshield, console low between the seats; positions
+  read off the chassis visual mesh, no interior dimensions in hand). The new
   **Cabin** camera mode looks at both from the driver's seat.
 - [ ] **Phase 4 — interactivity**: clickable RSA inputs; resolve multi-writer
   arbitration with electricsim's RSA controller first.
