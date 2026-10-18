@@ -1611,6 +1611,11 @@ int SimApp::RunWithVisualization() {
         m_vis->Advance(render_dt);
 
         // --- Camera override ---
+        // The visual system's active camera is not the node it returned at
+        // setup (seen at runtime: a different node by the first frame), so a
+        // node captured once is driven in vain and every mode shows Chrono's
+        // own chase view. Hand over the live one each frame.
+        m_camera->SetCamera(m_vis->GetActiveCamera());
         m_camera->Update(m_world->GetPose());
         if (m_dash3d)
             m_dash3d->Place(m_world->GetPose());

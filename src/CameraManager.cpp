@@ -61,6 +61,7 @@ void CameraManager::SetModeFromString(const std::string& name) {
 
 // ---------------------------------------------------------------------------
 void CameraManager::Update(const VehiclePose& pose) {
+    if (m_camera == nullptr) return;
     switch (m_mode) {
         case CameraMode::Chase:    ApplyChase(pose);    break;
         case CameraMode::Hood:     ApplyHood(pose);     break;
