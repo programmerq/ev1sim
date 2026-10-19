@@ -6,7 +6,7 @@
 
 #include <string>
 
-enum class CameraMode { Chase, Hood, Rear, TopDown, FreeLook, COUNT };
+enum class CameraMode { Chase, Hood, Rear, TopDown, FreeLook, Cabin, COUNT };
 
 class CameraManager : public irr::IEventReceiver {
 public:
@@ -22,6 +22,11 @@ public:
 
     // Call after vis->Advance() and before vis->BeginScene() each frame.
     void Update(const VehiclePose& pose);
+
+    /// Point the manager at the camera node to drive. The visual system can
+    /// replace its active camera after setup, so SimApp passes the current
+    /// one every frame rather than keeping the node it had at construction.
+    void SetCamera(irr::scene::ICameraSceneNode* camera) { m_camera = camera; }
 
     // IEventReceiver — handles mouse input for free-look orbit.
     bool OnEvent(const irr::SEvent& event) override;
@@ -61,4 +66,5 @@ private:
     void ApplyRear(const VehiclePose& p);
     void ApplyTopDown(const VehiclePose& p);
     void ApplyFreeLook(const VehiclePose& p);
+    void ApplyCabin(const VehiclePose& p);
 };

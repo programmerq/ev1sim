@@ -368,6 +368,8 @@ Cycled with **C**:
 3. **Rear** — behind the vehicle looking backward
 4. **Top-Down** — overhead view
 5. **Free-Look** — mouse orbit (drag to rotate, scroll to zoom)
+6. **Cabin** — driver's seat, looking at the cluster and console screens
+   (shown when the external sim is on)
 
 ## Architecture
 
