@@ -205,8 +205,13 @@ public:
     // kSigRunModeBroadcast (5711) carried the full 4-value enum, but only the
     // run-active bit survives on the wire (the ACC output has no cell yet —
     // external-sim gap), so OFF-vs-ACC and RUN-vs-START are not
-    // distinguishable here. Reads RSA_RUN1_OUT (RUN2 is identical).
+    // distinguishable here. Reads RSA_RUN1_OUT (RUN2 is identical) relative
+    // to its declared rest level (rsa_run_commanded_level), never as a raw
+    // bit: the line is active-low on the car.
     std::optional<bool> rsa_run_active() const;    // RSA_RUN1_OUT (rsa_ecu)
+    // Whether a written RSA_RUN1_OUT level means RUN is commanded: any level
+    // other than the cell's declared default (the line's rest level).
+    static bool rsa_run_commanded_level(bool level);
 
     // Auto-Disconnect main HV contactor closed (AD_MAIN_CONTACTOR — the AD's
     // own commanded output, the authoritative successor of kSigAdMainContactor
