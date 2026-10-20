@@ -357,7 +357,15 @@ deferred:
 | Space | Toggle parking brake |
 | R | Reset vehicle to spawn position |
 | C | Cycle camera mode |
+| Tab | Open the floating control panel (mouse) |
 | Esc | Quit |
+
+The floating panel holds a button for most switches in the car (locks,
+hood, trunk lid, windows, wipers, cruise, HVAC, the exterior keypad, whose
+keys enlarge under the mouse) and status rows for what the modules report.
+Its **Accel**, **Brake** and **Steer** sliders drive the car with the mouse:
+a slider moved off its rest position replaces that keyboard or wheel axis,
+and closing the panel returns all three to rest.
 
 ## Camera Modes
 

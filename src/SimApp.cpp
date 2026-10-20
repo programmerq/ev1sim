@@ -267,6 +267,7 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                         std::cout << "[UI] Ext keypad: btn" << (ki+1)
                                   << " tap (digit " << kDigits[ki] << ")\n";
                     });
+                m_floating_ui->MagnifyLastButtonOnHover();
             }
 
             // --- Exterior Keypad convenience macro: Enter "11111" ---
@@ -329,6 +330,13 @@ SimApp::SimApp(const Config& config) : m_config(config) {
             m_floating_ui->AddButton(
                 []() -> std::wstring { return L"Hood: Lower / Latch"; },
                 [this]() { m_panels->hood().lower_latch(); });
+
+            // --- Trunk lid open/close (same toggle as the T key) ---
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatTrunkLidLabel(m_panels->IsOpen(PanelID::TRUNK));
+                },
+                [this]() { m_panels->Toggle(PanelID::TRUNK); });
 
             // --- Wiper: cycle position (OFF → INT → LOW → HIGH → OFF) ---
             m_floating_ui->AddButton(
@@ -762,6 +770,23 @@ SimApp::SimApp(const Config& config) : m_config(config) {
                     return FormatPedalPercentLabel("Brake", m_last_cmd.front_brake);
                 },
                 []() {});   // no-op: display-only row
+
+            // --- Accelerator / brake / steering sliders (analog driver input) ---
+            // Off rest, each replaces that keyboard/wheel axis; see
+            // PanelDriverOverride.h.  Hiding the panel returns them to rest.
+            m_floating_ui->AddSlider(
+                [this]() { return FormatPedalSliderLabel(L"Accel", m_panel_override.throttle); },
+                0, 100, 0,
+                [this](int pos) { m_panel_override.throttle = pos / 100.0; });
+            m_floating_ui->AddSlider(
+                [this]() { return FormatPedalSliderLabel(L"Brake", m_panel_override.brake); },
+                0, 100, 0,
+                [this](int pos) { m_panel_override.brake = pos / 100.0; });
+            // Bar left = steer left (positive), so the bar's minimum is full left.
+            m_floating_ui->AddSlider(
+                [this]() { return FormatSteerSliderLabel(m_panel_override.steering); },
+                -100, 100, 0,
+                [this](int pos) { m_panel_override.steering = -pos / 100.0; });
 
             // --- Headlamp status (display-only; bulb feed line cache) ---
             // Reads GetBulbCmd for low-beam bulbs (LLBH, RLBH) and high-beam
@@ -1422,6 +1447,7 @@ int SimApp::RunWithVisualization() {
             m_wheel->ClearPendingActions();
         }
 #endif
+        ApplyPanelDriverOverride(cmd, m_panel_override);
         if (m_scripted && !m_paused)
             cmd = m_scripted->Update(m_world->GetState());
 
@@ -1992,8 +2018,9 @@ int SimApp::RunWithVisualization() {
             m_help_hide_time = 1e18;
         }
 
-        // Draw keyboard help overlay.
-        if (m_show_help) {
+        // Draw keyboard help overlay — not in UI mode, where the floating
+        // panel's columns sit under it and the mouse is in use anyway.
+        if (m_show_help && !m_ui_mode) {
             auto* drv  = m_vis->GetDevice()->getVideoDriver();
             auto* gui  = m_vis->GetDevice()->getGUIEnvironment();
             auto* font = gui->getBuiltInFont();

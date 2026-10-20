@@ -199,38 +199,19 @@ future-UI input on one side, chassis-segment signal publishing on the other.
 - [ ] Door lock solenoid **visual** click — the audio click already plays via
   `SounderAudio::PlayClick` (fired on motor end-of-travel in `SimApp`); only the
   on-screen visual remains.
-- [ ] Trunk animation (T key already toggles state; no visual today).
-
-## Door handles + exterior keypad follow-up
-
-- [ ] **Hover-magnify polish for keypad buttons** — currently uses Irrlicht
-  button hover state which is hover-color only (no geometric scale-up). A
-  geometric magnify would require custom IGUIElement drawing or a separate
-  overlay node; deferred.
+- [ ] Trunk animation (T key and the panel's "Trunk lid" button toggle
+  state; no visual today).
 
 ## Floating UI panel
-- [ ] **Remaining UI candidates** — next floating-panel rounds:
-  - Trunk open/close (T key covers it but panel would be friendlier)
-  - Hood open/close **(done)** — modeled as a two-stage latch (Hood: CLOSED →
-    POPPED → OPEN). Single primary-latch ajar sensor (6962) trips as soon as it
-    pops, so POPPED/OPEN are indistinguishable on the bus while ev1sim tracks the
-    full state. Panel: status row + Interior Release / Raise / Lower-Latch
-    buttons; F = pop/close shortcut. VehiclePanels.HOOD delegates to Hood.
-  - Power windows (driver, passenger) **(done)** — momentary press-and-hold
-    panel buttons (Drv/Pass Up/Down) drive signals 6980-6983 via the new
-    FloatingUiPanel hold-button support (polls IGUIButton::isPressed())
-  - Pedals: brake pressure slider, accelerator slider (currently
-    keyboard-only — no analog range exposed in FloatingUiPanel)
-  - Steering angle indicator **(done)** — display row, front road-wheel angle
-    (rad→deg, L/R); analog override still TODO
-  - IPC LCD brightness and LED telltale overrides
-  - IPC WAIT (charge-wait) telltale row — blocked until electricsim adds a
-    separate charge-state signal.  (The other three IPC LCD telltale slots —
-    HIGH_BEAM, LEFT_TURN, RIGHT_TURN — are already surfaced from the bulb feed
-    line cache.)
-  - RSA LEDs (door-lock feedback, entry-accepted, entry-denied)
-  - Shifter (PRND) **(done)** — "Gear Up/Down" panel buttons added (mirror the
-    `,` / `.` keys); display row was already present
+- [ ] **IPC LCD brightness and telltale overrides** — the telltale cells are
+  the IPC's own outputs, so a panel override is a second writer on cells the
+  IPC owns; settle that with electricsim first, as for the console buttons
+  (Phase 4 above).
+- [ ] **RSA door-lock feedback and entry-denied LEDs** — no RSA output cell
+  carries them yet (entry accepted is the console panel's VALID CODE lamp);
+  needs the cells in electricsim first.
+- [ ] **IPC WAIT (charge-wait) telltale row** — blocked until electricsim
+  adds a separate charge-state signal.
 
 ## Bus-mediated physics
 - [ ] **Regen ↔ friction blending (S15 — documented gap, do NOT fabricate).**

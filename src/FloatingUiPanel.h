@@ -10,8 +10,9 @@
 #include <vector>
 
 // ---------------------------------------------------------------------------
-// FloatingUiPanel — a translucent vertical column of clickable buttons
-// anchored to the top-left of the Irrlicht window.
+// FloatingUiPanel — a translucent grid of clickable rows (buttons and
+// sliders) anchored to the top-left of the Irrlicht window.  Rows run down a
+// column and wrap into the next column at the screen's bottom edge.
 //
 // Usage pattern:
 //   1. Construct with an IGUIEnvironment* and screen dimensions.
@@ -185,6 +186,38 @@ std::wstring FormatHoodStateLabel(int state);
 /// active: true while the switch is asserted (held) — appends " [ON]".
 std::wstring FormatPowerWindowButtonLabel(const wchar_t* text, bool active);
 
+// Body-panel and driver-control helpers for the floating panel's controls.
+/// Format the trunk-lid button label: "Trunk lid: OPEN" / "Trunk lid: CLOSED".
+/// Distinct from the trunk *lock* row, which reads "Trunk: locked/unlocked".
+std::wstring FormatTrunkLidLabel(bool open);
+/// Format a pedal slider label.  0 means the slider is not overriding the
+/// keyboard/wheel and shows "<name> slider: off"; otherwise "<name> slider: 35%".
+std::wstring FormatPedalSliderLabel(const wchar_t* name, double value_0_to_1);
+/// Format the steering slider label from a normalized command (-1..1,
+/// positive = left): "Steer slider: off" at 0, else "Steer slider: 20% L".
+std::wstring FormatSteerSliderLabel(double steering);
+
+// ---------------------------------------------------------------------------
+// Panel layout (pure, no Irrlicht)
+// ---------------------------------------------------------------------------
+struct FloatingUiRect {
+    int x0, y0, x1, y1;
+};
+
+/// Rows a column can hold before the panel wraps to the next column, for a
+/// screen `screen_h` pixels tall.  Always at least 1.
+int FloatingUiRowsPerColumn(int screen_h, int anchor_y, int row_h, int row_gap,
+                            int pad_top, int pad_bot);
+
+/// Screen rect of row `idx` when the panel wraps every `rows_per_col` rows.
+/// Columns stack left to right, each `row_w + col_gap` apart.
+FloatingUiRect FloatingUiRowRect(int idx, int rows_per_col, int origin_x,
+                                 int origin_y, int row_w, int row_h,
+                                 int row_gap, int col_gap);
+
+/// `r` scaled by `scale` about its centre (hover magnify).
+FloatingUiRect MagnifyRect(const FloatingUiRect& r, double scale);
+
 // ---------------------------------------------------------------------------
 class FloatingUiPanel : public irr::IEventReceiver {
 public:
@@ -211,6 +244,19 @@ public:
     void AddHoldButton(std::function<std::wstring()> label_fn,
                        std::function<void(bool)>     on_hold);
 
+    // Register a horizontal slider row: a label on the left, a scroll bar on
+    // the right running from `min` to `max` (integer steps).  on_change(pos)
+    // fires whenever the bar moves.  Hiding the panel returns the bar to
+    // `rest` and fires on_change(rest), so an analog override cannot stay
+    // applied while the panel is out of sight.
+    void AddSlider(std::function<std::wstring()> label_fn,
+                   int min, int max, int rest,
+                   std::function<void(int)> on_change);
+
+    // Grow the most recently added button by kMagnifyScale about its centre
+    // while the mouse is over it (keypad keys).  Text size is unchanged.
+    void MagnifyLastButtonOnHover();
+
     // Show or hide the whole panel (all buttons + background).
     void SetVisible(bool visible);
     bool IsVisible() const { return m_visible; }
@@ -230,16 +276,33 @@ private:
         std::function<void()>         on_click;
         std::function<void(bool)>     on_hold;        // momentary hold callback
         bool                          is_hold = false;
+        bool                          magnify = false;
+        FloatingUiRect                rect{};          // un-magnified rect
     };
 
+    struct SliderEntry {
+        irr::gui::IGUIStaticText*     label  = nullptr;
+        irr::gui::IGUIScrollBar*      bar    = nullptr;
+        std::function<std::wstring()> label_fn;
+        std::function<void(int)>      on_change;
+        int                           rest   = 0;
+    };
+
+    // Screen rect for the next row (buttons and sliders share the grid);
+    // also grows the background to cover it.
+    FloatingUiRect NextRow();
+
     // Create the Irrlicht button widget for the next entry (shared by
-    // AddButton / AddHoldButton); also grows the background panel.
+    // AddButton / AddHoldButton).
     irr::gui::IGUIButton* CreateButtonWidget(
-        const std::function<std::wstring()>& label_fn);
+        const std::function<std::wstring()>& label_fn, FloatingUiRect* rect_out);
 
     irr::gui::IGUIEnvironment* m_gui;
     irr::gui::IGUIStaticText*  m_bg       = nullptr;
     std::vector<ButtonEntry>   m_buttons;
+    std::vector<SliderEntry>   m_sliders;
+    int   m_rows = 0;
+    int   m_rows_per_col = 1;
     int   m_anchor_x;
     int   m_anchor_y;
     int   m_btn_w;
@@ -251,4 +314,6 @@ private:
     static constexpr int kBgPadTop   = 4;
     static constexpr int kBgPadRight = 4;
     static constexpr int kBgPadBot   = 4;
+    static constexpr int kColumnGap  = 4;  // pixels between wrapped columns
+    static constexpr double kMagnifyScale = 1.35;
 };
