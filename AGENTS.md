@@ -125,8 +125,6 @@ branch moves and can 404 after a rebase/merge), in the `blob` form — **never**
   catches ("the check that the vendored stub matches its record") instead of
   calling it a "gate".
 - Lead the body with the strongest finding, stated positively.
-- If a saved body shows `&lt;img&gt;`, the environment escaped it: patch the
-  body with `gh api -X PATCH repos/<owner>/<repo>/pulls/<n> -F body=@file`.
 
 <!-- BEGIN ev1-canon:say-it-once v1 -->
 **Say it once, say what is true now (canonical across all four EV1 repos).**
