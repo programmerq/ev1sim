@@ -1468,6 +1468,9 @@ int SimApp::RunWithVisualization() {
         // post-override command — see the headless twin of this site for
         // the feedback-collapse this prevents. @design 2026-07-04.
         const double driver_pedal_raw = cmd.throttle;
+        // The driver's own brake pedal, before the KEY OFF hold below clamps the
+        // plant's brakes: the pedal sensors (6900, 6904, 4074) report the foot.
+        const double driver_brake_raw = cmd.front_brake;
         ApplyElectronicsThrottle(cmd);
         ApplyElectronicsSteering(cmd);
 
@@ -1725,7 +1728,7 @@ int SimApp::RunWithVisualization() {
                 if (deg_q8 < -32768.0) deg_q8 = -32768.0;
                 return static_cast<std::int16_t>(deg_q8);
             };
-            m_external_sim->SetDriverBrakePedalQ8(clamp01_q8(cmd.front_brake));
+            m_external_sim->SetDriverBrakePedalQ8(clamp01_q8(driver_brake_raw));
             // Raw pedal, not the electronics-override result — 6903 is the
             // APA pedal sensor (PIM's input); see the capture site above.
             m_external_sim->SetDriverThrottleQ8(clamp01_q8(driver_pedal_raw));
@@ -1734,12 +1737,12 @@ int SimApp::RunWithVisualization() {
             m_external_sim->SetDriverGearSelector(
                 static_cast<std::uint8_t>(m_physical->prnd_selector().position()));
             // Brake switch (6904): derive from brake travel with hysteresis.
-            bool brake_sw = m_physical->brake_switch().update(cmd.front_brake);
+            bool brake_sw = m_physical->brake_switch().update(driver_brake_raw);
             m_external_sim->SetDriverBrakeSwitch(brake_sw);
             // Master cylinder pressure (4074): two-stage curve from pedal travel.
             // Drives BTCM brake-effort + the new rear EMB consumer.
             const double pressure_kpa =
-                m_physical->brake_pedal().update(cmd.front_brake);
+                m_physical->brake_pedal().update(driver_brake_raw);
             m_external_sim->SetBrakeMasterPressureKpa(
                 static_cast<float>(pressure_kpa));
             // Seatbelt driver (6964) + passenger (6965): driven by
@@ -2215,6 +2218,9 @@ int SimApp::RunHeadless() {
         // dormant today because no fleet module produces steering_cmd.
         // @design 2026-07-04.
         const double driver_pedal_raw = cmd.throttle;
+        // The driver's own brake pedal, before the KEY OFF hold below clamps the
+        // plant's brakes: the pedal sensors (6900, 6904, 4074) report the foot.
+        const double driver_brake_raw = cmd.front_brake;
         ApplyElectronicsThrottle(cmd);
         ApplyElectronicsSteering(cmd);
 
@@ -2308,19 +2314,19 @@ int SimApp::RunHeadless() {
                 if (v > 1.0) v = 1.0;
                 return static_cast<std::uint8_t>(v * 255.0 + 0.5);
             };
-            m_external_sim->SetDriverBrakePedalQ8(clamp01_q8(cmd.front_brake));
+            m_external_sim->SetDriverBrakePedalQ8(clamp01_q8(driver_brake_raw));
             m_external_sim->SetDriverThrottleQ8(clamp01_q8(driver_pedal_raw));
             m_external_sim->SetDriverSteeringDegQ8(0);  // no keyboard in headless
             // Gear selector: map PrndSelector::Position to enum (P=0, R=1, N=2, D=3).
             m_external_sim->SetDriverGearSelector(
                 static_cast<std::uint8_t>(m_physical->prnd_selector().position()));
             // Brake switch (6904): derive from brake travel with hysteresis.
-            bool brake_sw = m_physical->brake_switch().update(cmd.front_brake);
+            bool brake_sw = m_physical->brake_switch().update(driver_brake_raw);
             m_external_sim->SetDriverBrakeSwitch(brake_sw);
             // Master cylinder pressure (4074): two-stage curve from pedal travel.
             // Drives BTCM brake-effort + the new rear EMB consumer.
             const double pressure_kpa =
-                m_physical->brake_pedal().update(cmd.front_brake);
+                m_physical->brake_pedal().update(driver_brake_raw);
             m_external_sim->SetBrakeMasterPressureKpa(
                 static_cast<float>(pressure_kpa));
             // Seatbelt driver (6964) + passenger (6965): driven by
