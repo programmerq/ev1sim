@@ -13,7 +13,7 @@ electricsim stub.
 
 ## Commits
 
-Small and focused, saying why. Every code change adds a test in the same
+Focused, complete and logical, saying why. Every code change adds a test in the same
 commit, or the message says why none applies.
 
 ## Shared rules
