@@ -715,6 +715,10 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
         // torque the BTCM is asking the propulsion side to produce.
         else if (f == "btcm_retard_request_duty_q8")
             m_csv << static_cast<int>(bus.GetBtcmRetardRequestDutyQ8());
+        // PIM coast-down drag (CHASSIS_PIM_COAST_DRAG_NM), Nm at the motor
+        // shaft; -1 until the PIM has written it.
+        else if (f == "pim_coast_drag_nm")
+            m_csv << bus.GetPimCoastDragNm().value_or(-1.0f);
         // TJB rear-lamp branches, downstream of the trunk junction block's
         // RUN1 gate (4198/4199 tail, 4203/4204 stop).
         else if (f == "tjb_lr_tail_lamp")  m_csv << (bus.GetTjbLampBranch(0) ? 1 : 0);
