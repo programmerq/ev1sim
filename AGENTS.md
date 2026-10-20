@@ -121,11 +121,10 @@ branch moves and can 404 after a rebase/merge), in the `blob` form — **never**
 
 ### PR text
 
-- Never use the word "gate" in a PR title or body; name what the check
-  catches.
+- Use no jargon or label that is not clear on its own. Say what a check
+  catches ("the check that the vendored stub matches its record") instead of
+  calling it a "gate".
 - Lead the body with the strongest finding, stated positively.
-- A change repeated many times is illustrated with two or three
-  representative images.
 - If a saved body shows `&lt;img&gt;`, the environment escaped it: patch the
   body with `gh api -X PATCH repos/<owner>/<repo>/pulls/<n> -F body=@file`.
 
