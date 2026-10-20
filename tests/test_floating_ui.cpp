@@ -826,3 +826,135 @@ TEST_CASE("FormatHoodStateLabel: CLOSED / POPPED / OPEN + fallback", "[FloatingU
     CHECK(FormatHoodStateLabel(2) == L"Hood: OPEN");
     CHECK(FormatHoodStateLabel(9) == L"Hood: ?");
 }
+
+// ---------------------------------------------------------------------------
+// Driver-control rows: trunk lid, sliders, layout wrap, keypad magnify
+// ---------------------------------------------------------------------------
+
+TEST_CASE("FormatTrunkLidLabel reads the lid, not the lock", "[FloatingUI]") {
+    CHECK(FormatTrunkLidLabel(false) == L"Trunk lid: CLOSED");
+    CHECK(FormatTrunkLidLabel(true) == L"Trunk lid: OPEN");
+}
+
+TEST_CASE("Pedal and steer slider labels show off at rest", "[FloatingUI]") {
+    CHECK(FormatPedalSliderLabel(L"Accel", 0.0) == L"Accel slider: off");
+    CHECK(FormatPedalSliderLabel(L"Accel", 0.35) == L"Accel slider: 35%");
+    CHECK(FormatPedalSliderLabel(L"Brake", 1.7) == L"Brake slider: 100%");
+    CHECK(FormatPedalSliderLabel(L"Brake", std::numeric_limits<double>::quiet_NaN())
+          == L"Brake slider: off");
+    CHECK(FormatSteerSliderLabel(0.0) == L"Steer slider: off");
+    CHECK(FormatSteerSliderLabel(0.2) == L"Steer slider: 20% L");
+    CHECK(FormatSteerSliderLabel(-0.45) == L"Steer slider: 45% R");
+}
+
+TEST_CASE("Panel rows wrap into columns at the screen's bottom edge", "[FloatingUI]") {
+    // 720 px screen, panel at y=10, 22 px rows, 4 px gaps and pads.
+    const int per_col = FloatingUiRowsPerColumn(720, 10, 22, 4, 4, 4);
+    CHECK(per_col == 27);
+    // The last row of the first column still ends on screen.
+    const FloatingUiRect last = FloatingUiRowRect(per_col - 1, per_col, 14, 14, 220, 22, 4, 4);
+    CHECK(last.y1 + 4 <= 720);
+    // The next row starts the second column at the top.
+    const FloatingUiRect next = FloatingUiRowRect(per_col, per_col, 14, 14, 220, 22, 4, 4);
+    CHECK(next.x0 == 14 + 220 + 4);
+    CHECK(next.y0 == 14);
+    // A screen too short for one row still places rows (one per column).
+    CHECK(FloatingUiRowsPerColumn(10, 10, 22, 4, 4, 4) == 1);
+}
+
+TEST_CASE("MagnifyRect grows a rect about its centre", "[FloatingUI]") {
+    const FloatingUiRect r{100, 200, 140, 220};
+    const FloatingUiRect m = MagnifyRect(r, 1.5);
+    CHECK(m.x0 == 90);
+    CHECK(m.x1 == 150);
+    CHECK(m.y0 == 195);
+    CHECK(m.y1 == 225);
+}
+
+namespace {
+irr::gui::IGUIElement* ElementAt(irr::gui::IGUIEnvironment* gui, int x, int y) {
+    return gui->getRootGUIElement()->getElementFromPoint(irr::core::position2di(x, y));
+}
+}  // namespace
+
+TEST_CASE("Floating panel widgets: wrap, slider events, release on hide, magnify",
+          "[FloatingUI]") {
+    irr::IrrlichtDevice* dev = irr::createDevice(irr::video::EDT_NULL,
+                                                 irr::core::dimension2d<irr::u32>(1280, 720));
+    REQUIRE(dev != nullptr);
+    irr::gui::IGUIEnvironment* gui = dev->getGUIEnvironment();
+    {
+        FloatingUiPanel panel(gui, 10, 10, 220, 22);
+        int clicked = -1;
+        for (int i = 0; i < 30; ++i) {
+            panel.AddButton([i]() { return L"row " + std::to_wstring(i); },
+                            [&clicked, i]() { clicked = i; });
+        }
+        panel.MagnifyLastButtonOnHover();   // row 29
+        int slider_pos = 0;
+        panel.AddSlider([]() { return std::wstring(L"Accel"); }, 0, 100, 0,
+                        [&slider_pos](int pos) { slider_pos = pos; });
+        panel.SetVisible(true);
+        panel.UpdateLabels();
+
+        // Row 27 is the first of the second column, through the real widgets.
+        const FloatingUiRect r27 = FloatingUiRowRect(27, 27, 14, 14, 220, 22, 4, 4);
+        auto* b27 = ElementAt(gui, r27.x0 + 5, r27.y0 + 5);
+        REQUIRE(b27 != nullptr);
+        CHECK(b27->getType() == irr::gui::EGUIET_BUTTON);
+        CHECK(std::wstring(b27->getText()) == L"row 27");
+
+        // Clicking it reaches its callback.
+        irr::SEvent click{};
+        click.EventType = irr::EET_GUI_EVENT;
+        click.GUIEvent.Caller = b27;
+        click.GUIEvent.Element = nullptr;
+        click.GUIEvent.EventType = irr::gui::EGET_BUTTON_CLICKED;
+        CHECK(panel.OnEvent(click));
+        CHECK(clicked == 27);
+
+        // The slider (row 30) owns a scroll bar on the right of its row.
+        const FloatingUiRect r30 = FloatingUiRowRect(30, 27, 14, 14, 220, 22, 4, 4);
+        auto* bar_el = ElementAt(gui, r30.x1 - 20, (r30.y0 + r30.y1) / 2);
+        REQUIRE(bar_el != nullptr);
+        REQUIRE(bar_el->getType() == irr::gui::EGUIET_SCROLL_BAR);
+        auto* bar = static_cast<irr::gui::IGUIScrollBar*>(bar_el);
+        bar->setPos(60);
+        irr::SEvent moved{};
+        moved.EventType = irr::EET_GUI_EVENT;
+        moved.GUIEvent.Caller = bar;
+        moved.GUIEvent.Element = nullptr;
+        moved.GUIEvent.EventType = irr::gui::EGET_SCROLL_BAR_CHANGED;
+        CHECK(panel.OnEvent(moved));
+        CHECK(slider_pos == 60);
+
+        // Hiding the panel lets go of the analog override.
+        panel.SetVisible(false);
+        CHECK(slider_pos == 0);
+        CHECK(bar->getPos() == 0);
+
+        // Hovering the magnifiable key grows it; moving off restores it.
+        panel.SetVisible(true);
+        const FloatingUiRect r29 = FloatingUiRowRect(29, 27, 14, 14, 220, 22, 4, 4);
+        irr::SEvent mouse{};
+        mouse.EventType = irr::EET_MOUSE_INPUT_EVENT;
+        mouse.MouseInput.Event = irr::EMIE_MOUSE_MOVED;
+        mouse.MouseInput.X = (r29.x0 + r29.x1) / 2;
+        mouse.MouseInput.Y = (r29.y0 + r29.y1) / 2;
+        gui->postEventFromUser(mouse);
+        panel.UpdateLabels();
+        auto* b29 = ElementAt(gui, mouse.MouseInput.X, mouse.MouseInput.Y);
+        REQUIRE(b29 != nullptr);
+        const FloatingUiRect big = MagnifyRect(r29, 1.35);
+        CHECK(b29->getAbsolutePosition().UpperLeftCorner.X == big.x0);
+        CHECK(b29->getAbsolutePosition().getHeight() == big.y1 - big.y0);
+
+        mouse.MouseInput.X = 1200;
+        mouse.MouseInput.Y = 700;
+        gui->postEventFromUser(mouse);
+        panel.UpdateLabels();
+        CHECK(b29->getAbsolutePosition().UpperLeftCorner.X == r29.x0);
+        CHECK(b29->getAbsolutePosition().getHeight() == r29.y1 - r29.y0);
+    }
+    dev->drop();
+}

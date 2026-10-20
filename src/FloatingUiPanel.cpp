@@ -306,6 +306,68 @@ std::wstring FormatSteeringAngleLabel(double angle_deg) {
     return buf;
 }
 
+std::wstring FormatTrunkLidLabel(bool open) {
+    return open ? L"Trunk lid: OPEN" : L"Trunk lid: CLOSED";
+}
+
+std::wstring FormatPedalSliderLabel(const wchar_t* name, double value_0_to_1) {
+    std::wstring label = name ? name : L"";
+    label += L" slider: ";
+    if (!std::isfinite(value_0_to_1) || value_0_to_1 <= 0.0) return label + L"off";
+    if (value_0_to_1 > 1.0) value_0_to_1 = 1.0;
+    const int pct = static_cast<int>(value_0_to_1 * 100.0 + 0.5);
+    wchar_t buf[16];
+    std::swprintf(buf, sizeof(buf) / sizeof(buf[0]), L"%d%%", pct);
+    return label + buf;
+}
+
+std::wstring FormatSteerSliderLabel(double steering) {
+    if (!std::isfinite(steering) || steering == 0.0) return L"Steer slider: off";
+    double mag = steering < 0.0 ? -steering : steering;
+    if (mag > 1.0) mag = 1.0;
+    const int pct = static_cast<int>(mag * 100.0 + 0.5);
+    wchar_t buf[48];
+    std::swprintf(buf, sizeof(buf) / sizeof(buf[0]), L"Steer slider: %d%% %ls",
+                  pct, steering > 0.0 ? L"L" : L"R");
+    return buf;
+}
+
+// ---------------------------------------------------------------------------
+// Panel layout
+// ---------------------------------------------------------------------------
+
+int FloatingUiRowsPerColumn(int screen_h, int anchor_y, int row_h, int row_gap,
+                            int pad_top, int pad_bot) {
+    // n rows take n*row_h + (n-1)*row_gap; solve for the largest n that fits.
+    const int room = screen_h - anchor_y - pad_top - pad_bot + row_gap;
+    const int n = room / (row_h + row_gap);
+    return n < 1 ? 1 : n;
+}
+
+FloatingUiRect FloatingUiRowRect(int idx, int rows_per_col, int origin_x,
+                                 int origin_y, int row_w, int row_h,
+                                 int row_gap, int col_gap) {
+    if (rows_per_col < 1) rows_per_col = 1;
+    const int col = idx / rows_per_col;
+    const int row = idx % rows_per_col;
+    const int x = origin_x + col * (row_w + col_gap);
+    const int y = origin_y + row * (row_h + row_gap);
+    return {x, y, x + row_w, y + row_h};
+}
+
+FloatingUiRect MagnifyRect(const FloatingUiRect& r, double scale) {
+    const double cx = (r.x0 + r.x1) / 2.0;
+    const double cy = (r.y0 + r.y1) / 2.0;
+    const double hw = (r.x1 - r.x0) * scale / 2.0;
+    const double hh = (r.y1 - r.y0) * scale / 2.0;
+    return {static_cast<int>(std::lround(cx - hw)), static_cast<int>(std::lround(cy - hh)),
+            static_cast<int>(std::lround(cx + hw)), static_cast<int>(std::lround(cy + hh))};
+}
+
+namespace {
+irr::core::recti ToIrr(const FloatingUiRect& r) { return {r.x0, r.y0, r.x1, r.y1}; }
+}  // namespace
+
 // ---------------------------------------------------------------------------
 // FloatingUiPanel
 // ---------------------------------------------------------------------------
@@ -320,6 +382,16 @@ FloatingUiPanel::FloatingUiPanel(irr::gui::IGUIEnvironment* gui,
       m_btn_h(btn_h)
 {
     assert(gui && "FloatingUiPanel requires a valid IGUIEnvironment*");
+
+    // The panel holds more rows than one screen-height column fits, so it
+    // wraps into further columns at the screen's bottom edge.
+    int screen_h = 720;
+    if (irr::video::IVideoDriver* driver = gui->getVideoDriver()) {
+        const int h = static_cast<int>(driver->getScreenSize().Height);
+        if (h > 0) screen_h = h;
+    }
+    m_rows_per_col = FloatingUiRowsPerColumn(screen_h, anchor_y, btn_h, kPadding,
+                                             kBgPadTop, kBgPadBot);
 
     // Background panel — will be sized when first button is added.
     // Start hidden.
@@ -343,50 +415,56 @@ FloatingUiPanel::~FloatingUiPanel() {
         if (b.widget)
             b.widget->remove();
     }
+    for (auto& sl : m_sliders) {
+        if (sl.label) sl.label->remove();
+        if (sl.bar)   sl.bar->remove();
+    }
     if (m_bg)
         m_bg->remove();
 }
 
 // ---------------------------------------------------------------------------
-irr::gui::IGUIButton* FloatingUiPanel::CreateButtonWidget(
-        const std::function<std::wstring()>& label_fn) {
-    const int idx = static_cast<int>(m_buttons.size());
-    const int by  = m_anchor_y + kBgPadTop
-                    + idx * (m_btn_h + kPadding);
-    const int bx  = m_anchor_x + kBgPadLeft;
+FloatingUiRect FloatingUiPanel::NextRow() {
+    const FloatingUiRect r = FloatingUiRowRect(
+        m_rows, m_rows_per_col, m_anchor_x + kBgPadLeft, m_anchor_y + kBgPadTop,
+        m_btn_w, m_btn_h, kPadding, kColumnGap);
+    ++m_rows;
 
-    irr::core::recti rect(bx, by, bx + m_btn_w, by + m_btn_h);
+    // Resize background to cover every row so far, across all columns.
+    if (m_bg) {
+        const int cols = (m_rows + m_rows_per_col - 1) / m_rows_per_col;
+        const int rows = m_rows < m_rows_per_col ? m_rows : m_rows_per_col;
+        const int total_h = kBgPadTop + rows * (m_btn_h + kPadding) - kPadding + kBgPadBot;
+        const int total_w = kBgPadLeft + cols * (m_btn_w + kColumnGap) - kColumnGap
+                            + kBgPadRight;
+        m_bg->setRelativePosition(
+            irr::core::recti(m_anchor_x, m_anchor_y,
+                             m_anchor_x + total_w, m_anchor_y + total_h));
+    }
+    return r;
+}
+
+irr::gui::IGUIButton* FloatingUiPanel::CreateButtonWidget(
+        const std::function<std::wstring()>& label_fn, FloatingUiRect* rect_out) {
+    const int idx = m_rows;
+    const FloatingUiRect r = NextRow();
+    if (rect_out) *rect_out = r;
 
     // Compute the initial label.
     std::wstring init_label = label_fn ? label_fn() : L"";
 
-    auto* btn = m_gui->addButton(rect, nullptr, idx, init_label.c_str());
+    auto* btn = m_gui->addButton(ToIrr(r), nullptr, idx, init_label.c_str());
     if (btn) {
         btn->setVisible(false);  // hidden until panel is shown
         btn->setNotClipped(true);
-    }
-
-    // Resize background to cover all buttons (including the one being added).
-    if (m_bg) {
-        const int total_h = kBgPadTop
-                            + static_cast<int>(m_buttons.size() + 1)
-                              * (m_btn_h + kPadding)
-                            - kPadding
-                            + kBgPadBot;
-        const int total_w = kBgPadLeft + m_btn_w + kBgPadRight;
-        m_bg->setRelativePosition(
-            irr::core::recti(m_anchor_x, m_anchor_y,
-                             m_anchor_x + total_w,
-                             m_anchor_y + total_h));
     }
     return btn;
 }
 
 void FloatingUiPanel::AddButton(std::function<std::wstring()> label_fn,
                                 std::function<void()>         on_click) {
-    auto* btn = CreateButtonWidget(label_fn);
     ButtonEntry e;
-    e.widget   = btn;
+    e.widget   = CreateButtonWidget(label_fn, &e.rect);
     e.label_fn = std::move(label_fn);
     e.on_click = std::move(on_click);
     m_buttons.push_back(std::move(e));
@@ -394,13 +472,51 @@ void FloatingUiPanel::AddButton(std::function<std::wstring()> label_fn,
 
 void FloatingUiPanel::AddHoldButton(std::function<std::wstring()> label_fn,
                                     std::function<void(bool)>     on_hold) {
-    auto* btn = CreateButtonWidget(label_fn);
     ButtonEntry e;
-    e.widget   = btn;
+    e.widget   = CreateButtonWidget(label_fn, &e.rect);
     e.label_fn = std::move(label_fn);
     e.on_hold  = std::move(on_hold);
     e.is_hold  = true;
     m_buttons.push_back(std::move(e));
+}
+
+void FloatingUiPanel::AddSlider(std::function<std::wstring()> label_fn,
+                                int min, int max, int rest,
+                                std::function<void(int)> on_change) {
+    const FloatingUiRect r = NextRow();
+    // Label takes the left 45 % of the row, the bar the rest.
+    const int split = r.x0 + (r.x1 - r.x0) * 45 / 100;
+
+    SliderEntry e;
+    const std::wstring init_label = label_fn ? label_fn() : L"";
+    e.label = m_gui->addStaticText(init_label.c_str(),
+                                   irr::core::recti(r.x0 + 2, r.y0, split, r.y1),
+                                   /*border=*/false, /*wordWrap=*/false);
+    if (e.label) {
+        e.label->setOverrideColor(irr::video::SColor(255, 230, 230, 230));
+        e.label->setTextAlignment(irr::gui::EGUIA_UPPERLEFT, irr::gui::EGUIA_CENTER);
+        e.label->setVisible(false);
+        e.label->setNotClipped(true);
+    }
+    e.bar = m_gui->addScrollBar(/*horizontal=*/true,
+                                irr::core::recti(split + 2, r.y0 + 3, r.x1, r.y1 - 3));
+    if (e.bar) {
+        e.bar->setMin(min);
+        e.bar->setMax(max);
+        e.bar->setSmallStep(1);
+        e.bar->setLargeStep((max - min) / 10 > 0 ? (max - min) / 10 : 1);
+        e.bar->setPos(rest);
+        e.bar->setVisible(false);
+        e.bar->setNotClipped(true);
+    }
+    e.label_fn  = std::move(label_fn);
+    e.on_change = std::move(on_change);
+    e.rest      = rest;
+    m_sliders.push_back(std::move(e));
+}
+
+void FloatingUiPanel::MagnifyLastButtonOnHover() {
+    if (!m_buttons.empty()) m_buttons.back().magnify = true;
 }
 
 // ---------------------------------------------------------------------------
@@ -414,6 +530,15 @@ void FloatingUiPanel::SetVisible(bool visible) {
         // stay asserted (and keep publishing) while the panel is invisible.
         if (!visible && b.is_hold && b.on_hold)
             b.on_hold(false);
+    }
+    for (auto& sl : m_sliders) {
+        if (sl.label) sl.label->setVisible(visible);
+        if (sl.bar)   sl.bar->setVisible(visible);
+        // Same rule for analog overrides: hiding the panel lets go of them.
+        if (!visible) {
+            if (sl.bar) sl.bar->setPos(sl.rest);
+            if (sl.on_change) sl.on_change(sl.rest);
+        }
     }
 }
 
@@ -431,6 +556,20 @@ void FloatingUiPanel::UpdateLabels() {
             b.widget->setText(label.c_str());
         }
     }
+
+    // Hover magnify: grow the hovered key in place and draw it above its
+    // neighbours; every other magnifiable key goes back to its own rect.
+    const irr::gui::IGUIElement* hovered = m_gui->getHovered();
+    for (auto& b : m_buttons) {
+        if (!b.magnify || !b.widget) continue;
+        const bool over = (b.widget == hovered);
+        b.widget->setRelativePosition(ToIrr(over ? MagnifyRect(b.rect, kMagnifyScale) : b.rect));
+        if (over) m_gui->getRootGUIElement()->bringToFront(b.widget);
+    }
+
+    for (auto& sl : m_sliders) {
+        if (sl.label && sl.label_fn) sl.label->setText(sl.label_fn().c_str());
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -439,11 +578,22 @@ bool FloatingUiPanel::OnEvent(const irr::SEvent& event) {
         return false;
     if (event.EventType != irr::EET_GUI_EVENT)
         return false;
-    if (event.GUIEvent.EventType != irr::gui::EGET_BUTTON_CLICKED)
-        return false;
 
     // Match by widget pointer — button IDs may be reused in the GUI environment.
     const irr::gui::IGUIElement* caller = event.GUIEvent.Caller;
+
+    if (event.GUIEvent.EventType == irr::gui::EGET_SCROLL_BAR_CHANGED) {
+        for (auto& sl : m_sliders) {
+            if (sl.bar == caller) {
+                if (sl.on_change) sl.on_change(sl.bar->getPos());
+                return true;
+            }
+        }
+        return false;
+    }
+    if (event.GUIEvent.EventType != irr::gui::EGET_BUTTON_CLICKED)
+        return false;
+
     for (auto& b : m_buttons) {
         if (b.widget == caller) {
             if (b.on_click)
