@@ -61,6 +61,10 @@ free and PRs are not.
   doc, note or queue edit whose only purpose is carrying a record. With no
   such branch, the follow-up waits on a pushed branch until it grows into a
   chunk.
+- **Never copy one change into several open PRs.** Duplicated edits to the
+  same file across PRs are what cause conflict hell; it is never a reason to
+  split work into tiny PRs. A change lives in exactly one PR, and another PR
+  that needs it bases on that branch or waits for it to merge.
 
 *Draft and ready:* leaving draft means "ready for review", which is what
 GitHub's UI calls it, and the owner reviews only ready PRs.
