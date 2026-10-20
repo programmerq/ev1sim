@@ -3,6 +3,7 @@
 
 #include "BrakeActuator.h"
 #include "DriverCommand.h"
+#include "PanelDriverOverride.h"
 
 using Catch::Matchers::WithinAbs;
 
@@ -128,4 +129,39 @@ TEST_CASE("Front and rear brake channels are independent", "[BrakeActuator]") {
     for (int i = 0; i < 100; ++i) b.Advance(step, 0.0, 1.0);
     CHECK(b.front_pressure < 0.1);   // released
     CHECK(b.rear_position  > 0.5);   // engaging
+}
+
+// ---------------------------------------------------------------------------
+// PanelDriverOverride — the floating panel's analog sliders
+// ---------------------------------------------------------------------------
+
+TEST_CASE("Panel sliders at rest leave the keyboard command alone", "[PanelOverride]") {
+    DriverCommand cmd;
+    cmd.throttle = 0.4;
+    cmd.front_brake = cmd.rear_brake = 0.2;
+    cmd.steering = -0.3;
+    ApplyPanelDriverOverride(cmd, PanelDriverOverride{});
+    CHECK(cmd.throttle == 0.4);
+    CHECK(cmd.front_brake == 0.2);
+    CHECK(cmd.rear_brake == 0.2);
+    CHECK(cmd.steering == -0.3);
+}
+
+TEST_CASE("A moved panel slider replaces its axis only", "[PanelOverride]") {
+    DriverCommand cmd;
+    cmd.throttle = 0.4;
+    cmd.steering = -0.3;
+    PanelDriverOverride o;
+    o.brake = 0.6;
+    ApplyPanelDriverOverride(cmd, o);
+    CHECK(cmd.front_brake == 0.6);   // one pedal: both axles, like the keyboard
+    CHECK(cmd.rear_brake == 0.6);
+    CHECK(cmd.throttle == 0.4);
+    CHECK(cmd.steering == -0.3);
+
+    o.throttle = 1.5;   // clamped
+    o.steering = 0.25;  // left
+    ApplyPanelDriverOverride(cmd, o);
+    CHECK(cmd.throttle == 1.0);
+    CHECK(cmd.steering == 0.25);
 }
