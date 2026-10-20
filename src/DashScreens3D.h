@@ -5,6 +5,8 @@
 #include "RsaConsolePanel.h"
 #include "VehiclePose.h"
 
+#include <optional>
+
 // ---------------------------------------------------------------------------
 // DashScreens3D — the IPC cluster and RSA console as screens in the 3D scene.
 //
@@ -78,6 +80,17 @@ DashVec3 ChassisToWorld(const VehiclePose& pose, const DashVec3& p);
 /// in view from kDriverEye. Chassis frame. Pure.
 DashVec3 CabinLookPoint();
 
+/// Texture coordinates on a placed screen face.
+struct DashScreenUv {
+    double u, v;  // 0..1, u to the right, v downward (texture convention)
+};
+
+/// Where the ray `origin + t*dir` (t > 0) meets the face of a screen placed at
+/// `f` with `mount`'s size, or nullopt when it misses the face, runs parallel
+/// to it, or meets it behind the origin. Pure.
+std::optional<DashScreenUv> DashScreenUvAt(const DashScreenFrame& f, const DashScreenMount& mount,
+                                           const DashVec3& origin, const DashVec3& dir);
+
 // Texture size for each screen (pixels, square, power of two). The panels
 // are laid out at this width, so the cluster's 2D layout fits unchanged.
 inline constexpr int kDashScreenTexturePx = 256;
@@ -104,6 +117,10 @@ public:
     /// Move both quads to follow the chassis.
     void Place(const VehiclePose& pose);
 
+    /// The console control a world-space ray (a mouse click through the camera)
+    /// lands on, at the pose of the last Place(); kNone when it misses.
+    RsaConsoleControl ConsoleControlAt(const DashVec3& origin, const DashVec3& dir) const;
+
     bool HasTextures() const { return cluster_tex_ != nullptr && console_tex_ != nullptr; }
 
     irr::scene::IMeshSceneNode* cluster_node() const { return cluster_node_; }
@@ -119,6 +136,7 @@ private:
     irr::video::ITexture* console_tex_ = nullptr;
     irr::scene::IMeshSceneNode* cluster_node_ = nullptr;
     irr::scene::IMeshSceneNode* console_node_ = nullptr;
+    VehiclePose pose_{};
 };
 
 }  // namespace ev1sim

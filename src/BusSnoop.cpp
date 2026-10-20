@@ -32,6 +32,7 @@ DashPcmStatus DecodePcmResponse(const std::uint8_t* p) {
     s.service_soon_tt       = Bit(p[0], 0);
     s.reduced_perf_tt       = Bit(p[0], 1);
     s.pcm_temp_tt           = Bit(p[0], 2);
+    s.coast_down_led        = Bit(p[0], 3);
     s.charge_mode_display   = Bit(p[0], 4);
     s.pcm_service_now_tt    = Bit(p[1], 1);
     s.pcm_connection_detect = Bit(p[1], 2);

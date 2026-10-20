@@ -320,6 +320,7 @@ add_executable(ev1sim
     src/FloatingUiPanel.cpp
     src/InstrumentClusterPanel.cpp
     src/RsaConsolePanel.cpp
+    src/RsaConsoleInput.cpp
     src/DashScreens3D.cpp
     src/BusSnoop.cpp
     src/ExternalSimConnector.cpp
@@ -474,6 +475,7 @@ if(BUILD_TESTS)
         tests/test_bus_snoop.cpp
         tests/test_instrument_cluster_panel.cpp
         tests/test_rsa_console_panel.cpp
+        tests/test_rsa_console_input.cpp
         tests/test_dash_screens_3d.cpp
         tests/test_throttle_bus.cpp
         tests/test_scenario.cpp
@@ -504,6 +506,7 @@ if(BUILD_TESTS)
         src/FloatingUiPanel.cpp
         src/InstrumentClusterPanel.cpp
         src/RsaConsolePanel.cpp
+        src/RsaConsoleInput.cpp
         src/DashScreens3D.cpp
         src/BusSnoop.cpp
         src/VehiclePanels.cpp

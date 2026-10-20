@@ -84,13 +84,15 @@ broadcasts it on its GM-8192 status frame).
   (gauges, LCD, console). Same `DashSnapshot` feed; swap the render backend.
 
 ### Phase 4 — interactivity (input)
-- Make RSA console controls clickable to drive the bus (keypad / mode / PRND),
-  reusing ev1sim's existing driver-input producers (it already publishes these
-  via the keyboard path).
-- **Multi-writer arbitration:** the web `ev1_rsa_panel` (electricsim) and ev1sim
-  would both be RSA input sources. Settle "who owns the input" with electricsim's
-  RSA controller before enabling. This is an arbitration policy, **not** a
-  contract MAJOR.
+- Done. The RSA console controls (mode buttons, P/R/N/D, keypad, COAST DOWN)
+  are clickable in UI mode on the 2D panel and on the Cabin view's 3D console
+  screen (`src/RsaConsoleInput.{h,cpp}`, ray-to-screen hit in
+  `DashScreens3D::ConsoleControlAt`).
+- **Multi-writer arbitration:** a click drives a producer ev1sim already had
+  (`RsaKeypadDriver` and `PrndSelector` from the keyboard; the coast-down
+  switch cell from its scenario hook), so ev1sim adds no writer on any cell. Running electricsim's web
+  `ev1_rsa_panel` alongside ev1sim is the same two-source case it was before
+  clicks existed; no contract change.
 
 ## Risks / open questions
 - **Frame coverage** — confirm each wanted display value is actually carried in a

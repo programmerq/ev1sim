@@ -19,6 +19,12 @@
 //   OFF/ACC LED  = CHASSIS_RSA_ACC_OUT and not RUN
 //   VALID CODE   = CHASSIS_RSA_VALID_CODE (also lights the exterior KEYPAD lamp)
 //   P R N D      = the four CHASSIS_RSA_SELECTOR_LED_* cells
+//   COAST DOWN   = the PCM's $41 Coast Down LED Request (DashPcmStatus)
+//
+// Phase 4 makes the console's buttons clickable: OFF/ACC, RUN, LOCK, P R N D,
+// COAST DOWN and the five interior keypad keys.  Each LED row entry names the
+// control it sits on; HitTest() maps a point to it with the same layout Draw()
+// uses.  LOCK and the keypad keys have no lamp.
 //
 // The HVAC, fan, clock and trip LEDs in rsa_panel_catalog.yaml are marked
 // "stub" there (no RSA behaviour modelled), so the panel leaves them out rather
@@ -50,25 +56,49 @@ std::wstring FormatRsaBacklight(const std::optional<std::uint8_t>& dim_step);
 
 enum class RsaLedColor : std::uint8_t { kGreen, kAmber };
 
+/// A console control a click can land on.  kNone for indicators.
+enum class RsaConsoleControl : std::uint8_t {
+    kNone,
+    kOffAcc, kRun, kLock,
+    kPark, kReverse, kNeutral, kDrive,
+    kCoastDown,
+    kKey1, kKey2, kKey3, kKey4, kKey5,  // interior keypad [1/2] .. [9/0]
+};
+
 struct RsaLed {
     const wchar_t* name;  // static label, e.g. L"RUN"
     bool known;           // every cell the LED derives from has been written
     bool lit;             // meaningful only when known
     RsaLedColor color;
+    RsaConsoleControl control = RsaConsoleControl::kNone;  // the button it is
+    bool lamp = true;     // false: a plain button with no indicator
 };
 
 struct RsaConsoleView {
     std::vector<RsaLed> mode;      // OFF/ACC, RUN
     std::vector<RsaLed> selector;  // P, R, N, D
     std::vector<RsaLed> keypad;    // VALID CODE, KEYPAD (exterior)
+    std::vector<RsaLed> buttons;   // LOCK, COAST DOWN
+    std::vector<RsaLed> digits;    // interior keypad [1/2] .. [9/0]
     std::wstring security;
     std::wstring shift_lock;
     std::wstring btsi;
     std::wstring backlight;
 };
 
-/// Everything the panel shows, derived from the snapshot's RSA group. Pure.
-RsaConsoleView BuildRsaConsoleView(const std::optional<DashRsaConsole>& rsa);
+/// Everything the panel shows, derived from the snapshot's RSA group and the
+/// PCM's coast-down lamp request. Pure.
+RsaConsoleView BuildRsaConsoleView(const std::optional<DashRsaConsole>& rsa,
+                                   const std::optional<bool>& coast_down_led = std::nullopt);
+
+/// Where each LED/button of `view` sits for a panel at (x, y), `w` wide: the
+/// one layout Draw() paints and HitTest() reads.  Rows top to bottom: mode,
+/// selector, keypad lamps, buttons, digits.  Pure.
+struct RsaConsoleCell {
+    const RsaLed* led;
+    int x0, y0, x1, y1;
+};
+std::vector<RsaConsoleCell> LayoutRsaConsole(const RsaConsoleView& view, int x, int y, int w);
 
 // --- Panel -----------------------------------------------------------------
 
@@ -90,6 +120,10 @@ public:
 
     // Fixed height (the layout has no optional rows).
     int Height() const;
+
+    // The control under (px, py), or kNone (an indicator, a gap, outside the
+    // panel, or the panel hidden).
+    RsaConsoleControl HitTest(int px, int py) const;
 
 private:
     int x_;

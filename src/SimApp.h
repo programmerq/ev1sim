@@ -9,6 +9,7 @@
 #include "PanelDriverOverride.h"
 #include "HornAudio.h"
 #include "InstrumentClusterPanel.h"
+#include "RsaConsoleInput.h"
 #include "RsaConsolePanel.h"
 #include "SounderAudio.h"
 #include "KeyboardInputController.h"
@@ -209,6 +210,9 @@ private:
     /// bottom-centre from the connector's bus-snoop snapshot; external sim only.
     std::unique_ptr<ev1sim::InstrumentClusterPanel> m_cluster;
     std::unique_ptr<ev1sim::RsaConsolePanel> m_rsa_console;
+    /// Clicks on the console, 2D panel or 3D screen (display plan Phase 4),
+    /// in UI mode. Declared before m_vis, which holds it as an event receiver.
+    std::unique_ptr<ev1sim::RsaConsoleMouse> m_console_mouse;
 #ifdef EV1SIM_HAVE_WHEEL_IO
     std::unique_ptr<ev1sim::SdlContext>           m_sdl;
     std::unique_ptr<ev1sim::WheelInputController> m_wheel;

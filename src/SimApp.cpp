@@ -160,6 +160,27 @@ SimApp::SimApp(const Config& config) : m_config(config) {
         // Register camera manager's mouse handler with Irrlicht.
         m_vis->AddUserEventReceiver(m_camera.get());
 
+        // Console clicks (display plan Phase 4), in UI mode only: the 2D panel
+        // when it is on screen, else the 3D console screen under the cursor.
+        m_console_mouse = std::make_unique<ev1sim::RsaConsoleMouse>(
+            [this]() { return m_ui_mode; },
+            [this](int x, int y) {
+                if (m_rsa_console) {
+                    const auto c = m_rsa_console->HitTest(x, y);
+                    if (c != ev1sim::RsaConsoleControl::kNone) return c;
+                }
+                auto* cam = m_vis->GetActiveCamera();
+                if (!m_dash3d || cam == nullptr) return ev1sim::RsaConsoleControl::kNone;
+                const irr::core::line3df ray =
+                    m_vis->GetDevice()->getSceneManager()->getSceneCollisionManager()
+                        ->getRayFromScreenCoordinates(irr::core::position2di(x, y), cam);
+                const irr::core::vector3df d = ray.getVector();
+                return m_dash3d->ConsoleControlAt({ray.start.X, ray.start.Y, ray.start.Z},
+                                                  {d.X, d.Y, d.Z});
+            },
+            [this]() { return m_vis->GetDevice()->getTimer()->getRealTime() / 1000.0; });
+        m_vis->AddUserEventReceiver(m_console_mouse.get());
+
         // 7. Vehicle lights — needs Irrlicht scene graph to be populated.
         m_lights = std::make_unique<VehicleLights>();
 
@@ -1669,6 +1690,14 @@ int SimApp::RunWithVisualization() {
         if (m_floating_ui)
             m_floating_ui->UpdateLabels();
 
+        // --- Console clicks (same producers the keyboard drives) ---
+        if (m_console_mouse) {
+            for (const auto& a : m_console_mouse->TakeActions()) {
+                if (ev1sim::ApplyRsaConsoleAction(*m_physical, a) && m_external_sim)
+                    m_external_sim->SetCoastDownSwitch(m_physical->coast_down_button().on());
+            }
+        }
+
         // --- Panel toggles (1-4) ---
         for (int i = 0; i < VehiclePanels::NUM_PANELS; ++i) {
             if (m_keyboard->ConsumePanelToggle(i))
@@ -2752,6 +2781,8 @@ void SimApp::HvIsolationFault(int lead, double leak_kohm) {
 }
 
 void SimApp::CoastDownSwitch(bool on) {
+    // Through the button, so the console and a scenario agree on its position.
+    if (m_physical) m_physical->coast_down_button().set(on);
     if (m_external_sim) m_external_sim->SetCoastDownSwitch(on);
     std::cout << "[Scenario] coast_down_switch -> " << (on ? "ON" : "OFF") << "\n";
 }
