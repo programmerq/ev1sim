@@ -302,6 +302,7 @@ add_executable(ev1sim
     src/SimApp.cpp
     src/VehicleWorld.cpp
     src/EV1Vehicle.cpp
+    src/EV1DriveMotor.cpp
     src/EV1TMeasyTire.cpp
     src/CommandDriver.cpp
     src/KeyboardInputController.cpp
@@ -544,7 +545,9 @@ if(BUILD_TESTS)
             tests/test_rolling_spawn.cpp
             tests/test_reverse_drive.cpp
             tests/test_ride_frequency.cpp
+            tests/test_coast_drag.cpp
             src/EV1Vehicle.cpp
+            src/EV1DriveMotor.cpp
             src/EV1TMeasyTire.cpp
         )
         target_include_directories(ev1sim_plant_tests PRIVATE src)

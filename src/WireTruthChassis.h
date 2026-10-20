@@ -306,6 +306,14 @@ public:
     // (was kSigAdPrechargeRelay 5225). nullopt until AD writes it.
     std::optional<bool>  ad_precharge_relay() const;       // AD_PRECHARGE_RELAY
 
+    // The PIM's coast-down drag, Nm at the motor shaft (>= 0, opposing the
+    // shaft's rotation). nullopt until the PIM writes CHASSIS_PIM_COAST_DRAG_NM.
+    std::optional<float> pim_coast_drag_nm() const;        // CHASSIS_PIM_COAST_DRAG_NM
+
+    // The shifter's coast-down button position (1 = coast down), read by the
+    // RSA. ev1sim is this cell's producer. Returns false if not attached.
+    bool publish_coast_down_switch(bool on);               // DRIVER_COAST_DOWN_SWITCH
+
 private:
     WireTruthChassis();
     struct Impl;

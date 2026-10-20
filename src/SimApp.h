@@ -56,6 +56,7 @@ public:
     void FlashToPass(bool held) override;
     void FailThrottleInput(bool fail) override;
     void HvIsolationFault(int lead, double leak_kohm) override;
+    void CoastDownSwitch(bool on) override;
 
     // Dispatch a named input action (from a wheel button / Arduino contact) by
     // reusing the same handlers the keyboard drives.  Horn is a held input
@@ -109,6 +110,12 @@ private:
     // No-op in "local" mode or when the bus is stale / never received.
     // Logs freshness transitions on tick boundaries.
     void ApplyElectronicsThrottle(DriverCommand& cmd);
+
+    // Hand the drive motor's zero-pedal torque to the PIM's coast-down drag
+    // (CHASSIS_PIM_COAST_DRAG_NM) while the PIM is driving the car — electronics
+    // mode with its throttle command fresh — and back to the coast map
+    // otherwise.  Call after ApplyElectronicsThrottle.
+    void ApplyElectronicsCoastDrag();
 
     // Symmetric to ApplyElectronicsThrottle: override cmd.steering from the
     // chassis steering command (4076) when m_driver_mode == "electronics" and
@@ -299,6 +306,7 @@ private:
     // transitions on tick boundaries.
     std::string m_driver_mode = "local";          ///< "local" | "electronics"
     bool        m_throttle_bus_was_fresh = false; ///< was bus fresh last tick?
+    bool        m_coast_drag_from_pim    = false; ///< PIM owned zero-pedal torque last tick?
     std::chrono::milliseconds m_throttle_freshness_window{200};
     bool        m_steering_bus_was_fresh = false; ///< steering bus fresh last tick?
     std::chrono::milliseconds m_steering_freshness_window{200};

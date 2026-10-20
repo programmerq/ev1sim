@@ -184,6 +184,9 @@ void Scenario::Tick(double sim_time, const VehicleState& state,
         } else if (e.action == "fail_throttle_input") {
             // value != 0 → fail, 0 → restore.
             hooks.FailThrottleInput(e.value != 0.0);
+        } else if (e.action == "coast_down_switch") {
+            // The shifter's coast-down button: value != 0 → coast down.
+            hooks.CoastDownSwitch(e.value != 0.0);
         } else if (e.action == "hv_isolation_fault") {
             // value = fault-path resistance, kOhm (0 = dead short).
             // value2 = which HV lead: 1 = HV+, 2 = HV-, 0 = clear the fault.

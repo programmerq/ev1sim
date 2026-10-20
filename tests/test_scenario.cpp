@@ -51,6 +51,7 @@ struct CountingHooks : public ev1sim::ScenarioHooks {
     int flash_to_pass_on = 0, flash_to_pass_off = 0;
     int fail_throttle = 0, restore_throttle = 0;
     int hv_iso_calls = 0, hv_iso_lead = -1;
+    int coast_down_on = 0, coast_down_off = 0;
     double hv_iso_kohm = -1.0;
 
     void KeyOnCycle()        override { ++key_on_cycle; }
@@ -84,6 +85,9 @@ struct CountingHooks : public ev1sim::ScenarioHooks {
         ++hv_iso_calls;
         hv_iso_lead = lead;
         hv_iso_kohm = leak_kohm;
+    }
+    void CoastDownSwitch(bool on) override {
+        if (on) ++coast_down_on; else ++coast_down_off;
     }
 };
 
@@ -1345,6 +1349,28 @@ TEST_CASE("Scenario: hv_isolation_fault dispatches lead + leak, and clears",
     s.Tick(3.10, VehicleState{}, hooks, cmd);
     CHECK(hooks.hv_iso_calls == 3);
     CHECK(hooks.hv_iso_lead == 0);
+}
+
+TEST_CASE("Scenario: coast_down_switch sets and clears the shifter button",
+          "[Scenario]") {
+    using ev1sim::Scenario;
+
+    Scenario s;
+    s.set_events({
+        {1.00, "coast_down_switch", 1.0},
+        {2.00, "coast_down_switch", 0.0},
+    });
+
+    CountingHooks hooks;
+    DriverCommand cmd{};
+
+    s.Tick(0.50, VehicleState{}, hooks, cmd);
+    CHECK(hooks.coast_down_on == 0);
+    s.Tick(1.10, VehicleState{}, hooks, cmd);
+    CHECK(hooks.coast_down_on == 1);
+    CHECK(hooks.coast_down_off == 0);
+    s.Tick(2.10, VehicleState{}, hooks, cmd);
+    CHECK(hooks.coast_down_off == 1);
 }
 
 // ---------------------------------------------------------------------------

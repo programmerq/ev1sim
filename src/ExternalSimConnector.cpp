@@ -1531,6 +1531,12 @@ struct ExternalSimConnector::State {
     bool          hv_iso_fault_armed              = false;
     std::uint8_t  hv_iso_fault_lead               = 0u;
     std::uint32_t hv_iso_fault_kohm               = 0u;
+    // Shifter coast-down button (scenario action coast_down_switch).
+    bool          coast_down_switch_armed         = false;
+    bool          coast_down_switch_on            = false;
+    // PIM coast-down drag (CHASSIS_PIM_COAST_DRAG_NM), Nm at the shaft.
+    float         pim_coast_drag_nm               = 0.0f;
+    bool          has_pim_coast_drag_nm           = false;
 
     // IPC extra LCD telltales (IDs 4140–4145, chassis segment) — received from IPC.
     // bool: false=lamp off, true=lamp on.
@@ -2345,6 +2351,16 @@ void ExternalSimConnector::SetHvIsolationFault(std::uint8_t lead,
     m_state->hv_iso_fault_armed = true;
     m_state->hv_iso_fault_lead  = lead;
     m_state->hv_iso_fault_kohm  = leak_kohm;
+}
+
+void ExternalSimConnector::SetCoastDownSwitch(bool on) {
+    m_state->coast_down_switch_armed = true;
+    m_state->coast_down_switch_on    = on;
+}
+
+std::optional<float> ExternalSimConnector::GetPimCoastDragNm() const {
+    if (!m_state->has_pim_coast_drag_nm) return std::nullopt;
+    return m_state->pim_coast_drag_nm;
 }
 
 void ExternalSimConnector::SetSuppressThrottlePublish(bool suppress) {
@@ -3482,6 +3498,13 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             st.has_pim_cruise_setpoint_mps = true;
         }
 
+        // PIM coast-down drag -> CHASSIS_PIM_COAST_DRAG_NM; nullopt until PIM
+        // writes it. SimApp hands it to the drive motor.
+        if (auto drag = st.wire->pim_coast_drag_nm()) {
+            st.pim_coast_drag_nm     = *drag;
+            st.has_pim_coast_drag_nm = true;
+        }
+
         // AD precharge relay (was kSigAdPrechargeRelay 5225) -> AD_PRECHARGE_RELAY.
         // the external sim declared this cell; nullopt until AD writes it.
         if (auto pre = st.wire->ad_precharge_relay()) {
@@ -3680,6 +3703,11 @@ void ExternalSimConnector::Tick(double sim_time_s) {
     if (st.hv_iso_fault_armed && st.wire) {
         st.wire->publish_hv_isolation_fault(st.hv_iso_fault_lead,
                                             st.hv_iso_fault_kohm);
+    }
+    // Shifter coast-down button: unwritten until a scenario sets it (the RSA
+    // reads unwritten as not pressed), then level-held every tick.
+    if (st.coast_down_switch_armed && st.wire) {
+        st.wire->publish_coast_down_switch(st.coast_down_switch_on);
     }
 #endif
 

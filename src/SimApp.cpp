@@ -13,6 +13,7 @@
 #include <csignal>
 #include <ctime>
 #include <iostream>
+#include <optional>
 #include <thread>
 
 using namespace chrono;
@@ -1213,6 +1214,20 @@ void SimApp::ApplyElectronicsThrottle(DriverCommand& cmd) {
     cmd.throttle = static_cast<double>(bus.q8) / 255.0;
 }
 
+void SimApp::ApplyElectronicsCoastDrag() {
+    std::optional<double> drag;
+    if (m_driver_mode == "electronics" && m_external_sim &&
+        m_throttle_bus_was_fresh) {
+        if (const auto nm = m_external_sim->GetPimCoastDragNm()) drag = *nm;
+    }
+    if (drag.has_value() != m_coast_drag_from_pim) {
+        std::cout << (drag ? "[SimApp] coast torque from PIM (coast-down drag)\n"
+                           : "[SimApp] coast torque from the motor map\n");
+        m_coast_drag_from_pim = drag.has_value();
+    }
+    ev1sim::SetCoastDrag(m_world->GetVehicle(), drag);
+}
+
 void SimApp::ApplyElectronicsSteering(DriverCommand& cmd) {
     if (m_driver_mode != "electronics") return;
 
@@ -1472,6 +1487,7 @@ int SimApp::RunWithVisualization() {
         // plant's brakes: the pedal sensors (6900, 6904, 4074) report the foot.
         const double driver_brake_raw = cmd.front_brake;
         ApplyElectronicsThrottle(cmd);
+        ApplyElectronicsCoastDrag();
         ApplyElectronicsSteering(cmd);
 
         // --- Propulsion enable gate (KEY OFF override) ---
@@ -2222,6 +2238,7 @@ int SimApp::RunHeadless() {
         // plant's brakes: the pedal sensors (6900, 6904, 4074) report the foot.
         const double driver_brake_raw = cmd.front_brake;
         ApplyElectronicsThrottle(cmd);
+        ApplyElectronicsCoastDrag();
         ApplyElectronicsSteering(cmd);
 
         // --- Propulsion enable gate (KEY OFF override) ---
@@ -2732,6 +2749,11 @@ void SimApp::HvIsolationFault(int lead, double leak_kohm) {
     std::cout << "[Scenario] hv_isolation_fault -> "
               << (lead_u8 == 1 ? "HV+" : lead_u8 == 2 ? "HV-" : "cleared")
               << " " << kohm << " kOhm to chassis\n";
+}
+
+void SimApp::CoastDownSwitch(bool on) {
+    if (m_external_sim) m_external_sim->SetCoastDownSwitch(on);
+    std::cout << "[Scenario] coast_down_switch -> " << (on ? "ON" : "OFF") << "\n";
 }
 
 void SimApp::DispatchAction(ev1sim::InputAction action) {

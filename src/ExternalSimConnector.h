@@ -7,6 +7,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <optional>
 #include <memory>
 #include <string>
 
@@ -187,6 +188,11 @@ public:
     /// the AD places the leak in parallel with that lead's insulation and its
     /// imbalance detector (batt-685, 30..70 % of pack voltage) does the rest.
     void SetHvIsolationFault(std::uint8_t lead, std::uint32_t leak_kohm);
+
+    /// The shifter's coast-down button position (scenario action
+    /// "coast_down_switch"; 1 = coast down). Published on DRIVER_COAST_DOWN_SWITCH
+    /// every tick once set, for the RSA to report as $31 Coast Down Request.
+    void SetCoastDownSwitch(bool on);
     void SetDriverSteeringDegQ8(std::int16_t q8);
     void SetDriverGearSelector(std::uint8_t enum_v);
 
@@ -699,6 +705,10 @@ public:
     /// Returns 0.0f if never received.
     float GetPimCruiseSetpointMps() const;
     bool  HasReceivedPimCruiseSetpointMps() const;
+
+    /// The PIM's coast-down drag (CHASSIS_PIM_COAST_DRAG_NM), Nm at the motor
+    /// shaft, >= 0, opposing rotation. nullopt until the PIM has written it.
+    std::optional<float> GetPimCoastDragNm() const;
 
     /// What the instrument cluster shows (docs/ipc_rsa_display_plan.md Phase 1):
     /// the GM-8192 frames BusSnoop decoded off the module TX cells, fresh as of
