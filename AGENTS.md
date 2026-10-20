@@ -6,17 +6,10 @@ rules only.
 
 ## Run and verify
 
-Without Chrono, the unit suite CI runs:
-
-```sh
-cmake -B build -S . -DEV1SIM_TESTS_ONLY=ON -DEV1SIM_HAVE_WHEEL_IO=OFF
-cmake --build build --target ev1sim_tests -j"$(nproc)"
-ctest --test-dir build --output-on-failure
-tests/electricsim_stub/check_stub_sync.sh   # the vendored stub matches its record
-```
-
-The full build (Chrono, presets, sibling worktrees) is in `README.md`; the
-other CI legs are in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+Build and test as [`README.md`](README.md) says; CI's legs are in
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml). Run
+`tests/electricsim_stub/check_stub_sync.sh` after touching the vendored
+electricsim stub.
 
 ## Commits
 
