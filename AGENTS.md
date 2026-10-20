@@ -22,7 +22,7 @@ Develop on a feature branch (`claude/<id>`); never push to `main`.
 
 - **Merge stays the owner's call** — do not merge to `main`.
 
-<!-- BEGIN ev1-canon:pr-lifecycle v5 -->
+<!-- BEGIN ev1-canon:pr-lifecycle v6 -->
 **Branches, pushes and PRs (canonical across all four EV1 repos; this block is
 the only copy of these rules).** A new ruling replaces the wording here
 instead of being added beside it. Edit it in `ev1/CONVENTIONS.md`, bump the
@@ -47,12 +47,20 @@ free and PRs are not.
   `main` in).
 
 *When to open a PR:*
-- **Open a PR when the branch holds a chunk worth the owner's review**: a
-  coherent, finished piece of work he can act on, never a single page, small
-  fix or doc tweak. **Few large PRs beat many small ones**; never split
-  coherent work to keep diffs small. When the owner asks for a PR, open one.
-- **No PR whose only purpose is carrying a record.** A small doc, note or
-  queue edit rides an in-flight branch, even an imperfect topical fit.
+- **No tiny PRs.** Every PR costs a full CI run and an owner review, so open
+  one only when the branch holds a chunk worth that: a coherent, finished
+  piece of work he can act on, never a single page, small fix or doc tweak.
+  **Few large PRs beat many small ones**; never split coherent work to keep
+  diffs small. When the owner asks for a PR, open one.
+- **A PR carries its knock-ons.** Before opening, sweep the change into every
+  layer it touches: each other file, doc, comment, test, fixture and data
+  record that states the same fact or follows from it. A fix for one symptom
+  of a wider error fixes the whole class.
+- **Small follow-ups ride an in-flight branch** that already touches the same
+  files, even an imperfect topical fit, never a PR of their own; so does a
+  doc, note or queue edit whose only purpose is carrying a record. With no
+  such branch, the follow-up waits on a pushed branch until it grows into a
+  chunk.
 
 *Draft and ready:* leaving draft means "ready for review", which is what
 GitHub's UI calls it, and the owner reviews only ready PRs.
@@ -83,8 +91,10 @@ GitHub's UI calls it, and the owner reviews only ready PRs.
   and ride the next branch with code.
 - **Titles state the goal, not the process**: no "needs sign-off", no
   "proposal:" on finished work.
-- **Merges are the owner's click.**
-<!-- END ev1-canon:pr-lifecycle v5 -->
+- **Merges are the owner's click, and each merge is an invitation to the
+  next work item**: when your PR merges, start the next item instead of
+  stopping.
+<!-- END ev1-canon:pr-lifecycle v6 -->
 (ev1sim has no `scripts/backlog.py` — its notes channel is `DECISION_QUEUE.md`.)
 
 <!-- BEGIN ev1-canon:pr-images v3 -->
