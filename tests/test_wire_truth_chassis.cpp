@@ -749,10 +749,24 @@ TEST_CASE("WireTruthChassis::rsa_run_active follows RSA_RUN1_OUT", "[wire_truth]
     // Unwritten -> nullopt (consumer keeps its "no run-mode" default).
     REQUIRE(wire->rsa_run_active() == std::nullopt);
 
-    REQUIRE(rsa->write_bit(topo::kWireRSA_RUN1_OUT, true));
+    // The line's rest level is the cell's declared default; RUN is the other
+    // level. Written in those terms so the test holds at either modelled
+    // polarity, and asserted on the active-low car level directly below.
+    constexpr bool kRest = topo::kWireRSA_RUN1_OUT_Default;
+    REQUIRE(rsa->write_bit(topo::kWireRSA_RUN1_OUT, !kRest));
     REQUIRE(wire->rsa_run_active() == std::optional<bool>(true));
-    REQUIRE(rsa->write_bit(topo::kWireRSA_RUN1_OUT, false));
+    REQUIRE(rsa->write_bit(topo::kWireRSA_RUN1_OUT, kRest));
     REQUIRE(wire->rsa_run_active() == std::optional<bool>(false));
+}
+
+TEST_CASE("RSA run command reads relative to its rest level", "[wire_truth][ecu]") {
+    // ev1sim does not pick the polarity; the declared default does. With an
+    // active-low line (rest high) a low level is RUN; with the logical
+    // convention (rest low) a high level is RUN.
+    namespace topo = electricsim::topology;
+    constexpr bool kRest = topo::kWireRSA_RUN1_OUT_Default;
+    CHECK(ev1sim::WireTruthChassis::rsa_run_commanded_level(!kRest));
+    CHECK_FALSE(ev1sim::WireTruthChassis::rsa_run_commanded_level(kRest));
 }
 
 TEST_CASE("WireTruthChassis::ad_main_contactor_closed follows the AD's own AD_MAIN_CONTACTOR",
@@ -895,7 +909,8 @@ TEST_CASE("Connector dash snapshot: bus frames via BusSnoop plus the IPC lamp ce
     REQUIRE(fleet->write_float32(topo::kWireCHASSIS_IPC_TRIP_DISTANCE_M, 2500.0f));
     // The RSA's console outputs: ACC on, RUN off, the PARK selector LED lit.
     REQUIRE(fleet->write_bit(topo::kWireCHASSIS_RSA_ACC_OUT, true));
-    REQUIRE(fleet->write_bit(topo::kWireRSA_RUN1_OUT, false));
+    REQUIRE(fleet->write_bit(topo::kWireRSA_RUN1_OUT,
+                             topo::kWireRSA_RUN1_OUT_Default));  // rest = not RUN
     REQUIRE(fleet->write_bit(topo::kWireCHASSIS_RSA_SELECTOR_LED_PARK, true));
 
     // Pump the transmitters and the connector's tick in lockstep.
