@@ -1,26 +1,34 @@
-# AGENTS.md — guidance for AI agents contributing to ev1sim
+# AGENTS.md — the rules for agents working in ev1sim
 
-Entry point for any AI agent (Claude Code, etc.) picking up work in the ev1sim
-repo. This file captures the *operating conventions*; the build/run/architecture
-detail is **not** duplicated here — it lives in [`README.md`](README.md)
-(prerequisites, CMake presets, running, tests) and
-[`ARCHITECTURE.md`](ARCHITECTURE.md) (the boundaries and process layout). Read
-those for how the code works; read this for how we work on it.
+What the project is and how to build and run it: [`README.md`](README.md).
+Its process boundaries: [`ARCHITECTURE.md`](ARCHITECTURE.md). This file holds
+rules only.
 
-## The project in one paragraph
+## Run and verify
 
-ev1sim is the host-side **physics + visualization plant** for a future EV1
-electronics toolchain: a standalone C++ vehicle simulator built on Project
-Chrono that renders a drivable vehicle, accepts driver commands, and exposes
-clean command/telemetry boundaries so an external electrical simulator
-(`electricsim`) can drive the loads and read the sensors. See `ARCHITECTURE.md`
-for the seams and `README.md` for the build.
+Without Chrono, the unit suite CI runs:
 
-## Git / PR workflow
+```sh
+cmake -B build -S . -DEV1SIM_TESTS_ONLY=ON -DEV1SIM_HAVE_WHEEL_IO=OFF
+cmake --build build --target ev1sim_tests -j"$(nproc)"
+ctest --test-dir build --output-on-failure
+tests/electricsim_stub/check_stub_sync.sh   # the vendored stub matches its record
+```
 
-Develop on a feature branch (`claude/<id>`); never push to `main`.
+The full build (Chrono, presets, sibling worktrees) is in `README.md`; the
+other CI legs are in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
-- **Merge stays the owner's call** — do not merge to `main`.
+## Commits
+
+Small and focused, saying why. Every code change adds a test in the same
+commit, or the message says why none applies.
+
+## Shared rules
+
+The blocks below are shared by all four EV1 repos; edit them only in
+`ev1/CONVENTIONS.md`. ev1sim has no `scripts/backlog.py`: its notes channel
+and owner decision queue is [`DECISION_QUEUE.md`](DECISION_QUEUE.md). Never
+merge to `main`.
 
 <!-- BEGIN ev1-canon:pr-lifecycle v6 -->
 **Branches, pushes and PRs (canonical across all four EV1 repos; this block is
@@ -99,7 +107,6 @@ GitHub's UI calls it, and the owner reviews only ready PRs.
   next work item**: when your PR merges, start the next item instead of
   stopping.
 <!-- END ev1-canon:pr-lifecycle v6 -->
-(ev1sim has no `scripts/backlog.py` — its notes channel is `DECISION_QUEUE.md`.)
 
 <!-- BEGIN ev1-canon:pr-images v3 -->
 **PR-body images (canonical across all four EV1 repos).**
@@ -118,6 +125,16 @@ branch moves and can 404 after a rebase/merge), in the `blob` form — **never**
   stretches unsized images to the full body column and upscales small ones
   blurrily.
 <!-- END ev1-canon:pr-images v3 -->
+
+### PR text
+
+- Never use the word "gate" in a PR title or body; name what the check
+  catches.
+- Lead the body with the strongest finding, stated positively.
+- A change repeated many times is illustrated with two or three
+  representative images.
+- If a saved body shows `&lt;img&gt;`, the environment escaped it: patch the
+  body with `gh api -X PATCH repos/<owner>/<repo>/pulls/<n> -F body=@file`.
 
 <!-- BEGIN ev1-canon:say-it-once v1 -->
 **Say it once, say what is true now (canonical across all four EV1 repos).**
@@ -167,31 +184,6 @@ manual readings arrive, so the PR gate must never freeze a guess in place.
   resolve, never a rationale, essay or docstring of some length.
 <!-- END ev1-canon:ci-checks v2 -->
 
-- If the saved body shows `&lt;img&gt;` (a proxied environment entity-escaped
-  it), redo the edit from an unproxied session via
-  `gh api -X PATCH repos/<owner>/<repo>/pulls/<n> -F body=@file`.
-- **Conflict resolution:** rebase onto fresh `origin/main` *or* merge
-  `origin/main` into the branch — either is fine. Sync before new work; after a
-  rebase that rewrites already-pushed history, push with `--force-with-lease`
-  (never plain `--force`).
-
-### PR writing conduct
-
-Rulings: `ev1` `decisions/2026-07-25-pr-body-conduct-chat-rulings.md` and
-`decisions/2026-07-25-conflict-reduction-generated-files.md`.
-
-- **Never use the word "gate" in a PR title or body.** Say what the check
-  catches, not the name of the mechanism catching it.
-- **Lead the PR body with its strongest finding, stated positively** — say
-  what a thing *is*, not what it is not. Prose volume isn't evidence of work.
-- **Illustrate a change repeated many times with 2-3 representative images,
-  not all of them** — extends the `pr-images` rule above.
-- **A scheduled job owns generated/nightly-committed files; a PR diff never
-  hand-carries them.** Not applicable to ev1sim today — no such file exists
-  here yet; apply this if one appears.
-
-### Owner decision asks are self-contained
-
 <!-- BEGIN ev1-canon:decision-ask v3 -->
 **Owner decision asks are self-contained (canonical across all four EV1
 repos).**
@@ -223,12 +215,3 @@ that one message, on one screen, and carries all seven elements:
 Record the ruling immediately where it was asked, in one place; everything
 else points to it.
 <!-- END ev1-canon:decision-ask v3 -->
-
-## Commits
-
-Small, focused, well-described — explain *why* the change matters, not just
-*what* changed. Don't batch unrelated changes. Every code change either adds a
-test in the same commit or the message says why a test isn't appropriate; the
-CI suite (see [`README.md`](README.md) "Running Tests" and
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml)) should be green on the
-branch you're committing to.
