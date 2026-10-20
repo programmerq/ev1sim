@@ -831,6 +831,45 @@ TEST_CASE("Scenario: AD / bulb / horn stats fields read the bus mirrors",
     std::filesystem::remove(tmp_csv);
 }
 
+TEST_CASE("Scenario: pim_coast_drag_nm stats field reads the PIM's drag",
+          "[Scenario]") {
+    using ev1sim::Scenario;
+    using ev1sim::ScenarioStats;
+
+    auto tmp_csv = std::filesystem::temp_directory_path() /
+                   "ev1sim_scenario_stats_coast_drag_test.csv";
+    Scenario s;
+    ScenarioStats st{tmp_csv.string(), {"sim_time_s", "pim_coast_drag_nm"},
+                     0.10};
+    s.set_stats(st);
+    s.OpenStats();
+
+    ExternalSimConnector bus;
+    ev1sim::PhysicalWorld phys;
+    DriverCommand cmd{};
+    VehicleState state{};
+
+    // Row 1: the PIM has not written the cell yet.
+    s.MaybeSampleStats(0.0, state, phys, bus, cmd);
+    // Row 2: the PIM publishes 12 Nm of coast-down drag.
+    bus.DebugInjectPimCoastDragNm(12.0f);
+    s.MaybeSampleStats(0.15, state, phys, bus, cmd);
+
+    s.Close();
+
+    std::ifstream f(tmp_csv);
+    REQUIRE(f.is_open());
+    std::string header, row1, row2;
+    std::getline(f, header);
+    std::getline(f, row1);
+    std::getline(f, row2);
+    CHECK(header == "sim_time_s,pim_coast_drag_nm");
+    CHECK(row1 == "0,-1");
+    CHECK(row2 == "0.15,12");
+    f.close();
+    std::filesystem::remove(tmp_csv);
+}
+
 TEST_CASE("Scenario: IPC air-bag telltale stats field reads the bus mirror",
           "[Scenario]") {
     using ev1sim::Scenario;

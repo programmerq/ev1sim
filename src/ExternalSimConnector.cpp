@@ -2853,6 +2853,11 @@ void ExternalSimConnector::DebugInjectFloat(std::uint32_t signal_id, float value
     // Other float signals are not currently subscribed as inputs.
 }
 
+void ExternalSimConnector::DebugInjectPimCoastDragNm(float drag_nm) {
+    m_state->pim_coast_drag_nm     = drag_nm;
+    m_state->has_pim_coast_drag_nm = true;
+}
+
 void ExternalSimConnector::DebugInjectU8(std::uint32_t signal_id,
                                           std::uint8_t value) {
     if (signal_id == kSigThrottleCmdQ8) {

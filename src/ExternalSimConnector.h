@@ -828,6 +828,10 @@ public:
     /// Used by unit tests; not part of the runtime path.
     void DebugInjectU16(std::uint32_t signal_id, std::uint16_t value);
 
+    /// Inject the PIM's coast-down drag (CHASSIS_PIM_COAST_DRAG_NM has no
+    /// signal id).  Used by unit tests; not part of the runtime path.
+    void DebugInjectPimCoastDragNm(float drag_nm);
+
 private:
     Options m_opts;
 
