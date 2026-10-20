@@ -58,6 +58,16 @@ private:
 /// changed the coast-down button, which the caller publishes.
 bool ApplyRsaConsoleAction(PhysicalWorld& world, const RsaConsoleAction& action);
 
+/// Which console control a click at one screen point lands on. The 2D panel
+/// wins where it is drawn. Otherwise the 3D console screen is tried, but only
+/// when the console is on screen to be clicked: the Cabin camera is the one
+/// view that frames it (`cabin_view`), and a floating-UI widget drawn over
+/// the point (`gui_over_point`) takes the click instead. `screen_3d` does
+/// the ray test and is called only when both allow it. Pure.
+RsaConsoleControl PickRsaConsoleControl(RsaConsoleControl on_panel, bool cabin_view,
+                                        bool gui_over_point,
+                                        const std::function<RsaConsoleControl()>& screen_3d);
+
 /// Irrlicht receiver: left-button press/release while `enabled()` is true,
 /// hit-tested by `hit(x, y)`. Queues actions for SimApp to apply once per frame.
 class RsaConsoleMouse : public irr::IEventReceiver {

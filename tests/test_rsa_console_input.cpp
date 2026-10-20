@@ -150,3 +150,24 @@ TEST_CASE("Console mouse: clicks on the real panel layout become actions", "[rsa
     REQUIRE(actions[1].long_press);
     REQUIRE(mouse.TakeActions().empty());
 }
+
+TEST_CASE("Console click picker: 3D screen only in the Cabin view, under no GUI widget",
+          "[rsa_console_input]") {
+    using C = RsaConsoleControl;
+    int ray_tests = 0;
+    const auto screen = [&]() { ++ray_tests; return C::kDrive; };
+
+    // The 2D panel wins wherever it is drawn, in any view.
+    REQUIRE(PickRsaConsoleControl(C::kRun, false, false, screen) == C::kRun);
+    REQUIRE(ray_tests == 0);
+    // Off the panel, in the Cabin view with nothing over the point: the screen.
+    REQUIRE(PickRsaConsoleControl(C::kNone, true, false, screen) == C::kDrive);
+    REQUIRE(ray_tests == 1);
+    // Chase (or any other) view: the console quad may lie under the cursor in
+    // chassis space but is not what the driver sees, so no click.
+    REQUIRE(PickRsaConsoleControl(C::kNone, false, false, screen) == C::kNone);
+    // A floating-UI widget over the point takes the click.
+    REQUIRE(PickRsaConsoleControl(C::kNone, true, true, screen) == C::kNone);
+    REQUIRE(ray_tests == 1);
+    REQUIRE(PickRsaConsoleControl(C::kNone, true, false, nullptr) == C::kNone);
+}

@@ -25,6 +25,14 @@ std::optional<RsaConsoleAction> RsaConsolePointer::Release(double t_s) {
     return RsaConsoleAction{was, t_s - pressed_at_s_ >= kRsaKeypadLongPressS};
 }
 
+RsaConsoleControl PickRsaConsoleControl(RsaConsoleControl on_panel, bool cabin_view,
+                                        bool gui_over_point,
+                                        const std::function<RsaConsoleControl()>& screen_3d) {
+    if (on_panel != RsaConsoleControl::kNone) return on_panel;
+    if (!cabin_view || gui_over_point || !screen_3d) return RsaConsoleControl::kNone;
+    return screen_3d();
+}
+
 bool ApplyRsaConsoleAction(PhysicalWorld& world, const RsaConsoleAction& action) {
     using C = RsaConsoleControl;
     using P = PrndSelector::Position;

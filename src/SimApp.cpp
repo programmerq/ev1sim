@@ -161,22 +161,28 @@ SimApp::SimApp(const Config& config) : m_config(config) {
         m_vis->AddUserEventReceiver(m_camera.get());
 
         // Console clicks (display plan Phase 4), in UI mode only: the 2D panel
-        // when it is on screen, else the 3D console screen under the cursor.
+        // when it is on screen, else the 3D console screen under the cursor
+        // (Cabin view, nothing of the floating UI over the point).
         m_console_mouse = std::make_unique<ev1sim::RsaConsoleMouse>(
             [this]() { return m_ui_mode; },
             [this](int x, int y) {
-                if (m_rsa_console) {
-                    const auto c = m_rsa_console->HitTest(x, y);
-                    if (c != ev1sim::RsaConsoleControl::kNone) return c;
-                }
-                auto* cam = m_vis->GetActiveCamera();
-                if (!m_dash3d || cam == nullptr) return ev1sim::RsaConsoleControl::kNone;
-                const irr::core::line3df ray =
-                    m_vis->GetDevice()->getSceneManager()->getSceneCollisionManager()
-                        ->getRayFromScreenCoordinates(irr::core::position2di(x, y), cam);
-                const irr::core::vector3df d = ray.getVector();
-                return m_dash3d->ConsoleControlAt({ray.start.X, ray.start.Y, ray.start.Z},
-                                                  {d.X, d.Y, d.Z});
+                const auto on_panel = m_rsa_console ? m_rsa_console->HitTest(x, y)
+                                                    : ev1sim::RsaConsoleControl::kNone;
+                auto* gui = m_vis->GetDevice()->getGUIEnvironment();
+                auto* over = gui->getRootGUIElement()->getElementFromPoint(
+                    irr::core::position2di(x, y));
+                const bool gui_over = over != nullptr && over != gui->getRootGUIElement();
+                const bool cabin = m_camera && m_camera->GetMode() == CameraMode::Cabin;
+                return ev1sim::PickRsaConsoleControl(on_panel, cabin, gui_over, [&]() {
+                    auto* cam = m_vis->GetActiveCamera();
+                    if (!m_dash3d || cam == nullptr) return ev1sim::RsaConsoleControl::kNone;
+                    const irr::core::line3df ray =
+                        m_vis->GetDevice()->getSceneManager()->getSceneCollisionManager()
+                            ->getRayFromScreenCoordinates(irr::core::position2di(x, y), cam);
+                    const irr::core::vector3df d = ray.getVector();
+                    return m_dash3d->ConsoleControlAt({ray.start.X, ray.start.Y, ray.start.Z},
+                                                      {d.X, d.Y, d.Z});
+                });
             },
             [this]() { return m_vis->GetDevice()->getTimer()->getRealTime() / 1000.0; });
         m_vis->AddUserEventReceiver(m_console_mouse.get());
