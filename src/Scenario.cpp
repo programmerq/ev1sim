@@ -179,6 +179,7 @@ void Scenario::Tick(double sim_time, const VehicleState& state,
         } else if (e.action == "exterior_keypad_code"){ hooks.ExteriorKeypadCode();
         } else if (e.action == "door_handle_driver")  { hooks.DoorHandleDriver();
         } else if (e.action == "set_horn")            { m_held_horn = (e.value != 0.0);
+        } else if (e.action == "set_parking_brake")   { m_held_parking_brake = (e.value != 0.0);
         } else if (e.action == "flash_to_pass")       { hooks.FlashToPass(e.value != 0.0);
         } else if (e.action == "fail_throttle_input") {
             // value != 0 → fail, 0 → restore.
@@ -216,6 +217,7 @@ void Scenario::Tick(double sim_time, const VehicleState& state,
     // One physical horn contact (circuit 28); SimApp ORs low||high into
     // HornButton::set_held, so driving both mirrors a closed contact.
     if (m_held_horn)     cmd.horn_low    = cmd.horn_high = *m_held_horn;
+    if (m_held_parking_brake) cmd.parking_brake = *m_held_parking_brake;
 }
 
 // Lane-keeping law: a look-ahead COURSE controller with yaw-rate damping.

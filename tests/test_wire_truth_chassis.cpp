@@ -408,6 +408,28 @@ TEST_CASE("WireTruthChassis::mirror_signal: RSA mode buttons are three bit cells
     REQUIRE_FALSE(wire->mirror_signal(6971U, on, 1u));
 }
 
+TEST_CASE("WireTruthChassis::mirror_signal: park-brake switch presses reach the BTCM cells",
+          "[wire_truth][mirror_signal]") {
+    const std::string seg = unique_segment("ms_park_brake");
+    auto creator = create_fleet_table(seg, electricsim::topology::kTopologyHash);
+    REQUIRE(creator != nullptr);
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+
+    namespace topo = electricsim::topology;
+    const std::uint8_t on[] = {0x01u};
+    struct { std::uint32_t id; WireId cell; } const presses[] = {
+        {6946U, topo::kWireDRIVER_PARK_BRAKE_SET_REQ},
+        {6947U, topo::kWireDRIVER_PARK_BRAKE_RELEASE_REQ},
+    };
+    for (const auto& p : presses) {
+        REQUIRE(wire->mirror_signal(p.id, on, 1u));
+        bool v = false;
+        REQUIRE(creator->read_bit(p.cell, &v));
+        CHECK(v);
+    }
+}
+
 namespace {
 class ScopedEnv {
 public:

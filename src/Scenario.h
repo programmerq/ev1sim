@@ -55,6 +55,11 @@ class PhysicalWorld;
 //       would hide whether that OR works.
 //   set_horn:      value != 0 closes the driver horn contact (circuit 28) and
 //       holds it until a set_horn 0; the LHJB decides which tones sound.
+//   set_parking_brake:  value != 0 sets the driver's park-brake control and
+//       holds it until a set_parking_brake 0.  The control is a level whose
+//       rising edge SimApp publishes as the one-tick SET press (6946) and
+//       whose falling edge is the RELEASE press (6947); what the rear brakes
+//       then do is the BTCM's answer.
 //   lane_hold:  engage the scenario's lane-keeping driver: every tick until
 //       lane_release, steering is computed to hold the chassis on the world
 //       line y = value (metres), travelling along it toward +x, from pos_x /
@@ -296,6 +301,9 @@ private:
     // Horn contact, held like the pedals: set_horn value != 0 closes the
     // single driver horn contact (circuit 28) until the next set_horn 0.
     std::optional<bool>        m_held_horn;
+    // Park-brake control, held like the horn: set_parking_brake value != 0
+    // sets it until the next set_parking_brake 0.
+    std::optional<bool>        m_held_parking_brake;
 
     ScenarioStats              m_stats;
     std::ofstream              m_csv;
