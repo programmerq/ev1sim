@@ -205,6 +205,29 @@ TEST_CASE("Scenario: drive-cycle body actions reach their hooks",
     CHECK(cmd2.horn_low == true);
 }
 
+TEST_CASE("Scenario: set_parking_brake holds the park-brake control",
+          "[Scenario]") {
+    using ev1sim::Scenario;
+    Scenario s;
+    s.set_events({
+        {0.10, "set_parking_brake", 1.0},
+        {0.50, "set_parking_brake", 0.0},
+    });
+    CountingHooks hooks;
+    DriverCommand cmd{};
+    s.Tick(0.05, VehicleState{}, hooks, cmd);
+    CHECK(cmd.parking_brake == false);
+    s.Tick(0.20, VehicleState{}, hooks, cmd);
+    CHECK(cmd.parking_brake == true);
+    // Held on a fresh command with no further event, like the pedals.
+    DriverCommand cmd2{};
+    s.Tick(0.30, VehicleState{}, hooks, cmd2);
+    CHECK(cmd2.parking_brake == true);
+    DriverCommand cmd3{};
+    s.Tick(0.60, VehicleState{}, hooks, cmd3);
+    CHECK(cmd3.parking_brake == false);
+}
+
 TEST_CASE("Scenario: unknown action logs warning, doesn't crash",
           "[Scenario]") {
     using ev1sim::Scenario;

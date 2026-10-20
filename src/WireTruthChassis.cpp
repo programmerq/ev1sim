@@ -173,6 +173,9 @@ static const std::unordered_map<std::uint32_t, ProducerCell>& ProducerRegistry()
         {6912U, {kWireEXT_WHEEL_SPEED_RL,               WireType::kFloat32}},
         {6913U, {kWireEXT_WHEEL_SPEED_RR,               WireType::kFloat32}},
         // Driver buttons (bit / byte)
+        // Park-brake switch: one-tick SET / RELEASE presses (BTCM).
+        {6946U, {kWireDRIVER_PARK_BRAKE_SET_REQ,         WireType::kBit}},
+        {6947U, {kWireDRIVER_PARK_BRAKE_RELEASE_REQ,     WireType::kBit}},
         {6952U, {kWireDRIVER_IPC_TRIP_RESET_BUTTON,      WireType::kBit}},
         {6964U, {kWireDRIVER_SEATBELT_BUCKLED,           WireType::kBit}},
         {6965U, {kWireDRIVER_SEATBELT_BUCKLED_PASSENGER, WireType::kBit}},
