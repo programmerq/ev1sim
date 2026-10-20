@@ -10,8 +10,9 @@
 #include <vector>
 
 // ---------------------------------------------------------------------------
-// FloatingUiPanel — a translucent vertical column of clickable buttons
-// anchored to the top-left of the Irrlicht window.
+// FloatingUiPanel — a translucent grid of clickable rows (buttons and
+// sliders) anchored to the top-left of the Irrlicht window.  Rows run down a
+// column and wrap into the next column at the screen's bottom edge.
 //
 // Usage pattern:
 //   1. Construct with an IGUIEnvironment* and screen dimensions.
