@@ -112,35 +112,19 @@ float WiperRenderer::GetAngleDeg() const {
 // HUD
 // ---------------------------------------------------------------------------
 
-// Build the animated sweep bar string for non-OFF modes.
-// The bar is 8 characters wide; the cursor position is derived from the
-// wiper angle normalised to [-1, 1], then mapped to [0, 7].
-// Returns a narrow string like "─►──────" or "──────◄─".
-static void BuildSweepBar(float angle_deg, float max_angle_deg,
-                          wchar_t* out, int out_len) {
-    // Normalise angle to [-1, 1].
-    const float norm = (max_angle_deg > 0.0f)
-                        ? (angle_deg / max_angle_deg)
-                        : 0.0f;
-    // Map to [0, 7] (8-cell bar).
+// Build the sweep bar for non-OFF modes: 8 cells, park at the left, the far
+// end of the sweep at the right, the blade's cell marked. Plain ASCII: the
+// HUD's built-in Irrlicht font has no box-drawing or arrow glyphs.
+static void BuildSweepBar(double sweep01, wchar_t* out, int out_len) {
     constexpr int kCells = 8;
-    const int pos = static_cast<int>((norm + 1.0f) * 0.5f * (kCells - 1) + 0.5f);
+    const int pos = static_cast<int>(sweep01 * (kCells - 1) + 0.5);
     const int clamped = (pos < 0) ? 0 : (pos >= kCells ? kCells - 1 : pos);
 
-    // Determine direction of travel (positive sin derivative = moving right).
-    // We use position vs. kCells/2 as a simple proxy.
-    const bool moving_right = (norm >= 0.0f);
-
     wchar_t bar[kCells + 1];
-    for (int c = 0; c < kCells; ++c) {
-        if (c == clamped)
-            bar[c] = moving_right ? L'►' : L'◄';  // ► or ◄
-        else
-            bar[c] = L'─';  // ─
-    }
+    for (int c = 0; c < kCells; ++c) bar[c] = (c == clamped) ? L'#' : L'-';
     bar[kCells] = L'\0';
 
-    // Format: "[────►───]"
+    // Format: "[--#-----]"
     int written = 0;
     out[written++] = L'[';
     for (int c = 0; c < kCells && written < out_len - 2; ++c)
@@ -193,10 +177,8 @@ void WiperRenderer::DrawHUD(irr::IrrlichtDevice* device) const {
                 (m_mode == Mode::INT)  ? L"INT " :
                 (m_mode == Mode::LOW)  ? L"LOW " : L"HIGH";
             wchar_t bar[16];
-            // The bar runs park (left) to far end (right).
-            BuildSweepBar(static_cast<float>((2.0 * GetSweepFraction() - 1.0) * m_max_angle_deg),
-                          m_max_angle_deg, bar, 16);
-            // Combine: "INT [────►───]"
+            BuildSweepBar(GetSweepFraction(), bar, 16);
+            // Combine: "INT [--#-----]"
             ::wcsncpy(label, mode_str, 63);
             ::wcsncat(label, bar, 63 - static_cast<int>(::wcslen(label)));
             break;
