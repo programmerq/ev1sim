@@ -1537,6 +1537,10 @@ struct ExternalSimConnector::State {
     // PIM coast-down drag (CHASSIS_PIM_COAST_DRAG_NM), Nm at the shaft.
     float         pim_coast_drag_nm               = 0.0f;
     bool          has_pim_coast_drag_nm           = false;
+    // BTCM front modulator motor commands (CHASSIS_BTCM_FRONT_MOTOR_CMD_FL/FR),
+    // signed: +1 restore, -1 release, 0 neither.
+    float         btcm_front_motor_fl             = 0.0f;
+    float         btcm_front_motor_fr             = 0.0f;
 
     // IPC extra LCD telltales (IDs 4140–4145, chassis segment) — received from IPC.
     // bool: false=lamp off, true=lamp on.
@@ -2608,8 +2612,12 @@ ExternalSimConnector::AbsPhaseFront ExternalSimConnector::GetAbsPhaseFront(
         return ts_iso != 0 && ts_dmp != 0;
     };
 
-    auto decode_phase = [](bool iso, bool dmp) -> AbsPhaseFront::Phase {
+    auto decode_phase = [](bool iso, bool dmp,
+                           float motor = 0.0f) -> AbsPhaseFront::Phase {
         if (!iso && !dmp) return AbsPhaseFront::Phase::APPLY;
+        // Sealed iso with the motor's restore leg driven: re-apply toward the
+        // pedal (the plant's APPLY approaches the local brake from below).
+        if ( iso && !dmp && motor > 0.0f) return AbsPhaseFront::Phase::APPLY;
         if ( iso && !dmp) return AbsPhaseFront::Phase::HOLD;
         if ( iso &&  dmp) return AbsPhaseFront::Phase::DUMP;
         // iso=0, dump=1 is invalid per the ABS solenoid spec — treat as APPLY.
@@ -2636,7 +2644,8 @@ ExternalSimConnector::AbsPhaseFront ExternalSimConnector::GetAbsPhaseFront(
     auto decode_fl = [&]() -> AbsPhaseFront::Phase {
         if (fl_chassis_seen) {
             return decode_phase(st.chassis_btcm_iso_close_fl,
-                                st.chassis_btcm_dump_open_fl);
+                                st.chassis_btcm_dump_open_fl,
+                                st.btcm_front_motor_fl);
         }
         if (fl_main_seen) {
             return decode_phase(st.sol_fl_iso, st.sol_fl_dmp);
@@ -2646,7 +2655,8 @@ ExternalSimConnector::AbsPhaseFront ExternalSimConnector::GetAbsPhaseFront(
     auto decode_fr = [&]() -> AbsPhaseFront::Phase {
         if (fr_chassis_seen) {
             return decode_phase(st.chassis_btcm_iso_close_fr,
-                                st.chassis_btcm_dump_open_fr);
+                                st.chassis_btcm_dump_open_fr,
+                                st.btcm_front_motor_fr);
         }
         if (fr_main_seen) {
             return decode_phase(st.sol_fr_iso, st.sol_fr_dmp);
@@ -2856,6 +2866,11 @@ void ExternalSimConnector::DebugInjectFloat(std::uint32_t signal_id, float value
 void ExternalSimConnector::DebugInjectPimCoastDragNm(float drag_nm) {
     m_state->pim_coast_drag_nm     = drag_nm;
     m_state->has_pim_coast_drag_nm = true;
+}
+
+void ExternalSimConnector::DebugInjectBtcmFrontMotorCmd(float fl, float fr) {
+    m_state->btcm_front_motor_fl = fl;
+    m_state->btcm_front_motor_fr = fr;
 }
 
 void ExternalSimConnector::DebugInjectU8(std::uint32_t signal_id,
@@ -3509,6 +3524,11 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             st.pim_coast_drag_nm     = *drag;
             st.has_pim_coast_drag_nm = true;
         }
+
+        // BTCM front modulator motor commands; GetAbsPhaseFront reads them
+        // with the chassis iso/dump bits.
+        if (auto m = st.wire->btcm_front_motor_cmd_fl()) st.btcm_front_motor_fl = *m;
+        if (auto m = st.wire->btcm_front_motor_cmd_fr()) st.btcm_front_motor_fr = *m;
 
         // AD precharge relay (was kSigAdPrechargeRelay 5225) -> AD_PRECHARGE_RELAY.
         // the external sim declared this cell; nullopt until AD writes it.

@@ -409,11 +409,17 @@ public:
     /// authoritative for that wheel; if a chassis-bus update has ever
     /// arrived for a wheel it is preferred over the main-harness value.
     ///
-    /// Decoding table (iso=iso_close, dump=dump_open):
-    ///   iso=0, dump=0 → APPLY  (full local brake)
-    ///   iso=1, dump=0 → HOLD   (freeze previous brake torque)
-    ///   iso=1, dump=1 → DUMP   (release toward zero — 0.2× local brake)
-    ///   iso=0, dump=1 → invalid; treated as APPLY
+    /// Decoding table (iso=iso_close, dump=dump_open, motor = the chassis
+    /// CHASSIS_BTCM_FRONT_MOTOR_CMD_FL/FR, 0 when never written):
+    ///   iso=0, dump=0           → APPLY  (pedal pass-through, full local brake)
+    ///   iso=1, dump=0, motor>0  → APPLY  (the modulator motor restoring the
+    ///                                     sealed caliper toward the pedal)
+    ///   iso=1, dump=0, motor<=0 → HOLD   (freeze previous brake torque)
+    ///   iso=1, dump=1           → DUMP   (release toward zero)
+    ///   iso=0, dump=1           → invalid; treated as APPLY
+    /// The BTCM keeps the iso sealed for the whole anti-lock event, so its
+    /// re-apply arrives as iso=1 with motor +1 (electricsim
+    /// docs/3d_sim_contract.md §2.4).
     struct AbsPhaseFront {
         enum class Phase { APPLY, HOLD, DUMP };
         Phase fl       = Phase::APPLY;
@@ -831,6 +837,10 @@ public:
     /// Inject the PIM's coast-down drag (CHASSIS_PIM_COAST_DRAG_NM has no
     /// signal id).  Used by unit tests; not part of the runtime path.
     void DebugInjectPimCoastDragNm(float drag_nm);
+
+    /// Inject the BTCM front motor commands (CHASSIS_BTCM_FRONT_MOTOR_CMD_FL/FR
+    /// have no signal id).  Used by unit tests; not part of the runtime path.
+    void DebugInjectBtcmFrontMotorCmd(float fl, float fr);
 
 private:
     Options m_opts;
