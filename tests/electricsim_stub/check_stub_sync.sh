@@ -84,6 +84,29 @@ vendored_files() {
         | LC_ALL=C sort)
 }
 
+# The upstream original of a vendored file. The topology header is not committed
+# upstream: the external sim's build writes it from config/topology.yaml, so the
+# original is generated here from the upstream tree's own YAML and generator.
+TOPOLOGY_REL="src/io/topology/topology_generated.h"
+UPSTREAM_TOPOLOGY=""
+if [ -n "${UPSTREAM}" ] && [ -f "${UPSTREAM}/scripts/gen_topology_header.py" ] \
+    && grep -q -- '"--out"' "${UPSTREAM}/scripts/gen_topology_header.py"; then
+    UPSTREAM_TOPOLOGY="$(mktemp -d)/topology_generated.h"
+    trap 'rm -rf "$(dirname "${UPSTREAM_TOPOLOGY}")"' EXIT
+    if ! python3 "${UPSTREAM}/scripts/gen_topology_header.py" \
+            --out "${UPSTREAM_TOPOLOGY}" >/dev/null; then
+        echo "check_stub_sync: generating ${TOPOLOGY_REL} from '${UPSTREAM}' failed" >&2
+        exit 3
+    fi
+fi
+upstream_path() {
+    if [ "$1" = "${TOPOLOGY_REL}" ] && [ -n "${UPSTREAM_TOPOLOGY}" ]; then
+        printf '%s\n' "${UPSTREAM_TOPOLOGY}"
+    else
+        printf '%s\n' "${UPSTREAM}/$1"
+    fi
+}
+
 # ── --update: re-record the manifest ────────────────────────────────────────
 # Run this ONLY as part of a sync commit, never to make a red check green. The
 # selftest exists precisely because "just re-run --update" is the tempting wrong
@@ -110,10 +133,11 @@ if [ "${UPDATE}" = "1" ]; then
     update_bad=0
     while IFS= read -r rel; do
         [ -z "${rel}" ] && continue
-        if [ ! -f "${UPSTREAM}/${rel}" ]; then
+        up="$(upstream_path "${rel}")"
+        if [ ! -f "${up}" ]; then
             echo "  GONE       ${rel} (vendored here, not present upstream)" >&2
             update_bad=1
-        elif ! cmp -s "${STUB_DIR}/${rel}" "${UPSTREAM}/${rel}"; then
+        elif ! cmp -s "${STUB_DIR}/${rel}" "${up}"; then
             echo "  DRIFTED    ${rel} (differs from upstream)" >&2
             update_bad=1
         fi
@@ -217,11 +241,12 @@ if [ -n "${UPSTREAM}" ] && [ -d "${UPSTREAM}/src/io" ]; then
     upstream_state="CHECKED"
     while IFS= read -r rel; do
         [ -z "${rel}" ] && continue
-        if [ ! -f "${UPSTREAM}/${rel}" ]; then
+        up="$(upstream_path "${rel}")"
+        if [ ! -f "${up}" ]; then
             note_drift "  GONE       ${rel} (vendored here, no longer present upstream)"
             continue
         fi
-        if ! cmp -s "${STUB_DIR}/${rel}" "${UPSTREAM}/${rel}"; then
+        if ! cmp -s "${STUB_DIR}/${rel}" "${up}"; then
             note_drift "  DRIFTED    ${rel} (differs from upstream — the copy is stale)"
         fi
     done < <(printf '%s\n' "${manifest_list}")

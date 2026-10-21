@@ -42,8 +42,10 @@ ev1sim now attaches the shared `WireTable` and participates as a fleet peer:
 - **Consumer side — seam in place; horn wired.** The `written()`-gated overlay
   pattern is proven (horn). The remaining consumer groups need ev1sim to wire
   each overlay, which I'll do as you move each producer (see handshake below).
-- **Sharing model:** ev1sim compiles `wire_table.cpp`, `topology/env_open.cpp`,
-  and `topology_generated.h` directly from your `ELECTRICSIM_DIR` tree (no
+- **Sharing model:** ev1sim compiles `wire_table.cpp` and `topology/env_open.cpp`
+  directly from your `ELECTRICSIM_DIR` tree, and its configure step writes
+  `topology_generated.h` into ev1sim's build with that tree's
+  `scripts/gen_topology_header.py` from that tree's `config/topology.yaml` (no
   vendored copy). So ev1sim's compiled-in `kTopologyHash` is always exactly what
   your `wire_table.cpp` enforces — no drift. A topology change on your side is
   picked up by ev1sim's next rebuild automatically.

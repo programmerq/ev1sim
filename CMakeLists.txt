@@ -186,12 +186,13 @@ set(_electricsim_sources
     "src/io/uart/uart_rx.cpp"
     "src/io/uart/uart_tx.cpp")
 
-# Headers the connector compiles against: the generated topology (kWire*,
-# kTopologyHash, declare_all) and ev1_chassis_signals.hpp (the canonical
-# chassis-ID drift-guard static_asserts in ExternalSimConnector.cpp).  Both
-# survive on a wire-truth tree; probe them so a partial checkout is "stale".
+# Headers the connector compiles against: ev1_chassis_signals.hpp (the canonical
+# chassis-ID drift-guard static_asserts in ExternalSimConnector.cpp) and the
+# conductor publish edge below.  Probe them so a partial checkout is "stale".
+# The topology header (kWire*, kTopologyHash, declare_all) is probed separately:
+# a real electricsim tree has the YAML and generator it is written from, and the
+# vendored stub has the header itself.
 set(_electricsim_headers
-    "src/io/topology/topology_generated.h"
     "src/io/ev1_chassis_signals.hpp"
     # The publish edge for conductor cells. Conductor energisation is an OUTPUT of
     # the external sim's solver, so the substrate gives those cells no write
@@ -212,6 +213,12 @@ function(_ev1sim_check_electricsim_tree _root _out_var)
             return()
         endif()
     endforeach()
+    if(NOT (EXISTS "${_root}/config/topology.yaml"
+            AND EXISTS "${_root}/scripts/gen_topology_header.py")
+       AND NOT EXISTS "${_root}/src/io/topology/topology_generated.h")
+        set(${_out_var} FALSE PARENT_SCOPE)
+        return()
+    endif()
     set(${_out_var} TRUE PARENT_SCOPE)
 endfunction()
 
@@ -248,9 +255,8 @@ if(NOT ELECTRICSIM_DIR)
     endforeach()
 endif()
 
-# Build the substrate lib when a usable tree was found.  This is the SAME
-# ELECTRICSIM_DIR tree the topology hash is generated from (no vendored copy to
-# drift).  EV1SIM_HAVE_WIRE_TRUTH and EV1SIM_HAVE_EXTERNAL_SIM are now the same
+# Build the substrate lib when a usable tree was found.  The topology header is
+# generated from this SAME ELECTRICSIM_DIR tree (no vendored copy to drift).  EV1SIM_HAVE_WIRE_TRUTH and EV1SIM_HAVE_EXTERNAL_SIM are now the same
 # capability — the substrate being present — but both names are kept: the
 # connector's guarded code (publish/consume path) is under
 # EV1SIM_HAVE_EXTERNAL_SIM, and WireTruthChassis.cpp's real-vs-stub switch is
@@ -266,14 +272,39 @@ if(ELECTRICSIM_DIR)
         foreach(_src IN LISTS _electricsim_sources)
             list(APPEND _electricsim_sources_abs "${ELECTRICSIM_DIR}/${_src}")
         endforeach()
+        # electricsim does not commit the topology header; write it into this
+        # build from that tree's YAML with that tree's generator, and re-run
+        # configure when either changes.  The vendored stub carries the header
+        # itself under src/io.
+        set(_electricsim_gen_dir "${CMAKE_BINARY_DIR}/electricsim_generated/io")
+        if(EXISTS "${ELECTRICSIM_DIR}/scripts/gen_topology_header.py")
+            find_package(Python3 COMPONENTS Interpreter REQUIRED)
+            execute_process(
+                COMMAND ${Python3_EXECUTABLE}
+                        "${ELECTRICSIM_DIR}/scripts/gen_topology_header.py"
+                        --out "${_electricsim_gen_dir}/topology/topology_generated.h"
+                RESULT_VARIABLE _electricsim_gen_result)
+            if(NOT _electricsim_gen_result EQUAL 0)
+                message(FATAL_ERROR
+                    "${ELECTRICSIM_DIR}/scripts/gen_topology_header.py failed; "
+                    "see its output above")
+            endif()
+            set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+                "${ELECTRICSIM_DIR}/config/topology.yaml"
+                "${ELECTRICSIM_DIR}/scripts/gen_topology_header.py")
+        endif()
         add_library(electricsim_wire_substrate STATIC ${_electricsim_sources_abs})
         # src/io is the substrate's own include root (headers include each other
         # as "wire_table.hpp", "topology/...").  src/ is additionally needed so
         # "net_host/conductor_publisher.hpp" resolves — that header sits outside
         # src/io deliberately (it depends on the substrate, not the reverse).
+        # The generated root goes first; src/io/topology holds the generated
+        # header's own neighbour (wire_defaults.hpp).
         target_include_directories(electricsim_wire_substrate PUBLIC
+            "${_electricsim_gen_dir}"
             "${ELECTRICSIM_DIR}/src/io"
-            "${ELECTRICSIM_DIR}/src")
+            "${ELECTRICSIM_DIR}/src"
+            "${ELECTRICSIM_DIR}/src/io/topology")
         find_package(Threads REQUIRED)
         target_link_libraries(electricsim_wire_substrate PUBLIC Threads::Threads)
         set(EV1SIM_HAVE_EXTERNAL_SIM TRUE)
@@ -336,8 +367,9 @@ target_link_libraries(ev1sim PRIVATE
     nlohmann_json::nlohmann_json
 )
 # External-sim == wire-truth substrate present (Phase 4). One lib carries both:
-# the substrate's PUBLIC include dir (${ELECTRICSIM_DIR}/src/io) gives the
-# connector its topology_generated.h + ev1_chassis_signals.hpp, and linking it
+# the substrate's PUBLIC include dirs give the connector its topology header
+# (generated into this build, or the stub's vendored copy) and
+# ev1_chassis_signals.hpp, and linking it
 # pulls in the WireTable + env_open object code. Both compile defs are set so
 # the connector's guarded path (EV1SIM_HAVE_EXTERNAL_SIM) and WireTruthChassis's
 # real impl (EV1SIM_HAVE_WIRE_TRUTH) both light up.

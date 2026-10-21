@@ -34,7 +34,9 @@ that cannot fail is not a check.
   nothing previously enforced — and it runs in CI, where no external-sim checkout
   exists.
 - **Upstream sync** (when an external-sim tree is supplied): every vendored file
-  is byte-identical to its original. This catches the copy being stale.
+  is byte-identical to its original. This catches the copy being stale. The
+  topology header is not committed upstream, so its original is generated from
+  that tree's `config/topology.yaml` with that tree's generator.
 
 Neither leg alone is enough. Integrity would happily certify a tree that is
 internally consistent and a year behind; upstream sync cannot run in CI. The
