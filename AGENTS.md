@@ -23,7 +23,7 @@ The blocks below are shared by all four EV1 repos; edit them only in
 and owner decision queue is [`DECISION_QUEUE.md`](DECISION_QUEUE.md). Never
 merge to `main`.
 
-<!-- BEGIN ev1-canon:pr-lifecycle v6 -->
+<!-- BEGIN ev1-canon:pr-lifecycle v7 -->
 **Branches, pushes and PRs (canonical across all four EV1 repos; this block is
 the only copy of these rules).** A new ruling replaces the wording here
 instead of being added beside it. Edit it in `ev1/CONVENTIONS.md`, bump the
@@ -67,21 +67,28 @@ free and PRs are not.
   reason to split work into tiny PRs. A change lives in exactly one PR, and
   another PR that needs it bases on that branch or waits for it to merge.
 
-*Draft and ready:* leaving draft means "ready for review", which is what
-GitHub's UI calls it, and the owner reviews only ready PRs.
-- **Open PRs ready.** A draft PR is not a place to hold work in progress;
-  the pushed branch is.
+*Draft and ready:* ready means "merges as it sits". The owner reviews only
+ready PRs and acts straight from that list, so a ready PR that cannot merge
+wastes his review.
+- **Ready only when the page is clean:** no merge conflict, not based on a
+  stale or rewritten parent, not mid-rebase or mid-work, and CI green on its
+  head. A new PR opens as a draft and its owner flips it ready once that
+  holds. Work in progress lives on the pushed branch, not in a draft PR.
+- **The moment a ready PR stops merging as it sits** (a conflict after
+  another merge, a rewritten parent, a rework started), its owner flips it
+  to draft, fixes it in place, and flips it back once the page is clean.
+  Never close, replace or retarget a PR to clear that state.
 - **The owner flipping a PR to draft is his request-changes** (GitHub won't
   let him request changes on his own PR). Fix it, push, and flip it back to
   ready yourself with a "rework landed" comment.
-- The only other draft is a short cross-repo wait: a "waiting for <link> to
-  merge" note at the top of the body, flipped ready as soon as that merges.
+- A cross-repo wait is a draft too: a "waiting for <link> to merge" note at
+  the top of the body, flipped ready once that merges and the page is clean.
   A same-repo dependency is the base branch, not a draft.
-- Nothing else holds a PR in draft: not CI status, not a question with a
-  stated default (apply the default, note it, flip), not "awaiting owner
-  sign-off" (sign-off is the review), and not a peer or coordinator saying
-  so. Flip with `draft:false` on `mcp__github__update_pull_request` (the
-  mark-ready path can be permission-blocked).
+- Nothing else holds a PR in draft: not a question with a stated default
+  (apply the default, note it, flip), not "awaiting owner sign-off"
+  (sign-off is the review), and not a peer or coordinator saying so. Flip
+  with `draft:false` on `mcp__github__update_pull_request` (the mark-ready
+  path can be permission-blocked).
 
 *What a PR contains:*
 - **Complete.** Every item a PR mints is implemented in it, or names a
@@ -99,7 +106,7 @@ GitHub's UI calls it, and the owner reviews only ready PRs.
 - **Merges are the owner's click, and each merge is an invitation to the
   next work item**: when your PR merges, start the next item instead of
   stopping.
-<!-- END ev1-canon:pr-lifecycle v6 -->
+<!-- END ev1-canon:pr-lifecycle v7 -->
 
 <!-- BEGIN ev1-canon:pr-images v3 -->
 **PR-body images (canonical across all four EV1 repos).**
