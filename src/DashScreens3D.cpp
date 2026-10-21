@@ -13,6 +13,8 @@ constexpr double kDeg2Rad = 3.14159265358979323846 / 180.0;
 
 DashVec3 Add(const DashVec3& a, const DashVec3& b) { return {a.x + b.x, a.y + b.y, a.z + b.z}; }
 DashVec3 Scale(const DashVec3& a, double s) { return {a.x * s, a.y * s, a.z * s}; }
+DashVec3 Sub(const DashVec3& a, const DashVec3& b) { return {a.x - b.x, a.y - b.y, a.z - b.z}; }
+double Dot(const DashVec3& a, const DashVec3& b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
 DashVec3 Cross(const DashVec3& a, const DashVec3& b) {
     return {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x};
 }
@@ -89,6 +91,12 @@ void PlaceNode(irr::scene::IMeshSceneNode* node, const DashScreenFrame& f) {
     node->setPosition(ToIrr(f.center));
 }
 
+// Each panel sits at the texture's left edge, centred vertically.
+template <typename Panel>
+void AnchorInTexture(Panel& panel) {
+    panel.SetAnchor(0, std::max(0, (kDashScreenTexturePx - panel.Height()) / 2));
+}
+
 // Opaque version of the panels' glass colour, so the unused texture area
 // matches the panel background.
 const irr::video::SColor kScreenClear(255, 12, 20, 24);
@@ -109,6 +117,19 @@ DashVec3 CabinLookPoint() {
             (kClusterMount.z + kConsoleMount.z) / 2.0};
 }
 
+std::optional<DashScreenUv> DashScreenUvAt(const DashScreenFrame& f, const DashScreenMount& mount,
+                                           const DashVec3& origin, const DashVec3& dir) {
+    const double denom = Dot(dir, f.normal);
+    if (std::abs(denom) < 1e-12) return std::nullopt;  // parallel to the face
+    const double t = Dot(Sub(f.center, origin), f.normal) / denom;
+    if (t <= 0.0) return std::nullopt;                 // behind the origin
+    const DashVec3 d = Sub(Add(origin, Scale(dir, t)), f.center);
+    const double u = Dot(d, f.right) / mount.width_m + 0.5;
+    const double v = 0.5 - Dot(d, f.up) / mount.height_m;
+    if (u < 0.0 || u >= 1.0 || v < 0.0 || v >= 1.0) return std::nullopt;
+    return DashScreenUv{u, v};
+}
+
 DashScreenFrame PlaceDashScreen(const VehiclePose& pose, const DashScreenMount& mount) {
     const ChassisAxes a = Axes(pose);
     const double pitch = mount.pitch_deg * kDeg2Rad;
@@ -125,6 +146,8 @@ DashScreens3D::DashScreens3D(irr::IrrlichtDevice* device, ClusterUnits units)
     : device_(device),
       cluster_(units, 0, 0, kDashScreenTexturePx),
       console_(0, 0, kDashScreenTexturePx) {
+    AnchorInTexture(cluster_);
+    AnchorInTexture(console_);
     if (device_ == nullptr) return;
     irr::video::IVideoDriver* driver = device_->getVideoDriver();
     irr::scene::ISceneManager* smgr = device_->getSceneManager();
@@ -157,10 +180,9 @@ void DashScreens3D::Update(const DashSnapshot& snap) {
 void DashScreens3D::Refresh(irr::gui::IGUIFont* font) {
     if (!HasTextures()) return;
     irr::video::IVideoDriver* driver = device_->getVideoDriver();
-    // Each panel centred vertically in its square texture.
     auto draw_into = [&](irr::video::ITexture* tex, auto& panel) {
         driver->setRenderTarget(tex, true, true, kScreenClear);
-        panel.SetAnchor(0, std::max(0, (kDashScreenTexturePx - panel.Height()) / 2));
+        AnchorInTexture(panel);
         panel.Draw(driver, font);
     };
     draw_into(cluster_tex_, cluster_);
@@ -169,8 +191,18 @@ void DashScreens3D::Refresh(irr::gui::IGUIFont* font) {
 }
 
 void DashScreens3D::Place(const VehiclePose& pose) {
+    pose_ = pose;
     PlaceNode(cluster_node_, PlaceDashScreen(pose, kClusterMount));
     PlaceNode(console_node_, PlaceDashScreen(pose, kConsoleMount));
+}
+
+RsaConsoleControl DashScreens3D::ConsoleControlAt(const DashVec3& origin,
+                                                  const DashVec3& dir) const {
+    const auto uv = DashScreenUvAt(PlaceDashScreen(pose_, kConsoleMount), kConsoleMount,
+                                   origin, dir);
+    if (!uv) return RsaConsoleControl::kNone;
+    return console_.HitTest(static_cast<int>(uv->u * kDashScreenTexturePx),
+                            static_cast<int>(uv->v * kDashScreenTexturePx));
 }
 
 }  // namespace ev1sim

@@ -17,8 +17,13 @@ std::wstring Labelled(const wchar_t* label, const std::optional<bool>& v,
     return s;
 }
 
-RsaLed Led(const wchar_t* name, const std::optional<bool>& cell, RsaLedColor color) {
-    return RsaLed{name, cell.has_value(), cell.value_or(false), color};
+RsaLed Led(const wchar_t* name, const std::optional<bool>& cell, RsaLedColor color,
+           RsaConsoleControl control = RsaConsoleControl::kNone) {
+    return RsaLed{name, cell.has_value(), cell.value_or(false), color, control, true};
+}
+
+RsaLed Button(const wchar_t* name, RsaConsoleControl control) {
+    return RsaLed{name, true, false, RsaLedColor::kGreen, control, false};
 }
 
 }  // namespace
@@ -45,7 +50,8 @@ std::wstring FormatRsaBacklight(const std::optional<std::uint8_t>& dim_step) {
     return buf;
 }
 
-RsaConsoleView BuildRsaConsoleView(const std::optional<DashRsaConsole>& rsa) {
+RsaConsoleView BuildRsaConsoleView(const std::optional<DashRsaConsole>& rsa,
+                                   const std::optional<bool>& coast_down_led) {
     const DashRsaConsole none;
     const DashRsaConsole& c = rsa ? *rsa : none;
 
@@ -55,19 +61,29 @@ RsaConsoleView BuildRsaConsoleView(const std::optional<DashRsaConsole>& rsa) {
 
     RsaConsoleView v;
     v.mode = {
-        Led(L"OFF/ACC", off_acc, RsaLedColor::kGreen),
-        Led(L"RUN", c.run, RsaLedColor::kGreen),
+        Led(L"OFF/ACC", off_acc, RsaLedColor::kGreen, RsaConsoleControl::kOffAcc),
+        Led(L"RUN", c.run, RsaLedColor::kGreen, RsaConsoleControl::kRun),
     };
     v.selector = {
-        Led(L"P", c.led_park, RsaLedColor::kGreen),
-        Led(L"R", c.led_reverse, RsaLedColor::kGreen),
-        Led(L"N", c.led_neutral, RsaLedColor::kGreen),
-        Led(L"D", c.led_drive, RsaLedColor::kGreen),
+        Led(L"P", c.led_park, RsaLedColor::kGreen, RsaConsoleControl::kPark),
+        Led(L"R", c.led_reverse, RsaLedColor::kGreen, RsaConsoleControl::kReverse),
+        Led(L"N", c.led_neutral, RsaLedColor::kGreen, RsaConsoleControl::kNeutral),
+        Led(L"D", c.led_drive, RsaLedColor::kGreen, RsaConsoleControl::kDrive),
     };
     // Keypad indicators are amber, as on the external sim's panel UI.
     v.keypad = {
         Led(L"VALID CODE", c.valid_code, RsaLedColor::kAmber),
         Led(L"KEYPAD", c.valid_code, RsaLedColor::kAmber),
+    };
+    v.buttons = {
+        Button(L"LOCK", RsaConsoleControl::kLock),
+        Led(L"COAST DOWN", coast_down_led, RsaLedColor::kAmber, RsaConsoleControl::kCoastDown),
+    };
+    // Keycaps as on the console keypad; a long press enters the higher digit.
+    v.digits = {
+        Button(L"1/2", RsaConsoleControl::kKey1), Button(L"3/4", RsaConsoleControl::kKey2),
+        Button(L"5/6", RsaConsoleControl::kKey3), Button(L"7/8", RsaConsoleControl::kKey4),
+        Button(L"9/0", RsaConsoleControl::kKey5),
     };
     v.security   = FormatRsaSecurity(c.security);
     v.shift_lock = FormatRsaShiftLock(c.shift_blocked);
@@ -83,7 +99,7 @@ constexpr int kPad = 8;
 constexpr int kRowH = 16;
 constexpr int kLedH = 16;
 constexpr int kLedGap = 3;
-constexpr int kLedRows = 3;   // mode, selector, keypad
+constexpr int kLedRows = 5;   // mode, selector, keypad lamps, buttons, digits
 constexpr int kTextRows = 5;  // title, security, shift lock, BTSI, backlight
 
 // Same palette family as the cluster panel; LEDs lit green or amber.
@@ -95,14 +111,50 @@ const irr::video::SColor kLedAmber(255, 255, 176, 0);
 const irr::video::SColor kLedOff(255, 40, 52, 56);
 const irr::video::SColor kLedUnknown(255, 26, 32, 34);
 const irr::video::SColor kLedLitText(255, 20, 16, 0);
+const irr::video::SColor kButton(255, 58, 72, 78);  // a key with no lamp
 
 }  // namespace
+
+std::vector<RsaConsoleCell> LayoutRsaConsole(const RsaConsoleView& view, int x, int y,
+                                             int w) {
+    std::vector<RsaConsoleCell> cells;
+    const int inner = w - 2 * kPad;
+    int row_y = y + kPad + kRowH;  // below the title row
+    // One row of LEDs, sharing the row width equally.
+    auto row = [&](const std::vector<RsaLed>& leds) {
+        const int n = static_cast<int>(leds.size());
+        if (n == 0) return;
+        const int led_w = (inner - (n - 1) * kLedGap) / n;
+        for (int i = 0; i < n; ++i) {
+            const int lx = x + kPad + i * (led_w + kLedGap);
+            cells.push_back({&leds[static_cast<std::size_t>(i)], lx, row_y, lx + led_w,
+                             row_y + kLedH});
+        }
+        row_y += kLedH + kLedGap;
+    };
+    row(view.mode);
+    row(view.selector);
+    row(view.keypad);
+    row(view.buttons);
+    row(view.digits);
+    return cells;
+}
 
 RsaConsolePanel::RsaConsolePanel(int anchor_x, int anchor_y, int width)
     : x_(anchor_x), y_(anchor_y), w_(width), view_(BuildRsaConsoleView(std::nullopt)) {}
 
 void RsaConsolePanel::Update(const DashSnapshot& snap) {
-    view_ = BuildRsaConsoleView(snap.rsa);
+    std::optional<bool> coast_led;
+    if (snap.pcm) coast_led = snap.pcm->coast_down_led;
+    view_ = BuildRsaConsoleView(snap.rsa, coast_led);
+}
+
+RsaConsoleControl RsaConsolePanel::HitTest(int px, int py) const {
+    if (!visible_) return RsaConsoleControl::kNone;
+    for (const RsaConsoleCell& c : LayoutRsaConsole(view_, x_, y_, w_)) {
+        if (px >= c.x0 && px < c.x1 && py >= c.y0 && py < c.y1) return c.led->control;
+    }
+    return RsaConsoleControl::kNone;
 }
 
 int RsaConsolePanel::Height() const {
@@ -127,29 +179,21 @@ void RsaConsolePanel::Draw(irr::video::IVideoDriver* driver,
     int y = y_ + kPad;
 
     text(L"RSA", x_ + kPad, y, inner, kRowH, kDimText);
-    y += kRowH;
 
-    // One row of LEDs, sharing the row width equally.
-    auto led_row = [&](const std::vector<RsaLed>& leds) {
-        const int n = static_cast<int>(leds.size());
-        const int led_w = (inner - (n - 1) * kLedGap) / n;
-        for (int i = 0; i < n; ++i) {
-            const RsaLed& led = leds[static_cast<std::size_t>(i)];
-            const int lx = x_ + kPad + i * (led_w + kLedGap);
-            const irr::video::SColor lit =
-                led.color == RsaLedColor::kAmber ? kLedAmber : kLedGreen;
-            const irr::video::SColor fill =
-                !led.known ? kLedUnknown : (led.lit ? lit : kLedOff);
-            driver->draw2DRectangle(fill, recti(lx, y, lx + led_w, y + kLedH));
-            const irr::video::SColor ink = led.known && led.lit ? kLedLitText : kDimText;
-            text(led.name, lx, y, led_w, kLedH, ink, true);
-        }
-        y += kLedH + kLedGap;
-    };
-    led_row(view_.mode);
-    led_row(view_.selector);
-    led_row(view_.keypad);
-    y += kPad - kLedGap;
+    int last_y1 = y + kRowH;
+    for (const RsaConsoleCell& c : LayoutRsaConsole(view_, x_, y_, w_)) {
+        const RsaLed& led = *c.led;
+        const irr::video::SColor lit =
+            led.color == RsaLedColor::kAmber ? kLedAmber : kLedGreen;
+        const irr::video::SColor fill =
+            !led.lamp ? kButton : (!led.known ? kLedUnknown : (led.lit ? lit : kLedOff));
+        driver->draw2DRectangle(fill, recti(c.x0, c.y0, c.x1, c.y1));
+        const irr::video::SColor ink =
+            !led.lamp ? kText : (led.known && led.lit ? kLedLitText : kDimText);
+        text(led.name, c.x0, c.y0, c.x1 - c.x0, c.y1 - c.y0, ink, true);
+        last_y1 = c.y1;
+    }
+    y = last_y1 + kPad;
 
     text(view_.security, x_ + kPad, y, inner, kRowH, kText);
     y += kRowH;

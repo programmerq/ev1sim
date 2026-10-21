@@ -302,6 +302,7 @@ add_executable(ev1sim
     src/SimApp.cpp
     src/VehicleWorld.cpp
     src/EV1Vehicle.cpp
+    src/EV1DriveMotor.cpp
     src/EV1TMeasyTire.cpp
     src/CommandDriver.cpp
     src/KeyboardInputController.cpp
@@ -319,6 +320,7 @@ add_executable(ev1sim
     src/FloatingUiPanel.cpp
     src/InstrumentClusterPanel.cpp
     src/RsaConsolePanel.cpp
+    src/RsaConsoleInput.cpp
     src/DashScreens3D.cpp
     src/BusSnoop.cpp
     src/ExternalSimConnector.cpp
@@ -473,6 +475,7 @@ if(BUILD_TESTS)
         tests/test_bus_snoop.cpp
         tests/test_instrument_cluster_panel.cpp
         tests/test_rsa_console_panel.cpp
+        tests/test_rsa_console_input.cpp
         tests/test_dash_screens_3d.cpp
         tests/test_throttle_bus.cpp
         tests/test_scenario.cpp
@@ -503,6 +506,7 @@ if(BUILD_TESTS)
         src/FloatingUiPanel.cpp
         src/InstrumentClusterPanel.cpp
         src/RsaConsolePanel.cpp
+        src/RsaConsoleInput.cpp
         src/DashScreens3D.cpp
         src/BusSnoop.cpp
         src/VehiclePanels.cpp
@@ -544,7 +548,9 @@ if(BUILD_TESTS)
             tests/test_rolling_spawn.cpp
             tests/test_reverse_drive.cpp
             tests/test_ride_frequency.cpp
+            tests/test_coast_drag.cpp
             src/EV1Vehicle.cpp
+            src/EV1DriveMotor.cpp
             src/EV1TMeasyTire.cpp
         )
         target_include_directories(ev1sim_plant_tests PRIVATE src)

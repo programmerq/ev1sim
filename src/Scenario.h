@@ -184,6 +184,10 @@ public:
     // short). The EV1's Auto Disconnect detects it as an imbalance of the
     // chassis-to-lead voltages (batt-685 ISOLATION DETECTION).
     virtual void HvIsolationFault(int lead, double leak_kohm) = 0;
+    // The shifter's coast-down button position (scenario action
+    // "coast_down_switch"), held until the next action. The RSA reports it to
+    // the PIM, which then commands coast-down drag (propulsion p57).
+    virtual void CoastDownSwitch(bool on) = 0;
 };
 
 class Scenario {

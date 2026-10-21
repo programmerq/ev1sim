@@ -660,6 +660,29 @@ RsaKeypadDriver::KeypadFireSet RsaKeypadDriver::consume_fires_now() {
     return fires;
 }
 
+void RsaKeypadDriver::press_mode_button(std::uint8_t mode_switch) {
+    switch (mode_switch) {
+        case kModeSwLock:
+            m_expected = ExpectedState::OFF;
+            break;
+        case kModeSwOffAcc:
+            // A tap from RUN does nothing (the RSA needs a one-second hold).
+            if (m_expected == ExpectedState::OFF) m_expected = ExpectedState::ACC;
+            break;
+        case kModeSwRun:
+            m_expected = ExpectedState::RUN;
+            break;
+        default:
+            return;  // not a single console mode button
+    }
+    enqueue_mode_(mode_switch);
+}
+
+void RsaKeypadDriver::press_digit(int button_idx, bool long_press) {
+    if (button_idx < 0 || button_idx >= 5) return;
+    m_pending.button_value[button_idx] = static_cast<std::uint8_t>(long_press ? 2u : 1u);
+}
+
 const char* RsaKeypadDriver::expected_state_name() const {
     switch (m_expected) {
         case ExpectedState::OFF: return "OFF";

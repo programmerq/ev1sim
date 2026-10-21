@@ -13,6 +13,7 @@
 #include <csignal>
 #include <ctime>
 #include <iostream>
+#include <optional>
 #include <thread>
 
 using namespace chrono;
@@ -158,6 +159,33 @@ SimApp::SimApp(const Config& config) : m_config(config) {
 
         // Register camera manager's mouse handler with Irrlicht.
         m_vis->AddUserEventReceiver(m_camera.get());
+
+        // Console clicks (display plan Phase 4), in UI mode only: the 2D panel
+        // when it is on screen, else the 3D console screen under the cursor
+        // (Cabin view, nothing of the floating UI over the point).
+        m_console_mouse = std::make_unique<ev1sim::RsaConsoleMouse>(
+            [this]() { return m_ui_mode; },
+            [this](int x, int y) {
+                const auto on_panel = m_rsa_console ? m_rsa_console->HitTest(x, y)
+                                                    : ev1sim::RsaConsoleControl::kNone;
+                auto* gui = m_vis->GetDevice()->getGUIEnvironment();
+                auto* over = gui->getRootGUIElement()->getElementFromPoint(
+                    irr::core::position2di(x, y));
+                const bool gui_over = over != nullptr && over != gui->getRootGUIElement();
+                const bool cabin = m_camera && m_camera->GetMode() == CameraMode::Cabin;
+                return ev1sim::PickRsaConsoleControl(on_panel, cabin, gui_over, [&]() {
+                    auto* cam = m_vis->GetActiveCamera();
+                    if (!m_dash3d || cam == nullptr) return ev1sim::RsaConsoleControl::kNone;
+                    const irr::core::line3df ray =
+                        m_vis->GetDevice()->getSceneManager()->getSceneCollisionManager()
+                            ->getRayFromScreenCoordinates(irr::core::position2di(x, y), cam);
+                    const irr::core::vector3df d = ray.getVector();
+                    return m_dash3d->ConsoleControlAt({ray.start.X, ray.start.Y, ray.start.Z},
+                                                      {d.X, d.Y, d.Z});
+                });
+            },
+            [this]() { return m_vis->GetDevice()->getTimer()->getRealTime() / 1000.0; });
+        m_vis->AddUserEventReceiver(m_console_mouse.get());
 
         // 7. Vehicle lights — needs Irrlicht scene graph to be populated.
         m_lights = std::make_unique<VehicleLights>();
@@ -1213,6 +1241,20 @@ void SimApp::ApplyElectronicsThrottle(DriverCommand& cmd) {
     cmd.throttle = static_cast<double>(bus.q8) / 255.0;
 }
 
+void SimApp::ApplyElectronicsCoastDrag() {
+    std::optional<double> drag;
+    if (m_driver_mode == "electronics" && m_external_sim &&
+        m_throttle_bus_was_fresh) {
+        if (const auto nm = m_external_sim->GetPimCoastDragNm()) drag = *nm;
+    }
+    if (drag.has_value() != m_coast_drag_from_pim) {
+        std::cout << (drag ? "[SimApp] coast torque from PIM (coast-down drag)\n"
+                           : "[SimApp] coast torque from the motor map\n");
+        m_coast_drag_from_pim = drag.has_value();
+    }
+    ev1sim::SetCoastDrag(m_world->GetVehicle(), drag);
+}
+
 void SimApp::ApplyElectronicsSteering(DriverCommand& cmd) {
     if (m_driver_mode != "electronics") return;
 
@@ -1472,6 +1514,7 @@ int SimApp::RunWithVisualization() {
         // plant's brakes: the pedal sensors (6900, 6904, 4074) report the foot.
         const double driver_brake_raw = cmd.front_brake;
         ApplyElectronicsThrottle(cmd);
+        ApplyElectronicsCoastDrag();
         ApplyElectronicsSteering(cmd);
 
         // --- Propulsion enable gate (KEY OFF override) ---
@@ -1652,6 +1695,14 @@ int SimApp::RunWithVisualization() {
         // --- Floating UI panel label refresh ---
         if (m_floating_ui)
             m_floating_ui->UpdateLabels();
+
+        // --- Console clicks (same producers the keyboard drives) ---
+        if (m_console_mouse) {
+            for (const auto& a : m_console_mouse->TakeActions()) {
+                if (ev1sim::ApplyRsaConsoleAction(*m_physical, a) && m_external_sim)
+                    m_external_sim->SetCoastDownSwitch(m_physical->coast_down_button().on());
+            }
+        }
 
         // --- Panel toggles (1-4) ---
         for (int i = 0; i < VehiclePanels::NUM_PANELS; ++i) {
@@ -2222,6 +2273,7 @@ int SimApp::RunHeadless() {
         // plant's brakes: the pedal sensors (6900, 6904, 4074) report the foot.
         const double driver_brake_raw = cmd.front_brake;
         ApplyElectronicsThrottle(cmd);
+        ApplyElectronicsCoastDrag();
         ApplyElectronicsSteering(cmd);
 
         // --- Propulsion enable gate (KEY OFF override) ---
@@ -2732,6 +2784,13 @@ void SimApp::HvIsolationFault(int lead, double leak_kohm) {
     std::cout << "[Scenario] hv_isolation_fault -> "
               << (lead_u8 == 1 ? "HV+" : lead_u8 == 2 ? "HV-" : "cleared")
               << " " << kohm << " kOhm to chassis\n";
+}
+
+void SimApp::CoastDownSwitch(bool on) {
+    // Through the button, so the console and a scenario agree on its position.
+    if (m_physical) m_physical->coast_down_button().set(on);
+    if (m_external_sim) m_external_sim->SetCoastDownSwitch(on);
+    std::cout << "[Scenario] coast_down_switch -> " << (on ? "ON" : "OFF") << "\n";
 }
 
 void SimApp::DispatchAction(ev1sim::InputAction action) {

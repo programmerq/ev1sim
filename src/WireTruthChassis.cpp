@@ -869,6 +869,15 @@ std::optional<bool> WireTruthChassis::ad_precharge_relay() const {
     return read_bit(electricsim::topology::kWireAD_PRECHARGE_RELAY);
 }
 
+std::optional<float> WireTruthChassis::pim_coast_drag_nm() const {
+    return read_float32(electricsim::topology::kWireCHASSIS_PIM_COAST_DRAG_NM);
+}
+
+bool WireTruthChassis::publish_coast_down_switch(bool on) {
+    if (!attached()) return false;
+    return write_bit(electricsim::topology::kWireDRIVER_COAST_DOWN_SWITCH, on);
+}
+
 }  // namespace ev1sim
 
 #else  // !EV1SIM_HAVE_WIRE_TRUTH
@@ -1015,6 +1024,10 @@ std::optional<float> WireTruthChassis::pim_cruise_setpoint_mps() const {
 std::optional<bool> WireTruthChassis::ad_precharge_relay() const {
     return std::nullopt;
 }
+std::optional<float> WireTruthChassis::pim_coast_drag_nm() const {
+    return std::nullopt;
+}
+bool WireTruthChassis::publish_coast_down_switch(bool) { return false; }
 
 }  // namespace ev1sim
 

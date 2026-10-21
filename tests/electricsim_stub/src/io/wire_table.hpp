@@ -251,7 +251,17 @@ class WireTable {
   // how we know the directory is the one we expect). declare() on the
   // result is still permitted (is_creator is true) for adding new
   // cells, but declaring an already-present id is a no-op-false.
-  static std::unique_ptr<WireTable> adopt(const WireTableOptions& opts);
+  //
+  // adopt() REFUSES (nullptr, *outcome = kLiveOwner) when the segment's
+  // owner marker names a process that is provably still running and is
+  // not this one: the segment is not an orphan, and taking its lifecycle
+  // would leave two live owners, the first to exit unlinking it under the
+  // other. kInvalid covers every attach()-class failure, where the caller's
+  // unlink-and-recreate recovery is safe; kLiveOwner is the one where it is
+  // not, which is why the caller has to be told which it got.
+  enum class AdoptOutcome { kAdopted, kInvalid, kLiveOwner };
+  static std::unique_ptr<WireTable> adopt(const WireTableOptions& opts,
+                                          AdoptOutcome* outcome = nullptr);
 
   ~WireTable();
 
@@ -529,6 +539,19 @@ class WireTable {
   //                  [ barrier_ack_count() == k ]; work; barrier_ack().
   // @design 2026-10-01 claude — owner ruling 2026-10-01 (serialized turns,
   // solver last); docs/proposals/barrier_intra_tick_ordering_2026-08-12.md.
+  //
+  // DEPARTURE (a scripted mid-run death under the barrier). A turn-k consumer
+  // that is about to die on purpose calls barrier_depart(k) first. Bit k+1 of
+  // the `enabled` word marks the turn departed for the rest of the run (bit 0
+  // is the armed flag), so the leader counts it as acked every tick and each
+  // later turn waits for one ack fewer: turn k's slot in the ack order is
+  // barrier_turn_slot(k) = k minus the departed turns below k. The leader
+  // still holds every tick until the survivors ack, so the death lands on the
+  // same sim tick every run and the survivors stay in lockstep. Turns 0..30
+  // can depart (31 bits); the fleet is far smaller.
+  //   departing turn consumer: barrier_depart(k); then exit without acking.
+  // An undeclared consumer has no turn and cannot depart; the leader times out
+  // on it as on any crash.
 
   // Leader: arm the barrier (idempotent). After this, consumers that are
   // sim-time masters will block-and-ack.
@@ -536,9 +559,10 @@ class WireTable {
   // Leader: open a new tick — reset the ack counter, bump the publish
   // generation, wake blocked consumers. Call AFTER publishing all cells.
   void barrier_publish_tick();
-  // Leader: block until `consumer_count` consumers have acked the current tick,
-  // or `timeout_ms` elapses. Returns true if all acked, false on timeout (a
-  // consumer crashed/never-joined — the caller should abort the run).
+  // Leader: block until `consumer_count` consumers have acked the current tick
+  // (a departed turn counts as acked), or `timeout_ms` elapses. Returns true if
+  // all acked, false on timeout (a consumer crashed/never-joined — the caller
+  // should abort the run).
   bool barrier_await_acks(std::uint32_t consumer_count, int timeout_ms);
 
   // Consumer: is a leader driving the barrier?
@@ -553,11 +577,12 @@ class WireTable {
   // Current publish generation (the tick the leader has opened). Consumers use
   // it to seed *prev_gen when joining mid-stream. 0 before the first tick.
   std::uint32_t barrier_publish_gen() const;
-  // Turn consumer: block until the current tick's ack counter reaches `turn`
-  // (i.e. consumers 0..turn-1 have all acked), or until timeout_ms. Same
-  // futex slice and wall deadline as barrier_await_acks. Returns true once the
-  // counter is >= turn (the caller checks for == turn — more means a stray ack
-  // landed), false on timeout (an earlier turn holder or the leader is gone).
+  // Turn consumer: block until the current tick's ack counter reaches
+  // barrier_turn_slot(turn) (every live consumer of an earlier turn has
+  // acked), or until timeout_ms. Same futex slice and wall deadline as
+  // barrier_await_acks. Returns true once the counter is >= the slot (the
+  // caller checks for == slot — more means a stray ack landed), false on
+  // timeout (an earlier turn holder or the leader is gone).
   // Call only after barrier_await_tick() returned this tick: the leader zeroes
   // the counter before it bumps the generation, so a counter read after the
   // generation read never belongs to the previous tick. @design 2026-10-01.
@@ -565,6 +590,14 @@ class WireTable {
   // The current tick's ack count — under serialized turns, the turn being
   // served. Read-only; used for the turn-start / pre-ack invariant checks.
   std::uint32_t barrier_ack_count() const;
+  // Departing turn consumer: mark turn `turn` departed for the rest of the run
+  // and wake the leader and later turns. Returns false (and changes nothing)
+  // for turn >= kBarrierMaxDepartTurns.
+  static constexpr std::uint32_t kBarrierMaxDepartTurns = 31u;
+  bool barrier_depart(std::uint32_t turn);
+  // Turn `turn`'s position in this tick's ack order: `turn` minus the departed
+  // turns below it.
+  std::uint32_t barrier_turn_slot(std::uint32_t turn) const;
 
   // ── TEST-ONLY fault-injection hooks ──────────────────────────────
   //
@@ -588,7 +621,8 @@ class WireTable {
   // Shared body for attach()/adopt(). take_ownership controls whether
   // the resulting handle unlinks the segment on destruction.
   static std::unique_ptr<WireTable> attach_impl(const WireTableOptions& opts,
-                                                bool take_ownership);
+                                                bool take_ownership,
+                                                AdoptOutcome* outcome);
   struct Impl;
   std::unique_ptr<Impl> impl_;
 };

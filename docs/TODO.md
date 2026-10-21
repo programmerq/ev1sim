@@ -30,8 +30,16 @@ ratified decisions: [`docs/ipc_rsa_display_plan.md`](ipc_rsa_display_plan.md).
   dash top below the windshield, console low between the seats; positions
   read off the chassis visual mesh, no interior dimensions in hand). The new
   **Cabin** camera mode looks at both from the driver's seat.
-- [ ] **Phase 4 — interactivity**: clickable RSA inputs; resolve multi-writer
-  arbitration with electricsim's RSA controller first.
+- [x] **Phase 4 — interactivity**: the console panel's controls are
+  clickable in UI mode (Tab), on the 2D panel and on the 3D console screen in
+  the Cabin view (`src/RsaConsoleInput.{h,cpp}`). OFF/ACC, RUN and LOCK go
+  through the keypad driver's mode-switch bits, P/R/N/D through the selector's
+  pins, the five keys through the keypad driver (held 0.5 s or more = long
+  press), and COAST DOWN toggles the driver's coast-down switch, lit from the
+  PCM's $41 Coast Down LED request. Every click reuses a producer ev1sim
+  already had (the keyboard's, or the coast-down cell's scenario hook), so
+  ev1sim gains no new writer on any cell and the
+  arbitration with electricsim's web RSA panel is unchanged.
 
 ## Physical-world components (next batches)
 
@@ -205,8 +213,8 @@ future-UI input on one side, chassis-segment signal publishing on the other.
 ## Floating UI panel
 - [ ] **IPC LCD brightness and telltale overrides** — the telltale cells are
   the IPC's own outputs, so a panel override is a second writer on cells the
-  IPC owns; settle that with electricsim first, as for the console buttons
-  (Phase 4 above).
+  IPC owns; settle that with electricsim first. (The console buttons needed
+  no such step: they reuse the keyboard's producers, Phase 4 above.)
 - [ ] **RSA door-lock feedback and entry-denied LEDs** — no RSA output cell
   carries them yet (entry accepted is the console panel's VALID CODE lamp);
   needs the cells in electricsim first.

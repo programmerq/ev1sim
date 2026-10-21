@@ -127,13 +127,31 @@ std::unique_ptr<::electricsim::io::WireTable> try_open_from_env(
     // and silently orphaned every live reader. adopt() validates magic
     // + version + topology_hash, so it only succeeds when the orphan
     // is the segment we'd have created anyway.
-    auto adopted = ::electricsim::io::WireTable::adopt(opts);
+    using AdoptOutcome = ::electricsim::io::WireTable::AdoptOutcome;
+    AdoptOutcome outcome = AdoptOutcome::kInvalid;
+    auto adopted = ::electricsim::io::WireTable::adopt(opts, &outcome);
     if (adopted != nullptr) {
       std::fprintf(stderr,
                    "topology::try_open_from_env: adopted existing valid "
                    "segment %s (reusing inode; readers unaffected)\n",
                    name);
       return adopted;
+    }
+
+    // adopt() refused because the segment's recorded owner is a
+    // LIVE process. It is not an orphan, so the unlink + recreate below would
+    // remove a running owner's segment. Join it as a non-owning participant
+    // instead: same inode, same topology (adopt() validated the hash before
+    // checking the owner), and the live owner keeps its lifecycle.
+    if (outcome == AdoptOutcome::kLiveOwner) {
+      auto joined = ::electricsim::io::WireTable::attach(opts);
+      if (joined != nullptr) {
+        std::fprintf(stderr,
+                     "topology::try_open_from_env: segment %s has a live "
+                     "owner; attached as a non-owning participant\n",
+                     name);
+      }
+      return joined;
     }
 
 #if !defined(_WIN32)

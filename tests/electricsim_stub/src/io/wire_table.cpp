@@ -35,6 +35,7 @@
 
 #include <atomic>
 #include <cerrno>
+#include <bitset>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -174,8 +175,12 @@ static_assert(std::atomic<std::uint64_t>::is_always_lock_free,
 // but-slow peers are the normal case). Hardening path if it bites: have the
 // leader treat a consumer PID-exit (vat already monitors fleet PIDs) as an
 // immediate abort instead of waiting the timeout. Tracked alongside the proposal.
+// `enabled` carries two things in one word: bit 0 is "a leader armed the
+// barrier", and bit k+1 is "the turn-k consumer departed" (barrier_depart). A
+// departed turn counts as acked for the rest of the run, so turns 0..30 can
+// leave a fleet without the leader waiting out its timeout on a dead process.
 struct BarrierState {
-  std::atomic<std::uint32_t> enabled;      // 0 = inert; 1 = leader armed
+  std::atomic<std::uint32_t> enabled;      // bit 0 = armed; bit k+1 = turn k departed
   std::atomic<std::uint32_t> publish_gen;  // per-tick generation (consumer-wait word)
   std::atomic<std::uint32_t> ack_count;    // consumers that acked the tick (leader-wait word)
 };
@@ -296,12 +301,12 @@ std::uint32_t current_pid() {
 }
 
 // The pid recorded in `m` when it names a process that is running RIGHT NOW
-// and is not us; 0 otherwise. Used only for the adopt() diagnostic below, so it
-// is deliberately one-sided: it answers a pid only on POSITIVE evidence (a
-// /proc entry that exists and, where a start time was recorded, matches), and
-// 0 whenever it cannot tell. A false 0 costs a missing warning; a false pid
-// would cry wolf on every ordinary orphan recovery, which is how a diagnostic
-// gets ignored.
+// and is not us; 0 otherwise. Used by adopt() to refuse a live owner's
+// segment, so it is deliberately one-sided: it answers a pid only on POSITIVE
+// evidence (a /proc entry that exists and, where a start time was recorded,
+// matches), and 0 whenever it cannot tell. A false 0 lets adopt() take over a
+// segment whose owner it could not see; a false pid would make adopt() refuse
+// an ordinary orphan recovery.
 std::uint32_t another_live_owner_pid(const OwnerMarker* m) {
 #if defined(__linux__)
   const std::uint32_t pid = m->owner_pid.load(std::memory_order_acquire);
@@ -1071,15 +1076,19 @@ std::unique_ptr<WireTable> WireTable::create(
 }
 
 std::unique_ptr<WireTable> WireTable::attach(const WireTableOptions& opts) {
-  return attach_impl(opts, /*take_ownership=*/false);
+  return attach_impl(opts, /*take_ownership=*/false, nullptr);
 }
 
-std::unique_ptr<WireTable> WireTable::adopt(const WireTableOptions& opts) {
-  return attach_impl(opts, /*take_ownership=*/true);
+std::unique_ptr<WireTable> WireTable::adopt(const WireTableOptions& opts,
+                                            AdoptOutcome* outcome) {
+  return attach_impl(opts, /*take_ownership=*/true, outcome);
 }
 
 std::unique_ptr<WireTable> WireTable::attach_impl(const WireTableOptions& opts,
-                                                 bool take_ownership) {
+                                                 bool take_ownership,
+                                                 AdoptOutcome* outcome) {
+  // Every early return below is an attach()-class failure.
+  if (outcome != nullptr) *outcome = AdoptOutcome::kInvalid;
   auto table = std::unique_ptr<WireTable>(new WireTable());
   Impl* impl = table->impl_.get();
   // Keep is_creator=false through mapping + validation so that ANY
@@ -1304,39 +1313,38 @@ std::unique_ptr<WireTable> WireTable::attach_impl(const WireTableOptions& opts,
   // attach() can't declare() — is_creator stays false — so the value is
   // harmless there.)
   impl->next_cell_offset = static_cast<std::uint32_t>(high_water);
-  // Validation passed — confer ownership now (adopt path) so the dtor
-  // unlinks on clean shutdown. attach path leaves this false.
-  impl->is_creator = take_ownership;
   if (take_ownership) {
-    // adopt() only: the orphan's recorded owner is by definition gone (that is
-    // why we are adopting), so re-stamp — otherwise the owner-scoped shm sweep
-    // would unlink the segment out from under the process that just took it
-    // over. A plain attach() takes no ownership and leaves the marker alone.
-    //
-    // "By definition gone" is the PREMISE, and this is where it gets checked
-    // out loud. adopt() is reached from the creator path after create() lost
-    // the race for the name; if the marker we are about to overwrite names a
-    // process that is still running, the premise is false and two live
-    // processes now believe they own this segment's lifecycle — whichever
-    // exits first unlinks it under the other. Diagnostic, not refusal:
-    // returning nullptr here would send the caller down its "unlink the
-    // unusable orphan and recreate" recovery, which unlinks the live owner's
-    // segment and is strictly worse than adopting it. The refusal, and the
-    // paired change to that recovery it requires, are tracked separately.
+    // adopt() only. Its premise is that the segment is an ORPHAN whose
+    // creator is gone; the owner marker makes that checkable, so check it
+    // BEFORE conferring ownership. If the recorded owner is still running and
+    // is not us, refuse: is_creator is still false here, so this handle's
+    // destructor leaves the live owner's segment alone, and the caller is
+    // told kLiveOwner so it does not take its unlink-and-recreate recovery
+    // (which would remove the segment under the live owner).
     const std::uint32_t live_owner =
         another_live_owner_pid(owner_of(impl->header));
     if (live_owner != 0) {
       std::fprintf(stderr,
-                   "WireTable::adopt: WARNING segment %s records owner pid %u, "
-                   "which is STILL RUNNING and is not this process (pid %u). "
-                   "Taking lifecycle ownership anyway: both processes now "
-                   "believe they own it, and the first to exit unlinks it "
-                   "under the other. If that other process is a live vehicle "
-                   "or test, stop it instead of adopting its segment.\n",
+                   "WireTable::adopt: segment %s records owner pid %u, which "
+                   "is STILL RUNNING and is not this process (pid %u). "
+                   "Refusing to take lifecycle ownership of a live owner's "
+                   "segment.\n",
                    impl->segment_name.c_str(),
                    static_cast<unsigned>(live_owner),
                    static_cast<unsigned>(current_pid()));
+      if (outcome != nullptr) *outcome = AdoptOutcome::kLiveOwner;
+      return nullptr;
     }
+  }
+  // Validation passed — confer ownership now (adopt path) so the dtor
+  // unlinks on clean shutdown. attach path leaves this false.
+  impl->is_creator = take_ownership;
+  if (outcome != nullptr) *outcome = AdoptOutcome::kAdopted;
+  if (take_ownership) {
+    // The recorded owner is gone (checked above), so re-stamp — otherwise
+    // the owner-scoped shm sweep would unlink the segment out from under the
+    // process that just took it over. A plain attach() takes no ownership and
+    // leaves the marker alone.
     stamp_owner(impl->header);
   }
   return table;
@@ -1850,11 +1858,24 @@ bool WireTable::is_creator() const noexcept {
 
 // ── Co-sim tick barrier (primitive-4 B) ─────────────────────────────────────
 
+namespace {
+constexpr std::uint32_t kBarrierArmedBit = 1u;
+
+// Departed turns strictly below `turn`: those slots of the ack counter are
+// never filled, so turn `turn` starts once the counter reaches turn - this.
+std::uint32_t departed_below(std::uint32_t enabled, std::uint32_t turn) {
+  const std::uint32_t departed = enabled >> 1;
+  const std::uint32_t below =
+      turn >= 31u ? departed : (departed & ((1u << turn) - 1u));
+  return static_cast<std::uint32_t>(std::bitset<32>(below).count());
+}
+}  // namespace
+
 void WireTable::barrier_arm() {
   BarrierState* b = barrier_of(impl_->header);
   // publish_gen/ack_count are already zero from the creator's reserved[] memset;
-  // arm last (release) so a consumer that observes enabled==1 also sees them.
-  b->enabled.store(1u, std::memory_order_release);
+  // arm last (release) so a consumer that observes the armed bit also sees them.
+  b->enabled.fetch_or(kBarrierArmedBit, std::memory_order_release);
 }
 
 void WireTable::barrier_publish_tick() {
@@ -1872,20 +1893,27 @@ bool WireTable::barrier_await_acks(std::uint32_t consumer_count, int timeout_ms)
   BarrierState* b = barrier_of(impl_->header);
   const auto deadline =
       std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
+  const auto done = [&](std::uint32_t acked) {
+    const std::uint32_t departed = departed_below(
+        b->enabled.load(std::memory_order_acquire), 32u);
+    return acked + departed >= consumer_count;
+  };
   for (;;) {
     const std::uint32_t acked = b->ack_count.load(std::memory_order_acquire);
-    if (acked >= consumer_count) return true;
+    if (done(acked)) return true;
     if (std::chrono::steady_clock::now() >= deadline) {
-      return b->ack_count.load(std::memory_order_acquire) >= consumer_count;
+      return done(b->ack_count.load(std::memory_order_acquire));
     }
-    // Block on the ack word; consumers wake it after each fetch_add. The slice
-    // bounds a missed wake; re-loop re-reads ack_count and the deadline.
+    // Block on the ack word; consumers wake it after each fetch_add (and a
+    // departing consumer wakes it too). The slice bounds a missed wake; re-loop
+    // re-reads ack_count, the departed set and the deadline.
     barrier_futex_wait_slice(&b->ack_count, acked);
   }
 }
 
 bool WireTable::barrier_active() const {
-  return barrier_of(impl_->header)->enabled.load(std::memory_order_acquire) != 0u;
+  return (barrier_of(impl_->header)->enabled.load(std::memory_order_acquire) &
+          kBarrierArmedBit) != 0u;
 }
 
 std::uint32_t WireTable::barrier_publish_gen() const {
@@ -1907,23 +1935,39 @@ void WireTable::barrier_ack() {
   barrier_futex_wake(&b->ack_count);
 }
 
+bool WireTable::barrier_depart(std::uint32_t turn) {
+  if (turn >= kBarrierMaxDepartTurns) return false;
+  BarrierState* b = barrier_of(impl_->header);
+  b->enabled.fetch_or(1u << (turn + 1u), std::memory_order_acq_rel);
+  // The leader and every later turn holder wait on the ack word; wake them so
+  // they re-read the departed set now rather than after a futex slice.
+  barrier_futex_wake(&b->ack_count);
+  return true;
+}
+
+std::uint32_t WireTable::barrier_turn_slot(std::uint32_t turn) const {
+  return turn - departed_below(
+      barrier_of(impl_->header)->enabled.load(std::memory_order_acquire), turn);
+}
+
 // Serialized turns: the ack counter doubles as the turn counter (see the
 // barrier doc block in wire_table.hpp). Same shape as barrier_await_acks —
 // re-read the atomic, check the wall deadline, block one bounded futex slice
 // on the ack word — because it is the same wait on the same word, only for a
 // smaller count. barrier_ack()'s FUTEX_WAKE(INT_MAX) wakes every waiter on
 // the word, so the leader and each queued turn holder all re-check; a waiter
-// whose turn has not come goes straight back to sleep. @design 2026-10-01
-// claude.
+// whose turn has not come goes straight back to sleep. A departed earlier turn
+// lowers the count this turn waits for (barrier_turn_slot).
 bool WireTable::barrier_await_turn(std::uint32_t turn, int timeout_ms) const {
   BarrierState* b = barrier_of(impl_->header);
   const auto deadline =
       std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
   for (;;) {
     const std::uint32_t acked = b->ack_count.load(std::memory_order_acquire);
-    if (acked >= turn) return true;
+    if (acked >= barrier_turn_slot(turn)) return true;
     if (std::chrono::steady_clock::now() >= deadline) {
-      return b->ack_count.load(std::memory_order_acquire) >= turn;
+      return b->ack_count.load(std::memory_order_acquire) >=
+             barrier_turn_slot(turn);
     }
     barrier_futex_wait_slice(&b->ack_count, acked);
   }

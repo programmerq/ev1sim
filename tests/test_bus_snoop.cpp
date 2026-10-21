@@ -64,9 +64,19 @@ TEST_CASE("BusSnoop: $41 PCM Data Response gives speed, gear and PCM requests", 
     REQUIRE(pcm->service_soon_tt);
     REQUIRE_FALSE(pcm->reduced_perf_tt);
     REQUIRE(pcm->pcm_temp_tt);
+    REQUIRE_FALSE(pcm->coast_down_led);
     REQUIRE(pcm->charge_mode_display);
     REQUIRE(pcm->pcm_service_now_tt);
     REQUIRE_FALSE(pcm->pcm_connection_detect);
+
+    // [2] b3 alone: the PCM's Coast Down LED Request, and nothing else.
+    const std::uint8_t q[7] = {0x08u, 0u, 0u, 0u, 0u, 0u, 0u};
+    REQUIRE(snoop.DecodeFrame(0x41u, q, 7u, 2.0));
+    const auto coast = snoop.Snapshot(2.0).pcm;
+    REQUIRE(coast);
+    REQUIRE(coast->coast_down_led);
+    REQUIRE_FALSE(coast->pcm_temp_tt);
+    REQUIRE_FALSE(coast->charge_mode_display);
 }
 
 TEST_CASE("BusSnoop: $40 PCM Data Poll gives the pack readout", "[bus_snoop]") {

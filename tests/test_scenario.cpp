@@ -51,6 +51,7 @@ struct CountingHooks : public ev1sim::ScenarioHooks {
     int flash_to_pass_on = 0, flash_to_pass_off = 0;
     int fail_throttle = 0, restore_throttle = 0;
     int hv_iso_calls = 0, hv_iso_lead = -1;
+    int coast_down_on = 0, coast_down_off = 0;
     double hv_iso_kohm = -1.0;
 
     void KeyOnCycle()        override { ++key_on_cycle; }
@@ -84,6 +85,9 @@ struct CountingHooks : public ev1sim::ScenarioHooks {
         ++hv_iso_calls;
         hv_iso_lead = lead;
         hv_iso_kohm = leak_kohm;
+    }
+    void CoastDownSwitch(bool on) override {
+        if (on) ++coast_down_on; else ++coast_down_off;
     }
 };
 
@@ -827,6 +831,45 @@ TEST_CASE("Scenario: AD / bulb / horn stats fields read the bus mirrors",
     std::filesystem::remove(tmp_csv);
 }
 
+TEST_CASE("Scenario: pim_coast_drag_nm stats field reads the PIM's drag",
+          "[Scenario]") {
+    using ev1sim::Scenario;
+    using ev1sim::ScenarioStats;
+
+    auto tmp_csv = std::filesystem::temp_directory_path() /
+                   "ev1sim_scenario_stats_coast_drag_test.csv";
+    Scenario s;
+    ScenarioStats st{tmp_csv.string(), {"sim_time_s", "pim_coast_drag_nm"},
+                     0.10};
+    s.set_stats(st);
+    s.OpenStats();
+
+    ExternalSimConnector bus;
+    ev1sim::PhysicalWorld phys;
+    DriverCommand cmd{};
+    VehicleState state{};
+
+    // Row 1: the PIM has not written the cell yet.
+    s.MaybeSampleStats(0.0, state, phys, bus, cmd);
+    // Row 2: the PIM publishes 12 Nm of coast-down drag.
+    bus.DebugInjectPimCoastDragNm(12.0f);
+    s.MaybeSampleStats(0.15, state, phys, bus, cmd);
+
+    s.Close();
+
+    std::ifstream f(tmp_csv);
+    REQUIRE(f.is_open());
+    std::string header, row1, row2;
+    std::getline(f, header);
+    std::getline(f, row1);
+    std::getline(f, row2);
+    CHECK(header == "sim_time_s,pim_coast_drag_nm");
+    CHECK(row1 == "0,-1");
+    CHECK(row2 == "0.15,12");
+    f.close();
+    std::filesystem::remove(tmp_csv);
+}
+
 TEST_CASE("Scenario: IPC air-bag telltale stats field reads the bus mirror",
           "[Scenario]") {
     using ev1sim::Scenario;
@@ -1345,6 +1388,28 @@ TEST_CASE("Scenario: hv_isolation_fault dispatches lead + leak, and clears",
     s.Tick(3.10, VehicleState{}, hooks, cmd);
     CHECK(hooks.hv_iso_calls == 3);
     CHECK(hooks.hv_iso_lead == 0);
+}
+
+TEST_CASE("Scenario: coast_down_switch sets and clears the shifter button",
+          "[Scenario]") {
+    using ev1sim::Scenario;
+
+    Scenario s;
+    s.set_events({
+        {1.00, "coast_down_switch", 1.0},
+        {2.00, "coast_down_switch", 0.0},
+    });
+
+    CountingHooks hooks;
+    DriverCommand cmd{};
+
+    s.Tick(0.50, VehicleState{}, hooks, cmd);
+    CHECK(hooks.coast_down_on == 0);
+    s.Tick(1.10, VehicleState{}, hooks, cmd);
+    CHECK(hooks.coast_down_on == 1);
+    CHECK(hooks.coast_down_off == 0);
+    s.Tick(2.10, VehicleState{}, hooks, cmd);
+    CHECK(hooks.coast_down_off == 1);
 }
 
 // ---------------------------------------------------------------------------

@@ -131,3 +131,64 @@ TEST_CASE("Screens tolerate a missing device", "[dash3d]") {
     screens.Place(VehiclePose{});
     screens.Refresh(nullptr);
 }
+
+TEST_CASE("A ray through a screen's face lands at its texture coordinates", "[dash3d]") {
+    const VehiclePose pose = TurnedLeft();
+    const DashScreenFrame f = PlaceDashScreen(pose, kConsoleMount);
+    const DashVec3 eye = ChassisToWorld(pose, kDriverEye);
+    auto toward = [&](const DashVec3& p) {
+        return DashVec3{p.x - eye.x, p.y - eye.y, p.z - eye.z};
+    };
+
+    // Through the centre: the middle of the texture.
+    auto uv = DashScreenUvAt(f, kConsoleMount, eye, toward(f.center));
+    REQUIRE(uv);
+    REQUIRE(uv->u == Approx(0.5).margin(1e-9));
+    REQUIRE(uv->v == Approx(0.5).margin(1e-9));
+
+    // A quarter of the way in from the top-left corner: u, v = 0.25.
+    const double w = kConsoleMount.width_m, h = kConsoleMount.height_m;
+    const DashVec3 p{f.center.x - f.right.x * w / 4 + f.up.x * h / 4,
+                     f.center.y - f.right.y * w / 4 + f.up.y * h / 4,
+                     f.center.z - f.right.z * w / 4 + f.up.z * h / 4};
+    uv = DashScreenUvAt(f, kConsoleMount, eye, toward(p));
+    REQUIRE(uv);
+    REQUIRE(uv->u == Approx(0.25).margin(1e-9));
+    REQUIRE(uv->v == Approx(0.25).margin(1e-9));
+
+    // Pointing away, or past the edge: no hit.
+    const DashVec3 away = toward(f.center);
+    REQUIRE_FALSE(DashScreenUvAt(f, kConsoleMount, eye, {-away.x, -away.y, -away.z}));
+    const DashVec3 off{f.center.x + f.right.x * w, f.center.y + f.right.y * w,
+                       f.center.z + f.right.z * w};
+    REQUIRE_FALSE(DashScreenUvAt(f, kConsoleMount, eye, toward(off)));
+    // Parallel to the face.
+    const DashVec3 in_front{f.center.x + f.normal.x * 0.1, f.center.y + f.normal.y * 0.1,
+                            f.center.z + f.normal.z * 0.1};
+    REQUIRE_FALSE(DashScreenUvAt(f, kConsoleMount, in_front, f.right));
+}
+
+TEST_CASE("A click through the 3D console lands on the control drawn there", "[dash3d]") {
+    DashScreens3D screens(nullptr);
+    const VehiclePose pose = TurnedLeft();
+    screens.Place(pose);
+    const DashScreenFrame f = PlaceDashScreen(pose, kConsoleMount);
+    const DashVec3 eye = ChassisToWorld(pose, kDriverEye);
+    const RsaConsolePanel& panel = screens.console_panel();
+    // Aim at each control's centre through the screen's texture mapping.
+    for (const RsaConsoleCell& c : LayoutRsaConsole(panel.view(), 0,
+                                                   (kDashScreenTexturePx - panel.Height()) / 2,
+                                                   kDashScreenTexturePx)) {
+        const double u = ((c.x0 + c.x1) / 2.0) / kDashScreenTexturePx;
+        const double v = ((c.y0 + c.y1) / 2.0) / kDashScreenTexturePx;
+        const double sx = (u - 0.5) * kConsoleMount.width_m;
+        const double sy = (0.5 - v) * kConsoleMount.height_m;
+        const DashVec3 p{f.center.x + f.right.x * sx + f.up.x * sy,
+                         f.center.y + f.right.y * sx + f.up.y * sy,
+                         f.center.z + f.right.z * sx + f.up.z * sy};
+        REQUIRE(screens.ConsoleControlAt(eye, {p.x - eye.x, p.y - eye.y, p.z - eye.z}) ==
+                c.led->control);
+    }
+    // Straight up from the eye misses the console.
+    REQUIRE(screens.ConsoleControlAt(eye, {0, 0, 1}) == RsaConsoleControl::kNone);
+}

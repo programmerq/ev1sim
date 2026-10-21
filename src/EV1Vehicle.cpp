@@ -1,6 +1,7 @@
 #include "EV1Vehicle.h"
 
 #include "Aerodynamics.h"
+#include "EV1DriveMotor.h"
 #include "EV1TMeasyTire.h"
 
 #include "chrono_vehicle/ChPowertrainAssembly.h"
@@ -117,7 +118,7 @@ std::unique_ptr<WheeledVehicle> BuildEV1Vehicle(const ChCoordsys<>& pose,
                                           Aerodynamics::kAirDensityIsaSeaLevel);
 
     // Powertrain: engine + single-speed transmission.
-    auto engine       = ReadEngineJSON(engine_json);
+    auto engine       = chrono_types::make_shared<EV1DriveMotor>(engine_json);
     auto transmission = ReadTransmissionJSON(trans_json);
     ev1->InitializePowertrain(
         chrono_types::make_shared<ChPowertrainAssembly>(engine, transmission));
@@ -147,6 +148,31 @@ void SetMotorDirection(ChWheeledVehicle& vehicle, MotorDirection dir) {
                           ? ChAutomaticTransmission::DriveMode::REVERSE
                           : ChAutomaticTransmission::DriveMode::FORWARD;
     if (transmission->GetDriveMode() != mode) transmission->SetDriveMode(mode);
+}
+
+EV1DriveMotor* DriveMotor(ChWheeledVehicle& vehicle) {
+    return dynamic_cast<EV1DriveMotor*>(vehicle.GetEngine().get());
+}
+
+void SetCoastDrag(ChWheeledVehicle& vehicle, std::optional<double> drag_nm) {
+    auto* motor = DriveMotor(vehicle);
+    if (!motor) return;
+    if (!drag_nm) {
+        motor->ClearCoastTorque();
+        return;
+    }
+    // The motor's own frame: in reverse its positive torque drives the car
+    // backward (SetMotorDirection), so its rotation sign flips with the gear.
+    double omega = SignedMotorShaftSpeed(vehicle);
+    const auto transmission =
+        std::dynamic_pointer_cast<ChAutomaticTransmission>(vehicle.GetTransmission());
+    if (transmission &&
+        transmission->GetDriveMode() == ChAutomaticTransmission::DriveMode::REVERSE)
+        omega = -omega;
+    const double drag = std::max(0.0, *drag_nm);
+    motor->SetCoastTorque(std::abs(omega) < kCoastDragDeadbandRadS
+                              ? 0.0
+                              : -std::copysign(drag, omega));
 }
 
 double SignedMotorShaftSpeed(const ChWheeledVehicle& vehicle) {

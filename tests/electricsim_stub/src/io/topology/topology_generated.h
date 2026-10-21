@@ -27,16 +27,16 @@
 namespace electricsim::topology {
 
 inline constexpr std::uint32_t kFormatVersion = 2U;
-inline constexpr std::uint32_t kTopologyHash = 0x2181D22BU;
-inline constexpr std::size_t kWireCount = 454;
+inline constexpr std::uint32_t kTopologyHash = 0x9044B45DU;
+inline constexpr std::size_t kWireCount = 465;
 
 // Per-class cell counts. Emitted so a
 // receipt can print the classification without re-parsing YAML,
 // and so a test can assert against them. The legacy count is held
 // by a DECREASING ratchet in the generator that fails on !=.
-inline constexpr std::size_t kConductorCellCount = 92;
+inline constexpr std::size_t kConductorCellCount = 98;
 inline constexpr std::size_t kElementStateCellCount = 71;
-inline constexpr std::size_t kSemanticCellCount = 101;
+inline constexpr std::size_t kSemanticCellCount = 106;
 inline constexpr std::size_t kUnclassifiedLegacyCellCount = 190;
 
 // Named cell ids. Sequential by YAML key order; changing that
@@ -109,22 +109,22 @@ inline constexpr ::electricsim::io::WireId kWireBPM_VEHICLE_WAKEUP = 57U;
 inline constexpr ::electricsim::io::WireId kWireBPM_COUPLER_PRESENT = 58U;
 inline constexpr ::electricsim::io::WireId kWireBPM_SHUNT_SENSE_HEALTHY = 59U;
 inline constexpr ::electricsim::io::WireId kWireHTCM_PERIODIC_WAKE_PULSE = 60U;
-inline constexpr ::electricsim::io::WireId kWireBPM_AD_POWER_CMD = 61U;
-inline constexpr ::electricsim::io::WireId kWireHV_BUS_VOLTAGE_MV = 62U;
-inline constexpr ::electricsim::io::WireId kWireHV_BUS_CURRENT_MA = 63U;
-inline constexpr ::electricsim::io::ConductorId kWireHV_BUS_PRESENT{64U};
-inline constexpr ::electricsim::io::WireId kWireAPM_OUTPUT_VOLTAGE_MV = 65U;
-inline constexpr ::electricsim::io::WireId kWireAPM_HV_CONTACTOR_CLOSED = 66U;
-inline constexpr ::electricsim::io::WireId kWireAPM_OUTPUT_CURRENT_Q8 = 67U;
-inline constexpr ::electricsim::io::WireId kWireGM8192_BPM_TX = 68U;
-inline constexpr ::electricsim::io::WireId kWireGM8192_BTCM_TX = 69U;
-inline constexpr ::electricsim::io::WireId kWireGM8192_PIM_TX = 70U;
-inline constexpr ::electricsim::io::WireId kWireGM8192_RSA_TX = 71U;
-inline constexpr ::electricsim::io::WireId kWireGM8192_HTCM_TX = 72U;
-inline constexpr ::electricsim::io::WireId kWireGM8192_IPC_TX = 73U;
-inline constexpr ::electricsim::io::WireId kWireGM8192_APM_TX = 74U;
-inline constexpr ::electricsim::io::WireId kWireGM8192_SCANTOOL_TX = 75U;
-inline constexpr ::electricsim::io::WireId kWireGM8192_BPM_TX_CLASS2 = 76U;
+inline constexpr ::electricsim::io::WireId kWireHV_BUS_VOLTAGE_MV = 61U;
+inline constexpr ::electricsim::io::WireId kWireHV_BUS_CURRENT_MA = 62U;
+inline constexpr ::electricsim::io::ConductorId kWireHV_BUS_PRESENT{63U};
+inline constexpr ::electricsim::io::WireId kWireAPM_OUTPUT_VOLTAGE_MV = 64U;
+inline constexpr ::electricsim::io::WireId kWireAPM_HV_CONTACTOR_CLOSED = 65U;
+inline constexpr ::electricsim::io::WireId kWireAPM_OUTPUT_CURRENT_Q8 = 66U;
+inline constexpr ::electricsim::io::WireId kWireGM8192_BPM_TX = 67U;
+inline constexpr ::electricsim::io::WireId kWireGM8192_BTCM_TX = 68U;
+inline constexpr ::electricsim::io::WireId kWireGM8192_PIM_TX = 69U;
+inline constexpr ::electricsim::io::WireId kWireGM8192_RSA_TX = 70U;
+inline constexpr ::electricsim::io::WireId kWireGM8192_HTCM_TX = 71U;
+inline constexpr ::electricsim::io::WireId kWireGM8192_IPC_TX = 72U;
+inline constexpr ::electricsim::io::WireId kWireGM8192_APM_TX = 73U;
+inline constexpr ::electricsim::io::WireId kWireGM8192_SCANTOOL_TX = 74U;
+inline constexpr ::electricsim::io::WireId kWireGM8192_BPM_TX_CLASS2 = 75U;
+inline constexpr ::electricsim::io::WireId kWireGM8192_CHARGER_TX_CLASS2 = 76U;
 inline constexpr ::electricsim::io::ConductorId kWireBULB_FEED_LINE_LBL{77U};
 inline constexpr ::electricsim::io::ConductorId kWireBULB_FEED_LINE_RBL{78U};
 inline constexpr ::electricsim::io::ConductorId kWireBULB_FEED_LINE_LHBH{79U};
@@ -406,103 +406,114 @@ inline constexpr ::electricsim::io::ConductorId kWireLHJB_FEED_BPLUS_FUSEBLOCK{3
 inline constexpr ::electricsim::io::ConductorId kWireLHJB_FEED_STOP_ALWAYS_HOT{355U};
 inline constexpr ::electricsim::io::ConductorId kWireLHJB_FEED_RUN1{356U};
 inline constexpr ::electricsim::io::ElementStateId kWireRHJB_ES_AUX_RAIL_LATCH{357U};
-inline constexpr ::electricsim::io::ElementStateId kWireRHJB_ES_PMM_MODULE_BPLUS{358U};
-inline constexpr ::electricsim::io::ElementStateId kWireRHJB_ES_PMM_RUN1_CONTACT{359U};
-inline constexpr ::electricsim::io::ElementStateId kWireRHJB_ES_PMM_RUN2_CONTACT{360U};
-inline constexpr ::electricsim::io::ElementStateId kWireRHJB_ES_DLM_LOCK_RELAY{361U};
-inline constexpr ::electricsim::io::ElementStateId kWireRHJB_ES_DLM_LOCK_REST{362U};
-inline constexpr ::electricsim::io::ElementStateId kWireRHJB_ES_DLM_UNLOCK_RELAY{363U};
-inline constexpr ::electricsim::io::ElementStateId kWireRHJB_ES_DLM_UNLOCK_REST{364U};
-inline constexpr ::electricsim::io::ElementStateId kWireRHJB_ES_DILM_LOW_SIDE{365U};
-inline constexpr ::electricsim::io::ConductorId kWireRHJB_FEED_BPLUS_842{366U};
-inline constexpr ::electricsim::io::ConductorId kWireRHJB_FEED_MCU_SUPPLY{367U};
-inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_RHJB_DILM_FOUR_BAR_LAMP{368U};
-inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_RHJB_DILM_MIRROR_LAMP{369U};
-inline constexpr ::electricsim::io::ElementStateId kWireHV_ES_MAIN_CONTACTOR{370U};
-inline constexpr ::electricsim::io::ElementStateId kWireHV_ES_PRECHARGE_CONTACTOR{371U};
-inline constexpr ::electricsim::io::ElementStateId kWireAPM_ES_TWELVE_VOLT_ENABLE{372U};
-inline constexpr ::electricsim::io::ElementStateId kWireAPM_ES_HWS_DRIVE_ENABLE{373U};
-inline constexpr ::electricsim::io::ElementStateId kWireAPM_ES_CMC_DRIVE_ENABLE{374U};
-inline constexpr ::electricsim::io::ElementStateId kWireHTCM_ES_COOLANT_PUMP_DRIVE{375U};
-inline constexpr ::electricsim::io::ElementStateId kWireHTCM_ES_RADIATOR_FAN_DRIVE{376U};
-inline constexpr ::electricsim::io::ElementStateId kWireHTCM_ES_HEATER_VALVE_DRIVE{377U};
-inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_APM_HWS_GRID_ENERGISED{378U};
-inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_APM_CMC_MOTOR_ENERGISED{379U};
-inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_TEMP_TT_DRV{380U};
-inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_SERVICE_NOW_TT_DRV{381U};
-inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_SEAT_BELT_TT_DRV{382U};
-inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_REDUCED_PERF_TT_DRV{383U};
-inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_BATTERY_LIFE_TT_DRV{384U};
-inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_CHECK_TIRE_PRESS_TT_DRV{385U};
-inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_AIR_BAG_TT_DRV{386U};
-inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_ANTILOCK_TT_DRV{387U};
-inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_LOW_TRAC_TT_DRV{388U};
-inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_BRAKE_TT_DRV{389U};
-inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_PARK_BRAKE_TT_DRV{390U};
-inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_SEG_SEATBELT_PASS_DRV{391U};
-inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_SEG_CHECK_MESSAGES_DRV{392U};
-inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_SEG_LEFT_TURN_DRV{393U};
-inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_SEG_RIGHT_TURN_DRV{394U};
-inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_SEG_HIGH_BEAM_DRV{395U};
-inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_SEG_PARK_LAMP_DRV{396U};
-inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_SEG_DOOR_AJAR_DRV{397U};
-inline constexpr ::electricsim::io::ElementStateId kWirePIM_ES_INVERTER_ENABLE{398U};
-inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_PIM_DC_LINK_PRESENT{399U};
-inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_PIM_INVERTER_ENERGISED{400U};
-inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_PIM_DRIVE_MOTOR_ENERGISED{401U};
-inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_FRONT_BRAKE_ENABLE{402U};
-inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REAR_BRAKE_ENABLE{403U};
-inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_FRONT_ISO_FL{404U};
-inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_FRONT_ISO_FR{405U};
-inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_FRONT_MOD_LF{406U};
-inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_FRONT_MOD_RF{407U};
-inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REAR_EMB_LR{408U};
-inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REAR_EMB_RR{409U};
-inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REGEN_DISABLE{410U};
-inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_BRAKE_SW_OUT{411U};
-inline constexpr ::electricsim::io::ElementStateId kWireCHASSIS_ES_AUX_BATTERY_TERMINAL_MV{412U};
-inline constexpr ::electricsim::io::WireId kWireWIPER_SW_DELAY_TAP = 413U;
-inline constexpr ::electricsim::io::WireId kWireAD_CHASSIS_GROUND_REF_MV = 414U;
-inline constexpr ::electricsim::io::WireId kWireAD_CHASSIS_GROUND_REF_CONTINUITY = 415U;
-inline constexpr ::electricsim::io::WireId kWireAD_GROUND_SENSE_REF_MV = 416U;
-inline constexpr ::electricsim::io::WireId kWireAD_GROUND_SENSE_REF_CONTINUITY = 417U;
-inline constexpr ::electricsim::io::WireId kWireAD_ISOLATION_CHASSIS_REF_PERMILLE = 418U;
-inline constexpr ::electricsim::io::WireId kWireBPM_AD_RELAY_OPEN_PERMIT = 419U;
-inline constexpr ::electricsim::io::WireId kWireAPM_BRAKE_LOAD_SHED_OUT = 420U;
-inline constexpr ::electricsim::io::WireId kWireAPM_HV_INPUT_CURRENT_Q8 = 421U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_PIM_RETARD_ACHIEVED_DUTY_Q8 = 422U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_PARK_BRAKE_SET_REQ = 423U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_PARK_BRAKE_RELEASE_REQ = 424U;
-inline constexpr ::electricsim::io::WireId kWireBTCM_BRAKE_SWITCH_SENSE_820E = 425U;
-inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_WIPER_MOTOR_ASSEMBLY_SUPPLY{426U};
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_WIPER_SWEEP_POSITION = 427U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_WIPER_PARK_SWITCH_CLOSED = 428U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_WIPER_END_OF_SWEEP_SWITCH_CLOSED = 429U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_WIPER_MOTOR_RUNNING = 430U;
-inline constexpr ::electricsim::io::ElementStateId kWireRHJB_ES_WSW_GROUND_SINK{431U};
-inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_TJB_LR_BACKUP_LAMP{432U};
-inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_TJB_RR_BACKUP_LAMP{433U};
-inline constexpr ::electricsim::io::WireId kWireTJB_DEFOG_COMMAND_193B = 434U;
-inline constexpr ::electricsim::io::ElementStateId kWireTJB_ES_DEFOG_MODULE_LO_CLOSED{435U};
-inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_TJB_PRI_DEFOG_LO{436U};
-inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_TJB_SEC_DEFOG_LO{437U};
-inline constexpr ::electricsim::io::ElementStateId kWireAD_ES_STATE_A_RELEASED{438U};
-inline constexpr ::electricsim::io::ElementStateId kWireAD_ES_STATE_B_RELEASED{439U};
-inline constexpr ::electricsim::io::ElementStateId kWireAD_ES_STATE_C_RELEASED{440U};
-inline constexpr ::electricsim::io::ElementStateId kWireAD_ES_POWER_SUPPLY_OUT{441U};
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_MODE_SW_LOCK = 442U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_MODE_SW_OFF_ACC = 443U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_MODE_SW_RUN = 444U;
-inline constexpr ::electricsim::io::WireId kWireHV_ISOLATION_FAULT_LEAD = 445U;
-inline constexpr ::electricsim::io::WireId kWireHV_ISOLATION_FAULT_KOHM = 446U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_BPM_AD_DTC_BITMAP = 447U;
-inline constexpr ::electricsim::io::ElementStateId kWirePIM_ES_SERVICE_SOON_TT_DRV{448U};
-inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_IPC_SERVICE_SOON_TELLTALE{449U};
-inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_WAIT_TT_DRV{450U};
-inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_IPC_WAIT_TELLTALE{451U};
-inline constexpr ::electricsim::io::WireId kWireHV_BUS_PACK_CURRENT_MA = 452U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO = 453U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI = 454U;
+inline constexpr ::electricsim::io::ElementStateId kWireRHJB_ES_PMM_RUN1_CONTACT{358U};
+inline constexpr ::electricsim::io::ElementStateId kWireRHJB_ES_PMM_RUN2_CONTACT{359U};
+inline constexpr ::electricsim::io::ElementStateId kWireRHJB_ES_DLM_LOCK_RELAY{360U};
+inline constexpr ::electricsim::io::ElementStateId kWireRHJB_ES_DLM_LOCK_REST{361U};
+inline constexpr ::electricsim::io::ElementStateId kWireRHJB_ES_DLM_UNLOCK_RELAY{362U};
+inline constexpr ::electricsim::io::ElementStateId kWireRHJB_ES_DLM_UNLOCK_REST{363U};
+inline constexpr ::electricsim::io::ElementStateId kWireRHJB_ES_DILM_LOW_SIDE{364U};
+inline constexpr ::electricsim::io::ConductorId kWireRHJB_FEED_BPLUS_842{365U};
+inline constexpr ::electricsim::io::ConductorId kWireRHJB_FEED_MCU_SUPPLY{366U};
+inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_RHJB_DILM_FOUR_BAR_LAMP{367U};
+inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_RHJB_DILM_MIRROR_LAMP{368U};
+inline constexpr ::electricsim::io::ElementStateId kWireHV_ES_MAIN_CONTACTOR{369U};
+inline constexpr ::electricsim::io::ElementStateId kWireHV_ES_PRECHARGE_CONTACTOR{370U};
+inline constexpr ::electricsim::io::ElementStateId kWireAPM_ES_TWELVE_VOLT_ENABLE{371U};
+inline constexpr ::electricsim::io::ElementStateId kWireAPM_ES_HWS_DRIVE_ENABLE{372U};
+inline constexpr ::electricsim::io::ElementStateId kWireAPM_ES_CMC_DRIVE_ENABLE{373U};
+inline constexpr ::electricsim::io::ElementStateId kWireHTCM_ES_COOLANT_PUMP_DRIVE{374U};
+inline constexpr ::electricsim::io::ElementStateId kWireHTCM_ES_RADIATOR_FAN_DRIVE{375U};
+inline constexpr ::electricsim::io::ElementStateId kWireHTCM_ES_HEATER_VALVE_DRIVE{376U};
+inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_APM_HWS_GRID_ENERGISED{377U};
+inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_APM_CMC_MOTOR_ENERGISED{378U};
+inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_TEMP_TT_DRV{379U};
+inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_SERVICE_NOW_TT_DRV{380U};
+inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_SEAT_BELT_TT_DRV{381U};
+inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_REDUCED_PERF_TT_DRV{382U};
+inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_BATTERY_LIFE_TT_DRV{383U};
+inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_CHECK_TIRE_PRESS_TT_DRV{384U};
+inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_AIR_BAG_TT_DRV{385U};
+inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_ANTILOCK_TT_DRV{386U};
+inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_LOW_TRAC_TT_DRV{387U};
+inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_BRAKE_TT_DRV{388U};
+inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_PARK_BRAKE_TT_DRV{389U};
+inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_SEG_SEATBELT_PASS_DRV{390U};
+inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_SEG_CHECK_MESSAGES_DRV{391U};
+inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_SEG_LEFT_TURN_DRV{392U};
+inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_SEG_RIGHT_TURN_DRV{393U};
+inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_SEG_HIGH_BEAM_DRV{394U};
+inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_SEG_PARK_LAMP_DRV{395U};
+inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_SEG_DOOR_AJAR_DRV{396U};
+inline constexpr ::electricsim::io::ElementStateId kWirePIM_ES_INVERTER_ENABLE{397U};
+inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_PIM_DC_LINK_PRESENT{398U};
+inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_PIM_INVERTER_ENERGISED{399U};
+inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_PIM_DRIVE_MOTOR_ENERGISED{400U};
+inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_FRONT_BRAKE_ENABLE{401U};
+inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REAR_BRAKE_ENABLE{402U};
+inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_FRONT_ISO_FL{403U};
+inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_FRONT_ISO_FR{404U};
+inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_FRONT_MOD_LF{405U};
+inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_FRONT_MOD_RF{406U};
+inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REAR_EMB_LR{407U};
+inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REAR_EMB_RR{408U};
+inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REGEN_DISABLE{409U};
+inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_BRAKE_SW_OUT{410U};
+inline constexpr ::electricsim::io::ElementStateId kWireCHASSIS_ES_AUX_BATTERY_TERMINAL_MV{411U};
+inline constexpr ::electricsim::io::WireId kWireWIPER_SW_DELAY_TAP = 412U;
+inline constexpr ::electricsim::io::WireId kWireAD_CHASSIS_GROUND_REF_MV = 413U;
+inline constexpr ::electricsim::io::WireId kWireAD_CHASSIS_GROUND_REF_CONTINUITY = 414U;
+inline constexpr ::electricsim::io::WireId kWireAD_GROUND_SENSE_REF_MV = 415U;
+inline constexpr ::electricsim::io::WireId kWireAD_GROUND_SENSE_REF_CONTINUITY = 416U;
+inline constexpr ::electricsim::io::WireId kWireAD_ISOLATION_CHASSIS_REF_PERMILLE = 417U;
+inline constexpr ::electricsim::io::WireId kWireBPM_AD_RELAY_OPEN_PERMIT = 418U;
+inline constexpr ::electricsim::io::WireId kWireAPM_BRAKE_LOAD_SHED_OUT = 419U;
+inline constexpr ::electricsim::io::WireId kWireAPM_HV_INPUT_CURRENT_Q8 = 420U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_PIM_RETARD_ACHIEVED_DUTY_Q8 = 421U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_PARK_BRAKE_SET_REQ = 422U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_PARK_BRAKE_RELEASE_REQ = 423U;
+inline constexpr ::electricsim::io::WireId kWireBTCM_BRAKE_SWITCH_SENSE_820E = 424U;
+inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_WIPER_MOTOR_ASSEMBLY_SUPPLY{425U};
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_WIPER_SWEEP_POSITION = 426U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_WIPER_PARK_SWITCH_CLOSED = 427U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_WIPER_END_OF_SWEEP_SWITCH_CLOSED = 428U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_WIPER_MOTOR_RUNNING = 429U;
+inline constexpr ::electricsim::io::ElementStateId kWireRHJB_ES_WSW_GROUND_SINK{430U};
+inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_TJB_LR_BACKUP_LAMP{431U};
+inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_TJB_RR_BACKUP_LAMP{432U};
+inline constexpr ::electricsim::io::WireId kWireTJB_DEFOG_COMMAND_193B = 433U;
+inline constexpr ::electricsim::io::ElementStateId kWireTJB_ES_DEFOG_MODULE_LO_CLOSED{434U};
+inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_TJB_PRI_DEFOG_LO{435U};
+inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_TJB_SEC_DEFOG_LO{436U};
+inline constexpr ::electricsim::io::ElementStateId kWireAD_ES_STATE_A_RELEASED{437U};
+inline constexpr ::electricsim::io::ElementStateId kWireAD_ES_STATE_B_RELEASED{438U};
+inline constexpr ::electricsim::io::ElementStateId kWireAD_ES_STATE_C_RELEASED{439U};
+inline constexpr ::electricsim::io::ElementStateId kWireAD_ES_POWER_SUPPLY_OUT{440U};
+inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_MODE_SW_LOCK = 441U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_MODE_SW_OFF_ACC = 442U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_MODE_SW_RUN = 443U;
+inline constexpr ::electricsim::io::WireId kWireHV_ISOLATION_FAULT_LEAD = 444U;
+inline constexpr ::electricsim::io::WireId kWireHV_ISOLATION_FAULT_KOHM = 445U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_BPM_AD_DTC_BITMAP = 446U;
+inline constexpr ::electricsim::io::ElementStateId kWirePIM_ES_SERVICE_SOON_TT_DRV{447U};
+inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_IPC_SERVICE_SOON_TELLTALE{448U};
+inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_WAIT_TT_DRV{449U};
+inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_IPC_WAIT_TELLTALE{450U};
+inline constexpr ::electricsim::io::WireId kWireHV_BUS_PACK_CURRENT_MA = 451U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO = 452U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI = 453U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_HVAC_HEAT = 454U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_HVAC_VENT = 455U;
+inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_HVAC_AC = 456U;
+inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_BATTERY_RECOVERY_SWITCH{457U};
+inline constexpr ::electricsim::io::ConductorId kWireAPM_VEHICLE_WAKE_UP_IN{458U};
+inline constexpr ::electricsim::io::ConductorId kWireAD_FEED_LOGIC_SUPPLY{459U};
+inline constexpr ::electricsim::io::WireId kWireDRIVER_COAST_DOWN_SWITCH = 460U;
+inline constexpr ::electricsim::io::ConductorId kWireBTCM_FEED_FRONT_BRAKE_FUSE_542{461U};
+inline constexpr ::electricsim::io::ConductorId kWireBTCM_FEED_REAR_BRAKE_FUSE_642{462U};
+inline constexpr ::electricsim::io::ConductorId kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B{463U};
+inline constexpr ::electricsim::io::ConductorId kWireBTCM_FEED_REAR_BRAKE_BPLUS_2033{464U};
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_PIM_COAST_DRAG_NM = 465U;
 
 // Per-net default + init_policy constants.
 // Used by consumers that opt into the kDefault policy — see
@@ -511,9 +522,9 @@ inline constexpr ::electricsim::io::WireId kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI
 // disagreement is caught by the attach-time hash check.
 inline constexpr auto kWireRUN1_Default = false;
 inline constexpr InitPolicy kWireRUN1_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireRSA_RUN1_OUT_Default = false;
+inline constexpr auto kWireRSA_RUN1_OUT_Default = true;
 inline constexpr InitPolicy kWireRSA_RUN1_OUT_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireRSA_RUN2_OUT_Default = false;
+inline constexpr auto kWireRSA_RUN2_OUT_Default = true;
 inline constexpr InitPolicy kWireRSA_RUN2_OUT_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireAD_STATE_A_Default = false;
 inline constexpr InitPolicy kWireAD_STATE_A_InitPolicy = InitPolicy::kHold;
@@ -629,8 +640,6 @@ inline constexpr auto kWireBPM_SHUNT_SENSE_HEALTHY_Default = true;
 inline constexpr InitPolicy kWireBPM_SHUNT_SENSE_HEALTHY_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireHTCM_PERIODIC_WAKE_PULSE_Default = static_cast<std::uint8_t>(0x0U);
 inline constexpr InitPolicy kWireHTCM_PERIODIC_WAKE_PULSE_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireBPM_AD_POWER_CMD_Default = false;
-inline constexpr InitPolicy kWireBPM_AD_POWER_CMD_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireHV_BUS_VOLTAGE_MV_Default = 0x0U;
 inline constexpr InitPolicy kWireHV_BUS_VOLTAGE_MV_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireHV_BUS_CURRENT_MA_Default = 0x0U;
@@ -661,6 +670,8 @@ inline constexpr auto kWireGM8192_SCANTOOL_TX_Default = true;
 inline constexpr InitPolicy kWireGM8192_SCANTOOL_TX_InitPolicy = InitPolicy::kDefault;
 inline constexpr auto kWireGM8192_BPM_TX_CLASS2_Default = true;
 inline constexpr InitPolicy kWireGM8192_BPM_TX_CLASS2_InitPolicy = InitPolicy::kDefault;
+inline constexpr auto kWireGM8192_CHARGER_TX_CLASS2_Default = true;
+inline constexpr InitPolicy kWireGM8192_CHARGER_TX_CLASS2_InitPolicy = InitPolicy::kDefault;
 inline constexpr auto kWireBULB_FEED_LINE_LBL_Default = false;
 inline constexpr InitPolicy kWireBULB_FEED_LINE_LBL_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireBULB_FEED_LINE_RBL_Default = false;
@@ -1223,8 +1234,6 @@ inline constexpr auto kWireLHJB_FEED_RUN1_Default = false;
 inline constexpr InitPolicy kWireLHJB_FEED_RUN1_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireRHJB_ES_AUX_RAIL_LATCH_Default = false;
 inline constexpr InitPolicy kWireRHJB_ES_AUX_RAIL_LATCH_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireRHJB_ES_PMM_MODULE_BPLUS_Default = false;
-inline constexpr InitPolicy kWireRHJB_ES_PMM_MODULE_BPLUS_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireRHJB_ES_PMM_RUN1_CONTACT_Default = false;
 inline constexpr InitPolicy kWireRHJB_ES_PMM_RUN1_CONTACT_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireRHJB_ES_PMM_RUN2_CONTACT_Default = false;
@@ -1417,6 +1426,30 @@ inline constexpr auto kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO_Default = 0x0ULL;
 inline constexpr InitPolicy kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI_Default = 0x0ULL;
 inline constexpr InitPolicy kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireDRIVER_RSA_HVAC_HEAT_Default = false;
+inline constexpr InitPolicy kWireDRIVER_RSA_HVAC_HEAT_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireDRIVER_RSA_HVAC_VENT_Default = false;
+inline constexpr InitPolicy kWireDRIVER_RSA_HVAC_VENT_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireDRIVER_RSA_HVAC_AC_Default = false;
+inline constexpr InitPolicy kWireDRIVER_RSA_HVAC_AC_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireDRIVER_ES_BATTERY_RECOVERY_SWITCH_Default = false;
+inline constexpr InitPolicy kWireDRIVER_ES_BATTERY_RECOVERY_SWITCH_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireAPM_VEHICLE_WAKE_UP_IN_Default = false;
+inline constexpr InitPolicy kWireAPM_VEHICLE_WAKE_UP_IN_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireAD_FEED_LOGIC_SUPPLY_Default = false;
+inline constexpr InitPolicy kWireAD_FEED_LOGIC_SUPPLY_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireDRIVER_COAST_DOWN_SWITCH_Default = false;
+inline constexpr InitPolicy kWireDRIVER_COAST_DOWN_SWITCH_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireBTCM_FEED_FRONT_BRAKE_FUSE_542_Default = false;
+inline constexpr InitPolicy kWireBTCM_FEED_FRONT_BRAKE_FUSE_542_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireBTCM_FEED_REAR_BRAKE_FUSE_642_Default = false;
+inline constexpr InitPolicy kWireBTCM_FEED_REAR_BRAKE_FUSE_642_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B_Default = false;
+inline constexpr InitPolicy kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireBTCM_FEED_REAR_BRAKE_BPLUS_2033_Default = false;
+inline constexpr InitPolicy kWireBTCM_FEED_REAR_BRAKE_BPLUS_2033_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_PIM_COAST_DRAG_NM_Default = 0.0f;
+inline constexpr InitPolicy kWireCHASSIS_PIM_COAST_DRAG_NM_InitPolicy = InitPolicy::kHold;
 
 // Declare every wire in this topology on the given (creator)
 // table. Returns true iff all declarations succeed.
@@ -1482,7 +1515,6 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(kWireBPM_COUPLER_PRESENT, ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(kWireBPM_SHUNT_SENSE_HEALTHY, ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(kWireHTCM_PERIODIC_WAKE_PULSE, ::electricsim::io::WireType::kByte) && ok;
-  ok = table.declare(kWireBPM_AD_POWER_CMD, ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(kWireHV_BUS_VOLTAGE_MV, ::electricsim::io::WireType::kUint32) && ok;
   ok = table.declare(kWireHV_BUS_CURRENT_MA, ::electricsim::io::WireType::kUint32) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireHV_BUS_PRESENT), ::electricsim::io::WireType::kBit) && ok;
@@ -1498,6 +1530,7 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(kWireGM8192_APM_TX, ::electricsim::io::WireType::kBitStream) && ok;
   ok = table.declare(kWireGM8192_SCANTOOL_TX, ::electricsim::io::WireType::kBitStream) && ok;
   ok = table.declare(kWireGM8192_BPM_TX_CLASS2, ::electricsim::io::WireType::kBitStream) && ok;
+  ok = table.declare(kWireGM8192_CHARGER_TX_CLASS2, ::electricsim::io::WireType::kBitStream) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBULB_FEED_LINE_LBL), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBULB_FEED_LINE_RBL), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBULB_FEED_LINE_LHBH), ::electricsim::io::WireType::kBit) && ok;
@@ -1779,7 +1812,6 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_STOP_ALWAYS_HOT), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_RUN1), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRHJB_ES_AUX_RAIL_LATCH), ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRHJB_ES_PMM_MODULE_BPLUS), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRHJB_ES_PMM_RUN1_CONTACT), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRHJB_ES_PMM_RUN2_CONTACT), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRHJB_ES_DLM_LOCK_RELAY), ::electricsim::io::WireType::kBit) && ok;
@@ -1876,6 +1908,18 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(kWireHV_BUS_PACK_CURRENT_MA, ::electricsim::io::WireType::kUint32) && ok;
   ok = table.declare(kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO, ::electricsim::io::WireType::kUint64) && ok;
   ok = table.declare(kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI, ::electricsim::io::WireType::kUint64) && ok;
+  ok = table.declare(kWireDRIVER_RSA_HVAC_HEAT, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireDRIVER_RSA_HVAC_VENT, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireDRIVER_RSA_HVAC_AC, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_BATTERY_RECOVERY_SWITCH), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireAPM_VEHICLE_WAKE_UP_IN), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireAD_FEED_LOGIC_SUPPLY), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireDRIVER_COAST_DOWN_SWITCH, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_FUSE_542), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_FUSE_642), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_BPLUS_2033), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireCHASSIS_PIM_COAST_DRAG_NM, ::electricsim::io::WireType::kFloat32) && ok;
   return ok;
 }
 
@@ -1944,7 +1988,6 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case kWireBPM_COUPLER_PRESENT: return "BPM_COUPLER_PRESENT";
     case kWireBPM_SHUNT_SENSE_HEALTHY: return "BPM_SHUNT_SENSE_HEALTHY";
     case kWireHTCM_PERIODIC_WAKE_PULSE: return "HTCM_PERIODIC_WAKE_PULSE";
-    case kWireBPM_AD_POWER_CMD: return "BPM_AD_POWER_CMD";
     case kWireHV_BUS_VOLTAGE_MV: return "HV_BUS_VOLTAGE_MV";
     case kWireHV_BUS_CURRENT_MA: return "HV_BUS_CURRENT_MA";
     case static_cast<::electricsim::io::WireId>(kWireHV_BUS_PRESENT): return "HV_BUS_PRESENT";
@@ -1960,6 +2003,7 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case kWireGM8192_APM_TX: return "GM8192_APM_TX";
     case kWireGM8192_SCANTOOL_TX: return "GM8192_SCANTOOL_TX";
     case kWireGM8192_BPM_TX_CLASS2: return "GM8192_BPM_TX_CLASS2";
+    case kWireGM8192_CHARGER_TX_CLASS2: return "GM8192_CHARGER_TX_CLASS2";
     case static_cast<::electricsim::io::WireId>(kWireBULB_FEED_LINE_LBL): return "BULB_FEED_LINE_LBL";
     case static_cast<::electricsim::io::WireId>(kWireBULB_FEED_LINE_RBL): return "BULB_FEED_LINE_RBL";
     case static_cast<::electricsim::io::WireId>(kWireBULB_FEED_LINE_LHBH): return "BULB_FEED_LINE_LHBH";
@@ -2241,7 +2285,6 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_STOP_ALWAYS_HOT): return "LHJB_FEED_STOP_ALWAYS_HOT";
     case static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_RUN1): return "LHJB_FEED_RUN1";
     case static_cast<::electricsim::io::WireId>(kWireRHJB_ES_AUX_RAIL_LATCH): return "RHJB_ES_AUX_RAIL_LATCH";
-    case static_cast<::electricsim::io::WireId>(kWireRHJB_ES_PMM_MODULE_BPLUS): return "RHJB_ES_PMM_MODULE_BPLUS";
     case static_cast<::electricsim::io::WireId>(kWireRHJB_ES_PMM_RUN1_CONTACT): return "RHJB_ES_PMM_RUN1_CONTACT";
     case static_cast<::electricsim::io::WireId>(kWireRHJB_ES_PMM_RUN2_CONTACT): return "RHJB_ES_PMM_RUN2_CONTACT";
     case static_cast<::electricsim::io::WireId>(kWireRHJB_ES_DLM_LOCK_RELAY): return "RHJB_ES_DLM_LOCK_RELAY";
@@ -2338,6 +2381,18 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case kWireHV_BUS_PACK_CURRENT_MA: return "HV_BUS_PACK_CURRENT_MA";
     case kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO: return "CHASSIS_PIM_ACTIVE_DTC_BITMAP_LO";
     case kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI: return "CHASSIS_PIM_ACTIVE_DTC_BITMAP_HI";
+    case kWireDRIVER_RSA_HVAC_HEAT: return "DRIVER_RSA_HVAC_HEAT";
+    case kWireDRIVER_RSA_HVAC_VENT: return "DRIVER_RSA_HVAC_VENT";
+    case kWireDRIVER_RSA_HVAC_AC: return "DRIVER_RSA_HVAC_AC";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_BATTERY_RECOVERY_SWITCH): return "DRIVER_ES_BATTERY_RECOVERY_SWITCH";
+    case static_cast<::electricsim::io::WireId>(kWireAPM_VEHICLE_WAKE_UP_IN): return "APM_VEHICLE_WAKE_UP_IN";
+    case static_cast<::electricsim::io::WireId>(kWireAD_FEED_LOGIC_SUPPLY): return "AD_FEED_LOGIC_SUPPLY";
+    case kWireDRIVER_COAST_DOWN_SWITCH: return "DRIVER_COAST_DOWN_SWITCH";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_FUSE_542): return "BTCM_FEED_FRONT_BRAKE_FUSE_542";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_FUSE_642): return "BTCM_FEED_REAR_BRAKE_FUSE_642";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B): return "BTCM_FEED_FRONT_BRAKE_BPLUS_1633B";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_BPLUS_2033): return "BTCM_FEED_REAR_BRAKE_BPLUS_2033";
+    case kWireCHASSIS_PIM_COAST_DRAG_NM: return "CHASSIS_PIM_COAST_DRAG_NM";
     default: return ::std::string_view{};
   }
 }
@@ -2411,7 +2466,6 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case kWireBPM_COUPLER_PRESENT: return "vehicle_sim";
     case kWireBPM_SHUNT_SENSE_HEALTHY: return "vehicle_sim";
     case kWireHTCM_PERIODIC_WAKE_PULSE: return "";
-    case kWireBPM_AD_POWER_CMD: return "";
     case kWireHV_BUS_VOLTAGE_MV: return "hv_bus_host";
     case kWireHV_BUS_CURRENT_MA: return "hv_bus_host";
     case static_cast<::electricsim::io::WireId>(kWireHV_BUS_PRESENT): return "";
@@ -2427,6 +2481,7 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case kWireGM8192_APM_TX: return "apm_ecu";
     case kWireGM8192_SCANTOOL_TX: return "scantool_host";
     case kWireGM8192_BPM_TX_CLASS2: return "bpm_ecu";
+    case kWireGM8192_CHARGER_TX_CLASS2: return "charger";
     case static_cast<::electricsim::io::WireId>(kWireBULB_FEED_LINE_LBL): return "";
     case static_cast<::electricsim::io::WireId>(kWireBULB_FEED_LINE_RBL): return "";
     case static_cast<::electricsim::io::WireId>(kWireBULB_FEED_LINE_LHBH): return "";
@@ -2708,7 +2763,6 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_STOP_ALWAYS_HOT): return "";
     case static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_RUN1): return "";
     case static_cast<::electricsim::io::WireId>(kWireRHJB_ES_AUX_RAIL_LATCH): return "rhjb_ecu";
-    case static_cast<::electricsim::io::WireId>(kWireRHJB_ES_PMM_MODULE_BPLUS): return "rhjb_ecu";
     case static_cast<::electricsim::io::WireId>(kWireRHJB_ES_PMM_RUN1_CONTACT): return "rhjb_ecu";
     case static_cast<::electricsim::io::WireId>(kWireRHJB_ES_PMM_RUN2_CONTACT): return "rhjb_ecu";
     case static_cast<::electricsim::io::WireId>(kWireRHJB_ES_DLM_LOCK_RELAY): return "rhjb_ecu";
@@ -2805,6 +2859,18 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case kWireHV_BUS_PACK_CURRENT_MA: return "hv_bus_host";
     case kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO: return "pim_ecu";
     case kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI: return "pim_ecu";
+    case kWireDRIVER_RSA_HVAC_HEAT: return "";
+    case kWireDRIVER_RSA_HVAC_VENT: return "";
+    case kWireDRIVER_RSA_HVAC_AC: return "";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_BATTERY_RECOVERY_SWITCH): return "none";
+    case static_cast<::electricsim::io::WireId>(kWireAPM_VEHICLE_WAKE_UP_IN): return "";
+    case static_cast<::electricsim::io::WireId>(kWireAD_FEED_LOGIC_SUPPLY): return "";
+    case kWireDRIVER_COAST_DOWN_SWITCH: return "";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_FUSE_542): return "";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_FUSE_642): return "";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B): return "";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_BPLUS_2033): return "";
+    case kWireCHASSIS_PIM_COAST_DRAG_NM: return "";
     default: return ::std::string_view{};
   }
 }
@@ -2882,7 +2948,6 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(kWireBPM_COUPLER_PRESENT, &gen) && gen == 0) { visitor(::std::string_view{"BPM_COUPLER_PRESENT"}, kWireBPM_COUPLER_PRESENT); ++count; }
   if (table.write_gen(kWireBPM_SHUNT_SENSE_HEALTHY, &gen) && gen == 0) { visitor(::std::string_view{"BPM_SHUNT_SENSE_HEALTHY"}, kWireBPM_SHUNT_SENSE_HEALTHY); ++count; }
   if (table.write_gen(kWireHTCM_PERIODIC_WAKE_PULSE, &gen) && gen == 0) { visitor(::std::string_view{"HTCM_PERIODIC_WAKE_PULSE"}, kWireHTCM_PERIODIC_WAKE_PULSE); ++count; }
-  if (table.write_gen(kWireBPM_AD_POWER_CMD, &gen) && gen == 0) { visitor(::std::string_view{"BPM_AD_POWER_CMD"}, kWireBPM_AD_POWER_CMD); ++count; }
   if (table.write_gen(kWireHV_BUS_VOLTAGE_MV, &gen) && gen == 0) { visitor(::std::string_view{"HV_BUS_VOLTAGE_MV"}, kWireHV_BUS_VOLTAGE_MV); ++count; }
   if (table.write_gen(kWireHV_BUS_CURRENT_MA, &gen) && gen == 0) { visitor(::std::string_view{"HV_BUS_CURRENT_MA"}, kWireHV_BUS_CURRENT_MA); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireHV_BUS_PRESENT), &gen) && gen == 0) { visitor(::std::string_view{"HV_BUS_PRESENT"}, static_cast<::electricsim::io::WireId>(kWireHV_BUS_PRESENT)); ++count; }
@@ -2898,6 +2963,7 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(kWireGM8192_APM_TX, &gen) && gen == 0) { visitor(::std::string_view{"GM8192_APM_TX"}, kWireGM8192_APM_TX); ++count; }
   if (table.write_gen(kWireGM8192_SCANTOOL_TX, &gen) && gen == 0) { visitor(::std::string_view{"GM8192_SCANTOOL_TX"}, kWireGM8192_SCANTOOL_TX); ++count; }
   if (table.write_gen(kWireGM8192_BPM_TX_CLASS2, &gen) && gen == 0) { visitor(::std::string_view{"GM8192_BPM_TX_CLASS2"}, kWireGM8192_BPM_TX_CLASS2); ++count; }
+  if (table.write_gen(kWireGM8192_CHARGER_TX_CLASS2, &gen) && gen == 0) { visitor(::std::string_view{"GM8192_CHARGER_TX_CLASS2"}, kWireGM8192_CHARGER_TX_CLASS2); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBULB_FEED_LINE_LBL), &gen) && gen == 0) { visitor(::std::string_view{"BULB_FEED_LINE_LBL"}, static_cast<::electricsim::io::WireId>(kWireBULB_FEED_LINE_LBL)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBULB_FEED_LINE_RBL), &gen) && gen == 0) { visitor(::std::string_view{"BULB_FEED_LINE_RBL"}, static_cast<::electricsim::io::WireId>(kWireBULB_FEED_LINE_RBL)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBULB_FEED_LINE_LHBH), &gen) && gen == 0) { visitor(::std::string_view{"BULB_FEED_LINE_LHBH"}, static_cast<::electricsim::io::WireId>(kWireBULB_FEED_LINE_LHBH)); ++count; }
@@ -3179,7 +3245,6 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_STOP_ALWAYS_HOT), &gen) && gen == 0) { visitor(::std::string_view{"LHJB_FEED_STOP_ALWAYS_HOT"}, static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_STOP_ALWAYS_HOT)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_RUN1), &gen) && gen == 0) { visitor(::std::string_view{"LHJB_FEED_RUN1"}, static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_RUN1)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRHJB_ES_AUX_RAIL_LATCH), &gen) && gen == 0) { visitor(::std::string_view{"RHJB_ES_AUX_RAIL_LATCH"}, static_cast<::electricsim::io::WireId>(kWireRHJB_ES_AUX_RAIL_LATCH)); ++count; }
-  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRHJB_ES_PMM_MODULE_BPLUS), &gen) && gen == 0) { visitor(::std::string_view{"RHJB_ES_PMM_MODULE_BPLUS"}, static_cast<::electricsim::io::WireId>(kWireRHJB_ES_PMM_MODULE_BPLUS)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRHJB_ES_PMM_RUN1_CONTACT), &gen) && gen == 0) { visitor(::std::string_view{"RHJB_ES_PMM_RUN1_CONTACT"}, static_cast<::electricsim::io::WireId>(kWireRHJB_ES_PMM_RUN1_CONTACT)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRHJB_ES_PMM_RUN2_CONTACT), &gen) && gen == 0) { visitor(::std::string_view{"RHJB_ES_PMM_RUN2_CONTACT"}, static_cast<::electricsim::io::WireId>(kWireRHJB_ES_PMM_RUN2_CONTACT)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRHJB_ES_DLM_LOCK_RELAY), &gen) && gen == 0) { visitor(::std::string_view{"RHJB_ES_DLM_LOCK_RELAY"}, static_cast<::electricsim::io::WireId>(kWireRHJB_ES_DLM_LOCK_RELAY)); ++count; }
@@ -3276,6 +3341,18 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(kWireHV_BUS_PACK_CURRENT_MA, &gen) && gen == 0) { visitor(::std::string_view{"HV_BUS_PACK_CURRENT_MA"}, kWireHV_BUS_PACK_CURRENT_MA); ++count; }
   if (table.write_gen(kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_PIM_ACTIVE_DTC_BITMAP_LO"}, kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO); ++count; }
   if (table.write_gen(kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_PIM_ACTIVE_DTC_BITMAP_HI"}, kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI); ++count; }
+  if (table.write_gen(kWireDRIVER_RSA_HVAC_HEAT, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_RSA_HVAC_HEAT"}, kWireDRIVER_RSA_HVAC_HEAT); ++count; }
+  if (table.write_gen(kWireDRIVER_RSA_HVAC_VENT, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_RSA_HVAC_VENT"}, kWireDRIVER_RSA_HVAC_VENT); ++count; }
+  if (table.write_gen(kWireDRIVER_RSA_HVAC_AC, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_RSA_HVAC_AC"}, kWireDRIVER_RSA_HVAC_AC); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_BATTERY_RECOVERY_SWITCH), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_BATTERY_RECOVERY_SWITCH"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_BATTERY_RECOVERY_SWITCH)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireAPM_VEHICLE_WAKE_UP_IN), &gen) && gen == 0) { visitor(::std::string_view{"APM_VEHICLE_WAKE_UP_IN"}, static_cast<::electricsim::io::WireId>(kWireAPM_VEHICLE_WAKE_UP_IN)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireAD_FEED_LOGIC_SUPPLY), &gen) && gen == 0) { visitor(::std::string_view{"AD_FEED_LOGIC_SUPPLY"}, static_cast<::electricsim::io::WireId>(kWireAD_FEED_LOGIC_SUPPLY)); ++count; }
+  if (table.write_gen(kWireDRIVER_COAST_DOWN_SWITCH, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_COAST_DOWN_SWITCH"}, kWireDRIVER_COAST_DOWN_SWITCH); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_FUSE_542), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_FEED_FRONT_BRAKE_FUSE_542"}, static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_FUSE_542)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_FUSE_642), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_FEED_REAR_BRAKE_FUSE_642"}, static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_FUSE_642)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_FEED_FRONT_BRAKE_BPLUS_1633B"}, static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_BPLUS_2033), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_FEED_REAR_BRAKE_BPLUS_2033"}, static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_BPLUS_2033)); ++count; }
+  if (table.write_gen(kWireCHASSIS_PIM_COAST_DRAG_NM, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_PIM_COAST_DRAG_NM"}, kWireCHASSIS_PIM_COAST_DRAG_NM); ++count; }
   return count;
 }
 
@@ -3349,7 +3426,6 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case kWireBPM_COUPLER_PRESENT: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
     case kWireBPM_SHUNT_SENSE_HEALTHY: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
     case kWireHTCM_PERIODIC_WAKE_PULSE: return ::electricsim::io::CellClass::kSemantic;
-    case kWireBPM_AD_POWER_CMD: return ::electricsim::io::CellClass::kSemantic;
     case kWireHV_BUS_VOLTAGE_MV: return ::electricsim::io::CellClass::kSemantic;
     case kWireHV_BUS_CURRENT_MA: return ::electricsim::io::CellClass::kSemantic;
     case static_cast<::electricsim::io::WireId>(kWireHV_BUS_PRESENT): return ::electricsim::io::CellClass::kConductor;
@@ -3365,6 +3441,7 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case kWireGM8192_APM_TX: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
     case kWireGM8192_SCANTOOL_TX: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
     case kWireGM8192_BPM_TX_CLASS2: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
+    case kWireGM8192_CHARGER_TX_CLASS2: return ::electricsim::io::CellClass::kSemantic;
     case static_cast<::electricsim::io::WireId>(kWireBULB_FEED_LINE_LBL): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireBULB_FEED_LINE_RBL): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireBULB_FEED_LINE_LHBH): return ::electricsim::io::CellClass::kConductor;
@@ -3646,7 +3723,6 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_STOP_ALWAYS_HOT): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_RUN1): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireRHJB_ES_AUX_RAIL_LATCH): return ::electricsim::io::CellClass::kElementState;
-    case static_cast<::electricsim::io::WireId>(kWireRHJB_ES_PMM_MODULE_BPLUS): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireRHJB_ES_PMM_RUN1_CONTACT): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireRHJB_ES_PMM_RUN2_CONTACT): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireRHJB_ES_DLM_LOCK_RELAY): return ::electricsim::io::CellClass::kElementState;
@@ -3743,6 +3819,18 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case kWireHV_BUS_PACK_CURRENT_MA: return ::electricsim::io::CellClass::kSemantic;
     case kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO: return ::electricsim::io::CellClass::kSemantic;
     case kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI: return ::electricsim::io::CellClass::kSemantic;
+    case kWireDRIVER_RSA_HVAC_HEAT: return ::electricsim::io::CellClass::kSemantic;
+    case kWireDRIVER_RSA_HVAC_VENT: return ::electricsim::io::CellClass::kSemantic;
+    case kWireDRIVER_RSA_HVAC_AC: return ::electricsim::io::CellClass::kSemantic;
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_BATTERY_RECOVERY_SWITCH): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireAPM_VEHICLE_WAKE_UP_IN): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireAD_FEED_LOGIC_SUPPLY): return ::electricsim::io::CellClass::kConductor;
+    case kWireDRIVER_COAST_DOWN_SWITCH: return ::electricsim::io::CellClass::kSemantic;
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_FUSE_542): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_FUSE_642): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_BPLUS_2033): return ::electricsim::io::CellClass::kConductor;
+    case kWireCHASSIS_PIM_COAST_DRAG_NM: return ::electricsim::io::CellClass::kSemantic;
     default: return ::electricsim::io::CellClass::kUnknown;
   }
 }

@@ -40,6 +40,7 @@ struct DashPcmStatus {
     bool service_soon_tt = false;       // [2] b0
     bool reduced_perf_tt = false;       // [2] b1
     bool pcm_temp_tt = false;           // [2] b2
+    bool coast_down_led = false;        // [2] b3, Coast Down LED Request
     bool charge_mode_display = false;   // [2] b4
     bool pcm_service_now_tt = false;    // [3] b1
     bool pcm_connection_detect = false; // [3] b2

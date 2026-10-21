@@ -169,6 +169,11 @@ public:
     /// Advance one step toward P (D→N→R→P; stays at P if already at P).
     void cycle_down();
 
+    /// Go straight to `p`: the EV1's selector is four console push buttons, so
+    /// a press selects its position directly (the RSA still decides whether to
+    /// accept it, e.g. brake-to-shift out of P).
+    void set_position(Position p) { m_position = p; }
+
     Position position() const { return m_position; }
 
     /// Wire-level pin outputs per propulsion manual p. 343.
@@ -392,6 +397,19 @@ public:
     /// Consume the fires for the current tick (returns and clears in one go).
     KeypadFireSet consume_fires_now();
 
+    /// One console mode-button press (kModeSw* mask), as clicked on the console
+    /// panel: queued behind anything the K-key cycle still has in flight, and
+    /// the local expected state follows what the RSA does with that press from
+    /// here (LOCK -> OFF; OFF/ACC from OFF -> ACC, a tap from RUN does nothing;
+    /// RUN -> RUN).  The expectation is a guess the RSA may refuse (RUN needs
+    /// the code first); the run-mode broadcast is the truth.
+    void press_mode_button(std::uint8_t mode_switch);
+
+    /// One interior keypad button press, as clicked on the console panel:
+    /// button idx 0..4, a long press for the higher digit.  Fires on the next
+    /// consume_fires_now() unless the K-key cycle is sending that button too.
+    void press_digit(int button_idx, bool long_press);
+
     /// Current locally-expected RSA state (for HUD display).
     ExpectedState expected_state() const { return m_expected; }
 
@@ -438,6 +456,22 @@ private:
 
     /// Initialise m_code to default "11111" (five button-0 taps).
     void init_default_code_();
+};
+
+/// The shifter's coast-down button.  p.48 reads it as a position ("COAST DOWN
+/// SW: Displays the position of the coast down button on the shifter. YES =
+/// coast down"), so it is modelled as push-on / push-off and published as a
+/// held level on DRIVER_COAST_DOWN_SWITCH (@inferred 2026-10-20 claude: the
+/// print names a position, not a pulse).  Whether coast-down is accepted is the
+/// PCM's: the console lamp shows the $41 Coast Down LED Request, not this.
+class CoastDownButton {
+public:
+    bool on() const { return m_on; }
+    void set(bool on) { m_on = on; }
+    void toggle() { m_on = !m_on; }
+
+private:
+    bool m_on = false;
 };
 
 /// IPC cluster trip-reset button (momentary dash button).
@@ -1277,6 +1311,9 @@ public:
     IpcTripResetButton&       ipc_trip_reset()       { return m_ipc_trip_reset; }
     const IpcTripResetButton& ipc_trip_reset() const { return m_ipc_trip_reset; }
 
+    CoastDownButton&       coast_down_button()       { return m_coast_down; }
+    const CoastDownButton& coast_down_button() const { return m_coast_down; }
+
     CruiseStalk&       cruise_stalk()       { return m_cruise_stalk; }
     const CruiseStalk& cruise_stalk() const { return m_cruise_stalk; }
 
@@ -1406,6 +1443,7 @@ private:
     HornButton         m_horn_button;
     RsaKeypadDriver    m_rsa_keypad;
     IpcTripResetButton m_ipc_trip_reset;
+    CoastDownButton    m_coast_down;
     CruiseStalk        m_cruise_stalk;
     WiperStalk         m_wiper_stalk;
     DoorLocks          m_door_locks;

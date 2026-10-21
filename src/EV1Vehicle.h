@@ -4,6 +4,7 @@
 #include "chrono_vehicle/wheeled_vehicle/vehicle/WheeledVehicle.h"
 
 #include <memory>
+#include <optional>
 
 namespace ev1sim {
 
@@ -27,6 +28,24 @@ enum class MotorDirection { kForward, kReverse };
 /// transmission in its reverse gear (ratio -1).  No-op on a vehicle whose
 /// transmission is not automatic.
 void SetMotorDirection(chrono::vehicle::ChWheeledVehicle& vehicle, MotorDirection dir);
+
+class EV1DriveMotor;
+
+/// The vehicle's drive motor (EV1DriveMotor.h), or nullptr on a vehicle built
+/// some other way.
+EV1DriveMotor* DriveMotor(chrono::vehicle::ChWheeledVehicle& vehicle);
+
+/// Below this shaft speed the coast drag is withheld: a regen drag opposes
+/// rotation and cannot start a shaft turning.  The PIM's own drag is zero
+/// below the p.209 regen cutoff (~996 rpm), far above this.
+inline constexpr double kCoastDragDeadbandRadS = 1.0;
+
+/// Give the PIM's coast-down drag (`drag_nm`, Nm at the shaft, >= 0) to the
+/// drive motor as torque opposing the shaft's current rotation, or hand the
+/// zero-pedal torque back to the motor map (nullopt).  Call once per step
+/// before Synchronize.  No-op on a vehicle without an EV1DriveMotor.
+void SetCoastDrag(chrono::vehicle::ChWheeledVehicle& vehicle,
+                  std::optional<double> drag_nm);
 
 /// Motor shaft speed in rad/s, signed: positive turning the car forward,
 /// negative turning it backward, whichever way the torque points.  The
