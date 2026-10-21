@@ -52,7 +52,12 @@ bool VehiclePanels::IsOpen(PanelID panel) const {
 // HUD — panel status on the top-down vehicle diagram
 // ---------------------------------------------------------------------------
 
-void VehiclePanels::DrawHUD(irr::IrrlichtDevice* device) const {
+int VehiclePanels::LockKnobOffsetPx(const LockIndicator& li) {
+    double s = li.stroke01 < 0.0 ? 0.0 : (li.stroke01 > 1.0 ? 1.0 : li.stroke01);
+    return static_cast<int>(s * kLockKnobTravelPx + 0.5);
+}
+
+void VehiclePanels::DrawHUD(irr::IrrlichtDevice* device, const BodyLockIndicators* locks) const {
     if (!device) return;
 
     auto* driver = device->getVideoDriver();
@@ -118,4 +123,22 @@ void VehiclePanels::DrawHUD(irr::IrrlichtDevice* device) const {
         driver->draw2DRectangle(c,
             irr::core::recti(x, y1, x + 2, y2));
     }
+
+    if (locks == nullptr) return;
+
+    // Lock knobs: a small square that slides along its travel as the lock
+    // actuator strokes; red when latched locked, grey unlocked, amber while a
+    // door-lock motor is mid-stroke. Door knobs slide down the diagram to
+    // lock, the trunk's to the right.
+    auto knob_color = [](const LockIndicator& li) {
+        if (li.moving) return SColor(230, 230, 170, 30);
+        return li.locked ? SColor(240, 220, 40, 30) : SColor(200, 90, 90, 100);
+    };
+    auto knob = [&](const LockIndicator& li, int x, int y) {
+        driver->draw2DRectangle(knob_color(li), irr::core::recti(x - 2, y - 2, x + 2, y + 2));
+    };
+    const int door_y = car_top + 49;
+    knob(locks->driver, cx - car_hw + 5, door_y + LockKnobOffsetPx(locks->driver));
+    knob(locks->passenger, cx + car_hw - 5, door_y + LockKnobOffsetPx(locks->passenger));
+    knob(locks->trunk, cx - 4 + LockKnobOffsetPx(locks->trunk), car_bot - 22);
 }

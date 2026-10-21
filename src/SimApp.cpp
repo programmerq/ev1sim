@@ -1954,8 +1954,15 @@ int SimApp::RunWithVisualization() {
                     ? m_external_sim->GetWiperMotorCommand()
                     : 0u;  // default OFF when no RHJB command yet
             m_wiper->Tick(render_dt, wiper_cmd);
+            m_wiper->SetPlantSweepPosition(m_external_sim->GetWiperSweepPositionPct());
         }
         m_wiper->ApplyToScene();
+        // The two wipers on the windshield, swung to the renderer's sweep
+        // fraction. Created on the first frame, like the dash screens, once
+        // the visual system's scene is set up.
+        if (!m_wiper3d)
+            m_wiper3d = std::make_unique<ev1sim::WiperBlades3D>(m_vis->GetDevice());
+        m_wiper3d->Place(m_world->GetPose(), m_wiper->GetSweepFraction());
 
         // --- Door lock mirror from RSA (chassis bus 4084/4085) ---
         // RSA publishes desired lock state; ev1sim mirrors it to DoorLocks.
@@ -2009,7 +2016,17 @@ int SimApp::RunWithVisualization() {
                              mu.mu,
                              &abs_phase);
         m_lights->DrawHUD(m_vis->GetDevice());
-        m_panels->DrawHUD(m_vis->GetDevice());
+        {
+            using S = ev1sim::DoorLocks::State;
+            const auto& locks = m_physical->door_locks();
+            const auto& lh = m_physical->door_lock_motor_lh();
+            const auto& rh = m_physical->door_lock_motor_rh();
+            const BodyLockIndicators lock_view{
+                MakeLockIndicator(locks.driver() == S::LOCKED, lh.position(), lh.moving()),
+                MakeLockIndicator(locks.passenger() == S::LOCKED, rh.position(), rh.moving()),
+                MakeLockIndicator(locks.trunk() == S::LOCKED, 0.0, false)};
+            m_panels->DrawHUD(m_vis->GetDevice(), &lock_view);
+        }
         m_wiper->DrawHUD(m_vis->GetDevice());
 
         // IPC instrument cluster, bottom-centre: what the modules put on the

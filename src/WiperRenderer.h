@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 
 // Forward declarations to avoid pulling in Irrlicht headers.
 namespace irr {
@@ -22,14 +23,10 @@ namespace irr {
 /// (or HUD) is `sin(phase) × max_angle_deg`, which naturally produces the
 /// symmetric left↔right sweep without any extra bookkeeping.
 ///
-/// Mesh path: no wiper mesh exists in the EV1 chassis model
-/// (data/vehicle/ev1/ev1_chassis_vis.obj contains no "wiper" or "windshield"
-/// object groups).  The implementation therefore uses a HUD-only fallback:
-/// a small "WIPER" overlay block rendered below the lights snapshot panel.
-///
-/// TODO: When wiper meshes are added to the chassis model, call
-///       WiperRenderer::FindWiperNode(smgr->getRootSceneNode()) and the class
-///       will automatically rotate them instead of drawing the HUD bar.
+/// Visuals: a small "WIPER" HUD block above the lights snapshot panel, and
+/// the wipers on the windshield, which WiperBlades3D draws from
+/// GetSweepFraction() (the chassis mesh has no wiper parts, so FindWiperNode()
+/// finds none).
 class WiperRenderer {
 public:
     /// Wiper motor command enum — mirrors kSigChassisWiperMotorCommand values.
@@ -64,6 +61,23 @@ public:
     /// Convenience overload that takes the Mode enum directly.
     void Tick(double dt_s, Mode mode);
 
+    /// The blade position the RHJB's wiper-motor plant publishes
+    /// (CHASSIS_WIPER_SWEEP_POSITION, percent of one cycle, 0 = park, 50 = end
+    /// of sweep), or nullopt before it has. When set, GetSweepFraction() and
+    /// the HUD follow it instead of this class's own phase, so the park return
+    /// after OFF shows as the plant runs it.
+    void SetPlantSweepPosition(std::optional<std::uint8_t> position_pct) {
+        m_plant_position_pct = position_pct;
+    }
+
+    /// Sweep fraction (0 = park, 1 = far end) from a plant position: percent
+    /// of one full cycle, 0 = park, 50 = end of sweep, back to park at 100.
+    static double SweepFromPlantPosition(std::uint8_t position_pct);
+
+    /// Where the blades are: 0 = park, 1 = far end of the sweep. The plant's
+    /// position when published, else (1 - cos(phase)) / 2.
+    double GetSweepFraction() const;
+
     /// Attempt to find a wiper scene-graph node.  Returns true if found.
     /// When a node is found, ApplyToScene() rotates it instead of drawing HUD.
     bool FindWiperNode(irr::scene::ISceneNode* root);
@@ -95,6 +109,7 @@ private:
     Mode   m_mode      = Mode::OFF;
     double m_phase_rad = 0.0;
     float  m_max_angle_deg = kDefaultMaxAngleDeg;
+    std::optional<std::uint8_t> m_plant_position_pct;
 
     /// Non-owning pointer to the wiper scene-graph node, or null if absent.
     irr::scene::ISceneNode* m_wiper_node = nullptr;

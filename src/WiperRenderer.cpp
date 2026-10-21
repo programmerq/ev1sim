@@ -94,6 +94,16 @@ void WiperRenderer::ApplyToScene() {
 // Angle accessor
 // ---------------------------------------------------------------------------
 
+double WiperRenderer::SweepFromPlantPosition(std::uint8_t position_pct) {
+    const double p = position_pct > 100 ? 100.0 : static_cast<double>(position_pct);
+    return p <= 50.0 ? p / 50.0 : (100.0 - p) / 50.0;
+}
+
+double WiperRenderer::GetSweepFraction() const {
+    if (m_plant_position_pct) return SweepFromPlantPosition(*m_plant_position_pct);
+    return (1.0 - std::cos(m_phase_rad)) / 2.0;
+}
+
 float WiperRenderer::GetAngleDeg() const {
     return static_cast<float>(std::sin(m_phase_rad)) * m_max_angle_deg;
 }
@@ -183,7 +193,9 @@ void WiperRenderer::DrawHUD(irr::IrrlichtDevice* device) const {
                 (m_mode == Mode::INT)  ? L"INT " :
                 (m_mode == Mode::LOW)  ? L"LOW " : L"HIGH";
             wchar_t bar[16];
-            BuildSweepBar(GetAngleDeg(), m_max_angle_deg, bar, 16);
+            // The bar runs park (left) to far end (right).
+            BuildSweepBar(static_cast<float>((2.0 * GetSweepFraction() - 1.0) * m_max_angle_deg),
+                          m_max_angle_deg, bar, 16);
             // Combine: "INT [────►───]"
             ::wcsncpy(label, mode_str, 63);
             ::wcsncat(label, bar, 63 - static_cast<int>(::wcslen(label)));
