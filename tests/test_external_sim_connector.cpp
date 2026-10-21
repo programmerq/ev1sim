@@ -1395,6 +1395,34 @@ TEST_CASE("GetAbsPhaseFront prefers chassis-bus iso/dump over main-harness",
     CHECK(phase.fr == Phase::DUMP);
 }
 
+TEST_CASE("GetAbsPhaseFront reads a sealed iso with the motor restoring as APPLY",
+          "[ExternalSim][ABS][chassis-bus]") {
+    ExternalSimConnector c;
+    c.DebugInjectDelta(5050, true);   // BTCM heartbeat.
+    // Both wheels sealed, no dump: the BTCM's mid-event state.
+    c.DebugInjectDelta(4147, true);   // iso_close FL
+    c.DebugInjectDelta(4149, false);  // dump_open FL
+    c.DebugInjectDelta(4148, true);   // iso_close FR
+    c.DebugInjectDelta(4150, false);  // dump_open FR
+    using Phase = ExternalSimConnector::AbsPhaseFront::Phase;
+
+    auto phase = c.GetAbsPhaseFront(std::chrono::milliseconds(3000));
+    CHECK(phase.fl == Phase::HOLD);   // no motor command yet: hold
+    CHECK(phase.fr == Phase::HOLD);
+
+    c.DebugInjectBtcmFrontMotorCmd(1.0f, 0.0f);  // FL restoring, FR holding
+    phase = c.GetAbsPhaseFront(std::chrono::milliseconds(3000));
+    CHECK(phase.fl == Phase::APPLY);
+    CHECK(phase.fr == Phase::HOLD);
+
+    // The release leg with a sealed iso still needs dump_open to read DUMP.
+    c.DebugInjectBtcmFrontMotorCmd(-1.0f, -1.0f);
+    c.DebugInjectDelta(4149, true);
+    phase = c.GetAbsPhaseFront(std::chrono::milliseconds(3000));
+    CHECK(phase.fl == Phase::DUMP);
+    CHECK(phase.fr == Phase::HOLD);
+}
+
 TEST_CASE("GetAbsPhaseFront falls back to main-harness when chassis-bus silent",
           "[ExternalSim][ABS][chassis-bus]") {
     ExternalSimConnector c;

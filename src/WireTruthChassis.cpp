@@ -873,6 +873,14 @@ std::optional<float> WireTruthChassis::pim_coast_drag_nm() const {
     return read_float32(electricsim::topology::kWireCHASSIS_PIM_COAST_DRAG_NM);
 }
 
+std::optional<float> WireTruthChassis::btcm_front_motor_cmd_fl() const {
+    return read_float32(electricsim::topology::kWireCHASSIS_BTCM_FRONT_MOTOR_CMD_FL);
+}
+
+std::optional<float> WireTruthChassis::btcm_front_motor_cmd_fr() const {
+    return read_float32(electricsim::topology::kWireCHASSIS_BTCM_FRONT_MOTOR_CMD_FR);
+}
+
 bool WireTruthChassis::publish_coast_down_switch(bool on) {
     if (!attached()) return false;
     return write_bit(electricsim::topology::kWireDRIVER_COAST_DOWN_SWITCH, on);
@@ -1025,6 +1033,12 @@ std::optional<bool> WireTruthChassis::ad_precharge_relay() const {
     return std::nullopt;
 }
 std::optional<float> WireTruthChassis::pim_coast_drag_nm() const {
+    return std::nullopt;
+}
+std::optional<float> WireTruthChassis::btcm_front_motor_cmd_fl() const {
+    return std::nullopt;
+}
+std::optional<float> WireTruthChassis::btcm_front_motor_cmd_fr() const {
     return std::nullopt;
 }
 bool WireTruthChassis::publish_coast_down_switch(bool) { return false; }

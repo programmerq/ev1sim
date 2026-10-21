@@ -27,8 +27,8 @@
 namespace electricsim::topology {
 
 inline constexpr std::uint32_t kFormatVersion = 2U;
-inline constexpr std::uint32_t kTopologyHash = 0x9044B45DU;
-inline constexpr std::size_t kWireCount = 465;
+inline constexpr std::uint32_t kTopologyHash = 0x49504611U;
+inline constexpr std::size_t kWireCount = 467;
 
 // Per-class cell counts. Emitted so a
 // receipt can print the classification without re-parsing YAML,
@@ -36,7 +36,7 @@ inline constexpr std::size_t kWireCount = 465;
 // by a DECREASING ratchet in the generator that fails on !=.
 inline constexpr std::size_t kConductorCellCount = 98;
 inline constexpr std::size_t kElementStateCellCount = 71;
-inline constexpr std::size_t kSemanticCellCount = 106;
+inline constexpr std::size_t kSemanticCellCount = 108;
 inline constexpr std::size_t kUnclassifiedLegacyCellCount = 190;
 
 // Named cell ids. Sequential by YAML key order; changing that
@@ -514,6 +514,8 @@ inline constexpr ::electricsim::io::ConductorId kWireBTCM_FEED_REAR_BRAKE_FUSE_6
 inline constexpr ::electricsim::io::ConductorId kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B{463U};
 inline constexpr ::electricsim::io::ConductorId kWireBTCM_FEED_REAR_BRAKE_BPLUS_2033{464U};
 inline constexpr ::electricsim::io::WireId kWireCHASSIS_PIM_COAST_DRAG_NM = 465U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_FRONT_MOTOR_CMD_FL = 466U;
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_BTCM_FRONT_MOTOR_CMD_FR = 467U;
 
 // Per-net default + init_policy constants.
 // Used by consumers that opt into the kDefault policy — see
@@ -1450,6 +1452,10 @@ inline constexpr auto kWireBTCM_FEED_REAR_BRAKE_BPLUS_2033_Default = false;
 inline constexpr InitPolicy kWireBTCM_FEED_REAR_BRAKE_BPLUS_2033_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireCHASSIS_PIM_COAST_DRAG_NM_Default = 0.0f;
 inline constexpr InitPolicy kWireCHASSIS_PIM_COAST_DRAG_NM_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_BTCM_FRONT_MOTOR_CMD_FL_Default = 0.0f;
+inline constexpr InitPolicy kWireCHASSIS_BTCM_FRONT_MOTOR_CMD_FL_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHASSIS_BTCM_FRONT_MOTOR_CMD_FR_Default = 0.0f;
+inline constexpr InitPolicy kWireCHASSIS_BTCM_FRONT_MOTOR_CMD_FR_InitPolicy = InitPolicy::kHold;
 
 // Declare every wire in this topology on the given (creator)
 // table. Returns true iff all declarations succeed.
@@ -1920,6 +1926,8 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_BPLUS_2033), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(kWireCHASSIS_PIM_COAST_DRAG_NM, ::electricsim::io::WireType::kFloat32) && ok;
+  ok = table.declare(kWireCHASSIS_BTCM_FRONT_MOTOR_CMD_FL, ::electricsim::io::WireType::kFloat32) && ok;
+  ok = table.declare(kWireCHASSIS_BTCM_FRONT_MOTOR_CMD_FR, ::electricsim::io::WireType::kFloat32) && ok;
   return ok;
 }
 
@@ -2393,6 +2401,8 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B): return "BTCM_FEED_FRONT_BRAKE_BPLUS_1633B";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_BPLUS_2033): return "BTCM_FEED_REAR_BRAKE_BPLUS_2033";
     case kWireCHASSIS_PIM_COAST_DRAG_NM: return "CHASSIS_PIM_COAST_DRAG_NM";
+    case kWireCHASSIS_BTCM_FRONT_MOTOR_CMD_FL: return "CHASSIS_BTCM_FRONT_MOTOR_CMD_FL";
+    case kWireCHASSIS_BTCM_FRONT_MOTOR_CMD_FR: return "CHASSIS_BTCM_FRONT_MOTOR_CMD_FR";
     default: return ::std::string_view{};
   }
 }
@@ -2871,6 +2881,8 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B): return "";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_BPLUS_2033): return "";
     case kWireCHASSIS_PIM_COAST_DRAG_NM: return "";
+    case kWireCHASSIS_BTCM_FRONT_MOTOR_CMD_FL: return "";
+    case kWireCHASSIS_BTCM_FRONT_MOTOR_CMD_FR: return "";
     default: return ::std::string_view{};
   }
 }
@@ -3353,6 +3365,8 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_FEED_FRONT_BRAKE_BPLUS_1633B"}, static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_BPLUS_2033), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_FEED_REAR_BRAKE_BPLUS_2033"}, static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_BPLUS_2033)); ++count; }
   if (table.write_gen(kWireCHASSIS_PIM_COAST_DRAG_NM, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_PIM_COAST_DRAG_NM"}, kWireCHASSIS_PIM_COAST_DRAG_NM); ++count; }
+  if (table.write_gen(kWireCHASSIS_BTCM_FRONT_MOTOR_CMD_FL, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_BTCM_FRONT_MOTOR_CMD_FL"}, kWireCHASSIS_BTCM_FRONT_MOTOR_CMD_FL); ++count; }
+  if (table.write_gen(kWireCHASSIS_BTCM_FRONT_MOTOR_CMD_FR, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_BTCM_FRONT_MOTOR_CMD_FR"}, kWireCHASSIS_BTCM_FRONT_MOTOR_CMD_FR); ++count; }
   return count;
 }
 
@@ -3831,6 +3845,8 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_BPLUS_2033): return ::electricsim::io::CellClass::kConductor;
     case kWireCHASSIS_PIM_COAST_DRAG_NM: return ::electricsim::io::CellClass::kSemantic;
+    case kWireCHASSIS_BTCM_FRONT_MOTOR_CMD_FL: return ::electricsim::io::CellClass::kSemantic;
+    case kWireCHASSIS_BTCM_FRONT_MOTOR_CMD_FR: return ::electricsim::io::CellClass::kSemantic;
     default: return ::electricsim::io::CellClass::kUnknown;
   }
 }

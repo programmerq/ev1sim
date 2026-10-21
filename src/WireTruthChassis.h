@@ -310,6 +310,11 @@ public:
     // shaft's rotation). nullopt until the PIM writes CHASSIS_PIM_COAST_DRAG_NM.
     std::optional<float> pim_coast_drag_nm() const;        // CHASSIS_PIM_COAST_DRAG_NM
 
+    // The BTCM front modulator motor commands, signed [-1,+1] (+1 restore,
+    // -1 release, 0 neither). nullopt until the BTCM writes them.
+    std::optional<float> btcm_front_motor_cmd_fl() const;  // CHASSIS_BTCM_FRONT_MOTOR_CMD_FL
+    std::optional<float> btcm_front_motor_cmd_fr() const;  // CHASSIS_BTCM_FRONT_MOTOR_CMD_FR
+
     // The shifter's coast-down button position (1 = coast down), read by the
     // RSA. ev1sim is this cell's producer. Returns false if not attached.
     bool publish_coast_down_switch(bool on);               // DRIVER_COAST_DOWN_SWITCH

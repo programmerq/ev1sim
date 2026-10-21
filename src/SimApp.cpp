@@ -1127,6 +1127,9 @@ void SimApp::ApplyAbsFrontBrake(double time, double dt_s,
     const double alpha_dump  =
         dt_s >= tau_dump  ? 1.0 : (1.0 - std::exp(-dt_s / tau_dump));
 
+    // APPLY also covers the BTCM's modulator motor restoring a sealed caliper
+    // (iso sealed, restore leg driven; GetAbsPhaseFront's decode table): the
+    // same approach toward the local brake, which caps it at the pedal level.
     auto modulate = [&](Phase phase, double prev, double local) -> double {
         switch (phase) {
             case Phase::APPLY: return prev + alpha_apply * (local - prev);
