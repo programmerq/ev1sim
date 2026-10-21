@@ -27,14 +27,14 @@
 namespace electricsim::topology {
 
 inline constexpr std::uint32_t kFormatVersion = 2U;
-inline constexpr std::uint32_t kTopologyHash = 0x66F8D3B5U;
-inline constexpr std::size_t kWireCount = 461;
+inline constexpr std::uint32_t kTopologyHash = 0x9044B45DU;
+inline constexpr std::size_t kWireCount = 465;
 
 // Per-class cell counts. Emitted so a
 // receipt can print the classification without re-parsing YAML,
 // and so a test can assert against them. The legacy count is held
 // by a DECREASING ratchet in the generator that fails on !=.
-inline constexpr std::size_t kConductorCellCount = 94;
+inline constexpr std::size_t kConductorCellCount = 98;
 inline constexpr std::size_t kElementStateCellCount = 71;
 inline constexpr std::size_t kSemanticCellCount = 106;
 inline constexpr std::size_t kUnclassifiedLegacyCellCount = 190;
@@ -509,7 +509,11 @@ inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_BATTERY_RECOVE
 inline constexpr ::electricsim::io::ConductorId kWireAPM_VEHICLE_WAKE_UP_IN{458U};
 inline constexpr ::electricsim::io::ConductorId kWireAD_FEED_LOGIC_SUPPLY{459U};
 inline constexpr ::electricsim::io::WireId kWireDRIVER_COAST_DOWN_SWITCH = 460U;
-inline constexpr ::electricsim::io::WireId kWireCHASSIS_PIM_COAST_DRAG_NM = 461U;
+inline constexpr ::electricsim::io::ConductorId kWireBTCM_FEED_FRONT_BRAKE_FUSE_542{461U};
+inline constexpr ::electricsim::io::ConductorId kWireBTCM_FEED_REAR_BRAKE_FUSE_642{462U};
+inline constexpr ::electricsim::io::ConductorId kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B{463U};
+inline constexpr ::electricsim::io::ConductorId kWireBTCM_FEED_REAR_BRAKE_BPLUS_2033{464U};
+inline constexpr ::electricsim::io::WireId kWireCHASSIS_PIM_COAST_DRAG_NM = 465U;
 
 // Per-net default + init_policy constants.
 // Used by consumers that opt into the kDefault policy — see
@@ -1436,6 +1440,14 @@ inline constexpr auto kWireAD_FEED_LOGIC_SUPPLY_Default = false;
 inline constexpr InitPolicy kWireAD_FEED_LOGIC_SUPPLY_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireDRIVER_COAST_DOWN_SWITCH_Default = false;
 inline constexpr InitPolicy kWireDRIVER_COAST_DOWN_SWITCH_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireBTCM_FEED_FRONT_BRAKE_FUSE_542_Default = false;
+inline constexpr InitPolicy kWireBTCM_FEED_FRONT_BRAKE_FUSE_542_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireBTCM_FEED_REAR_BRAKE_FUSE_642_Default = false;
+inline constexpr InitPolicy kWireBTCM_FEED_REAR_BRAKE_FUSE_642_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B_Default = false;
+inline constexpr InitPolicy kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireBTCM_FEED_REAR_BRAKE_BPLUS_2033_Default = false;
+inline constexpr InitPolicy kWireBTCM_FEED_REAR_BRAKE_BPLUS_2033_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireCHASSIS_PIM_COAST_DRAG_NM_Default = 0.0f;
 inline constexpr InitPolicy kWireCHASSIS_PIM_COAST_DRAG_NM_InitPolicy = InitPolicy::kHold;
 
@@ -1903,6 +1915,10 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireAPM_VEHICLE_WAKE_UP_IN), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireAD_FEED_LOGIC_SUPPLY), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(kWireDRIVER_COAST_DOWN_SWITCH, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_FUSE_542), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_FUSE_642), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_BPLUS_2033), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(kWireCHASSIS_PIM_COAST_DRAG_NM, ::electricsim::io::WireType::kFloat32) && ok;
   return ok;
 }
@@ -2372,6 +2388,10 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case static_cast<::electricsim::io::WireId>(kWireAPM_VEHICLE_WAKE_UP_IN): return "APM_VEHICLE_WAKE_UP_IN";
     case static_cast<::electricsim::io::WireId>(kWireAD_FEED_LOGIC_SUPPLY): return "AD_FEED_LOGIC_SUPPLY";
     case kWireDRIVER_COAST_DOWN_SWITCH: return "DRIVER_COAST_DOWN_SWITCH";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_FUSE_542): return "BTCM_FEED_FRONT_BRAKE_FUSE_542";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_FUSE_642): return "BTCM_FEED_REAR_BRAKE_FUSE_642";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B): return "BTCM_FEED_FRONT_BRAKE_BPLUS_1633B";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_BPLUS_2033): return "BTCM_FEED_REAR_BRAKE_BPLUS_2033";
     case kWireCHASSIS_PIM_COAST_DRAG_NM: return "CHASSIS_PIM_COAST_DRAG_NM";
     default: return ::std::string_view{};
   }
@@ -2846,6 +2866,10 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case static_cast<::electricsim::io::WireId>(kWireAPM_VEHICLE_WAKE_UP_IN): return "";
     case static_cast<::electricsim::io::WireId>(kWireAD_FEED_LOGIC_SUPPLY): return "";
     case kWireDRIVER_COAST_DOWN_SWITCH: return "";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_FUSE_542): return "";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_FUSE_642): return "";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B): return "";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_BPLUS_2033): return "";
     case kWireCHASSIS_PIM_COAST_DRAG_NM: return "";
     default: return ::std::string_view{};
   }
@@ -3324,6 +3348,10 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireAPM_VEHICLE_WAKE_UP_IN), &gen) && gen == 0) { visitor(::std::string_view{"APM_VEHICLE_WAKE_UP_IN"}, static_cast<::electricsim::io::WireId>(kWireAPM_VEHICLE_WAKE_UP_IN)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireAD_FEED_LOGIC_SUPPLY), &gen) && gen == 0) { visitor(::std::string_view{"AD_FEED_LOGIC_SUPPLY"}, static_cast<::electricsim::io::WireId>(kWireAD_FEED_LOGIC_SUPPLY)); ++count; }
   if (table.write_gen(kWireDRIVER_COAST_DOWN_SWITCH, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_COAST_DOWN_SWITCH"}, kWireDRIVER_COAST_DOWN_SWITCH); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_FUSE_542), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_FEED_FRONT_BRAKE_FUSE_542"}, static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_FUSE_542)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_FUSE_642), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_FEED_REAR_BRAKE_FUSE_642"}, static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_FUSE_642)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_FEED_FRONT_BRAKE_BPLUS_1633B"}, static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_BPLUS_2033), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_FEED_REAR_BRAKE_BPLUS_2033"}, static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_BPLUS_2033)); ++count; }
   if (table.write_gen(kWireCHASSIS_PIM_COAST_DRAG_NM, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_PIM_COAST_DRAG_NM"}, kWireCHASSIS_PIM_COAST_DRAG_NM); ++count; }
   return count;
 }
@@ -3798,6 +3826,10 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case static_cast<::electricsim::io::WireId>(kWireAPM_VEHICLE_WAKE_UP_IN): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireAD_FEED_LOGIC_SUPPLY): return ::electricsim::io::CellClass::kConductor;
     case kWireDRIVER_COAST_DOWN_SWITCH: return ::electricsim::io::CellClass::kSemantic;
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_FUSE_542): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_FUSE_642): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_BPLUS_2033): return ::electricsim::io::CellClass::kConductor;
     case kWireCHASSIS_PIM_COAST_DRAG_NM: return ::electricsim::io::CellClass::kSemantic;
     default: return ::electricsim::io::CellClass::kUnknown;
   }
