@@ -193,6 +193,11 @@ public:
     /// "coast_down_switch"; 1 = coast down). Published on DRIVER_COAST_DOWN_SWITCH
     /// every tick once set, for the RSA to report as $31 Coast Down Request.
     void SetCoastDownSwitch(bool on);
+
+    /// Queue one click of the RSA's DIM UP (`up`) or DIM DOWN button. Each
+    /// tick publishes at most one queued click per button on
+    /// DRIVER_RSA_DIM_UP / _DOWN, so the RSA reads every click separately.
+    void PressRsaDimmer(bool up);
     void SetDriverSteeringDegQ8(std::int16_t q8);
     void SetDriverGearSelector(std::uint8_t enum_v);
 

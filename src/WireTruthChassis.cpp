@@ -822,6 +822,8 @@ ev1sim::DashRsaConsole WireTruthChassis::rsa_console() const {
     c.led_neutral   = read_bit(kWireCHASSIS_RSA_SELECTOR_LED_NEUTRAL);
     c.led_drive     = read_bit(kWireCHASSIS_RSA_SELECTOR_LED_DRIVE);
     c.dim_step      = read_byte(kWireCHASSIS_RSA_DIM_LEVEL_STEP);
+    c.lock_driver   = read_byte(kWireCHASSIS_DOOR_LOCK_CMD_DRIVER);
+    c.lock_passenger = read_byte(kWireCHASSIS_DOOR_LOCK_CMD_PASSENGER);
     return c;
 }
 std::optional<bool> WireTruthChassis::ipc_wait_drive() const {
@@ -888,6 +890,13 @@ std::optional<std::uint8_t> WireTruthChassis::wiper_sweep_position_pct() const {
 bool WireTruthChassis::publish_coast_down_switch(bool on) {
     if (!attached()) return false;
     return write_bit(electricsim::topology::kWireDRIVER_COAST_DOWN_SWITCH, on);
+}
+
+bool WireTruthChassis::publish_rsa_dim_click(bool up) {
+    if (!attached()) return false;
+    const auto cell = up ? electricsim::topology::kWireDRIVER_RSA_DIM_UP
+                         : electricsim::topology::kWireDRIVER_RSA_DIM_DOWN;
+    return write_bit(cell, true) && write_bit(cell, false);
 }
 
 }  // namespace ev1sim
@@ -1049,6 +1058,7 @@ std::optional<std::uint8_t> WireTruthChassis::wiper_sweep_position_pct() const {
     return std::nullopt;
 }
 bool WireTruthChassis::publish_coast_down_switch(bool) { return false; }
+bool WireTruthChassis::publish_rsa_dim_click(bool) { return false; }
 
 }  // namespace ev1sim
 

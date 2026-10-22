@@ -1534,6 +1534,8 @@ struct ExternalSimConnector::State {
     // Shifter coast-down button (scenario action coast_down_switch).
     bool          coast_down_switch_armed         = false;
     bool          coast_down_switch_on            = false;
+    // RSA DIM DOWN / DIM UP clicks not yet published ([0] down, [1] up).
+    int           rsa_dim_clicks[2]               = {0, 0};
     // PIM coast-down drag (CHASSIS_PIM_COAST_DRAG_NM), Nm at the shaft.
     float         pim_coast_drag_nm               = 0.0f;
     bool          has_pim_coast_drag_nm           = false;
@@ -2362,6 +2364,10 @@ void ExternalSimConnector::SetHvIsolationFault(std::uint8_t lead,
 void ExternalSimConnector::SetCoastDownSwitch(bool on) {
     m_state->coast_down_switch_armed = true;
     m_state->coast_down_switch_on    = on;
+}
+
+void ExternalSimConnector::PressRsaDimmer(bool up) {
+    ++m_state->rsa_dim_clicks[up ? 1 : 0];
 }
 
 std::optional<float> ExternalSimConnector::GetPimCoastDragNm() const {
@@ -3752,6 +3758,13 @@ void ExternalSimConnector::Tick(double sim_time_s) {
     // reads unwritten as not pressed), then level-held every tick.
     if (st.coast_down_switch_armed && st.wire) {
         st.wire->publish_coast_down_switch(st.coast_down_switch_on);
+    }
+    // RSA dimmer: one queued click per button per tick, so two clicks never
+    // land between the same two RSA reads.
+    for (int up = 0; up < 2; ++up) {
+        if (st.rsa_dim_clicks[up] > 0 && st.wire &&
+            st.wire->publish_rsa_dim_click(up == 1))
+            --st.rsa_dim_clicks[up];
     }
 #endif
 

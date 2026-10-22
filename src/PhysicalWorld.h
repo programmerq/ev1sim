@@ -474,6 +474,26 @@ private:
     bool m_on = false;
 };
 
+/// The RSA's DIM UP / DIM DOWN buttons (ESM ELPD 440), momentary.  Each
+/// press queues one click; SimApp hands the clicks to the external sim, which
+/// publishes each as a press and release on DRIVER_RSA_DIM_UP / _DOWN.  The
+/// RSA owns the dimmer step; ev1sim only presses its buttons.
+class RsaDimmerButtons {
+public:
+    void press(bool up) { ++(up ? m_up : m_down); }
+    /// Clicks queued since the last take, then cleared.
+    int take(bool up) {
+        int& n = up ? m_up : m_down;
+        const int v = n;
+        n = 0;
+        return v;
+    }
+
+private:
+    int m_up = 0;
+    int m_down = 0;
+};
+
 /// IPC cluster trip-reset button (momentary dash button).
 ///
 /// Single-shot press: press() marks a pending event; consume_press_event()
@@ -1314,6 +1334,9 @@ public:
     CoastDownButton&       coast_down_button()       { return m_coast_down; }
     const CoastDownButton& coast_down_button() const { return m_coast_down; }
 
+    RsaDimmerButtons&       rsa_dimmer()       { return m_rsa_dimmer; }
+    const RsaDimmerButtons& rsa_dimmer() const { return m_rsa_dimmer; }
+
     CruiseStalk&       cruise_stalk()       { return m_cruise_stalk; }
     const CruiseStalk& cruise_stalk() const { return m_cruise_stalk; }
 
@@ -1444,6 +1467,7 @@ private:
     RsaKeypadDriver    m_rsa_keypad;
     IpcTripResetButton m_ipc_trip_reset;
     CoastDownButton    m_coast_down;
+    RsaDimmerButtons   m_rsa_dimmer;
     CruiseStalk        m_cruise_stalk;
     WiperStalk         m_wiper_stalk;
     DoorLocks          m_door_locks;

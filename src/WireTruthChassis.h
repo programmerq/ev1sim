@@ -324,6 +324,11 @@ public:
     // RSA. ev1sim is this cell's producer. Returns false if not attached.
     bool publish_coast_down_switch(bool on);               // DRIVER_COAST_DOWN_SWITCH
 
+    // One click (press then release) of the RSA's DIM UP or DIM DOWN button;
+    // the RSA moves its dimmer step one level per click. Returns false if not
+    // attached.
+    bool publish_rsa_dim_click(bool up);                   // DRIVER_RSA_DIM_UP / _DOWN
+
 private:
     WireTruthChassis();
     struct Impl;
