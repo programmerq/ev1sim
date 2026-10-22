@@ -716,6 +716,11 @@ public:
     /// shaft, >= 0, opposing rotation. nullopt until the PIM has written it.
     std::optional<float> GetPimCoastDragNm() const;
 
+    /// The wiper blades' position from the RHJB's wiper-motor plant
+    /// (CHASSIS_WIPER_SWEEP_POSITION): percent of one full sweep cycle, 0 =
+    /// park, 50 = end of sweep. nullopt until the RHJB has written it.
+    std::optional<std::uint8_t> GetWiperSweepPositionPct() const;
+
     /// What the instrument cluster shows (docs/ipc_rsa_display_plan.md Phase 1):
     /// the GM-8192 frames BusSnoop decoded off the module TX cells, fresh as of
     /// the current sim time, plus the IPC's own lamps (4130-4145) copied from
@@ -841,6 +846,10 @@ public:
     /// Inject the BTCM front motor commands (CHASSIS_BTCM_FRONT_MOTOR_CMD_FL/FR
     /// have no signal id).  Used by unit tests; not part of the runtime path.
     void DebugInjectBtcmFrontMotorCmd(float fl, float fr);
+
+    /// Inject the wiper blade position (CHASSIS_WIPER_SWEEP_POSITION has no
+    /// signal id).  Used by unit tests; not part of the runtime path.
+    void DebugInjectWiperSweepPositionPct(std::uint8_t pct);
 
 private:
     Options m_opts;

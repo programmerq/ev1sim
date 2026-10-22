@@ -13,6 +13,33 @@ enum class PanelID : int {
     COUNT  // = 4
 };
 
+/// One lock as the body diagram shows it: the latch state, and where the lock
+/// actuator's stroke is (0 = unlocked end, 1 = locked end). While a door-lock
+/// motor is mid-stroke the knob follows the motor; otherwise it sits at the
+/// end the latch says.
+struct LockIndicator {
+    bool   locked   = false;
+    bool   moving   = false;
+    double stroke01 = 0.0;
+};
+
+/// Pure: the indicator for a latch state plus, for a motorised door lock, its
+/// motor's stroke (DoorLockMotor::position()/moving()). The trunk has no
+/// motor model, so it passes motor_moving = false.
+inline LockIndicator MakeLockIndicator(bool latch_locked, double motor_stroke01,
+                                       bool motor_moving) {
+    LockIndicator li;
+    li.locked = latch_locked;
+    li.moving = motor_moving;
+    li.stroke01 = motor_moving ? motor_stroke01 : (latch_locked ? 1.0 : 0.0);
+    return li;
+}
+
+/// The three locks on the diagram: driver door, passenger door, trunk.
+struct BodyLockIndicators {
+    LockIndicator driver, passenger, trunk;
+};
+
 /// Tracks open/closed state of body panels (hood, trunk, doors).
 /// Each panel maps to a physical sensor in the electronic harness.
 /// No geometry or animation — just state and HUD indicators.
@@ -30,9 +57,15 @@ public:
     Hood&       hood()       { return m_hood; }
     const Hood& hood() const { return m_hood; }
 
-    /// Draw panel status indicators on the top-down vehicle HUD.
+    /// Draw panel status indicators on the top-down vehicle HUD, and when
+    /// `locks` is given a lock knob inside each door and the trunk.
     /// Call between BeginScene/EndScene.
-    void DrawHUD(irr::IrrlichtDevice* device) const;
+    void DrawHUD(irr::IrrlichtDevice* device, const BodyLockIndicators* locks = nullptr) const;
+
+    /// Pixel offset of a lock knob along its travel (0 at the unlocked end,
+    /// kLockKnobTravelPx at the locked end).
+    static int LockKnobOffsetPx(const LockIndicator& li);
+    static constexpr int kLockKnobTravelPx = 8;
 
     static constexpr int NUM_PANELS = static_cast<int>(PanelID::COUNT);
 
