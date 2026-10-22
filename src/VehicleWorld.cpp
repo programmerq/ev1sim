@@ -88,9 +88,10 @@ VehicleWorld::VehicleWorld(const Config& config_in) {
             std::cout << "[VehicleWorld] Settled at rest in " << took << " s\n";
             // Reset (R) puts the car back at ride height, not up in the air.
             m_spawn_pos.z() = m_vehicle->GetChassisBody()->GetPos().z();
-        } else
+        } else {
             std::cout << "[VehicleWorld] WARNING: still moving after "
                       << ev1sim::kSettleMaxS << " s of settling\n";
+        }
     }
 
     std::cout << "[VehicleWorld] Initialised: model=" << config.vehicle_model
