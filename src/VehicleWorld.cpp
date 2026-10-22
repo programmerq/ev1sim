@@ -79,6 +79,20 @@ VehicleWorld::VehicleWorld(const Config& config_in) {
     // Terrain.
     CreateTerrain(config);
 
+    // A car created at rest lands and stops before sim time 0, so nothing
+    // that reads the plant sees the drop.  A rolling spawn is already moving.
+    if (config.spawn.settle && config.spawn.speed_mps == 0.0) {
+        const double took = ev1sim::SettleAtRest(*m_vehicle, *m_terrain,
+                                                 config.simulation.step_size_s);
+        if (took >= 0.0) {
+            std::cout << "[VehicleWorld] Settled at rest in " << took << " s\n";
+            // Reset (R) puts the car back at ride height, not up in the air.
+            m_spawn_pos.z() = m_vehicle->GetChassisBody()->GetPos().z();
+        } else
+            std::cout << "[VehicleWorld] WARNING: still moving after "
+                      << ev1sim::kSettleMaxS << " s of settling\n";
+    }
+
     std::cout << "[VehicleWorld] Initialised: model=" << config.vehicle_model
               << "  terrain=" << config.terrain.type;
     if (config.terrain.type == "level")
