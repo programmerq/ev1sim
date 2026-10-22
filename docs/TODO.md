@@ -202,13 +202,20 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   Surfacing this as a `kSigChassisAbsActive` boolean would let a
   game-controller adapter drive a rumble motor for tactile feedback.
   Out of scope until game-controller input/FFB lands.
-## Outputs ev1sim could render (defer all)
-- [ ] Wiper motor visual sweep (model update needed).
-- [ ] Door lock solenoid **visual** click — the audio click already plays via
-  `SounderAudio::PlayClick` (fired on motor end-of-travel in `SimApp`); only the
-  on-screen visual remains.
-- [ ] Trunk animation (T key and the panel's "Trunk lid" button toggle
-  state; no visual today).
+## Outputs ev1sim could render
+- [x] Wiper sweep: `WiperBlades3D` (`src/WiperBlades3D.{h,cpp}`) draws both
+  wipers as arm and blade bars on the windshield (the chassis mesh has no wiper
+  parts), swung to the blade position the RHJB's wiper-motor plant publishes
+  (`CHASSIS_WIPER_SWEEP_POSITION`), so the park return after OFF shows too; the
+  HUD's WIPER bar follows the same position. Parked blade-tip heights from the
+  body manual (p. 126); pivots, lengths and sweep angle are `@design`.
+- [x] Door lock visual: the body diagram (bottom right) has a lock knob inside
+  each door and the trunk, sliding with the door-lock motor's stroke (amber
+  mid-stroke, red latched locked); the audio click still plays at end of
+  travel.
+- [ ] Trunk lid animation in 3D. Its open/closed state is on the body diagram,
+  but the chassis visual mesh is one piece, so the lid can't swing until the
+  mesh has it as its own part (an asset change, not code).
 
 ## Floating UI panel
 - [ ] **IPC LCD brightness and telltale overrides** — the telltale cells are

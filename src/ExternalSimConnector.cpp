@@ -1541,6 +1541,8 @@ struct ExternalSimConnector::State {
     // signed: +1 restore, -1 release, 0 neither.
     float         btcm_front_motor_fl             = 0.0f;
     float         btcm_front_motor_fr             = 0.0f;
+    std::uint8_t  wiper_sweep_position_pct        = 0u;
+    bool          has_wiper_sweep_position_pct    = false;
 
     // IPC extra LCD telltales (IDs 4140–4145, chassis segment) — received from IPC.
     // bool: false=lamp off, true=lamp on.
@@ -2367,6 +2369,11 @@ std::optional<float> ExternalSimConnector::GetPimCoastDragNm() const {
     return m_state->pim_coast_drag_nm;
 }
 
+std::optional<std::uint8_t> ExternalSimConnector::GetWiperSweepPositionPct() const {
+    if (!m_state->has_wiper_sweep_position_pct) return std::nullopt;
+    return m_state->wiper_sweep_position_pct;
+}
+
 void ExternalSimConnector::SetSuppressThrottlePublish(bool suppress) {
     m_state->suppress_throttle_publish = suppress;
 }
@@ -2871,6 +2878,11 @@ void ExternalSimConnector::DebugInjectPimCoastDragNm(float drag_nm) {
 void ExternalSimConnector::DebugInjectBtcmFrontMotorCmd(float fl, float fr) {
     m_state->btcm_front_motor_fl = fl;
     m_state->btcm_front_motor_fr = fr;
+}
+
+void ExternalSimConnector::DebugInjectWiperSweepPositionPct(std::uint8_t pct) {
+    m_state->wiper_sweep_position_pct     = pct;
+    m_state->has_wiper_sweep_position_pct = true;
 }
 
 void ExternalSimConnector::DebugInjectU8(std::uint32_t signal_id,
@@ -3529,6 +3541,13 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         // with the chassis iso/dump bits.
         if (auto m = st.wire->btcm_front_motor_cmd_fl()) st.btcm_front_motor_fl = *m;
         if (auto m = st.wire->btcm_front_motor_cmd_fr()) st.btcm_front_motor_fr = *m;
+
+        // Wiper blade position -> CHASSIS_WIPER_SWEEP_POSITION; nullopt until
+        // the RHJB writes it. SimApp swings the 3D wipers with it.
+        if (auto pos = st.wire->wiper_sweep_position_pct()) {
+            st.wiper_sweep_position_pct     = *pos;
+            st.has_wiper_sweep_position_pct = true;
+        }
 
         // AD precharge relay (was kSigAdPrechargeRelay 5225) -> AD_PRECHARGE_RELAY.
         // the external sim declared this cell; nullopt until AD writes it.

@@ -1014,6 +1014,31 @@ TEST_CASE("WireTruthChassis::pim_cruise_active/setpoint follow the PIM cruise ce
     REQUIRE(wire->pim_cruise_setpoint_mps() == std::optional<float>(25.0f));
 }
 
+TEST_CASE("Wiper blade position: the RHJB's CHASSIS_WIPER_SWEEP_POSITION reaches the connector",
+          "[wire_truth][ecu]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("ecu_wiper_pos");
+    auto rhjb = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(rhjb != nullptr);
+
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+    REQUIRE(wire->wiper_sweep_position_pct() == std::nullopt);  // unwritten
+    REQUIRE(rhjb->write_byte(topo::kWireCHASSIS_WIPER_SWEEP_POSITION, 37u));
+    REQUIRE(wire->wiper_sweep_position_pct() == std::optional<std::uint8_t>(37u));
+
+    // Through the connector's tick, as SimApp reads it.
+    ScopedEnv env("ELECTRICSIM_WIRES_NAME", seg.c_str());
+    ExternalSimConnector::Options opts;
+    opts.enabled = true;
+    ExternalSimConnector c(opts);
+    c.Tick(0.0);
+    REQUIRE(c.GetWiperSweepPositionPct() == std::optional<std::uint8_t>(37u));
+    REQUIRE(rhjb->write_byte(topo::kWireCHASSIS_WIPER_SWEEP_POSITION, 75u));
+    c.Tick(0.01);
+    REQUIRE(c.GetWiperSweepPositionPct() == std::optional<std::uint8_t>(75u));
+}
+
 TEST_CASE("WireTruthChassis::ad_precharge_relay follows AD_PRECHARGE_RELAY",
           "[wire_truth][ecu]") {
     namespace topo = electricsim::topology;

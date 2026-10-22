@@ -315,6 +315,11 @@ public:
     std::optional<float> btcm_front_motor_cmd_fl() const;  // CHASSIS_BTCM_FRONT_MOTOR_CMD_FL
     std::optional<float> btcm_front_motor_cmd_fr() const;  // CHASSIS_BTCM_FRONT_MOTOR_CMD_FR
 
+    // The wiper blades' position, percent of one full sweep cycle (0 = park,
+    // 50 = end of sweep), from the RHJB's wiper-motor plant. nullopt until the
+    // RHJB writes CHASSIS_WIPER_SWEEP_POSITION.
+    std::optional<std::uint8_t> wiper_sweep_position_pct() const;  // CHASSIS_WIPER_SWEEP_POSITION
+
     // The shifter's coast-down button position (1 = coast down), read by the
     // RSA. ev1sim is this cell's producer. Returns false if not attached.
     bool publish_coast_down_switch(bool on);               // DRIVER_COAST_DOWN_SWITCH

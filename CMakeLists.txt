@@ -349,6 +349,7 @@ add_executable(ev1sim
     src/VehicleLights.cpp
     src/VehiclePanels.cpp
     src/WiperRenderer.cpp
+    src/WiperBlades3D.cpp
     src/PhysicalWorld.cpp
     src/FloatingUiPanel.cpp
     src/InstrumentClusterPanel.cpp
@@ -511,6 +512,7 @@ if(BUILD_TESTS)
         tests/test_rsa_console_panel.cpp
         tests/test_rsa_console_input.cpp
         tests/test_dash_screens_3d.cpp
+        tests/test_wiper_blades_3d.cpp
         tests/test_throttle_bus.cpp
         tests/test_scenario.cpp
         tests/test_brake_pedal.cpp
@@ -536,6 +538,7 @@ if(BUILD_TESTS)
         src/ScriptedDriver.cpp
         src/VehicleLights.cpp
         src/WiperRenderer.cpp
+        src/WiperBlades3D.cpp
         src/PhysicalWorld.cpp
         src/FloatingUiPanel.cpp
         src/InstrumentClusterPanel.cpp

@@ -881,6 +881,10 @@ std::optional<float> WireTruthChassis::btcm_front_motor_cmd_fr() const {
     return read_float32(electricsim::topology::kWireCHASSIS_BTCM_FRONT_MOTOR_CMD_FR);
 }
 
+std::optional<std::uint8_t> WireTruthChassis::wiper_sweep_position_pct() const {
+    return read_byte(electricsim::topology::kWireCHASSIS_WIPER_SWEEP_POSITION);
+}
+
 bool WireTruthChassis::publish_coast_down_switch(bool on) {
     if (!attached()) return false;
     return write_bit(electricsim::topology::kWireDRIVER_COAST_DOWN_SWITCH, on);
@@ -1039,6 +1043,9 @@ std::optional<float> WireTruthChassis::btcm_front_motor_cmd_fl() const {
     return std::nullopt;
 }
 std::optional<float> WireTruthChassis::btcm_front_motor_cmd_fr() const {
+    return std::nullopt;
+}
+std::optional<std::uint8_t> WireTruthChassis::wiper_sweep_position_pct() const {
     return std::nullopt;
 }
 bool WireTruthChassis::publish_coast_down_switch(bool) { return false; }

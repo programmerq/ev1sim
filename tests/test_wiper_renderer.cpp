@@ -192,3 +192,35 @@ TEST_CASE("WiperRenderer: Tick() with raw command from connector feeds phase",
     CHECK(w.GetPhaseRad() > 0.0);
     CHECK(w.GetPhaseRad() < 2.0 * M_PI);
 }
+
+// ---------------------------------------------------------------------------
+// Sweep fraction: the plant's published blade position wins over the phase
+// ---------------------------------------------------------------------------
+
+TEST_CASE("WiperRenderer sweep fraction from the plant position: 0 park, 50 far end",
+          "[WiperRenderer]") {
+    CHECK_THAT(WiperRenderer::SweepFromPlantPosition(0), WithinAbs(0.0, 1e-12));
+    CHECK_THAT(WiperRenderer::SweepFromPlantPosition(25), WithinAbs(0.5, 1e-12));
+    CHECK_THAT(WiperRenderer::SweepFromPlantPosition(50), WithinAbs(1.0, 1e-12));
+    CHECK_THAT(WiperRenderer::SweepFromPlantPosition(75), WithinAbs(0.5, 1e-12));
+    CHECK_THAT(WiperRenderer::SweepFromPlantPosition(99), WithinAbs(0.02, 1e-12));
+    CHECK_THAT(WiperRenderer::SweepFromPlantPosition(200), WithinAbs(0.0, 1e-12));  // clamped
+}
+
+TEST_CASE("WiperRenderer follows the plant position, its own phase without one",
+          "[WiperRenderer]") {
+    WiperRenderer w;
+    CHECK_THAT(w.GetSweepFraction(), WithinAbs(0.0, 1e-12));  // parked
+    // Half a LOW wipe of its own: phase pi, the far end.
+    w.Tick(0.5 * 60.0 / WiperRenderer::kCadenceLow, WiperRenderer::Mode::LOW);
+    CHECK_THAT(w.GetSweepFraction(), WithinAbs(1.0, 1e-9));
+
+    // The plant says the blades are a quarter of the way out: that wins, even
+    // with the motor command OFF (the park relay is running them home).
+    w.SetPlantSweepPosition(std::uint8_t{12});
+    w.Tick(0.1, WiperRenderer::Mode::OFF);
+    CHECK_THAT(w.GetSweepFraction(), WithinAbs(0.24, 1e-12));
+    w.SetPlantSweepPosition(std::nullopt);
+    CHECK_THAT(w.GetSweepFraction(), WithinAbs(1.0, 1e-9));
+}
+

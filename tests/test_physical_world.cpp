@@ -2,6 +2,7 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include "PhysicalWorld.h"
+#include "VehiclePanels.h"
 
 #include <cstdint>
 #include <limits>
@@ -1622,3 +1623,54 @@ TEST_CASE("HvacControls: non-finite setpoint falls back to the default", "[Physi
     h.adjust_setpoint_c(nan);
     CHECK_THAT(h.temp_setpoint_c(), WithinAbs(HvacControls::kDefaultSetpointC, 1e-9));
 }
+
+TEST_CASE("Lock knobs on the body diagram follow the door-lock motors' stroke",
+          "[PhysicalWorld][DoorLocks]") {
+    using S = ev1sim::DoorLocks::State;
+    ev1sim::PhysicalWorld phys;
+    auto knob = [&](int door) {
+        const auto& m = door == 0 ? phys.door_lock_motor_lh() : phys.door_lock_motor_rh();
+        const S s = door == 0 ? phys.door_locks().driver() : phys.door_locks().passenger();
+        return MakeLockIndicator(s == S::LOCKED, m.position(), m.moving());
+    };
+
+    // At rest, unlocked: the knob sits at the unlocked end.
+    LockIndicator lh = knob(0);
+    CHECK_FALSE(lh.locked);
+    CHECK_FALSE(lh.moving);
+    CHECK(VehiclePanels::LockKnobOffsetPx(lh) == 0);
+
+    // The RHJB drives the LH lock leg for half the travel: the knob is
+    // mid-stroke and amber, the latch not yet moved.
+    const double half = ev1sim::DoorLockMotor::Config{}.traverse_time_s / 2.0;
+    phys.StepDoorLockPlant(half, true, false, false, false);
+    lh = knob(0);
+    CHECK(lh.moving);
+    CHECK_FALSE(lh.locked);
+    CHECK(VehiclePanels::LockKnobOffsetPx(lh) == VehiclePanels::kLockKnobTravelPx / 2);
+
+    // To the end of travel: latched locked, knob at the locked end.
+    phys.StepDoorLockPlant(half, true, false, false, false);
+    lh = knob(0);
+    CHECK(lh.locked);
+    CHECK_FALSE(lh.moving);
+    CHECK(VehiclePanels::LockKnobOffsetPx(lh) == VehiclePanels::kLockKnobTravelPx);
+
+    // Locked through the RSA mirror with no motor running (the passenger
+    // motor never moved): the knob still shows the latch.
+    phys.door_locks().set_passenger(S::LOCKED);
+    CHECK(VehiclePanels::LockKnobOffsetPx(knob(1)) == VehiclePanels::kLockKnobTravelPx);
+
+    // Drawn on a null driver with and without the knobs.
+    irr::IrrlichtDevice* dev = irr::createDevice(irr::video::EDT_NULL,
+                                                 irr::core::dimension2d<irr::u32>(640, 480));
+    REQUIRE(dev != nullptr);
+    VehiclePanels panels;
+    const BodyLockIndicators view{knob(0), knob(1), MakeLockIndicator(true, 0.0, false)};
+    dev->getVideoDriver()->beginScene(true, true, irr::video::SColor(255, 0, 0, 0));
+    panels.DrawHUD(dev, &view);
+    panels.DrawHUD(dev);
+    dev->getVideoDriver()->endScene();
+    dev->drop();
+}
+
