@@ -44,7 +44,7 @@
     "length_m": 200.0,
     "width_m": 200.0
   },
-  "spawn": { "x": 0.0, "y": 0.0, "z": 0.08, "yaw_deg": 0.0 },
+  "spawn": { "x": 0.0, "y": 0.0, "z": 0.08, "yaw_deg": 0.0, "settle": false },
   "simulation": {
     "step_size_s": 0.001,
     "render_fps": 60,

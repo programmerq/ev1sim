@@ -1,6 +1,7 @@
 #pragma once
 
 #include "chrono/core/ChCoordsys.h"
+#include "chrono_vehicle/ChTerrain.h"
 #include "chrono_vehicle/wheeled_vehicle/vehicle/WheeledVehicle.h"
 
 #include <memory>
@@ -53,5 +54,22 @@ void SetCoastDrag(chrono::vehicle::ChWheeledVehicle& vehicle,
 /// the engine's); the sign is the driveshaft's direction of rotation, which
 /// Chrono's simple-map transmission discards (std::abs).
 double SignedMotorShaftSpeed(const chrono::vehicle::ChWheeledVehicle& vehicle);
+
+/// What SettleAtRest calls "at rest": chassis speed, vertical speed and pitch
+/// rate all under these, held for kSettleHoldS.
+inline constexpr double kSettleSpeedMps   = 0.002;
+inline constexpr double kSettlePitchRadS  = 0.002;
+inline constexpr double kSettleHoldS      = 0.2;
+inline constexpr double kSettleMaxS       = 10.0;
+
+/// Let a car created at rest drop onto its tyres and stop moving before
+/// anything watches it: step it, unbraked, until it is at rest (above), then
+/// stop every part and put the system clock back to 0.  A car spawned above its ride
+/// height otherwise lands and pitches fore-aft for ~2 s, turning the motor
+/// shaft back and forth while the electronics are already reading it.
+/// Returns the sim time the settle took, or a negative value when the car was
+/// still moving at kSettleMaxS (the clock is reset either way).
+double SettleAtRest(chrono::vehicle::ChWheeledVehicle& vehicle,
+                    chrono::vehicle::ChTerrain& terrain, double step_size_s);
 
 }  // namespace ev1sim
