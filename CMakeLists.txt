@@ -272,12 +272,14 @@ if(ELECTRICSIM_DIR)
         foreach(_src IN LISTS _electricsim_sources)
             list(APPEND _electricsim_sources_abs "${ELECTRICSIM_DIR}/${_src}")
         endforeach()
-        # electricsim does not commit the topology header; write it into this
+        # When the tree does not commit the topology header, write it into this
         # build from that tree's YAML with that tree's generator, and re-run
-        # configure when either changes.  The vendored stub carries the header
-        # itself under src/io.
+        # configure when either changes.  A tree that still commits it (the
+        # vendored stub, or an electricsim checkout from before the header left
+        # git) is used as is.
         set(_electricsim_gen_dir "${CMAKE_BINARY_DIR}/electricsim_generated/io")
-        if(EXISTS "${ELECTRICSIM_DIR}/scripts/gen_topology_header.py")
+        if(NOT EXISTS "${ELECTRICSIM_DIR}/src/io/topology/topology_generated.h"
+           AND EXISTS "${ELECTRICSIM_DIR}/scripts/gen_topology_header.py")
             find_package(Python3 COMPONENTS Interpreter REQUIRED)
             execute_process(
                 COMMAND ${Python3_EXECUTABLE}
