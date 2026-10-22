@@ -56,8 +56,11 @@ ctest -L guard        # the checks, and the proof they respond to their input
 
 ## Refreshing the vendored copies
 
-Copy verbatim from `${ELECTRICSIM_DIR}/src/` (do not hand-edit), then re-record the
-manifest **in the same commit as the copy**:
+Copy verbatim from `${ELECTRICSIM_DIR}/src/` (do not hand-edit). The topology
+header is the one exception: electricsim does not commit it, so generate it with
+that tree's `scripts/gen_topology_header.py --out
+tests/electricsim_stub/src/io/topology/topology_generated.h` instead. Then
+re-record the manifest **in the same commit as the copy**:
 
 ```sh
 tests/electricsim_stub/check_stub_sync.sh --update --upstream <external-sim tree>
@@ -116,6 +119,8 @@ The procedure, in one commit:
 cp -r <external-sim tree>/src/io/…                tests/electricsim_stub/src/io/
 cp    <external-sim tree>/src/net_host/conductor_publisher.hpp \
                                                   tests/electricsim_stub/src/net_host/
+python3 <external-sim tree>/scripts/gen_topology_header.py \
+        --out tests/electricsim_stub/src/io/topology/topology_generated.h
 tests/electricsim_stub/check_stub_sync.sh --update --upstream <external-sim tree>
 ctest -L guard
 ```
