@@ -20,6 +20,8 @@
 #   6. upstream byte differs          -> DRIFTED   (1)   the real drift case
 #   7. upstream absent + --require    -> UNAVAIL   (2)   a skip that must not pass
 #   8. --update on a drifted copy     -> REFUSED   (1)   a provenance never verified
+#   9. generated upstream header      -> both      (0/1) the header electricsim
+#                                                         writes, not commits
 #
 # Legs 1-5 need no external-sim tree, so they run in CI. Legs 6-8 synthesise a
 # fake upstream out of the stub itself, so they need no external-sim tree either.
@@ -147,12 +149,41 @@ leg "8b --update on a matching copy -> RECORDED" 0 \
     "${WORK}/update_clean/check_stub_sync.sh" \
     --update --upstream "${WORK}/fake_upstream_upd"
 
+# ── Leg 9: an upstream that generates the topology header ───────────────────
+# electricsim does not commit topology_generated.h; the check generates the
+# original with that tree's gen_topology_header.py --out. The fake generator
+# writes a header kept beside it: the stub's own (in sync), then one byte off.
+fake_generating_upstream() {
+    local dest="$1"
+    rm -rf "${dest}"
+    mkdir -p "${dest}/scripts"
+    cp -r "${STUB_SRC}/src" "${dest}/src"
+    mv "${dest}/src/io/topology/topology_generated.h" "${dest}/scripts/header.h"
+    cat > "${dest}/scripts/gen_topology_header.py" <<'PY'
+import argparse, os, shutil
+parser = argparse.ArgumentParser()
+parser.add_argument("--out", required=True)
+args = parser.parse_args()
+shutil.copy(os.path.join(os.path.dirname(__file__), "header.h"), args.out)
+PY
+}
+fresh_copy "${WORK}/gen_upstream_copy"
+fake_generating_upstream "${WORK}/gen_upstream"
+leg "9 generated header matches -> IN_SYNC" 0 \
+    "${WORK}/gen_upstream_copy/check_stub_sync.sh" \
+    --upstream "${WORK}/gen_upstream" --require-upstream
+printf '\n// selftest: the YAML moved and the copy did not\n' \
+    >> "${WORK}/gen_upstream/scripts/header.h"
+leg "9b generated header differs -> DRIFTED" 1 \
+    "${WORK}/gen_upstream_copy/check_stub_sync.sh" \
+    --upstream "${WORK}/gen_upstream" --require-upstream
+
 echo ""
 if [ "${fails}" != "0" ]; then
     echo "selftest FAILED: ${fails} leg(s) did not produce the demanded verdict."
     echo "check_stub_sync.sh is not proven to work — treat its green as meaningless."
     exit 1
 fi
-echo "selftest passed: all 10 legs produced the demanded verdict."
+echo "selftest passed: all 12 legs produced the demanded verdict."
 echo "The guard fails on drift and passes in sync — its verdict tracks its input."
 exit 0
