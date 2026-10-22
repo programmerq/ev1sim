@@ -213,9 +213,11 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   each door and the trunk, sliding with the door-lock motor's stroke (amber
   mid-stroke, red latched locked); the audio click still plays at end of
   travel.
-- [ ] Trunk lid animation in 3D. Its open/closed state is on the body diagram,
-  but the chassis visual mesh is one piece, so the lid can't swing until the
-  mesh has it as its own part (an asset change, not code).
+- [x] Trunk lid opens in 3D: `TrunkLid3D` (`src/TrunkLid3D.{h,cpp}`) swings
+  the lid about its front-edge hinge while the trunk is open (T key or the UI
+  panel). The lid is its own mesh, `ev1_trunk_lid.obj`, split out of the
+  chassis visual mesh by `ev1model/split_trunk_lid.py`; open angle and travel
+  time are `@design`.
 
 ## Floating UI panel
 - [ ] **IPC LCD brightness and telltale overrides** — the telltale cells are
