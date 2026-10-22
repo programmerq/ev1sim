@@ -47,6 +47,8 @@ bool ApplyRsaConsoleAction(PhysicalWorld& world, const RsaConsoleAction& action)
         case C::kNeutral: world.prnd_selector().set_position(P::N); return false;
         case C::kDrive:   world.prnd_selector().set_position(P::D); return false;
         case C::kCoastDown: world.coast_down_button().toggle(); return true;
+        case C::kDimDown: world.rsa_dimmer().press(false); return false;
+        case C::kDimUp:   world.rsa_dimmer().press(true);  return false;
         case C::kKey1: case C::kKey2: case C::kKey3: case C::kKey4: case C::kKey5:
             keypad.press_digit(static_cast<int>(action.control) - static_cast<int>(C::kKey1),
                                action.long_press);

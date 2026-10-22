@@ -1829,6 +1829,11 @@ int SimApp::RunWithVisualization() {
             // IPC trip-reset (6952): consume one-shot event and publish.
             m_external_sim->SetDriverIpcTripReset(
                 m_physical->ipc_trip_reset().consume_press_event());
+            // RSA DIM UP / DIM DOWN clicks from the console.
+            for (const bool up : {false, true}) {
+                for (int n = m_physical->rsa_dimmer().take(up); n > 0; --n)
+                    m_external_sim->PressRsaDimmer(up);
+            }
             // Cruise stalk: evolve the faithful 3-contact model from the keyboard
             // held contacts (UI presses + N cancel already folded in via press_*),
             // then publish the raw chassis cavities kSigCruiseSw_* (4047-4049).
@@ -2443,6 +2448,11 @@ int SimApp::RunHeadless() {
             // stable zeros.
             m_external_sim->SetDriverIpcTripReset(
                 m_physical->ipc_trip_reset().consume_press_event());
+            // RSA DIM UP / DIM DOWN clicks from the console.
+            for (const bool up : {false, true}) {
+                for (int n = m_physical->rsa_dimmer().take(up); n > 0; --n)
+                    m_external_sim->PressRsaDimmer(up);
+            }
             m_physical->cruise_stalk().update(tick_dt, false, false);
             m_external_sim->SetCruiseSetCoastContact(
                 m_physical->cruise_stalk().set_coast_contact());
