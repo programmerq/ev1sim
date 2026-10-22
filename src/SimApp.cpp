@@ -5,6 +5,7 @@
 
 #include "chrono_vehicle/ChEngine.h"
 #include "chrono_vehicle/ChTransmission.h"
+#include "chrono_vehicle/ChVehicleModelData.h"
 
 #include <algorithm>
 #include <atomic>
@@ -1963,6 +1964,12 @@ int SimApp::RunWithVisualization() {
         if (!m_wiper3d)
             m_wiper3d = std::make_unique<ev1sim::WiperBlades3D>(m_vis->GetDevice());
         m_wiper3d->Place(m_world->GetPose(), m_wiper->GetSweepFraction());
+        // The trunk lid, its own mesh, swung open about its hinge while the
+        // trunk is open.
+        if (!m_trunk_lid3d)
+            m_trunk_lid3d = std::make_unique<ev1sim::TrunkLid3D>(
+                m_vis->GetDevice(), GetDataFile("ev1/ev1_trunk_lid.obj"));
+        m_trunk_lid3d->Update(m_world->GetPose(), m_panels->IsOpen(PanelID::TRUNK), render_dt);
 
         // --- Door lock mirror from RSA (chassis bus 4084/4085) ---
         // RSA publishes desired lock state; ev1sim mirrors it to DoorLocks.

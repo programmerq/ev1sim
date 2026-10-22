@@ -19,6 +19,7 @@ Fixes:
      (rearmost reflectors) stays opaque d=1.0.
 
 Usage: python3 fix_obj_coords.py [ev1model_dir]
+       Then run split_trunk_lid.py on the result.
        Default ev1model_dir is the directory containing this script.
 """
 

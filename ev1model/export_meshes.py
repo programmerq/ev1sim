@@ -17,6 +17,8 @@ Origin: center of wheelbase at ground contact level.
 Scale:  uniform factor to match real EV1 wheelbase (2.512 m).
 
 Run:  blender --background GMEV1-pluslight.blend --python export_meshes.py
+Then: python3 fix_obj_coords.py, and python3 split_trunk_lid.py to move the
+       trunk lid into its own ev1_trunk_lid.obj.
 """
 
 import bpy
