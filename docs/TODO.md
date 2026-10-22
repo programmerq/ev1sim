@@ -217,17 +217,6 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   but the chassis visual mesh is one piece, so the lid can't swing until the
   mesh has it as its own part (an asset change, not code).
 
-## Floating UI panel
-- [ ] **IPC LCD brightness and telltale overrides** — the telltale cells are
-  the IPC's own outputs, so a panel override is a second writer on cells the
-  IPC owns; settle that with electricsim first. (The console buttons needed
-  no such step: they reuse the keyboard's producers, Phase 4 above.)
-- [ ] **RSA door-lock feedback and entry-denied LEDs** — no RSA output cell
-  carries them yet (entry accepted is the console panel's VALID CODE lamp);
-  needs the cells in electricsim first.
-- [ ] **IPC WAIT (charge-wait) telltale row** — blocked until electricsim
-  adds a separate charge-state signal.
-
 ## Bus-mediated physics
 - [ ] **Regen ↔ friction blending (S15 — documented gap, do NOT fabricate).**
   Friction braking is regen-agnostic and regen (PIM's motor-current readout,

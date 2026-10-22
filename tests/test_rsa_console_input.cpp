@@ -106,6 +106,16 @@ TEST_CASE("Console COAST DOWN toggles the button and reports the change", "[rsa_
     REQUIRE_FALSE(ApplyRsaConsoleAction(w, {C::kNone, false}));
 }
 
+TEST_CASE("Console DIM - / DIM + queue one click each", "[rsa_console_input]") {
+    PhysicalWorld w;
+    REQUIRE_FALSE(ApplyRsaConsoleAction(w, {C::kDimUp, false}));
+    REQUIRE_FALSE(ApplyRsaConsoleAction(w, {C::kDimUp, false}));
+    REQUIRE_FALSE(ApplyRsaConsoleAction(w, {C::kDimDown, false}));
+    REQUIRE(w.rsa_dimmer().take(true) == 2);
+    REQUIRE(w.rsa_dimmer().take(false) == 1);
+    REQUIRE(w.rsa_dimmer().take(true) == 0);  // taken once
+}
+
 namespace {
 irr::SEvent Mouse(irr::EMOUSE_INPUT_EVENT e, int x, int y) {
     irr::SEvent ev{};
@@ -133,9 +143,9 @@ TEST_CASE("Console mouse: clicks on the real panel layout become actions", "[rsa
     REQUIRE(mouse.OnEvent(centre(1, irr::EMIE_LMOUSE_PRESSED_DOWN)));
     REQUIRE_FALSE(mouse.OnEvent(centre(1, irr::EMIE_LMOUSE_LEFT_UP)));
     // A keypad key held 0.6 s: the higher digit, on release.
-    REQUIRE(mouse.OnEvent(centre(10, irr::EMIE_LMOUSE_PRESSED_DOWN)));
+    REQUIRE(mouse.OnEvent(centre(12, irr::EMIE_LMOUSE_PRESSED_DOWN)));
     now = 0.6;
-    REQUIRE(mouse.OnEvent(centre(10, irr::EMIE_LMOUSE_LEFT_UP)));
+    REQUIRE(mouse.OnEvent(centre(12, irr::EMIE_LMOUSE_LEFT_UP)));
     // A click on the VALID CODE lamp or off the panel is not the console's.
     REQUIRE_FALSE(mouse.OnEvent(centre(6, irr::EMIE_LMOUSE_PRESSED_DOWN)));
     REQUIRE_FALSE(mouse.OnEvent(Mouse(irr::EMIE_LMOUSE_PRESSED_DOWN, 5, 5)));

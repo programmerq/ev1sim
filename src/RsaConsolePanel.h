@@ -20,11 +20,15 @@
 //   VALID CODE   = CHASSIS_RSA_VALID_CODE (also lights the exterior KEYPAD lamp)
 //   P R N D      = the four CHASSIS_RSA_SELECTOR_LED_* cells
 //   COAST DOWN   = the PCM's $41 Coast Down LED Request (DashPcmStatus)
+//   Security     = CHASSIS_RSA_SECURITY_INDICATOR: solid after 25 key entries
+//                  without a valid code, the car's only "entry denied" sign
+//   Door locks   = the RSA's lock commands (CHASSIS_DOOR_LOCK_CMD_*); the
+//                  console has no lock lamp
 //
 // Phase 4 makes the console's buttons clickable: OFF/ACC, RUN, LOCK, P R N D,
-// COAST DOWN and the five interior keypad keys.  Each LED row entry names the
+// COAST DOWN, DIM - / DIM + and the five interior keypad keys.  Each LED row entry names the
 // control it sits on; HitTest() maps a point to it with the same layout Draw()
-// uses.  LOCK and the keypad keys have no lamp.
+// uses.  LOCK, the dimmer and the keypad keys have no lamp.
 //
 // The HVAC, fan, clock and trip LEDs in rsa_panel_catalog.yaml are marked
 // "stub" there (no RSA behaviour modelled), so the panel leaves them out rather
@@ -51,6 +55,10 @@ std::wstring FormatRsaShiftLock(const std::optional<bool>& shift_blocked);
 std::wstring FormatRsaBtsi(const std::optional<bool>& btsi_solenoid);
 /// "Backlight 70%" from the 0..10 dimmer step (clamped), or "Backlight ---".
 std::wstring FormatRsaBacklight(const std::optional<std::uint8_t>& dim_step);
+/// "Door locks: LOCKED" / "unlocked" when both doors agree, "Door locks: DRV
+/// locked, PAS unlocked" when not, "Door locks: ---" until both are written.
+std::wstring FormatRsaDoorLocks(const std::optional<std::uint8_t>& driver,
+                                const std::optional<std::uint8_t>& passenger);
 
 // --- View model ------------------------------------------------------------
 
@@ -62,6 +70,7 @@ enum class RsaConsoleControl : std::uint8_t {
     kOffAcc, kRun, kLock,
     kPark, kReverse, kNeutral, kDrive,
     kCoastDown,
+    kDimDown, kDimUp,
     kKey1, kKey2, kKey3, kKey4, kKey5,  // interior keypad [1/2] .. [9/0]
 };
 
@@ -79,11 +88,13 @@ struct RsaConsoleView {
     std::vector<RsaLed> selector;  // P, R, N, D
     std::vector<RsaLed> keypad;    // VALID CODE, KEYPAD (exterior)
     std::vector<RsaLed> buttons;   // LOCK, COAST DOWN
+    std::vector<RsaLed> dimmer;    // DIM -, DIM +
     std::vector<RsaLed> digits;    // interior keypad [1/2] .. [9/0]
     std::wstring security;
     std::wstring shift_lock;
     std::wstring btsi;
     std::wstring backlight;
+    std::wstring door_locks;
 };
 
 /// Everything the panel shows, derived from the snapshot's RSA group and the
@@ -93,7 +104,7 @@ RsaConsoleView BuildRsaConsoleView(const std::optional<DashRsaConsole>& rsa,
 
 /// Where each LED/button of `view` sits for a panel at (x, y), `w` wide: the
 /// one layout Draw() paints and HitTest() reads.  Rows top to bottom: mode,
-/// selector, keypad lamps, buttons, digits.  Pure.
+/// selector, keypad lamps, buttons, dimmer, digits.  Pure.
 struct RsaConsoleCell {
     const RsaLed* led;
     int x0, y0, x1, y1;

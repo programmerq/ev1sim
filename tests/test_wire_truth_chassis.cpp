@@ -1278,3 +1278,32 @@ TEST_CASE("RefuseConductorWrite: a write via a DIFFERENT accessor on the same "
     REQUIRE_FALSE(wire->write_bit(conductor_id, false));
     REQUIRE(count_occurrences(capture.contents(), "REFUSED write_bit") == 1);
 }
+
+TEST_CASE("WireTruthChassis: a DIM click is one press and release; lock commands reach the console",
+          "[wire_truth]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("dim");
+    auto producer = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(producer != nullptr);
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+
+    // The RSA counts a press as a fresh 1, or two generations past its cursor
+    // onto a 0 (ev1/rsa/rsa_dimmer_panel.hpp): one click must leave the cell
+    // at 0, two generations on.
+    WireTable::Sample<bool> s;
+    REQUIRE(wire->publish_rsa_dim_click(true));
+    REQUIRE(producer->read_bit_sample(topo::kWireDRIVER_RSA_DIM_UP, &s));
+    REQUIRE(s.written());
+    REQUIRE_FALSE(s.value);
+    REQUIRE(s.generation == 2u);
+    REQUIRE(wire->publish_rsa_dim_click(false));
+    REQUIRE(producer->read_bit_sample(topo::kWireDRIVER_RSA_DIM_DOWN, &s));
+    REQUIRE(s.generation == 2u);
+
+    REQUIRE(wire->rsa_console().lock_driver == std::nullopt);
+    REQUIRE(producer->write_byte(topo::kWireCHASSIS_DOOR_LOCK_CMD_DRIVER, 1u));
+    REQUIRE(producer->write_byte(topo::kWireCHASSIS_DOOR_LOCK_CMD_PASSENGER, 0u));
+    REQUIRE(wire->rsa_console().lock_driver == std::optional<std::uint8_t>(1u));
+    REQUIRE(wire->rsa_console().lock_passenger == std::optional<std::uint8_t>(0u));
+}

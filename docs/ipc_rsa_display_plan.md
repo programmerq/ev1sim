@@ -84,13 +84,17 @@ broadcasts it on its GM-8192 status frame).
   (gauges, LCD, console). Same `DashSnapshot` feed; swap the render backend.
 
 ### Phase 4 — interactivity (input)
-- Done. The RSA console controls (mode buttons, P/R/N/D, keypad, COAST DOWN)
+- Done. The RSA console controls (mode buttons, P/R/N/D, keypad, COAST DOWN,
+  DIM - / DIM +)
   are clickable in UI mode on the 2D panel and on the Cabin view's 3D console
   screen (`src/RsaConsoleInput.{h,cpp}`, ray-to-screen hit in
   `DashScreens3D::ConsoleControlAt`).
 - **Multi-writer arbitration:** a click drives a producer ev1sim already had
   (`RsaKeypadDriver` and `PrndSelector` from the keyboard; the coast-down
-  switch cell from its scenario hook), so ev1sim adds no writer on any cell. Running electricsim's web
+  switch cell from its scenario hook; the dimmer buttons' own driver-input
+  cells), so ev1sim adds no writer on any RSA or IPC output cell. Cluster
+  brightness is the RSA's dimmer step, and a telltale is lit by producing its
+  cause (external sim `docs/3d_sim_contract.md` §2.1, one writer per lamp). Running electricsim's web
   `ev1_rsa_panel` alongside ev1sim is the same two-source case it was before
   clicks existed; no contract change.
 
