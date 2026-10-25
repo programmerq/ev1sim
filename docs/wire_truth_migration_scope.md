@@ -51,7 +51,8 @@ onto the wire.
 - electricsim `docs/3d_sim_contract.md` — the cross-repo wire contract (signal
   IDs, encodings, cadence). **Encodings are frozen** (`EV1_CHASSIS_CONTRACT_VERSION
   1.9.0`); this migration does not change them.
-- electricsim `config/topology.yaml` + generated `src/io/topology/topology_generated.h`
+- electricsim `config/topology.yaml` + the `topology/topology_generated.h` its
+  `scripts/gen_topology_header.py` writes from it
   — the 234 declared cells, their `WireId`s, types, `producer:`/`consumers:`,
   `legacy_signal_id`, `default`/`init_policy`.
 - electricsim `notes/phase_c_chassis_migration_scope.md` — electricsim's own
@@ -112,8 +113,9 @@ checkout and compiles four of its `src/io/*.cpp` into the `electricsim_connector
 lib (with a stale-path guard and a stub fallback for CI). The wire substrate is
 the same shape, so this PR adds an `electricsim_wire_substrate` static lib that
 compiles `${ELECTRICSIM_DIR}/src/io/wire_table.cpp` +
-`src/io/topology/env_open.cpp` and exposes `src/io` as an include root
-(`topology_generated.h` comes along).
+`src/io/topology/env_open.cpp` and exposes `src/io` as an include root. The
+configure step writes `topology_generated.h` into ev1sim's build with that
+tree's generator from that tree's YAML.
 
 Why not the alternatives:
 - **A (vendored copy of the header):** the topology hash would silently drift
@@ -126,20 +128,19 @@ Why not the alternatives:
 - **C-submodule/FetchContent:** heaviest integration; unnecessary given the
   connector already resolves a sibling tree.
 
-**Drift safety (the whole point):** because ev1sim compiles
-`topology_generated.h` *and* links the `wire_table.cpp` from the **same**
+**Drift safety (the whole point):** because ev1sim generates
+`topology_generated.h` from, *and* links the `wire_table.cpp` from, the **same**
 `ELECTRICSIM_DIR` tree, the compiled-in `kTopologyHash` is always exactly what
 that `wire_table.cpp` enforces. ev1sim cannot attach with a stale hash — a
 mismatched checkout fails the attach gate loudly at runtime
 (`WireTable::attach: topology hash mismatch …`) rather than corrupting reads.
 
 **Sync procedure (write this down):**
-1. electricsim changes `config/topology.yaml` → regenerates
-   `topology_generated.h` (its own `gen_topology_header.py --check` CI gate
-   enforces this) → the new `kTopologyHash` is committed on the electricsim
-   branch ev1sim points at.
+1. electricsim changes `config/topology.yaml` on the branch ev1sim points at;
+   neither repo commits the generated header.
 2. ev1sim needs **no source change** — its next build against that
-   `ELECTRICSIM_DIR` recompiles the header + relinks `wire_table.cpp`, picking up
+   `ELECTRICSIM_DIR` re-runs configure, regenerates the header from the new YAML
+   and relinks `wire_table.cpp`, picking up
    the new hash and any new/renamed `kWire…` constants automatically.
 3. If a `kWire…` constant ev1sim references by name is **renamed/removed**
    upstream, ev1sim fails to *compile* (caught immediately, like the 4139 case in
