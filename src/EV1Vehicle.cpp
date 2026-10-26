@@ -4,6 +4,7 @@
 #include "EV1DriveMotor.h"
 #include "EV1TMeasyTire.h"
 
+#include "chrono_vehicle/ChDriver.h"
 #include "chrono_vehicle/ChPowertrainAssembly.h"
 #include "chrono_vehicle/ChTransmission.h"
 #include "chrono_vehicle/ChVehicleModelData.h"
@@ -181,6 +182,83 @@ double SignedMotorShaftSpeed(const ChWheeledVehicle& vehicle) {
     if (!transmission || !driveline) return 0.0;
     return std::copysign(std::abs(transmission->GetOutputMotorshaftSpeed()),
                          driveline->GetOutputDriveshaftSpeed());
+}
+
+namespace {
+
+// Kinetic energy of every moving part, in the units the peak test needs:
+// translational m|v|^2 plus |w|^2 per body, and w^2 per shaft.
+double MotionEnergy(ChSystem& sys) {
+    double e = 0.0;
+    for (const auto& b : sys.GetBodies()) {
+        if (b->IsFixed()) continue;
+        e += b->GetMass() * b->GetPosDt().Length2() + b->GetAngVelLocal().Length2();
+    }
+    for (const auto& sh : sys.GetShafts()) e += sh->GetPosDt() * sh->GetPosDt();
+    return e;
+}
+
+void StopEverything(ChSystem& sys) {
+    for (const auto& b : sys.GetBodies()) {
+        if (b->IsFixed()) continue;
+        b->SetPosDt(ChVector3d(0, 0, 0));
+        b->SetAngVelLocal(ChVector3d(0, 0, 0));
+        b->SetPosDt2(ChVector3d(0, 0, 0));
+        b->SetAngAccLocal(ChVector3d(0, 0, 0));
+    }
+    for (const auto& sh : sys.GetShafts()) {
+        sh->SetPosDt(0.0);
+        sh->SetPosDt2(0.0);
+    }
+}
+
+}  // namespace
+
+double SettleAtRest(ChWheeledVehicle& vehicle, ChTerrain& terrain,
+                    double step_size_s) {
+    // Kinetic damping: let the car fall and spring freely, and each time the
+    // motion energy passes a peak, stop every part where it is.  Each stop
+    // lands nearer the rest pose, so the swings shrink to nothing in a few
+    // cycles.  The car is never braked or pushed, so it ends where it would
+    // sit on its tyres, with nothing wound up.
+    ChSystem& sys = *vehicle.GetSystem();
+    const DriverInputs coast{};
+    double prev = 0.0;
+    bool rising = false;
+    double quiet_since = 0.0;
+    double settled_at = -1.0;
+    while (sys.GetChTime() < kSettleMaxS) {
+        const double t = sys.GetChTime();
+        terrain.Synchronize(t);
+        vehicle.Synchronize(t, coast, terrain);
+        terrain.Advance(step_size_s);
+        vehicle.Advance(step_size_s);
+
+        const double e = MotionEnergy(sys);
+        if (e < prev && rising) {
+            StopEverything(sys);
+            prev = 0.0;
+            rising = false;
+            continue;
+        }
+        rising = e > prev;
+        prev = e;
+
+        const auto chassis = vehicle.GetChassisBody();
+        const bool still =
+            std::abs(vehicle.GetSpeed()) < kSettleSpeedMps &&
+            std::abs(chassis->GetPosDt().z()) < kSettleSpeedMps &&
+            std::abs(chassis->GetAngVelLocal().y()) < kSettlePitchRadS;
+        if (!still) {
+            quiet_since = sys.GetChTime();
+        } else if (sys.GetChTime() - quiet_since >= kSettleHoldS) {
+            settled_at = sys.GetChTime();
+            break;
+        }
+    }
+    StopEverything(sys);
+    sys.SetChTime(0.0);
+    return settled_at;
 }
 
 }  // namespace ev1sim

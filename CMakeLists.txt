@@ -586,6 +586,7 @@ if(BUILD_TESTS)
         add_executable(ev1sim_plant_tests
             tests/test_launch_slip.cpp
             tests/test_rolling_spawn.cpp
+            tests/test_spawn_settle.cpp
             tests/test_reverse_drive.cpp
             tests/test_ride_frequency.cpp
             tests/test_coast_drag.cpp
