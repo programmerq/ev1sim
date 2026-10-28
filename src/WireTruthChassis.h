@@ -279,6 +279,11 @@ public:
     // producer (the vehicle plant). Returns false if not attached.
     bool publish_hv_isolation_fault(std::uint8_t lead, std::uint32_t kohm);
 
+    // The steering pump motor's case temperature, uint16 Q8 °C
+    // (CHASSIS_PS_MOTOR_CASE_TEMP_Q8, read by the PSCM's 150 °C switch). ev1sim
+    // is this cell's producer (the pump peripheral). Returns false if not attached.
+    bool publish_ps_motor_case_temp_q8(std::uint16_t q8);
+
     // BTCM GM-8192 TX liveness proxy: the total bit count ever appended to the
     // BTCM transmit bit-stream cell (GM8192_BTCM_TX). The BTCM broadcasts its
     // canonical status frame at 5 Hz, so a growing total => "BTCM transmitting"

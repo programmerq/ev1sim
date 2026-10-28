@@ -128,7 +128,8 @@ private:
 
     // Step the body peripherals that sit on the external electrical sim, both
     // directions, each tick:
-    //   - power-steering pump motor   (chassis 4097 in / 4098 out)
+    //   - power-steering pump motor   (chassis 4097 in / 4098 out, case
+    //                                  temperature out once the pump is driven)
     //   - sounder / piezo "click"     (chassis 4096 in)
     //   - door-lock motors LH/RH      (chassis 4182-4185 in)
     //   - door-lock rockers LH/RH     (chassis 4170-4173 out)
@@ -136,8 +137,9 @@ private:
     // inputs, mirrors door-lock end-of-travel into DoorLocks, and publishes the
     // rocker contacts the RHJB's lock module edges on.  Both loops call this one
     // function so the stimulus can never be live in one and dead in the other.
-    // Safe to call when m_external_sim is null (no-op).  dt is in seconds.
-    void ConsumeBodyActuatorPeripherals(double dt);
+    // Safe to call when m_external_sim is null (no-op).  dt is in seconds;
+    // steering is the tick's normalized steering command (the pump's load).
+    void ConsumeBodyActuatorPeripherals(double dt, double steering);
 
     // Publish the motor operating point on the chassis bus: RPM (4070) and
     // shaft torque (4071).  DC pack current (4072) is the external PIM's to

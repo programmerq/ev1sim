@@ -54,10 +54,6 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   at startup only and stays on sim time (`AmbientTempSensor::hour_of_day`);
   without a file, or when the script cannot reach the service, the almanac
   keeps its defaults.
-- [ ] **`power_steering_pump_motor` per-phase BLDC model (optional).**  The pump
-  plant (`ev1sim::PowerSteeringPumpMotor`, chassis 4097 in / 4098 interlock-closed
-  out) is currently a lumped-motor model; a per-phase BLDC model on `molex.A/B/C`
-  is an optional future refinement.
 
 ## ABS scenarios
 

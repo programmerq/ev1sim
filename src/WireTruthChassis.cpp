@@ -843,6 +843,10 @@ bool WireTruthChassis::publish_hv_isolation_fault(std::uint8_t lead,
     const bool b = write_uint32(electricsim::topology::kWireHV_ISOLATION_FAULT_KOHM, kohm);
     return a && b;
 }
+bool WireTruthChassis::publish_ps_motor_case_temp_q8(std::uint16_t q8) {
+    if (!attached()) return false;
+    return write_uint16(electricsim::topology::kWireCHASSIS_PS_MOTOR_CASE_TEMP_Q8, q8);
+}
 
 std::optional<std::uint64_t> WireTruthChassis::btcm_tx_total_bits() const {
     if (!attached()) return std::nullopt;
@@ -1032,6 +1036,7 @@ std::optional<bool> WireTruthChassis::ipc_wait_drive() const {
 bool WireTruthChassis::publish_hv_isolation_fault(std::uint8_t, std::uint32_t) {
     return false;
 }
+bool WireTruthChassis::publish_ps_motor_case_temp_q8(std::uint16_t) { return false; }
 std::optional<std::uint64_t> WireTruthChassis::btcm_tx_total_bits() const {
     return std::nullopt;
 }
