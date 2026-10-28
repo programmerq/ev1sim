@@ -60,6 +60,10 @@ class PhysicalWorld;
 //       rising edge SimApp publishes as the one-tick SET press (6946) and
 //       whose falling edge is the RELEASE press (6947); what the rear brakes
 //       then do is the BTCM's answer.
+//   set_charge_coupler:  value != 0 mates the charge paddle in the
+//       receptacle and holds it there until a set_charge_coupler 0 pulls it.
+//       The paddle is all this sets: whether the car then charges is the
+//       BPM's and the charger's answer.
 //   lane_hold:  engage the scenario's lane-keeping driver: every tick until
 //       lane_release, steering is computed to hold the chassis on the world
 //       line y = value (metres), travelling along it toward +x, from pos_x /
@@ -188,6 +192,11 @@ public:
     // "coast_down_switch"), held until the next action. The RSA reports it to
     // the PIM, which then commands coast-down drag (propulsion p57).
     virtual void CoastDownSwitch(bool on) = 0;
+    // The charge paddle (scenario action "set_charge_coupler"): mated=true
+    // puts it in the receptacle, false pulls it. The level the connector
+    // publishes on 4060, exactly as the interactive coupler toggle sets it.
+    // Not pure: a hooks implementer with no physical world has no paddle.
+    virtual void SetChargeCoupler(bool /*mated*/) {}
 };
 
 class Scenario {

@@ -52,6 +52,7 @@ struct CountingHooks : public ev1sim::ScenarioHooks {
     int fail_throttle = 0, restore_throttle = 0;
     int hv_iso_calls = 0, hv_iso_lead = -1;
     int coast_down_on = 0, coast_down_off = 0;
+    int coupler_mated = 0, coupler_pulled = 0;
     double hv_iso_kohm = -1.0;
 
     void KeyOnCycle()        override { ++key_on_cycle; }
@@ -88,6 +89,9 @@ struct CountingHooks : public ev1sim::ScenarioHooks {
     }
     void CoastDownSwitch(bool on) override {
         if (on) ++coast_down_on; else ++coast_down_off;
+    }
+    void SetChargeCoupler(bool mated) override {
+        if (mated) ++coupler_mated; else ++coupler_pulled;
     }
 };
 
@@ -1649,4 +1653,26 @@ TEST_CASE("Scenario: every rolling-start ABS scenario brakes after the "
     }
     // At least one, so the case cannot pass vacuously; not an exact count.
     CHECK(rolling >= 1);
+}
+
+TEST_CASE("Scenario: set_charge_coupler mates and pulls the charge paddle",
+          "[Scenario]") {
+    using ev1sim::Scenario;
+
+    Scenario s;
+    s.set_events({
+        {1.00, "set_charge_coupler", 1.0},
+        {2.00, "set_charge_coupler", 0.0},
+    });
+
+    CountingHooks hooks;
+    DriverCommand cmd{};
+
+    s.Tick(0.50, VehicleState{}, hooks, cmd);
+    CHECK(hooks.coupler_mated == 0);
+    s.Tick(1.10, VehicleState{}, hooks, cmd);
+    CHECK(hooks.coupler_mated == 1);
+    CHECK(hooks.coupler_pulled == 0);
+    s.Tick(2.10, VehicleState{}, hooks, cmd);
+    CHECK(hooks.coupler_pulled == 1);
 }
