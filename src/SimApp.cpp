@@ -2823,6 +2823,12 @@ void SimApp::FailThrottleInput(bool fail) {
               << (fail ? "SUPPRESSED" : "restored") << "\n";
 }
 
+void SimApp::SetChargeCoupler(bool mated) {
+    if (m_physical) m_physical->charge_coupler().set_present(mated);
+    std::cout << "[Scenario] set_charge_coupler -> "
+              << (mated ? "MATED" : "PULLED") << "\n";
+}
+
 void SimApp::HvIsolationFault(int lead, double leak_kohm) {
     const auto lead_u8 = static_cast<std::uint8_t>(
         (lead == 1 || lead == 2) ? lead : 0);

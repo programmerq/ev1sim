@@ -60,6 +60,7 @@ public:
     void FailThrottleInput(bool fail) override;
     void HvIsolationFault(int lead, double leak_kohm) override;
     void CoastDownSwitch(bool on) override;
+    void SetChargeCoupler(bool mated) override;
 
     // Dispatch a named input action (from a wheel button / Arduino contact) by
     // reusing the same handlers the keyboard drives.  Horn is a held input
