@@ -1676,3 +1676,45 @@ TEST_CASE("Scenario: set_charge_coupler mates and pulls the charge paddle",
     s.Tick(2.10, VehicleState{}, hooks, cmd);
     CHECK(hooks.coupler_pulled == 1);
 }
+
+TEST_CASE("Scenario: charge_coupler_present stats field reads the paddle",
+          "[Scenario]") {
+    using ev1sim::Scenario;
+    using ev1sim::ScenarioStats;
+
+    auto tmp_csv = std::filesystem::temp_directory_path() /
+                   "ev1sim_scenario_stats_charge_coupler_test.csv";
+    Scenario s;
+    ScenarioStats st{tmp_csv.string(), {"sim_time_s", "charge_coupler_present"},
+                     0.10};
+    s.set_stats(st);
+    s.OpenStats();
+
+    ExternalSimConnector bus;
+    ev1sim::PhysicalWorld phys;
+    DriverCommand cmd{};
+    VehicleState state{};
+
+    // Row 1: paddle out. Row 2: mated. Row 3: pulled again.
+    s.MaybeSampleStats(0.0, state, phys, bus, cmd);
+    phys.charge_coupler().set_present(true);
+    s.MaybeSampleStats(0.15, state, phys, bus, cmd);
+    phys.charge_coupler().set_present(false);
+    s.MaybeSampleStats(0.30, state, phys, bus, cmd);
+
+    s.Close();
+
+    std::ifstream f(tmp_csv);
+    REQUIRE(f.is_open());
+    std::string header, row1, row2, row3;
+    std::getline(f, header);
+    std::getline(f, row1);
+    std::getline(f, row2);
+    std::getline(f, row3);
+    CHECK(header == "sim_time_s,charge_coupler_present");
+    CHECK(row1 == "0,0");
+    CHECK(row2 == "0.15,1");
+    CHECK(row3 == "0.3,0");
+    f.close();
+    std::filesystem::remove(tmp_csv);
+}
