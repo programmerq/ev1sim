@@ -32,7 +32,11 @@
       "speed_taper_start_mps": 0.0,
       "speed_taper_full_mps": 0.0,
       "autocenter": false,
-      "invert": false
+      "invert": false,
+      "abs_rumble": true,
+      "abs_rumble_magnitude": 0.3,
+      "abs_rumble_period_ms": 60,
+      "abs_rumble_hold_ms": 250
     }
   }
 }

@@ -506,6 +506,7 @@ if(BUILD_TESTS)
         tests/test_level_file.cpp
         tests/test_vehicle_lights.cpp
         tests/test_physical_world.cpp
+        tests/test_abs_rumble.cpp
         tests/test_wiper_renderer.cpp
         tests/test_floating_ui.cpp
         tests/test_bus_snoop.cpp

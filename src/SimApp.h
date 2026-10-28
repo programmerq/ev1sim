@@ -223,6 +223,7 @@ private:
     std::unique_ptr<ev1sim::SdlContext>           m_sdl;
     std::unique_ptr<ev1sim::WheelInputController> m_wheel;
     std::unique_ptr<ev1sim::ForceFeedback>        m_ffb;
+    ev1sim::AbsRumble                             m_abs_rumble;
 #endif
 
     std::shared_ptr<chrono::vehicle::ChWheeledVehicleVisualSystemIrrlicht> m_vis;

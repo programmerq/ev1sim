@@ -69,6 +69,10 @@ void parse_ffb_config(const json& f, ev1sim::FfbConfig& out) {
     read_if(f, "speed_taper_full_mps", out.speed_taper_full_mps);
     read_if(f, "autocenter", out.autocenter);
     read_if(f, "invert", out.invert);
+    read_if(f, "abs_rumble", out.abs_rumble);
+    read_if(f, "abs_rumble_magnitude", out.abs_rumble_magnitude);
+    read_if(f, "abs_rumble_period_ms", out.abs_rumble_period_ms);
+    read_if(f, "abs_rumble_hold_ms", out.abs_rumble_hold_ms);
 }
 
 }  // namespace

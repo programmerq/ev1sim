@@ -1490,6 +1490,7 @@ int SimApp::RunWithVisualization() {
                 if (!m_ffb && m_config.input.ffb.enabled) {
                     m_ffb = std::make_unique<ev1sim::ForceFeedback>(
                         m_wheel->JoystickHandle(), m_config.input.ffb);
+                    m_abs_rumble = ev1sim::AbsRumble(m_config.input.ffb);
                 }
                 cmd.steering    = w.steering;
                 cmd.throttle    = w.throttle;
@@ -2174,9 +2175,19 @@ int SimApp::RunWithVisualization() {
 #ifdef EV1SIM_HAVE_WHEEL_IO
         // Force feedback from the current front-axle self-aligning torque
         // (zeroed while paused or with no haptic device).
+        // Plus a rumble while the BTCM's ABS modulates a front wheel.
         if (m_ffb) {
             const auto& vs = m_world->GetState();
             m_ffb->Update(vs.steering_torque, vs.speed_mps, !m_paused);
+            bool modulating = false;
+            if (!m_paused && m_external_sim->IsConnected()) {
+                using Phase = ExternalSimConnector::AbsPhaseFront::Phase;
+                const auto abs = m_external_sim->GetAbsPhaseFront(kAbsFreshnessWindow);
+                modulating = (abs.fl_fresh && abs.fl != Phase::APPLY) ||
+                             (abs.fr_fresh && abs.fr != Phase::APPLY);
+            }
+            m_abs_rumble.Update(render_dt, modulating);
+            m_ffb->SetRumble(m_abs_rumble.Magnitude());
         }
 #endif
         bool horn_low  = cmd.horn_low;

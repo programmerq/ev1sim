@@ -66,6 +66,18 @@ TEST_CASE("Config reads a rolling spawn speed", "[Config]") {
 }
 
 // -----------------------------------------------------------------------
+TEST_CASE("Config reads the force-feedback ABS rumble keys", "[Config][ffb]") {
+    auto path = WriteTempJson(R"({ "input": { "ffb": {
+        "abs_rumble": false, "abs_rumble_magnitude": 0.5,
+        "abs_rumble_period_ms": 40, "abs_rumble_hold_ms": 300 } } })");
+    Config cfg = Config::LoadFromFile(path);
+    CHECK_FALSE(cfg.input.ffb.abs_rumble);
+    CHECK_THAT(cfg.input.ffb.abs_rumble_magnitude, WithinAbs(0.5, 1e-12));
+    CHECK(cfg.input.ffb.abs_rumble_period_ms == 40);
+    CHECK(cfg.input.ffb.abs_rumble_hold_ms == 300);
+}
+
+// -----------------------------------------------------------------------
 TEST_CASE("Config loads values from JSON file", "[Config]") {
     auto path = WriteTempJson(R"({
         "vehicle_model": "hmmwv",
