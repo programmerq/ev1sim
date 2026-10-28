@@ -493,6 +493,36 @@ TEST_CASE("Connector publishes two RSA mode buttons pressed in one tick",
     CHECK(g2 != g_run);
 }
 
+TEST_CASE("Connector writes the pump case temperature only once armed, then every tick",
+          "[wire_truth][e2e]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("e2e_ps_case");
+    auto pscm = create_fleet_table(seg, topo::kTopologyHash);  // the PSCM's view
+    REQUIRE(pscm != nullptr);
+    ScopedEnv env("ELECTRICSIM_WIRES_NAME", seg.c_str());
+
+    ExternalSimConnector::Options opts;
+    opts.enabled = true;
+    ExternalSimConnector c(opts);
+
+    electricsim::io::WireTable::Sample<std::uint16_t> s;
+    c.Tick(0.01);
+    REQUIRE(pscm->read_uint16_sample(topo::kWireCHASSIS_PS_MOTOR_CASE_TEMP_Q8, &s));
+    CHECK_FALSE(s.written());   // unwritten = no pump peripheral; the PSCM's model stands
+
+    c.SetSteeringPumpCaseTempQ8(38400);   // 150 °C
+    c.Tick(0.02);
+    REQUIRE(pscm->read_uint16_sample(topo::kWireCHASSIS_PS_MOTOR_CASE_TEMP_Q8, &s));
+    REQUIRE(s.written());
+    CHECK(s.value == 38400);
+    const auto g1 = s.generation;
+
+    c.Tick(0.03);   // same value, still a fresh publish for the PSCM's freshness window
+    REQUIRE(pscm->read_uint16_sample(topo::kWireCHASSIS_PS_MOTOR_CASE_TEMP_Q8, &s));
+    CHECK(s.value == 38400);
+    CHECK(s.generation != g1);
+}
+
 // ---------------------------------------------------------------------------
 // apply_consumer_overlay tests.
 // @design 2026-06-15 — consumer overlay batch.

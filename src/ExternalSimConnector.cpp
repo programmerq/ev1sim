@@ -522,9 +522,11 @@ constexpr int           kNumSounderSignals    = 1;
 // The PSCM is an HV inverter on batt-731 whose molex 3-phase outputs (molex.A/
 // B/C) drive a steering pump motor; the motor body returns the HV interlock
 // loop on molex.D/E.  ev1sim's power_steering_pump_motor peripheral
-// (ev1sim::PowerSteeringPumpMotor) is the minimum-viable plant: it
-// consumes a single commanded pump speed and closes the HV interlock loop.
-// Per-phase BLDC commutation is future work.  Wire-level mapping:
+// (ev1sim::PowerSteeringPumpMotor) is a per-phase BLDC model: it consumes
+// the commanded pump speed (an output frequency up to 83 Hz), closes the HV
+// interlock loop and reports its case temperature
+// (CHASSIS_PS_MOTOR_CASE_TEMP_Q8, written through WireTruthChassis).
+// Wire-level mapping:
 //   4097  vehicle.steering.pump_motor.speed_cmd_q8     PSCM molex.A/B/C → pump  (uint8 q8: 0=stopped, 255=full)  [in]
 //   4098  vehicle.steering.pump_motor.interlock_closed pump molex.D/E → PSCM    (uint8 bool: 1=loop closed)      [out]
 constexpr std::uint32_t kSigPscmPumpSpeedCmdQ8      = 4097U;
@@ -1617,6 +1619,10 @@ struct ExternalSimConnector::State {
     // bool: true = molex.D/E loop closed (motor present).  Publish-on-change.
     bool          steering_pump_interlock_closed = true;   // motor present → loop closed
     std::int8_t   steering_pump_interlock_pub    = -1;     // -1 forces first publish
+    // Power-steering pump motor case temperature (CHASSIS_PS_MOTOR_CASE_TEMP_Q8),
+    // uint16 Q8 °C.  Written every tick once armed.
+    bool          steering_pump_case_temp_armed = false;
+    std::uint16_t steering_pump_case_temp_q8    = 0;
 
     // HVAC driver controls (IDs 4124-4128, chassis segment) — published to HTCM.
     // Publish-on-change; defaults match ev1sim::HvacControls.
@@ -2035,6 +2041,11 @@ bool ExternalSimConnector::HasReceivedSteeringPumpSpeedCmd() const {
 
 void ExternalSimConnector::SetSteeringPumpInterlockClosed(bool closed) {
     m_state->steering_pump_interlock_closed = closed;
+}
+
+void ExternalSimConnector::SetSteeringPumpCaseTempQ8(std::uint16_t q8) {
+    m_state->steering_pump_case_temp_armed = true;
+    m_state->steering_pump_case_temp_q8    = q8;
 }
 
 void ExternalSimConnector::SetHvacTempSetpointC(float setpoint_c) {
@@ -3753,6 +3764,11 @@ void ExternalSimConnector::Tick(double sim_time_s) {
     if (st.hv_iso_fault_armed && st.wire) {
         st.wire->publish_hv_isolation_fault(st.hv_iso_fault_lead,
                                             st.hv_iso_fault_kohm);
+    }
+    // Steering pump case temperature: unwritten until the pump is driven,
+    // then level-held every tick.
+    if (st.steering_pump_case_temp_armed && st.wire) {
+        st.wire->publish_ps_motor_case_temp_q8(st.steering_pump_case_temp_q8);
     }
     // Shifter coast-down button: unwritten until a scenario sets it (the RSA
     // reads unwritten as not pressed), then level-held every tick.

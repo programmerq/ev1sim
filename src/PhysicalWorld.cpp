@@ -809,4 +809,162 @@ void AmbientTempSensor::update(double time_of_day_hours) {
     if (m_humidity_pct > 100.0) m_humidity_pct = 100.0;
 }
 
+
+// ---------------------------------------------------------------------------
+// PowerSteeringPumpMotor — per-phase BLDC on the PSCM inverter.
+// ---------------------------------------------------------------------------
+
+namespace {
+constexpr double kTwoPi = 6.283185307179586;
+constexpr double kSqrt3Over2 = 0.8660254037844386;
+
+double Clamp(double v, double lo, double hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
+// Inverse Park + Clarke (amplitude-invariant): rotor-frame d/q onto phase A/B/C.
+double DqToPhase(double d, double q, double theta, int phase) {
+    const double alpha = d * std::cos(theta) - q * std::sin(theta);
+    const double beta  = d * std::sin(theta) + q * std::cos(theta);
+    switch (phase) {
+        case 0:  return alpha;
+        case 1:  return -0.5 * alpha + kSqrt3Over2 * beta;
+        default: return -0.5 * alpha - kSqrt3Over2 * beta;
+    }
+}
+}  // namespace
+
+double PowerSteeringPumpMotor::hydraulic_load_from_steering(double steering) const {
+    const double onset = m_cfg.stop_load_onset;
+    if (onset >= 1.0) return std::fabs(steering) >= 1.0 ? 1.0 : 0.0;
+    return Clamp((std::fabs(steering) - onset) / (1.0 - onset), 0.0, 1.0);
+}
+
+double PowerSteeringPumpMotor::pump_torque_nm(double omega_m) const {
+    // The pressure torque fades in over the first ~10 rad/s so a stopped
+    // rotor is not held by a torque it has no speed to react against.
+    const double pressure = m_cfg.rest_load_torque_nm +
+        m_load * (m_cfg.stop_load_torque_nm + m_cfg.stop_load_nms * omega_m);
+    return pressure * std::tanh(omega_m / 10.0);
+}
+
+double PowerSteeringPumpMotor::electrical_hz() const {
+    return m_cfg.pole_pairs * m_omega_m / kTwoPi;
+}
+double PowerSteeringPumpMotor::actual_speed() const {
+    if (m_cfg.max_output_hz <= 0.0) return 0.0;
+    return Clamp(electrical_hz() / m_cfg.max_output_hz, 0.0, 1.0);
+}
+double PowerSteeringPumpMotor::shaft_rpm() const { return m_omega_m * 60.0 / kTwoPi; }
+double PowerSteeringPumpMotor::phase_current_a(int phase) const {
+    return DqToPhase(m_id, m_iq, m_theta_e, phase);
+}
+double PowerSteeringPumpMotor::phase_voltage_v(int phase) const {
+    return DqToPhase(m_vd, m_vq, m_theta_e, phase);
+}
+double PowerSteeringPumpMotor::torque_nm() const {
+    return 1.5 * m_cfg.pole_pairs * m_cfg.flux_linkage_wb * m_iq;
+}
+double PowerSteeringPumpMotor::load_torque_nm() const {
+    return pump_torque_nm(m_omega_m) + m_cfg.friction_nms * m_omega_m;
+}
+double PowerSteeringPumpMotor::input_power_w() const {
+    return 1.5 * (m_vd * m_id + m_vq * m_iq);
+}
+double PowerSteeringPumpMotor::copper_loss_w() const {
+    return 1.5 * m_cfg.phase_resistance_ohm * (m_id * m_id + m_iq * m_iq);
+}
+std::uint16_t PowerSteeringPumpMotor::case_temp_q8(double c) {
+    if (!(c > 0.0)) return 0;
+    const double q8 = std::round(c * 256.0);
+    return q8 >= 65535.0 ? 65535 : static_cast<std::uint16_t>(q8);
+}
+double PowerSteeringPumpMotor::pump_heat_w() const {
+    return m_cfg.pump_heat_fraction * pump_torque_nm(m_omega_m) * m_omega_m;
+}
+double PowerSteeringPumpMotor::friction_loss_w() const {
+    return m_cfg.friction_nms * m_omega_m * m_omega_m;
+}
+
+void PowerSteeringPumpMotor::step_electrical(double h, double f_target_hz) {
+    const Config& c = m_cfg;
+    const int    p   = c.pole_pairs;
+    const double R   = c.phase_resistance_ohm;
+    const double L   = c.phase_inductance_h;
+    const double lam = c.flux_linkage_wb;
+
+    // Inverter frequency reference ramps toward the command.
+    const double max_step = c.ramp_hz_per_s * h;
+    m_ref_hz += Clamp(f_target_hz - m_ref_hz, -max_step, max_step);
+
+    const bool driving = m_present && (m_ref_hz > 0.0 || f_target_hz > 0.0);
+    double omega_e = p * m_omega_m;
+
+    if (!driving) {
+        // Phases open: no current, no torque; the rotor coasts.
+        m_id = m_iq = m_vd = m_vq = 0.0;
+        m_int_speed = m_int_d = m_int_q = 0.0;
+        m_ref_hz = m_present ? m_ref_hz : 0.0;
+    } else {
+        // Speed loop → q-axis current reference (d-axis held at zero).
+        const double kt  = 1.5 * p * lam;
+        const double wb  = c.speed_loop_bw_rad_s;
+        const double kp_w = c.rotor_inertia_kgm2 * wb / kt;
+        const double ki_w = kp_w * wb / 5.0;
+        const double w_ref = kTwoPi * m_ref_hz / p;
+        const double e_w = w_ref - m_omega_m;
+        double iq_ref = kp_w * e_w + m_int_speed;
+        const double iq_sat = Clamp(iq_ref, -c.current_limit_a, c.current_limit_a);
+        if (iq_sat == iq_ref || (iq_ref > iq_sat) != (e_w > 0.0)) m_int_speed += ki_w * e_w * h;
+        iq_ref = iq_sat;
+
+        // Current loops with back-EMF and cross-coupling feed-forward.
+        const double kp_i = L * c.current_loop_bw_rad_s;
+        const double ki_i = R * c.current_loop_bw_rad_s;
+        const double e_d = 0.0 - m_id;
+        const double e_q = iq_ref - m_iq;
+        double vd = kp_i * e_d + m_int_d - omega_e * L * m_iq;
+        double vq = kp_i * e_q + m_int_q + omega_e * (L * m_id + lam);
+        const double vmag = std::sqrt(vd * vd + vq * vq);
+        const bool limited = vmag > c.max_phase_voltage_v;
+        if (limited) {
+            const double k = c.max_phase_voltage_v / vmag;
+            vd *= k;
+            vq *= k;
+        } else {
+            m_int_d += ki_i * e_d * h;
+            m_int_q += ki_i * e_q * h;
+        }
+        m_vd = vd;
+        m_vq = vq;
+
+        // Motor electrical state in the rotor frame.
+        const double did = (m_vd - R * m_id + omega_e * L * m_iq) / L;
+        const double diq = (m_vq - R * m_iq - omega_e * (L * m_id + lam)) / L;
+        m_id += did * h;
+        m_iq += diq * h;
+    }
+
+    // Shaft.
+    const double t_net = torque_nm() - load_torque_nm();
+    m_omega_m += t_net / c.rotor_inertia_kgm2 * h;
+    if (m_omega_m < 0.0 && !driving) m_omega_m = 0.0;   // the pump does not run backwards
+    omega_e = p * m_omega_m;
+    m_theta_e = std::fmod(m_theta_e + omega_e * h, kTwoPi);
+    if (m_theta_e < 0.0) m_theta_e += kTwoPi;
+
+    // Case: copper, friction and pump-churn losses in, conduction to ambient out.
+    const double loss = copper_loss_w() + friction_loss_w() + pump_heat_w();
+    m_case_c += (loss - (m_case_c - m_ambient_c) / c.case_to_ambient_k_per_w) /
+                c.case_heat_capacity_j_per_k * h;
+}
+
+void PowerSteeringPumpMotor::update(double dt, double commanded_speed) {
+    m_cmd = Clamp(commanded_speed, 0.0, 1.0);
+    if (dt <= 0.0) return;
+    const double f_target = m_present ? m_cmd * m_cfg.max_output_hz : 0.0;
+    const double sub = m_cfg.substep_s > 0.0 ? m_cfg.substep_s : dt;
+    const int n = static_cast<int>(std::ceil(dt / sub));
+    const double h = dt / n;
+    for (int i = 0; i < n; ++i) step_electrical(h, f_target);
+}
+
 }  // namespace ev1sim

@@ -599,6 +599,13 @@ public:
     /// (motor present).  Set false for fault injection (motor unplugged).
     void SetSteeringPumpInterlockClosed(bool closed);
 
+    /// Outgoing power-steering pump motor case temperature, uint16 Q8 °C
+    /// (CHASSIS_PS_MOTOR_CASE_TEMP_Q8, the case sense the PSCM's 150 °C switch
+    /// reads).  Unwritten until the first call — the PSCM reads unwritten as
+    /// "no pump peripheral" and runs its own thermal model — then level-held
+    /// every tick, so the PSCM's freshness window sees a live producer.
+    void SetSteeringPumpCaseTempQ8(std::uint16_t q8);
+
     /// Outgoing HVAC driver-control requests (IDs 4124-4128, chassis segment) →
     /// HTCM.  Latched by these setters; published on change each tick.  Mirror of
     /// ev1sim::HvacControls.  Encodings: setpoint float32 °C; fan/mode

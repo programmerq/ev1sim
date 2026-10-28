@@ -156,14 +156,31 @@ but ev1sim does not require it.
 The PSCM is drawn as an HV inverter on `batt-731`; its molex 3-phase outputs
 (`molex.A/B/C`) drive a steering pump motor, and the motor body returns the HV
 interlock loop on `molex.D/E`.  ev1sim's `PhysicalWorld::power_steering_pump()`
-is the **minimum-viable plant**: it consumes a single commanded pump speed and
-tracks an actual speed with a first-order spin-up/spin-down lag
-(`response_tau_s`, default 0.15 s).  Real per-phase BLDC commutation is
-intentionally ignored — phase-level modelling is future work.
+is a **per-phase BLDC model**:
+
+- The commanded speed is a three-phase output frequency, up to the printed
+  83 Hz ceiling.  The inverter ramps its reference toward it, commutates on the
+  rotor angle and regulates speed through cascaded speed and current loops,
+  limited to elec-363's 180 VAC output.
+- The motor is integrated in the rotor (d/q) frame on a 20 µs sub-step and
+  projected onto phases A/B/C: `phase_current_a(n)`, `phase_voltage_v(n)`,
+  `electrical_angle_rad()`, plus torque, shaft speed and input power.
+- The pump load is a rest torque plus a pressure torque that builds as the
+  wheel nears full lock (`hydraulic_load_from_steering`, elec-363's LOW and
+  HIGH LOAD lines).  At 82 Hz the drawn power is ~80 W at rest and ~825 W
+  held at a stop, inside the printed envelope.
+- Copper and friction losses and a share of the pump's churning heat a
+  one-node case model that cools toward the ambient sensor's temperature;
+  a sustained full-lock hold reaches the PSCM's 150 °C switch in about ten
+  minutes.
+
+The manual prints the drive envelope, not the motor, so every motor, pump and
+loop constant in `PowerSteeringPumpMotor::Config` is `@inferred`; the thermal
+constants follow electricsim's PSCM plant.
 
 The motor body closes the HV interlock loop while present; `interlock_closed()`
 is what the PSCM senses.  `set_present(false)` opens the loop for fault
-injection.
+injection and disconnects the phases, so the rotor coasts.
 
 ### Wire-level mapping
 
@@ -171,14 +188,23 @@ injection.
 |------------------------------------|-----------------------|-------------------------------------------------|-----|
 | PSCM `molex.A/B/C` → pump phases   | **4097**              | `vehicle.steering.pump_motor.speed_cmd_q8`      | PSCM → ev1sim |
 | pump `molex.D/E` HV interlock loop | **4098**              | `vehicle.steering.pump_motor.interlock_closed`  | ev1sim → PSCM |
+| pump case sense (circuit 900A)     | wire cell             | `CHASSIS_PS_MOTOR_CASE_TEMP_Q8`                 | ev1sim → PSCM |
 
 Encodings: `4097` is `uint8` q8 (`0` = stopped, `255` = full); `4098` is
-`uint8`/bool (`1` = loop closed / motor present).
+`uint8`/bool (`1` = loop closed / motor present); the case temperature is
+`uint16` Q8 °C.
 Connector accessors: `GetSteeringPumpSpeedCmdQ8()` / `HasReceivedSteeringPumpSpeedCmd()`
-(in) and `SetSteeringPumpInterlockClosed(bool)` (out, published on change).
+(in), `SetSteeringPumpInterlockClosed(bool)` (out, published on change) and
+`SetSteeringPumpCaseTempQ8(uint16)` (out, every tick once set).  ev1sim writes
+the case temperature only after the first pump command arrives: unwritten
+tells the PSCM this fleet has no pump peripheral, so its own thermal model
+stays the source.
 
-This unlocks PSCM's deferred plant model in electricsim: PSCM receives its
-`pump_engaged` command, publishes `4097`, and reads `4098` as interlock-closed.
+electricsim's PSCM does not publish `4097` or read `4098` yet: neither has a
+cell in its topology (both are on the connector's pending-adoption list), and
+the PSCM drives its own pump plant.  Until it publishes its inverter drive,
+ev1sim's pump stays still in a co-simulated fleet and the case-temperature cell
+stays unwritten.
 
 ---
 

@@ -1341,16 +1341,27 @@ void SimApp::PublishMotorState() {
 // and publishes the one body stimulus that flows the other way — the door-lock
 // switch contacts.  Called once per tick from both the windowed and headless
 // loops, after the connector has drained inbound frames.
-void SimApp::ConsumeBodyActuatorPeripherals(double dt) {
+void SimApp::ConsumeBodyActuatorPeripherals(double dt, double steering) {
     if (!m_external_sim) return;
 
-    // --- Power-steering pump motor (chassis 4097 in) ---
-    // PSCM publishes a q8 commanded speed; drive the plant (0..1 normalized).
+    // --- Power-steering pump motor (chassis 4097 in, case temperature out) ---
+    // PSCM publishes a q8 commanded speed; drive the plant (0..1 normalized)
+    // against the load the steering puts on the pump, cooling toward ambient.
+    // The case temperature is published only once the PSCM has driven the
+    // pump: until then this fleet has no pump drive, and the PSCM's own
+    // thermal model stays the source.
     {
+        auto& pump = m_physical->power_steering_pump();
+        const bool driven = m_external_sim->HasReceivedSteeringPumpSpeedCmd();
         double cmd01 = 0.0;
-        if (m_external_sim->HasReceivedSteeringPumpSpeedCmd())
+        if (driven)
             cmd01 = static_cast<double>(m_external_sim->GetSteeringPumpSpeedCmdQ8()) / 255.0;
-        m_physical->power_steering_pump().update(dt, cmd01);
+        pump.set_hydraulic_load(pump.hydraulic_load_from_steering(steering));
+        pump.set_ambient_temp_c(m_physical->ambient_temp_sensor().temp_c());
+        pump.update(dt, cmd01);
+        if (driven)
+            m_external_sim->SetSteeringPumpCaseTempQ8(
+                ev1sim::PowerSteeringPumpMotor::case_temp_q8(pump.case_temp_c()));
     }
 
     // --- Sounder / piezo "tick" (chassis 4096 in) ---
@@ -2010,7 +2021,7 @@ int SimApp::RunWithVisualization() {
         }
 
         // --- Body actuator peripherals (door-lock motors / sounder / pump) ---
-        ConsumeBodyActuatorPeripherals(render_dt);
+        ConsumeBodyActuatorPeripherals(render_dt, cmd.steering);
 
         // --- Render ---
         m_vis->BeginScene();
@@ -2579,7 +2590,7 @@ int SimApp::RunHeadless() {
         }
 
         // --- Body actuator peripherals (door-lock motors / sounder / pump) ---
-        ConsumeBodyActuatorPeripherals(tick_dt);
+        ConsumeBodyActuatorPeripherals(tick_dt, cmd.steering);
 
         // --- Horn audio (external-sim-driven only in headless) ---
         bool horn_low = false, horn_high = false;

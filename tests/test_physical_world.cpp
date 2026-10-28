@@ -4,7 +4,10 @@
 #include "PhysicalWorld.h"
 #include "VehiclePanels.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
+#include <initializer_list>
 #include <limits>
 #include <string>
 #include <vector>
@@ -1503,24 +1506,41 @@ TEST_CASE("Sounder: counts one click per rising edge", "[PhysicalWorld][Sounder]
 }
 
 // ---------------------------------------------------------------------------
-// PowerSteeringPumpMotor — PSCM-driven pump (minimum-viable plant).
+// PowerSteeringPumpMotor — per-phase BLDC on the PSCM inverter.
 // ---------------------------------------------------------------------------
 
-TEST_CASE("PowerSteeringPumpMotor: present (interlock closed) by default", "[PhysicalWorld][SteeringPump]") {
+namespace {
+// Run the pump at a fixed command and load until it has settled.
+PowerSteeringPumpMotor SettledPump(double cmd, double load,
+                                   PowerSteeringPumpMotor::Config cfg = {}) {
+    PowerSteeringPumpMotor p(cfg);
+    p.set_hydraulic_load(load);
+    for (int i = 0; i < 100; ++i) p.update(0.01, cmd);   // 1 s
+    return p;
+}
+}  // namespace
+
+TEST_CASE("PowerSteeringPumpMotor: present (interlock closed) and still by default", "[PhysicalWorld][SteeringPump]") {
     PowerSteeringPumpMotor p;
     CHECK(p.interlock_closed());
     CHECK(p.commanded_speed() == 0.0);
     CHECK(p.actual_speed() == 0.0);
+    CHECK(p.phase_current_a(0) == 0.0);
+    CHECK(p.input_power_w() == 0.0);
 }
 
-TEST_CASE("PowerSteeringPumpMotor: actual speed lags then converges to command", "[PhysicalWorld][SteeringPump]") {
-    PowerSteeringPumpMotor p;            // default tau 0.15 s
+TEST_CASE("PowerSteeringPumpMotor: rotor frequency lags then converges to the commanded output frequency", "[PhysicalWorld][SteeringPump]") {
+    using Catch::Matchers::WithinRel;
+    PowerSteeringPumpMotor::Config cfg;
+    PowerSteeringPumpMotor p(cfg);
     p.update(0.01, 1.0);
     CHECK(p.commanded_speed() == 1.0);
     CHECK(p.actual_speed() > 0.0);       // started moving
-    CHECK(p.actual_speed() < 1.0);       // but lags the command
+    CHECK(p.actual_speed() < 0.5);       // but lags the command
     for (int i = 0; i < 200; ++i) p.update(0.01, 1.0);   // 2 s
-    CHECK(p.actual_speed() > 0.99);      // converged
+    CHECK(p.actual_speed() > 0.99);
+    CHECK_THAT(p.electrical_hz(), WithinRel(cfg.max_output_hz, 0.005));
+    CHECK_THAT(p.shaft_rpm(), WithinRel(cfg.max_output_hz * 60.0 / cfg.pole_pairs, 0.005));
 }
 
 TEST_CASE("PowerSteeringPumpMotor: command is clamped to [0,1]", "[PhysicalWorld][SteeringPump]") {
@@ -1531,22 +1551,130 @@ TEST_CASE("PowerSteeringPumpMotor: command is clamped to [0,1]", "[PhysicalWorld
     CHECK(p.commanded_speed() == 0.0);
 }
 
-TEST_CASE("PowerSteeringPumpMotor: zero tau is an instantaneous plant", "[PhysicalWorld][SteeringPump]") {
-    using Catch::Matchers::WithinAbs;
-    PowerSteeringPumpMotor::Config cfg;
-    cfg.response_tau_s = 0.0;
-    PowerSteeringPumpMotor p(cfg);
-    p.update(0.01, 0.7);
-    CHECK_THAT(p.actual_speed(), WithinAbs(0.7, 1e-12));
+TEST_CASE("PowerSteeringPumpMotor: the speed loop holds speed against a full stop load", "[PhysicalWorld][SteeringPump]") {
+    using Catch::Matchers::WithinRel;
+    const auto p = SettledPump(0.75, 1.0);
+    CHECK_THAT(p.electrical_hz(), WithinRel(0.75 * 83.0, 0.005));
+    CHECK_THAT(p.torque_nm(), WithinRel(p.load_torque_nm(), 0.01));   // steady state
 }
 
-TEST_CASE("PowerSteeringPumpMotor: unplugging opens the HV interlock loop", "[PhysicalWorld][SteeringPump]") {
-    PowerSteeringPumpMotor p;
+TEST_CASE("PowerSteeringPumpMotor: phase currents are a balanced three-phase set", "[PhysicalWorld][SteeringPump]") {
+    using Catch::Matchers::WithinAbs;
+    auto p = SettledPump(0.6, 1.0);
+    double peak_a = 0.0;
+    for (int i = 0; i < 400; ++i) {           // 40 ms, more than one electrical period
+        p.update(1e-4, 0.6);
+        const double ia = p.phase_current_a(0), ib = p.phase_current_a(1), ic = p.phase_current_a(2);
+        CHECK_THAT(ia + ib + ic, WithinAbs(0.0, 1e-9));
+        // Amplitude-invariant: sum of squares is 1.5 × |i|².
+        const double mag = std::sqrt((ia * ia + ib * ib + ic * ic) / 1.5);
+        peak_a = std::max(peak_a, std::fabs(ia));
+        CHECK_THAT(mag, WithinAbs(p.torque_nm() / (1.5 * 2 * 0.19), 0.05));
+    }
+    CHECK_THAT(peak_a, WithinAbs(p.torque_nm() / (1.5 * 2 * 0.19), 0.05));
+}
+
+TEST_CASE("PowerSteeringPumpMotor: phase B lags phase A by a third of a period", "[PhysicalWorld][SteeringPump]") {
+    using Catch::Matchers::WithinAbs;
+    auto p = SettledPump(0.5, 0.0);
+    // Phase B at angle θ equals phase A at θ - 2π/3: sample A, step a third of
+    // an electrical period, sample B.
+    const double ia0 = p.phase_current_a(0);
+    const double period = 1.0 / p.electrical_hz();
+    const int n = 1000;
+    for (int i = 0; i < n; ++i) p.update(period / 3.0 / n, 0.5);
+    CHECK_THAT(p.phase_current_a(1), WithinAbs(ia0, 0.02));
+}
+
+TEST_CASE("PowerSteeringPumpMotor: steady-state power balances", "[PhysicalWorld][SteeringPump]") {
+    using Catch::Matchers::WithinRel;
+    for (double load : {0.0, 1.0}) {
+        const auto p = SettledPump(0.9, load);
+        const double omega_m = p.shaft_rpm() * 2.0 * 3.141592653589793 / 60.0;
+        const double shaft_w = p.load_torque_nm() * omega_m;
+        CHECK_THAT(p.input_power_w(), WithinRel(shaft_w + p.copper_loss_w(), 0.01));
+    }
+}
+
+TEST_CASE("PowerSteeringPumpMotor: input power rises with load and with frequency", "[PhysicalWorld][SteeringPump]") {
+    const double rest_lo = SettledPump(0.3, 0.0).input_power_w();
+    const double rest_hi = SettledPump(1.0, 0.0).input_power_w();
+    const double stop_lo = SettledPump(0.3, 1.0).input_power_w();
+    const double stop_hi = SettledPump(1.0, 1.0).input_power_w();
+    CHECK(rest_lo < rest_hi);
+    CHECK(stop_lo < stop_hi);
+    CHECK(rest_lo < stop_lo);
+    CHECK(rest_hi < stop_hi);
+}
+
+TEST_CASE("PowerSteeringPumpMotor: phase voltage never exceeds the inverter ceiling", "[PhysicalWorld][SteeringPump]") {
+    PowerSteeringPumpMotor::Config cfg;
+    cfg.max_phase_voltage_v = 60.0;          // well under the back-EMF at full speed
+    PowerSteeringPumpMotor p(cfg);
+    p.set_hydraulic_load(1.0);
+    for (int i = 0; i < 20000; ++i) {
+        p.update(1e-4, 1.0);
+        for (int ph = 0; ph < 3; ++ph) CHECK(std::fabs(p.phase_voltage_v(ph)) <= 60.0 + 1e-9);
+    }
+    CHECK(p.actual_speed() < 0.9);          // voltage-limited, cannot reach the command
+}
+
+TEST_CASE("PowerSteeringPumpMotor: zero command opens the phases and the rotor coasts down", "[PhysicalWorld][SteeringPump]") {
+    auto p = SettledPump(1.0, 0.0);
+    const double running = p.actual_speed();
+    p.update(0.01, 0.0);
+    for (int i = 0; i < 300; ++i) p.update(0.01, 0.0);
+    CHECK(p.actual_speed() < 0.05 * running);
+    CHECK(p.phase_current_a(0) == 0.0);
+    CHECK(p.input_power_w() == 0.0);
+}
+
+TEST_CASE("PowerSteeringPumpMotor: unplugging opens the HV interlock loop and stops the drive", "[PhysicalWorld][SteeringPump]") {
+    auto p = SettledPump(1.0, 0.0);
     CHECK(p.interlock_closed());
     p.set_present(false);
     CHECK_FALSE(p.interlock_closed());
+    for (int i = 0; i < 300; ++i) p.update(0.01, 1.0);
+    CHECK(p.actual_speed() < 0.05);
+    CHECK(p.phase_current_a(0) == 0.0);
     p.set_present(true);
     CHECK(p.interlock_closed());
+    for (int i = 0; i < 200; ++i) p.update(0.01, 1.0);
+    CHECK(p.actual_speed() > 0.99);
+}
+
+TEST_CASE("PowerSteeringPumpMotor: case settles at ambient plus loss times thermal resistance", "[PhysicalWorld][SteeringPump]") {
+    using Catch::Matchers::WithinAbs;
+    PowerSteeringPumpMotor::Config cfg;
+    cfg.case_heat_capacity_j_per_k = 5.0;     // 3 s time constant
+    cfg.initial_case_temp_c = 10.0;
+    PowerSteeringPumpMotor p(cfg);
+    p.set_ambient_temp_c(10.0);
+    p.set_hydraulic_load(1.0);
+    for (int i = 0; i < 3000; ++i) p.update(0.01, 1.0);   // 30 s
+    const double loss = p.copper_loss_w() + p.friction_loss_w() + p.pump_heat_w();
+    CHECK(loss > 0.0);
+    CHECK_THAT(p.case_temp_c(), WithinAbs(10.0 + loss * cfg.case_to_ambient_k_per_w, 0.5));
+    // Off, it cools back to ambient.
+    for (int i = 0; i < 3000; ++i) p.update(0.01, 0.0);
+    CHECK_THAT(p.case_temp_c(), WithinAbs(10.0, 0.5));
+}
+
+TEST_CASE("PowerSteeringPumpMotor: stop load builds only near full lock", "[PhysicalWorld][SteeringPump]") {
+    using Catch::Matchers::WithinAbs;
+    PowerSteeringPumpMotor p;
+    CHECK(p.hydraulic_load_from_steering(0.0) == 0.0);
+    CHECK(p.hydraulic_load_from_steering(0.9) == 0.0);
+    CHECK_THAT(p.hydraulic_load_from_steering(-0.95), WithinAbs(0.5, 1e-12));
+    CHECK(p.hydraulic_load_from_steering(1.0) == 1.0);
+    CHECK(p.hydraulic_load_from_steering(1.3) == 1.0);
+}
+
+TEST_CASE("PowerSteeringPumpMotor: case temperature encodes as uint16 Q8", "[PhysicalWorld][SteeringPump]") {
+    CHECK(PowerSteeringPumpMotor::case_temp_q8(150.0) == 38400);
+    CHECK(PowerSteeringPumpMotor::case_temp_q8(25.5) == 6528);
+    CHECK(PowerSteeringPumpMotor::case_temp_q8(-5.0) == 0);
+    CHECK(PowerSteeringPumpMotor::case_temp_q8(400.0) == 65535);
 }
 
 // ---------------------------------------------------------------------------

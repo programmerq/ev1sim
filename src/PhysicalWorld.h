@@ -1158,56 +1158,148 @@ private:
 
 /// Power-steering pump motor (3-phase BLDC driven by the PSCM HV inverter).
 ///
-/// Minimum-viable plant: consumes a single commanded speed (normalized 0..1,
-/// the PSCM's q8 pump-speed command / 255) and tracks an actual speed with a
-/// first-order spin-up/spin-down lag.  Real BLDC commutation across the three
-/// molex phases (A/B/C) is intentionally ignored — per-phase modeling is
-/// future work.
+/// A per-phase permanent-magnet motor model on molex.A/B/C.  The PSCM's
+/// commanded speed (normalized 0..1, the q8 pump-speed command / 255) is a
+/// three-phase output frequency up to max_output_hz; the inverter ramps its
+/// reference toward it, commutates on the rotor angle (the BLDC part: the
+/// voltage vector follows the rotor, so the motor cannot fall out of step) and
+/// regulates speed with a cascaded speed / current loop.  The electrical state
+/// is integrated in the rotor (d/q) frame on a fixed sub-step and projected
+/// onto the three phases, so per-phase voltages and currents are outputs.
+///
+/// The shaft drives the steering pump: a rest torque while the steering is at
+/// rest plus a pressure torque that builds as the wheel is held against a stop
+/// (elec-363's LOW LOAD and HIGH LOAD lines).  The motor's copper and friction
+/// losses and a share of the pump's churning heat a one-node case model, which
+/// is the case temperature the PSCM's 150 °C switch reads
+/// (CHASSIS_PS_MOTOR_CASE_TEMP_Q8).
+///
+/// The manual prints the drive envelope (frequency, voltage, output power),
+/// not the motor, so every motor, pump and inverter-loop constant in Config is
+/// @inferred: chosen so the drawn input power follows elec-363's printed
+/// envelope (held at a stop: ~150 W at 18 Hz and ~825 W at 82 Hz, against the
+/// printed 100..200 W and 750..900 W; at rest ~80 W at 82 Hz against
+/// 65..100 W) and so a sustained full-lock hold can reach the 150 °C switch.  The thermal constants follow
+/// electricsim's own PSCM plant (ev1/pscm/pscm_plant.h, "Case-temperature rise
+/// from load") so the two models agree when either is the source.
 ///
 /// The motor body also closes the HV interlock loop (molex.D/E): while the
 /// peripheral is present/connected, interlock_closed() is true, which the PSCM
-/// senses.  set_present(false) opens the loop for fault injection.
+/// senses.  set_present(false) opens the loop for fault injection and
+/// disconnects the phases, so the rotor coasts.
 ///
 /// Wire-level mapping (see docs/peripherals.md):
 ///   PSCM molex.A/B/C → pump phase_A/B/C   (commanded speed, chassis 4097)
 ///   pump molex.D/E   → PSCM HV INTERLOCK   (interlock-closed, chassis 4098)
+///   pump case sense  → PSCM                (CHASSIS_PS_MOTOR_CASE_TEMP_Q8)
 class PowerSteeringPumpMotor {
 public:
     struct Config {
-        /// First-order response time constant (s): the actual speed chases the
-        /// commanded speed with this lag.  Default ~0.15 s (a responsive
-        /// accessory BLDC).  0 → instantaneous plant.
-        double response_tau_s = 0.15;
+        // --- Inverter (PSCM) ---
+        /// Output-frequency ceiling, Hz.  @source:manual elec-364/366 (the
+        /// "83 Hz" edge electricsim's ev1/pscm/pscm_speed_map.hpp implements).
+        double max_output_hz = 83.0;
+        /// Peak phase-voltage ceiling, V: elec-363's 180 VAC maximum read as
+        /// line-to-line RMS (@inferred), 180·√2/√3.
+        double max_phase_voltage_v = 146.97;
+        /// Frequency-reference ramp, Hz/s.  @inferred
+        double ramp_hz_per_s = 400.0;
+        /// Phase-current limit, A peak.  @inferred
+        double current_limit_a = 10.0;
+        /// Speed- and current-loop bandwidths, rad/s.  @inferred
+        double speed_loop_bw_rad_s   = 200.0;
+        double current_loop_bw_rad_s = 3000.0;
+
+        // --- Motor (all @inferred) ---
+        int    pole_pairs           = 2;
+        double phase_resistance_ohm = 1.0;
+        double phase_inductance_h   = 0.003;
+        double flux_linkage_wb      = 0.19;    ///< magnet flux, V·s per electrical rad
+        double rotor_inertia_kgm2   = 2.0e-4;  ///< motor + pump rotor
+        double friction_nms         = 1.5e-4;  ///< viscous bearing/seal drag, N·m·s
+
+        // --- Pump (all @inferred) ---
+        /// Pump torque with the steering at rest (open-centre valve), N·m.
+        double rest_load_torque_nm  = 0.28;
+        /// Extra pressure torque with the wheel held against a stop:
+        /// stop_load_torque_nm + stop_load_nms · shaft speed.
+        double stop_load_torque_nm  = 1.739;
+        double stop_load_nms        = 3.793e-3;
+        /// |steering| (normalized) where the stop load starts to build; it is
+        /// full at 1.0.  @design: elec-363's HIGH LOAD is the wheel held at a stop.
+        double stop_load_onset      = 0.9;
+        /// Share of the pump's shaft power lost as heat in the shared
+        /// motor/pump housing (the rest leaves in the fluid).
+        double pump_heat_fraction   = 0.25;
+
+        // --- Case thermal (electricsim ev1/pscm/pscm_plant.h's @inferred values) ---
+        double case_heat_capacity_j_per_k = 500.0;
+        double case_to_ambient_k_per_w    = 0.6;
+        double initial_case_temp_c        = 25.0;
+
+        /// Electrical integration sub-step, s.
+        double substep_s = 2.0e-5;
     };
 
     PowerSteeringPumpMotor() = default;
-    explicit PowerSteeringPumpMotor(const Config& cfg) : m_cfg(cfg) {}
+    explicit PowerSteeringPumpMotor(const Config& cfg)
+        : m_cfg(cfg), m_case_c(cfg.initial_case_temp_c), m_ambient_c(cfg.initial_case_temp_c) {}
 
     /// Advance the plant.  commanded_speed is normalized 0..1 and clamped.
-    void update(double dt, double commanded_speed) {
-        m_cmd = commanded_speed < 0.0 ? 0.0
-                                      : (commanded_speed > 1.0 ? 1.0 : commanded_speed);
-        if (dt <= 0.0 || m_cfg.response_tau_s <= 0.0) {
-            m_actual = m_cmd;   // instantaneous plant
-            return;
-        }
-        // Exponential approach: actual += (cmd - actual)·(1 - e^{-dt/tau}).
-        const double alpha = 1.0 - std::exp(-dt / m_cfg.response_tau_s);
-        m_actual += (m_cmd - m_actual) * alpha;
+    void update(double dt, double commanded_speed);
+
+    /// Hydraulic load, 0 (steering at rest) .. 1 (held against a stop).
+    void set_hydraulic_load(double load01) {
+        m_load = load01 < 0.0 ? 0.0 : (load01 > 1.0 ? 1.0 : load01);
     }
+    /// The hydraulic load a normalized steering position puts on the pump.
+    double hydraulic_load_from_steering(double steering) const;
+    /// Air temperature the case cools toward, °C.
+    void set_ambient_temp_c(double c) { m_ambient_c = c; }
 
     double commanded_speed() const { return m_cmd; }     // 0..1
-    double actual_speed()    const { return m_actual; }  // 0..1, after lag
+    /// Rotor electrical frequency as a fraction of max_output_hz (0..1).
+    double actual_speed() const;
+
+    // --- Per-phase and motor state ---
+    double electrical_hz() const;           ///< rotor electrical frequency
+    double shaft_rpm() const;
+    double electrical_angle_rad() const { return m_theta_e; }  ///< [0, 2π)
+    double phase_current_a(int phase) const;  ///< phase 0=A, 1=B, 2=C; A peak
+    double phase_voltage_v(int phase) const;  ///< phase-to-neutral, V
+    double torque_nm() const;                 ///< electromagnetic torque
+    double load_torque_nm() const;            ///< pump + friction torque on the shaft
+    double input_power_w() const;             ///< three-phase power into the motor
+    double copper_loss_w() const;
+    double friction_loss_w() const;
+    double pump_heat_w() const;               ///< pump churn heating the housing
+    double case_temp_c() const { return m_case_c; }
+    /// A case temperature on the CHASSIS_PS_MOTOR_CASE_TEMP_Q8 encoding:
+    /// uint16 Q8 °C, clamped to 0 .. 255.996 °C.
+    static std::uint16_t case_temp_q8(double c);
 
     /// HV interlock loop (molex.D/E): closed while the motor is present.
     bool interlock_closed() const { return m_present; }
     void set_present(bool present) { m_present = present; }
 
 private:
+    double pump_torque_nm(double omega_m) const;
+    void   step_electrical(double h, double f_target_hz);
+
     Config m_cfg{};
-    double m_cmd     = 0.0;
-    double m_actual  = 0.0;
-    bool   m_present = true;   // motor present → interlock loop closed
+    double m_cmd       = 0.0;
+    double m_load      = 0.0;
+    bool   m_present   = true;    // motor present → interlock loop closed
+
+    double m_ref_hz    = 0.0;     // inverter frequency reference
+    double m_omega_m   = 0.0;     // shaft speed, rad/s
+    double m_theta_e   = 0.0;     // rotor electrical angle, rad
+    double m_id = 0.0, m_iq = 0.0;
+    double m_vd = 0.0, m_vq = 0.0;
+    double m_int_speed = 0.0, m_int_d = 0.0, m_int_q = 0.0;
+
+    double m_case_c    = 25.0;
+    double m_ambient_c = 25.0;
 };
 
 /// HVAC control panel (driver HMI).
