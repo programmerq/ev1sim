@@ -28,6 +28,7 @@
 #include <unistd.h>  // getpid, close, dup, dup2
 
 #include "WireTruthChassis.h"
+#include "WireTruthIds.h"
 #include "ExternalSimConnector.h"  // end-to-end: wire -> overlay -> getter
 #include "BusSnoop.h"              // kDefaultStaleAfterS (dash snoop test)
 
@@ -1336,4 +1337,23 @@ TEST_CASE("WireTruthChassis: a DIM click is one press and release; lock commands
     REQUIRE(producer->write_byte(topo::kWireCHASSIS_DOOR_LOCK_CMD_PASSENGER, 0u));
     REQUIRE(wire->rsa_console().lock_driver == std::optional<std::uint8_t>(1u));
     REQUIRE(wire->rsa_console().lock_passenger == std::optional<std::uint8_t>(0u));
+}
+
+TEST_CASE("WireTruthChassis: a switch contact written by its producer id reads as an element state",
+          "[wire_truth][element_state]") {
+    const std::string name = unique_segment("es");
+    auto creator = create_fleet_table(name, electricsim::topology::kTopologyHash);
+    REQUIRE(creator);
+    auto wt = ev1sim::WireTruthChassis::Attach(name);
+    REQUIRE(wt);
+
+    const auto contact = electricsim::topology::kWireLHJB_ES_BRAKE_SW;
+    WireTable::Sample<bool> s{};
+    REQUIRE(wt->write_bit(ev1sim::ProducerWireId(contact), true));
+    REQUIRE(creator->read_bit_sample(contact, &s));
+    CHECK(s.written());
+    CHECK(s.value);
+    REQUIRE(wt->write_bit(ev1sim::ProducerWireId(contact), false));
+    REQUIRE(creator->read_bit_sample(contact, &s));
+    CHECK_FALSE(s.value);
 }
