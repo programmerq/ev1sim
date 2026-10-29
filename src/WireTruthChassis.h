@@ -36,7 +36,10 @@
 #include <optional>
 #include <string>
 
-namespace electricsim::io { class WireTable; }  // opaque here; see table()
+namespace electricsim::io {
+class WireTable;                          // opaque here; see table()
+enum class ElementStateId : std::uint32_t;
+}
 
 namespace ev1sim {
 
@@ -116,6 +119,8 @@ public:
     //                      keeps its own last/default value.
     //   - true/false    -> the live wire value.
     std::optional<bool>          read_bit(std::uint32_t wire_id) const;
+    // The same read for a switch or contactor contact (an element_state cell).
+    std::optional<bool>          read_contact(electricsim::io::ElementStateId id) const;
 
     // Generic typed reads for byte, float32, and uint32 cells. Same contract
     // as read_bit: nullopt when not attached, undeclared, type-mismatched, or
@@ -213,12 +218,9 @@ public:
     // other than the cell's declared default (the line's rest level).
     static bool rsa_run_commanded_level(bool level);
 
-    // Auto-Disconnect main HV contactor closed (AD_MAIN_CONTACTOR — the AD's
-    // own commanded output, the authoritative successor of kSigAdMainContactor
-    // 5224). Re-pointed 2026-07-04 off the APM_HV_CONTACTOR_CLOSED echo cell it
-    // was mis-mapped to in the wire-truth port: the echo is only written when an APM
-    // is in the fleet, so AD-only fleets read a permanent 0 (see .cpp comment).
-    std::optional<bool> ad_main_contactor_closed() const;  // AD_MAIN_CONTACTOR
+    // Auto-Disconnect main HV contactor closed: the AD's own contactor
+    // command, the contact the HV bus plant reads. nullopt until the AD writes it.
+    std::optional<bool> ad_main_contactor_closed() const;  // HV_ES_MAIN_CONTACTOR
 
     // Auto-Disconnect state enum, reconstructed from the three discrete AD state
     // lines (AD_STATE_A/B/C) + the AD power-supply discrete (AD_POWER_SUPPLY),
@@ -307,9 +309,9 @@ public:
     std::optional<bool>  pim_cruise_active() const;        // PIM_CRUISE_ACTIVE
     std::optional<float> pim_cruise_setpoint_mps() const;  // PIM_CRUISE_SETPOINT_MPS
 
-    // Auto-Disconnect precharge relay closed — external sim declared this cell
-    // (was kSigAdPrechargeRelay 5225). nullopt until AD writes it.
-    std::optional<bool>  ad_precharge_relay() const;       // AD_PRECHARGE_RELAY
+    // Auto-Disconnect precharge contactor closed, the contact the HV bus plant
+    // reads. nullopt until the AD writes it.
+    std::optional<bool>  ad_precharge_relay() const;       // HV_ES_PRECHARGE_CONTACTOR
 
     // The PIM's coast-down drag, Nm at the motor shaft (>= 0, opposing the
     // shaft's rotation). nullopt until the PIM writes CHASSIS_PIM_COAST_DRAG_NM.

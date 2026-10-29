@@ -3438,8 +3438,8 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             st.has_wiper_sweep_position_pct = true;
         }
 
-        // AD precharge relay (was kSigAdPrechargeRelay 5225) -> AD_PRECHARGE_RELAY.
-        // the external sim declared this cell; nullopt until AD writes it.
+        // AD precharge contactor (HV_ES_PRECHARGE_CONTACTOR); nullopt until
+        // the AD writes it.
         if (auto pre = st.wire->ad_precharge_relay()) {
             st.ad_precharge_relay     = *pre;
             st.has_ad_precharge_relay = true;
@@ -3718,7 +3718,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
     //        has_pim_cruise_* gate on written() so the HUD shows no cruise
     //        readout until PIM first writes them.
     //      - AD precharge relay (was 5225 -> st.ad_precharge_relay):
-    //        read off AD_PRECHARGE_RELAY in §2c above (written()-gated).
+    //        read off HV_ES_PRECHARGE_CONTACTOR in §2c above (written()-gated).
     //
     //    PUBLISH: driver inputs are mirrored to the WireTable (the DRIVER_* cells)
     //    via MirrorBatch — the same on-change batch the ring carried. No longer

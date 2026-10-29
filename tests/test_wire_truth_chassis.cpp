@@ -824,15 +824,10 @@ TEST_CASE("RSA run command reads relative to its rest level", "[wire_truth][ecu]
     CHECK_FALSE(ev1sim::WireTruthChassis::rsa_run_commanded_level(kRest));
 }
 
-TEST_CASE("WireTruthChassis::ad_main_contactor_closed follows the AD's own AD_MAIN_CONTACTOR",
+TEST_CASE("WireTruthChassis::ad_main_contactor_closed follows the AD's HV_ES_MAIN_CONTACTOR",
           "[wire_truth][ecu]") {
-    // Re-pointed 2026-07-04: was wrongly wired to APM_HV_CONTACTOR_CLOSED (the
-    // APM's downstream echo, only written when an APM is in the fleet), which
-    // read a permanent nullopt/0 in an APM-less fleet (VAT
-    // safety_ad_precharge_timeout is [hv_bus, ad] — no APM) even though the AD
-    // itself had genuinely closed the contactor. The getter must follow the
-    // AD's OWN commanded output, matching its sibling getters
-    // (ad_precharge_relay, ad_state_enum) below.
+    // The AD's own contactor command, the contact the HV bus plant reads, not
+    // the APM's downstream echo (only written when an APM is in the fleet).
     namespace topo = electricsim::topology;
     const std::string seg = unique_segment("ecu_ad_main");
     auto ad = create_fleet_table(seg, topo::kTopologyHash);
@@ -842,12 +837,10 @@ TEST_CASE("WireTruthChassis::ad_main_contactor_closed follows the AD's own AD_MA
     REQUIRE(wire != nullptr);
 
     REQUIRE(wire->ad_main_contactor_closed() == std::nullopt);  // unwritten
-    REQUIRE(ad->write_bit(topo::kWireAD_MAIN_CONTACTOR, true));
+    REQUIRE(ad->write_element_state(topo::kWireHV_ES_MAIN_CONTACTOR, true));
     REQUIRE(wire->ad_main_contactor_closed() == std::optional<bool>(true));
 
-    // The APM echo cell must NOT be what the getter follows — even with the
-    // echo written to a DIFFERENT value, the getter must keep reporting the
-    // AD's own cell.
+    // The APM echo written to a different value does not move the getter.
     REQUIRE(ad->write_bit(topo::kWireAPM_HV_CONTACTOR_CLOSED, false));
     REQUIRE(wire->ad_main_contactor_closed() == std::optional<bool>(true));
 }
@@ -1072,7 +1065,7 @@ TEST_CASE("Wiper blade position: the RHJB's CHASSIS_WIPER_SWEEP_POSITION reaches
     REQUIRE(c.GetWiperSweepPositionPct() == std::optional<std::uint8_t>(75u));
 }
 
-TEST_CASE("WireTruthChassis::ad_precharge_relay follows AD_PRECHARGE_RELAY",
+TEST_CASE("WireTruthChassis::ad_precharge_relay follows HV_ES_PRECHARGE_CONTACTOR",
           "[wire_truth][ecu]") {
     namespace topo = electricsim::topology;
     const std::string seg = unique_segment("ecu_ad_pre");
@@ -1083,9 +1076,9 @@ TEST_CASE("WireTruthChassis::ad_precharge_relay follows AD_PRECHARGE_RELAY",
     REQUIRE(wire != nullptr);
 
     REQUIRE(wire->ad_precharge_relay() == std::nullopt);  // unwritten
-    REQUIRE(ad->write_bit(topo::kWireAD_PRECHARGE_RELAY, true));
+    REQUIRE(ad->write_element_state(topo::kWireHV_ES_PRECHARGE_CONTACTOR, true));
     REQUIRE(wire->ad_precharge_relay() == std::optional<bool>(true));
-    REQUIRE(ad->write_bit(topo::kWireAD_PRECHARGE_RELAY, false));
+    REQUIRE(ad->write_element_state(topo::kWireHV_ES_PRECHARGE_CONTACTOR, false));
     REQUIRE(wire->ad_precharge_relay() == std::optional<bool>(false));
 }
 

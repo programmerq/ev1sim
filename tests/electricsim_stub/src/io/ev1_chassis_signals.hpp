@@ -758,10 +758,10 @@ inline constexpr std::uint32_t kSigDoorLockSw_RhUnlockOut = 4173U;  // 781C RH U
 //
 // DLM (Door Lock Module) motor-leg drives — four bools (one DLM,
 //   two SPDT relays driving both LH and RH motors in lockstep).
-//   4182 lh_motor_lock_drive   — circuit 294A, J9.C5  → LH motor LOCK leg
-//   4183 lh_motor_unlock_drive — circuit 295A, J9.C6  → LH motor UNLOCK leg
-//   4184 rh_motor_lock_drive   — circuit 294C, J3.A6  → RH motor LOCK leg
-//   4185 rh_motor_unlock_drive — circuit 295C, J3.A7  → RH motor UNLOCK leg
+//   4182 lh_motor_lock_drive   — circuit 295A, J9.C6  → LH motor LOCK leg
+//   4183 lh_motor_unlock_drive — circuit 294A, J9.C5  → LH motor UNLOCK leg
+//   4184 rh_motor_lock_drive   — circuit 295C, J3.A7  → RH motor LOCK leg
+//   4185 rh_motor_unlock_drive — circuit 294C, J3.A6  → RH motor UNLOCK leg
 //   @source:manual electrical p337 — DLM sub-block PSMELC67861AB.
 //
 // DILM (Delayed Interior Lamp Module) dimming level — uint8 0-255.
@@ -776,10 +776,10 @@ inline constexpr std::uint32_t kSigDoorLockSw_RhUnlockOut = 4173U;  // 781C RH U
 // ---------------------------------------------------------------------------
 inline constexpr std::uint32_t kSigChassisRhjbPmmRun1Bus   = 4180U;  // PMM: 41-family RUN-1 bus active
 inline constexpr std::uint32_t kSigChassisRhjbPmmRun2Bus   = 4181U;  // PMM: 241-family RUN-2 bus active
-inline constexpr std::uint32_t kSigChassisRhjbDlmLhLock    = 4182U;  // DLM: LH motor LOCK drive (294A)
-inline constexpr std::uint32_t kSigChassisRhjbDlmLhUnlock  = 4183U;  // DLM: LH motor UNLOCK drive (295A)
-inline constexpr std::uint32_t kSigChassisRhjbDlmRhLock    = 4184U;  // DLM: RH motor LOCK drive (294C)
-inline constexpr std::uint32_t kSigChassisRhjbDlmRhUnlock  = 4185U;  // DLM: RH motor UNLOCK drive (295C)
+inline constexpr std::uint32_t kSigChassisRhjbDlmLhLock    = 4182U;  // DLM: LH motor LOCK drive (295A)
+inline constexpr std::uint32_t kSigChassisRhjbDlmLhUnlock  = 4183U;  // DLM: LH motor UNLOCK drive (294A)
+inline constexpr std::uint32_t kSigChassisRhjbDlmRhLock    = 4184U;  // DLM: RH motor LOCK drive (295C)
+inline constexpr std::uint32_t kSigChassisRhjbDlmRhUnlock  = 4185U;  // DLM: RH motor UNLOCK drive (294C)
 inline constexpr std::uint32_t kSigChassisRhjbDilmLevel    = 4186U;  // DILM: interior lamp level (0-255)
 
 // ---------------------------------------------------------------------------

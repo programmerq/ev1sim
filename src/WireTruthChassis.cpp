@@ -300,6 +300,14 @@ std::optional<bool> WireTruthChassis::read_bit(std::uint32_t wire_id) const {
     return sample.value;
 }
 
+std::optional<bool> WireTruthChassis::read_contact(electricsim::io::ElementStateId id) const {
+    if (!attached()) return std::nullopt;
+    electricsim::io::WireTable::Sample<bool> sample;
+    if (!impl_->table->read_bit_sample(id, &sample)) return std::nullopt;
+    if (!sample.written()) return std::nullopt;
+    return sample.value;
+}
+
 // RefuseConductorWrite — the runtime half of the conductor discipline.
 //
 // The compile-time half (the ConductorId type) protects code that names a cell as
@@ -705,18 +713,9 @@ std::optional<bool> WireTruthChassis::rsa_run_active() const {
 }
 
 std::optional<bool> WireTruthChassis::ad_main_contactor_closed() const {
-    // Read the AD's OWN commanded main-contactor output (AD_MAIN_CONTACTOR),
-    // not the APM's downstream echo (APM_HV_CONTACTOR_CLOSED) it was
-    // mis-mapped to during the wire-truth port. The ring signal this getter
-    // replaces (kSigAdMainContactor 5224) was published BY THE AD, and the
-    // echo cell is only written when an APM is in the fleet — the VAT
-    // safety_ad_precharge_timeout fleet is [hv_bus, ad], so the echo stayed
-    // unwritten and the healthy-run "main contactor closed" discriminator
-    // read a permanent 0 while the AD's own log showed main=1. Found
-    // 2026-07-04 triaging the nightly. @design 2026-07-04 — authoritative
-    // source, matching the sibling getters (ad_precharge_relay, ad_state_enum),
-    // which already read the AD's own cells.
-    return read_bit(electricsim::topology::kWireAD_MAIN_CONTACTOR);
+    // The AD's own main-contactor command, as the HV bus plant reads it
+    // (HV_ES_MAIN_CONTACTOR), not the APM's downstream echo.
+    return read_contact(electricsim::topology::kWireHV_ES_MAIN_CONTACTOR);
 }
 
 std::optional<std::uint32_t> WireTruthChassis::ad_state_enum() const {
@@ -861,7 +860,7 @@ std::optional<float> WireTruthChassis::pim_cruise_setpoint_mps() const {
 }
 
 std::optional<bool> WireTruthChassis::ad_precharge_relay() const {
-    return read_bit(electricsim::topology::kWireAD_PRECHARGE_RELAY);
+    return read_contact(electricsim::topology::kWireHV_ES_PRECHARGE_CONTACTOR);
 }
 
 std::optional<float> WireTruthChassis::pim_coast_drag_nm() const {
@@ -969,6 +968,9 @@ std::uint32_t WireTruthChassis::CompiledTopologyHash() { return 0U; }
 
 bool WireTruthChassis::attached() const { return false; }
 std::optional<bool> WireTruthChassis::read_bit(std::uint32_t) const {
+    return std::nullopt;
+}
+std::optional<bool> WireTruthChassis::read_contact(electricsim::io::ElementStateId) const {
     return std::nullopt;
 }
 std::optional<std::uint8_t> WireTruthChassis::read_byte(std::uint32_t) const {
