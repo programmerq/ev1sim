@@ -597,7 +597,7 @@ public:
 
     /// Incoming IPC trip distance (ID 4132, chassis segment).
     /// Published by IPC controller on change (epsilon ~0.5 m) after each supervisor tick.
-    /// float32 LE, metres.  
+    /// float32 LE, metres.
     /// Returns -1.0f (sentinel) if never received.
     float GetIpcTripDistanceM() const;
     bool  HasReceivedIpcTripDistance() const;
