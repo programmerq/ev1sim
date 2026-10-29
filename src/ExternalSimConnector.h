@@ -813,10 +813,11 @@ public:
     /// signal id).  Used by unit tests; not part of the runtime path.
     void DebugInjectPimCoastDragNm(float drag_nm);
 
-    /// Inject one BTCM brake motor's two lead levels (drive = restore on a
-    /// front modulator, apply on a rear motor), as Tick reads them off the
-    /// wire.  Used by unit tests; not part of the runtime path.
-    void DebugInjectBtcmMotorLeads(BrakeMotor motor, bool drive, bool release);
+    /// Inject one BTCM brake motor's two lead levels, each a fraction of full
+    /// drive 0..1 (drive = restore on a front modulator, apply on a rear
+    /// motor), as Tick reads them off the wire.  Used by unit tests; not part
+    /// of the runtime path.
+    void DebugInjectBtcmMotorLeads(BrakeMotor motor, float drive, float release);
 
     /// Inject the wiper blade position (CHASSIS_WIPER_SWEEP_POSITION has no
     /// signal id).  Used by unit tests; not part of the runtime path.

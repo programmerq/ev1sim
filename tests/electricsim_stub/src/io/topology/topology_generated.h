@@ -26,15 +26,15 @@
 namespace electricsim::topology {
 
 inline constexpr std::uint32_t kFormatVersion = 2U;
-inline constexpr std::uint32_t kTopologyHash = 0xC6C69B8EU;
-inline constexpr std::size_t kWireCount = 514;
+inline constexpr std::uint32_t kTopologyHash = 0xEBCF8A89U;
+inline constexpr std::size_t kWireCount = 516;
 
 // Per-class cell counts. Emitted so a
 // receipt can print the classification without re-parsing YAML,
 // and so a test can assert against them. The legacy count is held
 // by a DECREASING ratchet in the generator that fails on !=.
 inline constexpr std::size_t kConductorCellCount = 158;
-inline constexpr std::size_t kElementStateCellCount = 119;
+inline constexpr std::size_t kElementStateCellCount = 121;
 inline constexpr std::size_t kSemanticCellCount = 87;
 inline constexpr std::size_t kUnclassifiedLegacyCellCount = 150;
 
@@ -518,6 +518,8 @@ inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REAR_EMB_LR_APPL
 inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REAR_EMB_LR_RELEASE{1322U};
 inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REAR_EMB_RR_APPLY{1323U};
 inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REAR_EMB_RR_RELEASE{1324U};
+inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REAR_EMB_LR_DUTY{1327U};
+inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REAR_EMB_RR_DUTY{1328U};
 inline constexpr ::electricsim::io::ConductorId kWireBTCM_BRAKE_SWITCH_SENSE_820E{428U};
 inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_WIPER_MOTOR_ASSEMBLY_SUPPLY{429U};
 inline constexpr ::electricsim::io::WireId kWireCHASSIS_WIPER_SWEEP_POSITION = 430U;
@@ -1484,13 +1486,13 @@ inline constexpr auto kWireBTCM_FRONT_MOD_RF_RESTORE_Default = false;
 inline constexpr InitPolicy kWireBTCM_FRONT_MOD_RF_RESTORE_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireBTCM_FRONT_MOD_RF_RELEASE_Default = false;
 inline constexpr InitPolicy kWireBTCM_FRONT_MOD_RF_RELEASE_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireBTCM_REAR_EMB_LR_APPLY_Default = false;
+inline constexpr auto kWireBTCM_REAR_EMB_LR_APPLY_Default = static_cast<std::uint16_t>(0x0U);
 inline constexpr InitPolicy kWireBTCM_REAR_EMB_LR_APPLY_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireBTCM_REAR_EMB_LR_RELEASE_Default = false;
+inline constexpr auto kWireBTCM_REAR_EMB_LR_RELEASE_Default = static_cast<std::uint16_t>(0x0U);
 inline constexpr InitPolicy kWireBTCM_REAR_EMB_LR_RELEASE_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireBTCM_REAR_EMB_RR_APPLY_Default = false;
+inline constexpr auto kWireBTCM_REAR_EMB_RR_APPLY_Default = static_cast<std::uint16_t>(0x0U);
 inline constexpr InitPolicy kWireBTCM_REAR_EMB_RR_APPLY_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireBTCM_REAR_EMB_RR_RELEASE_Default = false;
+inline constexpr auto kWireBTCM_REAR_EMB_RR_RELEASE_Default = static_cast<std::uint16_t>(0x0U);
 inline constexpr InitPolicy kWireBTCM_REAR_EMB_RR_RELEASE_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireBTCM_ES_FRONT_MOD_LF_RESTORE_Default = false;
 inline constexpr InitPolicy kWireBTCM_ES_FRONT_MOD_LF_RESTORE_InitPolicy = InitPolicy::kHold;
@@ -1508,6 +1510,10 @@ inline constexpr auto kWireBTCM_ES_REAR_EMB_RR_APPLY_Default = false;
 inline constexpr InitPolicy kWireBTCM_ES_REAR_EMB_RR_APPLY_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireBTCM_ES_REAR_EMB_RR_RELEASE_Default = false;
 inline constexpr InitPolicy kWireBTCM_ES_REAR_EMB_RR_RELEASE_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireBTCM_ES_REAR_EMB_LR_DUTY_Default = static_cast<std::uint16_t>(0x0U);
+inline constexpr InitPolicy kWireBTCM_ES_REAR_EMB_LR_DUTY_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireBTCM_ES_REAR_EMB_RR_DUTY_Default = static_cast<std::uint16_t>(0x0U);
+inline constexpr InitPolicy kWireBTCM_ES_REAR_EMB_RR_DUTY_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireBTCM_BRAKE_SWITCH_SENSE_820E_Default = false;
 inline constexpr InitPolicy kWireBTCM_BRAKE_SWITCH_SENSE_820E_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireCHASSIS_WIPER_MOTOR_ASSEMBLY_SUPPLY_Default = false;
@@ -2059,10 +2065,10 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_FRONT_MOD_LF_RELEASE), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_FRONT_MOD_RF_RESTORE), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_FRONT_MOD_RF_RELEASE), ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_EMB_LR_APPLY), ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_EMB_LR_RELEASE), ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_EMB_RR_APPLY), ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_EMB_RR_RELEASE), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_EMB_LR_APPLY), ::electricsim::io::WireType::kUint16) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_EMB_LR_RELEASE), ::electricsim::io::WireType::kUint16) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_EMB_RR_APPLY), ::electricsim::io::WireType::kUint16) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_EMB_RR_RELEASE), ::electricsim::io::WireType::kUint16) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_FRONT_MOD_LF_RESTORE), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_FRONT_MOD_LF_RELEASE), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_FRONT_MOD_RF_RESTORE), ::electricsim::io::WireType::kBit) && ok;
@@ -2071,6 +2077,8 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_LR_RELEASE), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_APPLY), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_RELEASE), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_LR_DUTY), ::electricsim::io::WireType::kUint16) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_DUTY), ::electricsim::io::WireType::kUint16) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_BRAKE_SWITCH_SENSE_820E), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireCHASSIS_WIPER_MOTOR_ASSEMBLY_SUPPLY), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(kWireCHASSIS_WIPER_SWEEP_POSITION, ::electricsim::io::WireType::kByte) && ok;
@@ -2593,6 +2601,8 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_LR_RELEASE): return "BTCM_ES_REAR_EMB_LR_RELEASE";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_APPLY): return "BTCM_ES_REAR_EMB_RR_APPLY";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_RELEASE): return "BTCM_ES_REAR_EMB_RR_RELEASE";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_LR_DUTY): return "BTCM_ES_REAR_EMB_LR_DUTY";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_DUTY): return "BTCM_ES_REAR_EMB_RR_DUTY";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_BRAKE_SWITCH_SENSE_820E): return "BTCM_BRAKE_SWITCH_SENSE_820E";
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_WIPER_MOTOR_ASSEMBLY_SUPPLY): return "CHASSIS_WIPER_MOTOR_ASSEMBLY_SUPPLY";
     case kWireCHASSIS_WIPER_SWEEP_POSITION: return "CHASSIS_WIPER_SWEEP_POSITION";
@@ -3114,6 +3124,8 @@ inline ::electricsim::io::WireId wire_id_for(::std::string_view name) noexcept {
   if (name == "BTCM_ES_REAR_EMB_LR_RELEASE") return static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_LR_RELEASE);
   if (name == "BTCM_ES_REAR_EMB_RR_APPLY") return static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_APPLY);
   if (name == "BTCM_ES_REAR_EMB_RR_RELEASE") return static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_RELEASE);
+  if (name == "BTCM_ES_REAR_EMB_LR_DUTY") return static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_LR_DUTY);
+  if (name == "BTCM_ES_REAR_EMB_RR_DUTY") return static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_DUTY);
   if (name == "BTCM_BRAKE_SWITCH_SENSE_820E") return static_cast<::electricsim::io::WireId>(kWireBTCM_BRAKE_SWITCH_SENSE_820E);
   if (name == "CHASSIS_WIPER_MOTOR_ASSEMBLY_SUPPLY") return static_cast<::electricsim::io::WireId>(kWireCHASSIS_WIPER_MOTOR_ASSEMBLY_SUPPLY);
   if (name == "CHASSIS_WIPER_SWEEP_POSITION") return kWireCHASSIS_WIPER_SWEEP_POSITION;
@@ -3640,6 +3652,8 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_LR_RELEASE): return "btcm_ecu";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_APPLY): return "btcm_ecu";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_RELEASE): return "btcm_ecu";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_LR_DUTY): return "btcm_ecu";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_DUTY): return "btcm_ecu";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_BRAKE_SWITCH_SENSE_820E): return "";
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_WIPER_MOTOR_ASSEMBLY_SUPPLY): return "";
     case kWireCHASSIS_WIPER_SWEEP_POSITION: return "";
@@ -4171,6 +4185,8 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_LR_RELEASE), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_ES_REAR_EMB_LR_RELEASE"}, static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_LR_RELEASE)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_APPLY), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_ES_REAR_EMB_RR_APPLY"}, static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_APPLY)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_RELEASE), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_ES_REAR_EMB_RR_RELEASE"}, static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_RELEASE)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_LR_DUTY), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_ES_REAR_EMB_LR_DUTY"}, static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_LR_DUTY)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_DUTY), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_ES_REAR_EMB_RR_DUTY"}, static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_DUTY)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_BRAKE_SWITCH_SENSE_820E), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_BRAKE_SWITCH_SENSE_820E"}, static_cast<::electricsim::io::WireId>(kWireBTCM_BRAKE_SWITCH_SENSE_820E)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireCHASSIS_WIPER_MOTOR_ASSEMBLY_SUPPLY), &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_WIPER_MOTOR_ASSEMBLY_SUPPLY"}, static_cast<::electricsim::io::WireId>(kWireCHASSIS_WIPER_MOTOR_ASSEMBLY_SUPPLY)); ++count; }
   if (table.write_gen(kWireCHASSIS_WIPER_SWEEP_POSITION, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_WIPER_SWEEP_POSITION"}, kWireCHASSIS_WIPER_SWEEP_POSITION); ++count; }
@@ -4698,6 +4714,8 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_LR_RELEASE): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_APPLY): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_RELEASE): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_LR_DUTY): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_DUTY): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireBTCM_BRAKE_SWITCH_SENSE_820E): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_WIPER_MOTOR_ASSEMBLY_SUPPLY): return ::electricsim::io::CellClass::kConductor;
     case kWireCHASSIS_WIPER_SWEEP_POSITION: return ::electricsim::io::CellClass::kSemantic;

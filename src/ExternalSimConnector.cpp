@@ -1618,18 +1618,18 @@ struct ExternalSimConnector::State {
     // A brake motor's two leads: a front modulator's restore and release, a
     // rear apply motor's apply and release. Each motor runs toward whichever
     // lead drives it.
-    void apply_btcm_motor_leads(BrakeMotor motor, bool drive, bool release) {
-        const float cmd = (drive ? 1.0f : 0.0f) - (release ? 1.0f : 0.0f);
+    void apply_btcm_motor_leads(BrakeMotor motor, float drive, float release) {
+        const float cmd = drive - release;
         const std::uint64_t t = now_ns();
         switch (motor) {
             case BrakeMotor::FrontLeft:
                 btcm_front_motor_fl              = cmd;
-                chassis_btcm_front_release_fl    = release;
+                chassis_btcm_front_release_fl    = release > 0.0f;
                 chassis_btcm_front_release_fl_ns = t;
                 break;
             case BrakeMotor::FrontRight:
                 btcm_front_motor_fr              = cmd;
-                chassis_btcm_front_release_fr    = release;
+                chassis_btcm_front_release_fr    = release > 0.0f;
                 chassis_btcm_front_release_fr_ns = t;
                 break;
             case BrakeMotor::RearLeft:
@@ -2764,8 +2764,8 @@ void ExternalSimConnector::DebugInjectPimCoastDragNm(float drag_nm) {
     m_state->has_pim_coast_drag_nm = true;
 }
 
-void ExternalSimConnector::DebugInjectBtcmMotorLeads(BrakeMotor motor, bool drive,
-                                                     bool release) {
+void ExternalSimConnector::DebugInjectBtcmMotorLeads(BrakeMotor motor, float drive,
+                                                     float release) {
     m_state->apply_btcm_motor_leads(motor, drive, release);
 }
 
