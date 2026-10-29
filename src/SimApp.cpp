@@ -2741,8 +2741,8 @@ void SimApp::PushExtContractDriverInputs(const DriverCommand& cmd, double sim_ti
     if (m_physical) {
         auto& pb = m_physical->park_brake_button();
         pb.update(cmd.parking_brake, sim_time_s);
-        m_external_sim->SetDriverParkBrakeSetRequest(pb.pushed() && pb.requested());
-        m_external_sim->SetDriverParkBrakeReleaseRequest(pb.pushed() && !pb.requested());
+        m_external_sim->SetDriverParkBrakeSetRequest(pb.pushed() && pb.push_applies());
+        m_external_sim->SetDriverParkBrakeReleaseRequest(pb.pushed() && !pb.push_applies());
     }
     // Key position (6966) — ev1sim does not model a key-cycle state
     // machine; the simulator runs as if the vehicle is always RUN (2).
