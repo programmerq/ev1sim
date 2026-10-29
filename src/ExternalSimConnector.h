@@ -627,12 +627,6 @@ public:
     bool GetIpcSeatbeltTelltaleDriver() const;
     bool HasReceivedIpcSeatbeltTelltaleDriver() const;
 
-    /// Incoming IPC seatbelt telltale — passenger seat (ID 4131, chassis segment).
-    /// Published by IPC when the passenger seat is unbuckled AND speed > ~8 km/h.
-    /// bool: true = lamp on (unbuckled at speed), false = lamp off.
-    /// Returns false if never received.
-    bool GetIpcSeatbeltTelltalePassenger() const;
-    bool HasReceivedIpcSeatbeltTelltalePassenger() const;
 
     /// Incoming IPC trip distance (ID 4132, chassis segment).
     /// Published by IPC controller on change (epsilon ~0.5 m) after each supervisor tick.

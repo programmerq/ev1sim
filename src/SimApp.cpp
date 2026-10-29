@@ -521,8 +521,8 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
                 [this]() { m_physical->hvac_controls().toggle_defrost(); });
 
             // --- IPC LCD telltale status (display-only; no click action) ---
-            // Subscribes to IPC chassis-bus signals 4130 (driver seatbelt telltale)
-            // and 4131 (passenger seatbelt telltale).  Lamp is ON when the seat is
+            // Subscribes to IPC chassis-bus signal 4130 (driver seatbelt telltale;
+            // the car has no passenger one).  Lamp is ON when the driver is
             // unbuckled AND vehicle speed > ~8 km/h (IPC supervisor threshold).
             // Labels update each frame via UpdateLabels().
             m_floating_ui->AddButton(
@@ -535,15 +535,6 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
                 },
                 []() {});   // no-op: display-only row
 
-            m_floating_ui->AddButton(
-                [this]() -> std::wstring {
-                    if (!m_external_sim) return L"Seatbelt (P): n/a";
-                    return FormatIpcSeatbeltTelltaleLabel(
-                        L"P",
-                        m_external_sim->GetIpcSeatbeltTelltalePassenger(),
-                        m_external_sim->HasReceivedIpcSeatbeltTelltalePassenger());
-                },
-                []() {});   // no-op: display-only row
 
             // --- PRND gear selector (display-only; read from local PhysicalWorld) ---
             // Reads m_physical->prnd_selector().position() directly — ev1sim is the

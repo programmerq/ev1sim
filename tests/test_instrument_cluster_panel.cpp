@@ -118,7 +118,7 @@ TEST_CASE("Cluster bus line says which modules are being heard", "[cluster]") {
 
 TEST_CASE("Cluster view: lamps are unknown until their cells are written", "[cluster]") {
     const ClusterView empty = BuildClusterView(DashSnapshot{}, ClusterUnits::kMetric);
-    REQUIRE(empty.lamps.size() == 15u);
+    REQUIRE(empty.lamps.size() == 14u);
     for (const auto& lamp : empty.lamps) {
         REQUIRE_FALSE(lamp.known);
         REQUIRE_FALSE(lamp.lit);
@@ -143,11 +143,11 @@ TEST_CASE("Cluster view: SERVICE SOON and WAIT lamps follow their cells", "[clus
     snap.lamps = DashLamps{};
     snap.lamps->wait = true;
     const ClusterView v = BuildClusterView(snap, ClusterUnits::kMetric);
-    REQUIRE(std::wstring(v.lamps[13].name) == L"SERVICE SOON");
-    REQUIRE_FALSE(v.lamps[13].known);
-    REQUIRE(std::wstring(v.lamps[14].name) == L"WAIT");
-    REQUIRE(v.lamps[14].known);
-    REQUIRE(v.lamps[14].lit);
+    REQUIRE(std::wstring(v.lamps[12].name) == L"SERVICE SOON");
+    REQUIRE_FALSE(v.lamps[12].known);
+    REQUIRE(std::wstring(v.lamps[13].name) == L"WAIT");
+    REQUIRE(v.lamps[13].known);
+    REQUIRE(v.lamps[13].lit);
 }
 
 TEST_CASE("Cluster trip label: metres to km or miles, blank until written", "[cluster]") {

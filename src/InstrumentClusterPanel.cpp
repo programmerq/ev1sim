@@ -150,7 +150,6 @@ ClusterView BuildClusterView(const DashSnapshot& snap, ClusterUnits units) {
         lamp(L"LOW TRAC", l.low_traction),
         lamp(L"AIRBAG", l.airbag),
         lamp(L"SEAT BELT D", l.seatbelt_driver),
-        lamp(L"SEAT BELT P", l.seatbelt_passenger),
         lamp(L"SERVICE NOW", l.service_now),
         lamp(L"CHECK MSGS", l.check_messages),
         lamp(L"TEMP", l.temp),
