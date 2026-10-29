@@ -32,7 +32,7 @@ TEST_CASE("RSA console door locks: the RSA's two lock commands", "[rsa_console]"
     REQUIRE(FormatRsaDoorLocks(U{0}, U{1}) == L"Door locks: DRV unlocked, PAS locked");
 }
 
-TEST_CASE("RSA console backlight: dimmer step 0..10 as a percentage", "[rsa_console]") {
+TEST_CASE("RSA console backlight: drive level in permille as a percentage", "[rsa_console]") {
     REQUIRE(FormatRsaBacklight(std::nullopt) == L"Backlight ---");
     REQUIRE(FormatRsaBacklight(std::uint16_t{0}) == L"Backlight 0%");
     REQUIRE(FormatRsaBacklight(std::uint16_t{705}) == L"Backlight 70%");
