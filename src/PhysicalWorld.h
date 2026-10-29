@@ -325,6 +325,7 @@ public:
         if (!m_seen) {
             m_seen = true;
             m_requested = requested;   // the car starts where the driver does
+            m_applied   = requested;
         } else if (requested != m_requested) {
             m_requested = requested;
             ++m_pushes_owed;
@@ -337,18 +338,21 @@ public:
             (m_since_s < 0.0 || sim_time_s - m_since_s >= kGapS - kTimeEpsS)) {
             m_pushed = true;
             m_since_s = sim_time_s;
+            m_applied = !m_applied;    // each push toggles the brake
             --m_pushes_owed;
         }
     }
     bool pushed() const { return m_pushed; }
-    /// The level this push moves the brake toward (true = apply).
-    bool requested() const { return m_requested; }
+    /// The level the current (or last) push moves the brake toward (true = apply),
+    /// fixed when the push starts.
+    bool push_applies() const { return m_applied; }
 
 private:
     static constexpr double kTimeEpsS = 1e-9;   // sim time is a sum of float steps
 
     bool   m_seen        = false;
-    bool   m_requested   = false;
+    bool   m_requested   = false;   // latest driver request
+    bool   m_applied     = false;   // brake level after the pushes started so far
     bool   m_pushed      = false;
     int    m_pushes_owed = 0;
     double m_since_s     = -1.0;   // start of the current push or gap; < 0 = never pushed

@@ -1812,7 +1812,7 @@ TEST_CASE("ParkBrakeButton: a change of request is one push held for kPushS", "[
     CHECK_FALSE(b.pushed());
     b.update(true, 1.0);
     CHECK(b.pushed());
-    CHECK(b.requested());
+    CHECK(b.push_applies());
     b.update(true, 1.0 + ParkBrakeButton::kPushS * 0.5);
     CHECK(b.pushed());
     b.update(true, 1.0 + ParkBrakeButton::kPushS);
@@ -1835,13 +1835,14 @@ TEST_CASE("ParkBrakeButton: changes faster than a press each become a push, with
     b.update(true, 1.0);            // push 1 starts
     b.update(false, 1.0 + p * 0.5); // second change while push 1 is held
     CHECK(b.pushed());
+    CHECK(b.push_applies());        // push 1 still applies; the release waits its turn
     b.update(false, 1.0 + p);       // push 1 ends, gap starts
     CHECK_FALSE(b.pushed());
     b.update(false, 1.0 + p + g * 0.5);
     CHECK_FALSE(b.pushed());
     b.update(false, 1.0 + p + g);   // push 2
     CHECK(b.pushed());
-    CHECK_FALSE(b.requested());
+    CHECK_FALSE(b.push_applies());
     b.update(false, 1.0 + 2 * p + g);
     CHECK_FALSE(b.pushed());
 }
