@@ -535,7 +535,6 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
                 },
                 []() {});   // no-op: display-only row
 
-
             // --- PRND gear selector (display-only; read from local PhysicalWorld) ---
             // Reads m_physical->prnd_selector().position() directly — ev1sim is the
             // source of truth.  No bus subscription required.

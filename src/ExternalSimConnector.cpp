@@ -2081,7 +2081,6 @@ bool ExternalSimConnector::HasReceivedIpcSeatbeltTelltaleDriver() const {
     return m_state->has_ipc_seatbelt_telltale_driver;
 }
 
-
 float ExternalSimConnector::GetIpcTripDistanceM() const {
     return m_state->ipc_trip_distance_m;
 }
