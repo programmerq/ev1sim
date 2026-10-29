@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <functional>
+#include <iterator>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -45,6 +46,8 @@ enum class RigSwitchTarget {
     HvacModeBilevel,
     HvacModeFeet,
     HvacModeDefrost,
+
+    Count,  // sentinel, keep last: ties kRigSwitchNames to the enum
 };
 
 namespace detail {
@@ -72,6 +75,11 @@ inline constexpr RigSwitchName kRigSwitchNames[] = {
     {RigSwitchTarget::HvacModeDefrost,     "hvac_mode_defrost"},
 };
 }  // namespace detail
+
+// Every RigSwitchTarget except None has exactly one name.
+static_assert(std::size(detail::kRigSwitchNames) ==
+                  static_cast<std::size_t>(RigSwitchTarget::Count) - 1,
+              "add the new RigSwitchTarget to detail::kRigSwitchNames");
 
 inline std::optional<RigSwitchTarget> RigSwitchTargetFromString(std::string_view name) {
     for (const auto& e : detail::kRigSwitchNames) {

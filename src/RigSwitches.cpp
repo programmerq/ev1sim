@@ -12,7 +12,8 @@ void ApplyRigSwitch(PhysicalWorld& world, RigSwitchTarget target, bool closed) {
     using Mode = HvacControls::Mode;
     auto& hvac = world.hvac_controls();
     switch (target) {
-        case T::None:                break;
+        case T::None:
+        case T::Count:               break;
         case T::SeatbeltDriver:      world.seatbelts().set_driver(closed); break;
         case T::SeatbeltPassenger:   world.seatbelts().set_passenger(closed); break;
         case T::ChargeCoupler:       world.charge_coupler().set_present(closed); break;
