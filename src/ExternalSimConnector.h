@@ -627,7 +627,6 @@ public:
     bool GetIpcSeatbeltTelltaleDriver() const;
     bool HasReceivedIpcSeatbeltTelltaleDriver() const;
 
-
     /// Incoming IPC trip distance (ID 4132, chassis segment).
     /// Published by IPC controller on change (epsilon ~0.5 m) after each supervisor tick.
     /// float32 LE, metres.  Resets to 0.0 on trip-reset button press (kSigDriverIpcTripResetButton).
