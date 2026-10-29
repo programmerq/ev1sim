@@ -91,6 +91,12 @@ bool publish_conductor(WireTable& table, ConductorId id, bool energised) {
     return publisher.publish(id, energised);
 }
 
+// The permille form, for conductors carrying a duty or level.
+bool publish_conductor_level(WireTable& table, ConductorId id, std::uint16_t permille) {
+    electricsim::net_host::ConductorPublisher publisher(table);
+    return publisher.publish_level(id, permille);
+}
+
 // The millivolt form of the same edge, for conductor cells carrying a measured
 // potential rather than a bare energised/not bit — the aux battery terminal is the
 // first of those. Same reasoning as above: the test stands in for the solver, so it
@@ -1351,4 +1357,35 @@ TEST_CASE("WireTruthChassis: a switch contact written by its producer id reads a
     REQUIRE(wt->write_bit(ev1sim::ProducerWireId(contact), false));
     REQUIRE(creator->read_bit_sample(contact, &s));
     CHECK_FALSE(s.value);
+}
+
+TEST_CASE("WireTruthChassis: brake motor leads read as fractions of full drive",
+          "[wire_truth][btcm]") {
+    namespace topo = electricsim::topology;
+    using M = ev1sim::WireTruthChassis::BtcmBrakeMotor;
+    const std::string seg = unique_segment("btcm_leads");
+    auto creator = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(creator != nullptr);
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+
+    // Unwritten leads read nullopt.
+    CHECK_FALSE(wire->btcm_motor_leads(M::RearLeft).has_value());
+    CHECK_FALSE(wire->btcm_motor_leads(M::FrontLeft).has_value());
+
+    // A rear lead carries the BTCM's duty in permille.
+    REQUIRE(publish_conductor_level(*creator, topo::kWireBTCM_REAR_EMB_LR_APPLY, 350u));
+    REQUIRE(publish_conductor_level(*creator, topo::kWireBTCM_REAR_EMB_LR_RELEASE, 0u));
+    auto lr = wire->btcm_motor_leads(M::RearLeft);
+    REQUIRE(lr.has_value());
+    CHECK(lr->drive == 0.35f);
+    CHECK(lr->release == 0.0f);
+
+    // A front lead is a bit.
+    REQUIRE(publish_conductor(*creator, topo::kWireBTCM_FRONT_MOD_LF_RESTORE, false));
+    REQUIRE(publish_conductor(*creator, topo::kWireBTCM_FRONT_MOD_LF_RELEASE, true));
+    auto lf = wire->btcm_motor_leads(M::FrontLeft);
+    REQUIRE(lf.has_value());
+    CHECK(lf->drive == 0.0f);
+    CHECK(lf->release == 1.0f);
 }

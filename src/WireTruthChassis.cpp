@@ -14,6 +14,7 @@
 #include "wire_table.hpp"                 // electricsim::io::WireTable
 #include "WireTruthIds.h"                 // ProducerWireId
 
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
@@ -870,30 +871,38 @@ std::optional<float> WireTruthChassis::pim_coast_drag_nm() const {
 std::optional<WireTruthChassis::BtcmMotorLeads> WireTruthChassis::btcm_motor_leads(
     BtcmBrakeMotor motor) const {
     using namespace electricsim::topology;
-    WireId drive = 0;
-    WireId release = 0;
+    const auto bit_leads = [&](WireId drive, WireId release)
+        -> std::optional<BtcmMotorLeads> {
+        const auto d = read_bit(drive);
+        const auto r = read_bit(release);
+        if (!d || !r) return std::nullopt;
+        return BtcmMotorLeads{*d ? 1.0f : 0.0f, *r ? 1.0f : 0.0f};
+    };
+    const auto duty_leads = [&](WireId drive, WireId release)
+        -> std::optional<BtcmMotorLeads> {
+        const auto d = read_uint16(drive);
+        const auto r = read_uint16(release);
+        if (!d || !r) return std::nullopt;
+        const auto frac = [](std::uint16_t permille) {
+            return static_cast<float>(std::min<std::uint16_t>(permille, 1000u)) / 1000.0f;
+        };
+        return BtcmMotorLeads{frac(*d), frac(*r)};
+    };
     switch (motor) {
         case BtcmBrakeMotor::FrontLeft:
-            drive   = ReadOnlyWireId(kWireBTCM_FRONT_MOD_LF_RESTORE);
-            release = ReadOnlyWireId(kWireBTCM_FRONT_MOD_LF_RELEASE);
-            break;
+            return bit_leads(ReadOnlyWireId(kWireBTCM_FRONT_MOD_LF_RESTORE),
+                             ReadOnlyWireId(kWireBTCM_FRONT_MOD_LF_RELEASE));
         case BtcmBrakeMotor::FrontRight:
-            drive   = ReadOnlyWireId(kWireBTCM_FRONT_MOD_RF_RESTORE);
-            release = ReadOnlyWireId(kWireBTCM_FRONT_MOD_RF_RELEASE);
-            break;
+            return bit_leads(ReadOnlyWireId(kWireBTCM_FRONT_MOD_RF_RESTORE),
+                             ReadOnlyWireId(kWireBTCM_FRONT_MOD_RF_RELEASE));
         case BtcmBrakeMotor::RearLeft:
-            drive   = ReadOnlyWireId(kWireBTCM_REAR_EMB_LR_APPLY);
-            release = ReadOnlyWireId(kWireBTCM_REAR_EMB_LR_RELEASE);
-            break;
+            return duty_leads(ReadOnlyWireId(kWireBTCM_REAR_EMB_LR_APPLY),
+                              ReadOnlyWireId(kWireBTCM_REAR_EMB_LR_RELEASE));
         case BtcmBrakeMotor::RearRight:
-            drive   = ReadOnlyWireId(kWireBTCM_REAR_EMB_RR_APPLY);
-            release = ReadOnlyWireId(kWireBTCM_REAR_EMB_RR_RELEASE);
-            break;
+            return duty_leads(ReadOnlyWireId(kWireBTCM_REAR_EMB_RR_APPLY),
+                              ReadOnlyWireId(kWireBTCM_REAR_EMB_RR_RELEASE));
     }
-    const auto d = read_bit(drive);
-    const auto r = read_bit(release);
-    if (!d || !r) return std::nullopt;
-    return BtcmMotorLeads{*d, *r};
+    return std::nullopt;
 }
 
 std::optional<std::uint16_t> WireTruthChassis::pim_retard_request_permille() const {

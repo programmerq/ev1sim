@@ -475,12 +475,10 @@ inline constexpr std::uint32_t kSigChassisAmbientHumidityPct   = 4091U;
 // Encoding: uint8 bool — 0=lamp off, 1=lamp on.
 // Lit when the driver belt is unbuckled AND vehicle speed exceeds ~8 km/h
 // (IPC_SUPERVISOR_SEATBELT_SPEED_THRESHOLD_MPS).
-// 4131 is reserved: the cluster has no passenger belt input (elec-249), so
-// nothing publishes it. The constant stays while ev1sim's drift guard names it
-// (scripts/audit_cross_repo_contract.py); do not reuse the slot.
+// 4131 — reserved: the cluster has no passenger belt input (elec-249). Do not
+// reuse the slot.
 // ---------------------------------------------------------------------------
 inline constexpr std::uint32_t kSigChassisIpcSeatbeltTelltaleDriver    = 4130U;
-inline constexpr std::uint32_t kSigChassisIpcSeatbeltTelltalePassenger = 4131U;
 
 // ---------------------------------------------------------------------------
 // IPC trip distance (electricsim/IPC → ev1sim chassis bus)

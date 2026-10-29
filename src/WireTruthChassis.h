@@ -319,14 +319,16 @@ public:
 
     // The BTCM's four brake motors, each driven through two leads: a front
     // modulator's restore and release leads, a rear apply motor's apply and
-    // release leads. A lead reads 1 while it drives current through its motor
-    // (BTCM_FRONT_MOD_{LF,RF}_{RESTORE,RELEASE}, BTCM_REAR_EMB_{LR,RR}_
-    // {APPLY,RELEASE}, conductors the solver publishes). nullopt until the
-    // solver has written both leads of that motor.
+    // release leads (BTCM_FRONT_MOD_{LF,RF}_{RESTORE,RELEASE}, BTCM_REAR_EMB_
+    // {LR,RR}_{APPLY,RELEASE}, conductors the solver publishes). Each level is
+    // the fraction of full drive while that lead drives current through its
+    // motor, 0 otherwise: a front lead is a bit (0 or 1), a rear lead carries
+    // the BTCM's duty in permille. nullopt until the solver has written both
+    // leads of that motor.
     enum class BtcmBrakeMotor { FrontLeft, FrontRight, RearLeft, RearRight };
     struct BtcmMotorLeads {
-        bool drive   = false;  // restore (front) or apply (rear)
-        bool release = false;
+        float drive   = 0.0f;  // restore (front) or apply (rear), 0..1
+        float release = 0.0f;
     };
     std::optional<BtcmMotorLeads> btcm_motor_leads(BtcmBrakeMotor motor) const;
 
