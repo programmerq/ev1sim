@@ -3647,6 +3647,13 @@ void ExternalSimConnector::Tick(double sim_time_s) {
     if (st.coast_down_switch_armed && st.wire) {
         st.wire->publish_coast_down_switch(st.coast_down_switch_on);
     }
+    // Accelerator pedal travel, level-held every tick: the PIM reads the pedal
+    // only through the solver's pps tracks. Withheld with the throttle delta
+    // during the fail_throttle_input fault window.
+    if (st.wire && !st.suppress_throttle_publish) {
+        st.wire->publish_pedal_travel(static_cast<std::uint16_t>(
+            (static_cast<unsigned>(st.driver_throttle_q8) * 1000u + 127u) / 255u));
+    }
     // The shifter's reverse contact (lever in R, the selector's 0011 code),
     // level-held every tick; it lights the backup lamps.
     if (st.wire) {

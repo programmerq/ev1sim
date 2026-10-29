@@ -344,6 +344,12 @@ public:
     // RSA. ev1sim is this cell's producer. Returns false if not attached.
     bool publish_coast_down_switch(bool on);               // DRIVER_COAST_DOWN_SWITCH
 
+    // Accelerator pedal travel, permille of full travel
+    // (DRIVER_ES_PEDAL_TRAVEL); the solver turns it into the PIM's pedal
+    // position tracks. ev1sim is this cell's producer. Returns false if not
+    // attached.
+    bool publish_pedal_travel(std::uint16_t permille);
+
     // PRND switch #2's REVERSE SELECT contact (DRIVER_ES_REVERSE_SELECT_SWITCH),
     // closed while the lever is in R; it lights the back-up lamps. ev1sim is
     // this cell's producer. Returns false if not attached.

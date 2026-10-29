@@ -296,3 +296,44 @@ TEST_CASE("Seat-belt and reverse-select contacts publish onto the wire through T
     c.Tick(0.2);
     CHECK_FALSE(contact(topo::kWireDRIVER_ES_REVERSE_SELECT_SWITCH));
 }
+
+// The accelerator pedal reaches the PIM only through the solver, so the
+// connector must write its travel (permille) on the pedal element every Tick,
+// and withhold it during the fail_throttle_input fault window.
+TEST_CASE("Accelerator pedal travel publishes onto the wire through Tick",
+          "[wire_truth][attach_outcome]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("pedal");
+    auto table = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(table != nullptr);
+
+    ScopedWiresName guard(seg.c_str());
+    ExternalSimConnector::Options opts;
+    opts.enabled = true;
+    ExternalSimConnector c(opts);
+
+    auto travel = [&]() {
+        electricsim::io::WireTable::Sample<std::uint16_t> s{};
+        REQUIRE(table->read_uint16_sample(topo::kWireDRIVER_ES_PEDAL_TRAVEL, &s));
+        REQUIRE(s.written());
+        return s.value;
+    };
+
+    c.SetDriverThrottleQ8(0);
+    c.Tick(0.0);
+    REQUIRE(c.IsConnected());
+    CHECK(travel() == 0u);
+
+    c.SetDriverThrottleQ8(153);   // 0.6 of full travel
+    c.Tick(0.1);
+    CHECK(travel() == 600u);
+
+    c.SetDriverThrottleQ8(255);
+    c.Tick(0.2);
+    CHECK(travel() == 1000u);
+
+    c.SetSuppressThrottlePublish(true);
+    c.SetDriverThrottleQ8(0);
+    c.Tick(0.3);
+    CHECK(travel() == 1000u);    // withheld during the fault window
+}

@@ -909,6 +909,13 @@ bool WireTruthChassis::publish_coast_down_switch(bool on) {
     return write_bit(ProducerWireId(electricsim::topology::kWireDRIVER_COAST_DOWN_SWITCH), on);
 }
 
+bool WireTruthChassis::publish_pedal_travel(std::uint16_t permille) {
+    if (!attached()) return false;
+    return impl_->table->write_element_state_level(
+        electricsim::topology::kWireDRIVER_ES_PEDAL_TRAVEL,
+        std::min<std::uint16_t>(permille, 1000u));
+}
+
 bool WireTruthChassis::publish_reverse_select_switch(bool closed) {
     if (!attached()) return false;
     return write_bit(ProducerWireId(electricsim::topology::kWireDRIVER_ES_REVERSE_SELECT_SWITCH),
@@ -1086,6 +1093,7 @@ std::optional<std::uint8_t> WireTruthChassis::wiper_sweep_position_pct() const {
     return std::nullopt;
 }
 bool WireTruthChassis::publish_coast_down_switch(bool) { return false; }
+bool WireTruthChassis::publish_pedal_travel(std::uint16_t) { return false; }
 bool WireTruthChassis::publish_reverse_select_switch(bool) { return false; }
 bool WireTruthChassis::publish_rsa_dim_click(bool) { return false; }
 
