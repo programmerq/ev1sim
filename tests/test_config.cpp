@@ -462,3 +462,23 @@ TEST_CASE("Config takes inline weather, and keeps the defaults for a missing fil
     CHECK(missing.environment.weather.phase_offset_hours ==
           defaults.environment.weather.phase_offset_hours);
 }
+
+TEST_CASE("Config reads rig devices, buttons and switches", "[Config][rig]") {
+    auto path = WriteTempJson(R"({ "input": { "rig": { "devices": [
+        { "device_name_match": "Leo Bodnar",
+          "buttons":  [ { "sdl_button": 0, "action": "hazard_toggle" } ],
+          "switches": [ { "sdl_button": 5, "switch": "seatbelt_driver" },
+                        { "sdl_button": 6, "switch": "hvac_ac", "invert": true },
+                        { "sdl_button": 7, "switch": "ignition" } ] } ] } } })");
+    Config cfg = Config::LoadFromFile(path);
+    REQUIRE(cfg.input.rig.devices.size() == 1);
+    const auto& d = cfg.input.rig.devices[0];
+    CHECK(d.device_name_match == "Leo Bodnar");
+    REQUIRE(d.buttons.size() == 1);
+    CHECK(d.buttons[0].action == ev1sim::InputAction::HazardToggle);
+    REQUIRE(d.switches.size() == 3);
+    CHECK(d.switches[0].sdl_button == 5);
+    CHECK(d.switches[0].target == ev1sim::RigSwitchTarget::SeatbeltDriver);
+    CHECK(d.switches[1].invert);
+    CHECK(d.switches[2].target == ev1sim::RigSwitchTarget::None);   // unknown name warns, binds nothing
+}

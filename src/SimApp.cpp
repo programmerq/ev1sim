@@ -103,7 +103,8 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
     // open fails (important for the no-hardware / CI case).
     const bool want_controller_rumble =
         !m_config.input.feedback.controller_rumble.device_name_match.empty();
-    if (!headless && (m_config.input.wheel.enabled || want_controller_rumble)) {
+    const bool want_rig = !m_config.input.rig.devices.empty();
+    if (!headless && (m_config.input.wheel.enabled || want_controller_rumble || want_rig)) {
         m_sdl = std::make_unique<ev1sim::SdlContext>();
         if (m_sdl->ok() && m_config.input.wheel.enabled) {
             m_wheel = std::make_unique<ev1sim::WheelInputController>(
@@ -112,6 +113,9 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
         if (m_sdl->ok() && want_controller_rumble) {
             m_controller_rumble = std::make_unique<ev1sim::ControllerRumble>(
                 m_sdl.get(), m_config.input.feedback.controller_rumble);
+        }
+        if (m_sdl->ok() && want_rig) {
+            m_rig = std::make_unique<ev1sim::RigInputDevices>(m_sdl.get(), m_config.input.rig);
         }
         // ForceFeedback is attached lazily in the render loop once a wheel is
         // actually present, so it works even when the wheel is hot-plugged
@@ -1508,6 +1512,20 @@ int SimApp::RunWithVisualization() {
             }
             for (ev1sim::InputAction a : m_wheel->PendingActions()) DispatchAction(a);
             m_wheel->ClearPendingActions();
+        }
+        // Rig button boxes: momentary buttons dispatch like wheel buttons;
+        // switches set their PhysicalWorld input when their level changes.
+        if (m_rig) {
+            const ev1sim::RigSample rig = m_rig->Update();
+            for (ev1sim::InputAction a : rig.actions) DispatchAction(a);
+            if (m_physical) {
+                for (const auto& [target, closed] : rig.switch_changes)
+                    ev1sim::ApplyRigSwitch(*m_physical, target, closed);
+            }
+            if (rig.horn) {
+                cmd.horn_low  = true;
+                cmd.horn_high = true;
+            }
         }
 #endif
         ApplyPanelDriverOverride(cmd, m_panel_override);

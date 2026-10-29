@@ -4,6 +4,7 @@
 
 #include "FeedbackChannel.h"       // FeedbackConfig
 #include "ForceFeedback.h"         // FfbConfig
+#include "RigSwitches.h"           // RigConfig
 #include "WheelInputController.h"  // WheelConfig + axis/button bindings
 
 struct Config {
@@ -85,6 +86,8 @@ struct Config {
         ev1sim::FfbConfig   ffb;
         // Tactile feedback channels and the devices that play them.
         ev1sim::FeedbackConfig feedback;
+        // Rig button boxes: momentary buttons and maintained switches.
+        ev1sim::RigConfig rig;
     } input;
 
     struct Telemetry {

@@ -231,11 +231,13 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   closed-loop test.
 
 ## Future: physical sim rig
-- [ ] Adapt the user's physical driving sim rig with a lookalike RSA, seat
-  belt sensor, IPC display, chime/horn sound effects.  Hook real HVAC
-  controls.  ev1sim's PhysicalWorld pattern should grow a hardware
-  backend that maps real switches to chassis-bus signals (replacing
-  keyboard input).
+- [ ] Adapt the user's physical driving sim rig with a lookalike RSA, IPC
+  display and chime/horn sound effects.  Real switches already reach the sim:
+  a USB button box's buttons bind to momentary actions or to maintained
+  switches (seat belts, charge coupler, A/C, defrost, windows, HVAC fan and
+  mode rotaries) through `input.rig` (`src/RigSwitches.h`).  Still open: the
+  lookalike RSA and IPC hardware, and switches that must reach the bus as
+  contact states rather than PhysicalWorld inputs.
 
 ## Vendored stub hygiene
 
