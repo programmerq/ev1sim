@@ -310,6 +310,54 @@ private:
     bool m_held = false;
 };
 
+/// Park-brake push button: one momentary button whose two linked contacts
+/// the BTCM reads, each push toggling apply/release.  The driver's request is
+/// a level (DriverCommand::parking_brake); every change of it becomes one
+/// push held for kPushS, with a kGapS release before any further push, so
+/// changes that arrive faster than a hand can press still each become a push.
+class ParkBrakeButton {
+public:
+    static constexpr double kPushS = 0.2;   // @inferred — a deliberate press, not a tap
+    static constexpr double kGapS  = 0.2;   // @inferred — release between two presses
+
+    /// Call once per tick with the requested level and the sim time.
+    void update(bool requested, double sim_time_s) {
+        if (!m_seen) {
+            m_seen = true;
+            m_requested = requested;   // the car starts where the driver does
+            m_applied   = requested;
+        } else if (requested != m_requested) {
+            m_requested = requested;
+            ++m_pushes_owed;
+        }
+        if (m_pushed && sim_time_s - m_since_s >= kPushS - kTimeEpsS) {
+            m_pushed = false;
+            m_since_s = sim_time_s;
+        }
+        if (!m_pushed && m_pushes_owed > 0 &&
+            (m_since_s < 0.0 || sim_time_s - m_since_s >= kGapS - kTimeEpsS)) {
+            m_pushed = true;
+            m_since_s = sim_time_s;
+            m_applied = !m_applied;    // each push toggles the brake
+            --m_pushes_owed;
+        }
+    }
+    bool pushed() const { return m_pushed; }
+    /// The level the current (or last) push moves the brake toward (true = apply),
+    /// fixed when the push starts.
+    bool push_applies() const { return m_applied; }
+
+private:
+    static constexpr double kTimeEpsS = 1e-9;   // sim time is a sum of float steps
+
+    bool   m_seen        = false;
+    bool   m_requested   = false;   // latest driver request
+    bool   m_applied     = false;   // brake level after the pushes started so far
+    bool   m_pushed      = false;
+    int    m_pushes_owed = 0;
+    double m_since_s     = -1.0;   // start of the current push or gap; < 0 = never pushed
+};
+
 /// RSA interior keypad + mode-button simulator.
 ///
 /// The EV1 RSA (Remote Security Access) module controls the vehicle's run
@@ -1417,6 +1465,9 @@ public:
     HornButton&       horn_button()       { return m_horn_button; }
     const HornButton& horn_button() const { return m_horn_button; }
 
+    ParkBrakeButton&       park_brake_button()       { return m_park_brake_button; }
+    const ParkBrakeButton& park_brake_button() const { return m_park_brake_button; }
+
     RsaKeypadDriver&       rsa_keypad()       { return m_rsa_keypad; }
     const RsaKeypadDriver& rsa_keypad() const { return m_rsa_keypad; }
 
@@ -1556,6 +1607,7 @@ private:
     TurnSignalStalk    m_turn_stalk;
     HazardSwitch       m_hazard_sw;
     HornButton         m_horn_button;
+    ParkBrakeButton    m_park_brake_button;
     RsaKeypadDriver    m_rsa_keypad;
     IpcTripResetButton m_ipc_trip_reset;
     CoastDownButton    m_coast_down;

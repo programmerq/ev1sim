@@ -231,11 +231,13 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   closed-loop test.
 
 ## Future: physical sim rig
-- [ ] Adapt the user's physical driving sim rig with a lookalike RSA, seat
-  belt sensor, IPC display, chime/horn sound effects.  Hook real HVAC
-  controls.  ev1sim's PhysicalWorld pattern should grow a hardware
-  backend that maps real switches to chassis-bus signals (replacing
-  keyboard input).
+- [ ] Adapt the user's physical driving sim rig with a lookalike RSA, IPC
+  display and chime/horn sound effects.  Real switches already reach the sim:
+  a USB button box's buttons bind to momentary actions or to maintained
+  switches (seat belts, charge coupler, A/C, defrost, windows, HVAC fan and
+  mode rotaries) through `input.rig` (`src/RigSwitches.h`).  Still open: the
+  lookalike RSA and IPC hardware, and switches that must reach the bus as
+  contact states rather than PhysicalWorld inputs.
 
 ## Vendored stub hygiene
 
@@ -258,13 +260,3 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   `config/nets/<module>.yaml` remain in `wire_table.hpp`, and the third path this
   entry implied was in these two files, `src/io/topology/feed_query.hpp`, turns
   out to sit in `tests/electricsim_stub/src/io/ev1_chassis_signals.hpp` instead.
-
-- [ ] **`ev1_chassis_signals.hpp` still carries upstream section citations.**
-  The scrub above covered two of the 17 vendored files.
-  `tests/electricsim_stub/src/io/ev1_chassis_signals.hpp` was untouched by it and
-  by the scrub before it, and still cites upstream planning documents by section
-  number in several comments.  Same constraint as before — byte-identical by
-  design, so it cannot be fixed here.  Upstream carries the worklist on
-  `BL-2026-08-10-no-private-ref-audit-on-vendorable-files`, together with the
-  automated check whose absence is why this keeps recurring; re-vendor that file
-  here once it lands.

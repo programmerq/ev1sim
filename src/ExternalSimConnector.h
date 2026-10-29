@@ -322,12 +322,9 @@ public:
     /// yet — defaults to false.  Reserved for a future bulb-check button.
     void SetDriverTelltaleTestRequest(bool pressed);
 
-    /// Park-brake set / release momentary requests (6946/6947).  These
-    /// are derived edge events from DriverCommand.parking_brake: a
-    /// false→true transition fires set; true→false fires release.
-    /// Both are one-tick pulses; the caller is responsible for emitting
-    /// exactly one set pulse per engage event and one release pulse per
-    /// disengage event.
+    /// Park-brake set / release requests (6946/6947): held while the
+    /// park-brake button (PhysicalWorld ParkBrakeButton) is pushed, on the
+    /// request matching the direction that push moves the brake.
     void SetDriverParkBrakeSetRequest(bool pressed);
     void SetDriverParkBrakeReleaseRequest(bool pressed);
 
@@ -629,13 +626,6 @@ public:
     /// Returns false if never received.
     bool GetIpcSeatbeltTelltaleDriver() const;
     bool HasReceivedIpcSeatbeltTelltaleDriver() const;
-
-    /// Incoming IPC seatbelt telltale — passenger seat (ID 4131, chassis segment).
-    /// Published by IPC when the passenger seat is unbuckled AND speed > ~8 km/h.
-    /// bool: true = lamp on (unbuckled at speed), false = lamp off.
-    /// Returns false if never received.
-    bool GetIpcSeatbeltTelltalePassenger() const;
-    bool HasReceivedIpcSeatbeltTelltalePassenger() const;
 
     /// Incoming IPC trip distance (ID 4132, chassis segment).
     /// Published by IPC controller on change (epsilon ~0.5 m) after each supervisor tick.

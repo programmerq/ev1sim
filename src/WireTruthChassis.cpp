@@ -12,6 +12,7 @@
 #include "topology/env_open.hpp"          // electricsim::topology::try_open_from_env
 #include "topology/topology_generated.h"  // kTopologyHash, kWireHORN_DRIVE_LINE_*
 #include "wire_table.hpp"                 // electricsim::io::WireTable
+#include "WireTruthIds.h"                 // ProducerWireId
 
 #include <cstdlib>
 #include <cstring>
@@ -65,6 +66,9 @@ namespace ev1sim {
 // @design 2026-06-15 — table-driven dual-write (Phase C-b producer batch).
 // ---------------------------------------------------------------------------
 struct ProducerCell {
+    template <typename Id>
+    constexpr ProducerCell(Id id, WireType type) : wire_id(ProducerWireId(id)), wire_type(type) {}
+
     WireId   wire_id;
     WireType wire_type;
 };
@@ -560,9 +564,8 @@ static const std::unordered_map<std::uint32_t, ConsumerCell>& ConsumerRegistry()
         {4087U, {kWireCHASSIS_POWER_WINDOW_MOTOR_PASSENGER, WireType::kByte}},
         // RSA shift-blocked cue (bit)
         {4088U, {kWireCHASSIS_RSA_SHIFT_BLOCKED,        WireType::kBit}},
-        // IPC seatbelt telltales (bit)
+        // IPC seatbelt telltale (bit)
         {4130U, {ReadOnlyWireId(kWireCHASSIS_IPC_SEATBELT_TELLTALE_DRIVER),    WireType::kBit}},
-        {4131U, {ReadOnlyWireId(kWireCHASSIS_IPC_SEATBELT_TELLTALE_PASSENGER), WireType::kBit}},
         // IPC trip distance (float32)
         {4132U, {kWireCHASSIS_IPC_TRIP_DISTANCE_M,      WireType::kFloat32}},
         // IPC BTCM / airbag telltales (bit)
@@ -839,13 +842,13 @@ std::optional<bool> WireTruthChassis::ipc_wait_drive() const {
 bool WireTruthChassis::publish_hv_isolation_fault(std::uint8_t lead,
                                                   std::uint32_t kohm) {
     if (!attached()) return false;
-    const bool a = write_byte(electricsim::topology::kWireHV_ISOLATION_FAULT_LEAD, lead);
-    const bool b = write_uint32(electricsim::topology::kWireHV_ISOLATION_FAULT_KOHM, kohm);
+    const bool a = write_byte(ProducerWireId(electricsim::topology::kWireHV_ISOLATION_FAULT_LEAD), lead);
+    const bool b = write_uint32(ProducerWireId(electricsim::topology::kWireHV_ISOLATION_FAULT_KOHM), kohm);
     return a && b;
 }
 bool WireTruthChassis::publish_ps_motor_case_temp_q8(std::uint16_t q8) {
     if (!attached()) return false;
-    return write_uint16(electricsim::topology::kWireCHASSIS_PS_MOTOR_CASE_TEMP_Q8, q8);
+    return write_uint16(ProducerWireId(electricsim::topology::kWireCHASSIS_PS_MOTOR_CASE_TEMP_Q8), q8);
 }
 
 std::optional<std::uint64_t> WireTruthChassis::btcm_tx_total_bits() const {
@@ -893,13 +896,13 @@ std::optional<std::uint8_t> WireTruthChassis::wiper_sweep_position_pct() const {
 
 bool WireTruthChassis::publish_coast_down_switch(bool on) {
     if (!attached()) return false;
-    return write_bit(electricsim::topology::kWireDRIVER_COAST_DOWN_SWITCH, on);
+    return write_bit(ProducerWireId(electricsim::topology::kWireDRIVER_COAST_DOWN_SWITCH), on);
 }
 
 bool WireTruthChassis::publish_rsa_dim_click(bool up) {
     if (!attached()) return false;
-    const auto cell = up ? electricsim::topology::kWireDRIVER_RSA_DIM_UP
-                         : electricsim::topology::kWireDRIVER_RSA_DIM_DOWN;
+    const WireId cell = up ? ProducerWireId(electricsim::topology::kWireDRIVER_RSA_DIM_UP)
+                           : ProducerWireId(electricsim::topology::kWireDRIVER_RSA_DIM_DOWN);
     return write_bit(cell, true) && write_bit(cell, false);
 }
 

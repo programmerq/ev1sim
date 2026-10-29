@@ -103,7 +103,8 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
     // open fails (important for the no-hardware / CI case).
     const bool want_controller_rumble =
         !m_config.input.feedback.controller_rumble.device_name_match.empty();
-    if (!headless && (m_config.input.wheel.enabled || want_controller_rumble)) {
+    const bool want_rig = !m_config.input.rig.devices.empty();
+    if (!headless && (m_config.input.wheel.enabled || want_controller_rumble || want_rig)) {
         m_sdl = std::make_unique<ev1sim::SdlContext>();
         if (m_sdl->ok() && m_config.input.wheel.enabled) {
             m_wheel = std::make_unique<ev1sim::WheelInputController>(
@@ -112,6 +113,9 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
         if (m_sdl->ok() && want_controller_rumble) {
             m_controller_rumble = std::make_unique<ev1sim::ControllerRumble>(
                 m_sdl.get(), m_config.input.feedback.controller_rumble);
+        }
+        if (m_sdl->ok() && want_rig) {
+            m_rig = std::make_unique<ev1sim::RigInputDevices>(m_sdl.get(), m_config.input.rig);
         }
         // ForceFeedback is attached lazily in the render loop once a wheel is
         // actually present, so it works even when the wheel is hot-plugged
@@ -517,8 +521,8 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
                 [this]() { m_physical->hvac_controls().toggle_defrost(); });
 
             // --- IPC LCD telltale status (display-only; no click action) ---
-            // Subscribes to IPC chassis-bus signals 4130 (driver seatbelt telltale)
-            // and 4131 (passenger seatbelt telltale).  Lamp is ON when the seat is
+            // Subscribes to IPC chassis-bus signal 4130 (driver seatbelt telltale;
+            // the car has no passenger one).  Lamp is ON when the driver is
             // unbuckled AND vehicle speed > ~8 km/h (IPC supervisor threshold).
             // Labels update each frame via UpdateLabels().
             m_floating_ui->AddButton(
@@ -528,16 +532,6 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
                         L"D",
                         m_external_sim->GetIpcSeatbeltTelltaleDriver(),
                         m_external_sim->HasReceivedIpcSeatbeltTelltaleDriver());
-                },
-                []() {});   // no-op: display-only row
-
-            m_floating_ui->AddButton(
-                [this]() -> std::wstring {
-                    if (!m_external_sim) return L"Seatbelt (P): n/a";
-                    return FormatIpcSeatbeltTelltaleLabel(
-                        L"P",
-                        m_external_sim->GetIpcSeatbeltTelltalePassenger(),
-                        m_external_sim->HasReceivedIpcSeatbeltTelltalePassenger());
                 },
                 []() {});   // no-op: display-only row
 
@@ -1509,6 +1503,20 @@ int SimApp::RunWithVisualization() {
             for (ev1sim::InputAction a : m_wheel->PendingActions()) DispatchAction(a);
             m_wheel->ClearPendingActions();
         }
+        // Rig button boxes: momentary buttons dispatch like wheel buttons;
+        // switches set their PhysicalWorld input when their level changes.
+        if (m_rig) {
+            const ev1sim::RigSample rig = m_rig->Update();
+            for (ev1sim::InputAction a : rig.actions) DispatchAction(a);
+            if (m_physical) {
+                for (const auto& [target, closed] : rig.switch_changes)
+                    ev1sim::ApplyRigSwitch(*m_physical, target, closed);
+            }
+            if (rig.horn) {
+                cmd.horn_low  = true;
+                cmd.horn_high = true;
+            }
+        }
 #endif
         ApplyPanelDriverOverride(cmd, m_panel_override);
         if (m_scripted && !m_paused)
@@ -1921,7 +1929,7 @@ int SimApp::RunWithVisualization() {
                 m_physical->door_handles().passenger_attempt());
             m_physical->door_handles().clear_oneshots();
             // 3D-sim contract buttons + key position (6940-6947, 6966).
-            PushExtContractDriverInputs(cmd);
+            PushExtContractDriverInputs(cmd, t);
         }
         // Ambient temp + humidity (chassis bus 4090-4091).
         PublishAmbient(t);
@@ -2553,7 +2561,7 @@ int SimApp::RunHeadless() {
                 m_physical->door_handles().passenger_attempt());
             m_physical->door_handles().clear_oneshots();
             // 3D-sim contract buttons + key position (6940-6947, 6966).
-            PushExtContractDriverInputs(cmd);
+            PushExtContractDriverInputs(cmd, t);
         }
         // Ambient temp + humidity (chassis bus 4090-4091).
         PublishAmbient(t);
@@ -2701,7 +2709,7 @@ int SimApp::RunHeadless() {
 // always constructs PhysicalWorld), but defensive null-checks make these
 // safe in tests that mock SimApp.
 // ---------------------------------------------------------------------------
-void SimApp::PushExtContractDriverInputs(const DriverCommand& cmd) {
+void SimApp::PushExtContractDriverInputs(const DriverCommand& cmd, double sim_time_s) {
     if (!m_external_sim) return;
     // (Horn 6940/6941 removed — the driver horn is a single contact (circuit
     //  28), published as the chassis horn cavity 4046 alongside the turn/hazard
@@ -2717,15 +2725,15 @@ void SimApp::PushExtContractDriverInputs(const DriverCommand& cmd) {
     }
     // Telltale test (6945) — no UI source yet; stub at false.
     m_external_sim->SetDriverTelltaleTestRequest(false);
-    // Park brake set/release (6946/6947) — edge-detect on the level
-    // state from DriverCommand.parking_brake.  A false→true transition
-    // fires the one-tick set request; true→false fires release.
-    const bool pb_now = cmd.parking_brake;
-    const bool pb_set_edge     = pb_now && !m_park_brake_prev;
-    const bool pb_release_edge = !pb_now &&  m_park_brake_prev;
-    m_external_sim->SetDriverParkBrakeSetRequest(pb_set_edge);
-    m_external_sim->SetDriverParkBrakeReleaseRequest(pb_release_edge);
-    m_park_brake_prev = pb_now;
+    // Park brake (6946/6947): each change of DriverCommand.parking_brake is
+    // one held push of the park-brake button (ParkBrakeButton), shown on the
+    // set or release request by the direction it moves the brake.
+    if (m_physical) {
+        auto& pb = m_physical->park_brake_button();
+        pb.update(cmd.parking_brake, sim_time_s);
+        m_external_sim->SetDriverParkBrakeSetRequest(pb.pushed() && pb.push_applies());
+        m_external_sim->SetDriverParkBrakeReleaseRequest(pb.pushed() && !pb.push_applies());
+    }
     // Key position (6966) — ev1sim does not model a key-cycle state
     // machine; the simulator runs as if the vehicle is always RUN (2).
     // Future work: derive ACC/START transitions when an ignition model
