@@ -193,11 +193,6 @@ future-UI input on one side, chassis-segment signal publishing on the other.
     - Front time-locked drops slightly with ABS but not dramatically
       because dry asphalt's high friction limit barely benefits from
       modulation.
-- [ ] **ABS rumble feedback for force-feedback rigs (deferred).**
-  When ABS engages, the BTCM sol_*_iso/sol_*_dmp signals cycle.
-  Surfacing this as a `kSigChassisAbsActive` boolean would let a
-  game-controller adapter drive a rumble motor for tactile feedback.
-  Out of scope until game-controller input/FFB lands.
 ## Outputs ev1sim could render
 - [x] Wiper sweep: `WiperBlades3D` (`src/WiperBlades3D.{h,cpp}`) draws both
   wipers as arm and blade bars on the windshield (the chassis mesh has no wiper

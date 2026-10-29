@@ -66,6 +66,23 @@ ForceFeedback::ForceFeedback(void* sdl_joystick, FfbConfig cfg) : m_cfg(cfg) {
         return;
     }
     m_haptic = haptic;
+
+    // The ABS rumble is optional: a wheel without sine support keeps the
+    // constant force and simply never rumbles.
+    if (cfg.abs_rumble && (SDL_GetHapticFeatures(haptic) & SDL_HAPTIC_SINE)) {
+        SDL_HapticEffect sine{};
+        sine.type                      = SDL_HAPTIC_SINE;
+        sine.periodic.type             = SDL_HAPTIC_SINE;
+        sine.periodic.direction.type   = SDL_HAPTIC_CARTESIAN;
+        sine.periodic.direction.dir[0] = 1;
+        sine.periodic.period           = 60;
+        sine.periodic.magnitude        = 0;
+        sine.periodic.length           = SDL_HAPTIC_INFINITY;
+        m_rumble_id = SDL_CreateHapticEffect(haptic, &sine);
+        if (m_rumble_id < 0) {
+            std::cerr << "[ForceFeedback] ABS rumble unavailable: " << SDL_GetError() << "\n";
+        }
+    }
 }
 
 ForceFeedback::~ForceFeedback() {
@@ -73,6 +90,9 @@ ForceFeedback::~ForceFeedback() {
         SDL_Haptic* h = static_cast<SDL_Haptic*>(m_haptic);
         if (m_effect_id >= 0) {
             SDL_DestroyHapticEffect(h, m_effect_id);
+        }
+        if (m_rumble_id >= 0) {
+            SDL_DestroyHapticEffect(h, m_rumble_id);
         }
         SDL_CloseHaptic(h);
     }
@@ -101,9 +121,38 @@ void ForceFeedback::Update(double torque_nm, double speed_mps, bool active) {
     }
 }
 
+void ForceFeedback::SetRumble(double magnitude, int period_ms) {
+    if (!m_haptic || m_rumble_id < 0) {
+        return;
+    }
+    SDL_Haptic* h = static_cast<SDL_Haptic*>(m_haptic);
+    if (magnitude <= 0.0) {
+        if (m_rumbling) {
+            SDL_StopHapticEffect(h, m_rumble_id);
+            m_rumbling = false;
+        }
+        return;
+    }
+    SDL_HapticEffect sine{};
+    sine.type                      = SDL_HAPTIC_SINE;
+    sine.periodic.type             = SDL_HAPTIC_SINE;
+    sine.periodic.direction.type   = SDL_HAPTIC_CARTESIAN;
+    sine.periodic.direction.dir[0] = 1;
+    sine.periodic.period           = static_cast<Uint16>(std::clamp(period_ms, 1, 65535));
+    sine.periodic.magnitude =
+        static_cast<Sint16>(std::lround(std::min(magnitude, 1.0) * 32767.0));
+    sine.periodic.length           = SDL_HAPTIC_INFINITY;
+    SDL_UpdateHapticEffect(h, m_rumble_id, &sine);
+    if (!m_rumbling) {
+        SDL_RunHapticEffect(h, m_rumble_id, SDL_HAPTIC_INFINITY);
+        m_rumbling = true;
+    }
+}
+
 void ForceFeedback::Stop() {
     if (m_haptic) {
         Update(0.0, 0.0, /*active=*/false);
+        SetRumble(0.0, 1);
     }
 }
 

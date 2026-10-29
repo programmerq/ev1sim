@@ -2,6 +2,7 @@
 
 #include "CameraManager.h"
 #include "Config.h"
+#include "ControllerRumble.h"
 #include "DashScreens3D.h"
 #include "DriverCommand.h"
 #include "ExternalSimConnector.h"
@@ -224,7 +225,9 @@ private:
     std::unique_ptr<ev1sim::SdlContext>           m_sdl;
     std::unique_ptr<ev1sim::WheelInputController> m_wheel;
     std::unique_ptr<ev1sim::ForceFeedback>        m_ffb;
+    std::unique_ptr<ev1sim::ControllerRumble>     m_controller_rumble;
 #endif
+    ev1sim::AbsFeedback                           m_abs_feedback;
 
     std::shared_ptr<chrono::vehicle::ChWheeledVehicleVisualSystemIrrlicht> m_vis;
     /// Cluster + console as screens in the 3D scene (display plan Phase 3).

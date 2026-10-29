@@ -60,6 +60,29 @@ void parse_wheel_config(const json& w, ev1sim::WheelConfig& out) {
     }
 }
 
+void parse_feedback_config(const json& f, ev1sim::FeedbackConfig& out) {
+    if (f.contains("abs")) {
+        const auto& a = f["abs"];
+        read_if(a, "enabled", out.abs.enabled);
+        read_if(a, "hold_ms", out.abs.hold_ms);
+        read_if(a, "pulse_period_ms", out.abs.pulse_period_ms);
+    }
+    if (f.contains("controller_rumble")) {
+        const auto& c = f["controller_rumble"];
+        read_if(c, "device_name_match", out.controller_rumble.device_name_match);
+        read_if(c, "abs_magnitude", out.controller_rumble.abs_magnitude);
+        if (c.contains("abs_motor")) {
+            using M = ev1sim::ControllerRumbleConfig::Motor;
+            const auto m = c.at("abs_motor").get<std::string>();
+            if (m == "low")       out.controller_rumble.abs_motor = M::Low;
+            else if (m == "high") out.controller_rumble.abs_motor = M::High;
+            else if (m == "both") out.controller_rumble.abs_motor = M::Both;
+            else std::cerr << "[Config] controller_rumble: unknown abs_motor '" << m
+                           << "' (low, high or both)\n";
+        }
+    }
+}
+
 void parse_ffb_config(const json& f, ev1sim::FfbConfig& out) {
     read_if(f, "enabled", out.enabled);
     read_if(f, "scale_nm_to_unit", out.scale_nm_to_unit);
@@ -69,6 +92,8 @@ void parse_ffb_config(const json& f, ev1sim::FfbConfig& out) {
     read_if(f, "speed_taper_full_mps", out.speed_taper_full_mps);
     read_if(f, "autocenter", out.autocenter);
     read_if(f, "invert", out.invert);
+    read_if(f, "abs_rumble", out.abs_rumble);
+    read_if(f, "abs_rumble_magnitude", out.abs_rumble_magnitude);
 }
 
 }  // namespace
@@ -199,6 +224,7 @@ Config Config::LoadFromFile(const std::string& path) {
         read_if(i, "brake_rise_rate",    cfg.input.brake_rise_rate);
         if (i.contains("wheel")) parse_wheel_config(i["wheel"], cfg.input.wheel);
         if (i.contains("ffb"))   parse_ffb_config(i["ffb"], cfg.input.ffb);
+        if (i.contains("feedback")) parse_feedback_config(i["feedback"], cfg.input.feedback);
     }
 
     if (j.contains("telemetry")) {

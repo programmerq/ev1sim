@@ -12,6 +12,11 @@ struct FfbConfig {
     double speed_taper_full_mps  = 0.0;   // 0 disables the taper (full force always)
     bool   autocenter            = false; // wheel-driver auto-centering spring
     bool   invert                = false; // flip force direction
+
+    // Sine on the steering axis while the ABS feedback channel is live
+    // (FeedbackChannel.h; its pulse_period_ms is the sine period).
+    bool   abs_rumble            = true;
+    double abs_rumble_magnitude  = 0.3;   // sine amplitude, unit force 0..1
 };
 
 // Constant-force feedback driven by the vehicle's front-axle self-aligning
@@ -37,7 +42,12 @@ public:
     // device) the force is driven to zero.
     void Update(double steering_torque_nm, double speed_mps, bool active);
 
-    // Drive the effect to zero (pause / disconnect).
+    // Play the ABS rumble as a sine on the steering axis at this unit
+    // amplitude and period (0 amplitude stops it).  A no-op on a device
+    // without SDL_HAPTIC_SINE.
+    void SetRumble(double magnitude, int period_ms);
+
+    // Drive the effects to zero (pause / disconnect).
     void Stop();
 
     // The signed unit force in [-max_clamp, max_clamp] for a torque + speed,
@@ -50,6 +60,8 @@ private:
     void* m_haptic    = nullptr;  // SDL_Haptic*
     int   m_effect_id = -1;
     bool  m_running   = false;
+    int   m_rumble_id = -1;      // SDL_HAPTIC_SINE effect, -1 when unsupported
+    bool  m_rumbling  = false;
     FfbConfig m_cfg;
 };
 

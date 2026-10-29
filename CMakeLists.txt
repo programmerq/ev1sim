@@ -149,7 +149,8 @@ if(EV1SIM_HAVE_WHEEL_IO)
     set(EV1SIM_WHEEL_IO_SRC
         src/SdlContext.cpp
         src/WheelInputController.cpp
-        src/ForceFeedback.cpp)
+        src/ForceFeedback.cpp
+        src/ControllerRumble.cpp)
     set(EV1SIM_WHEEL_IO_TEST_SRC tests/test_wheel_input.cpp)
     set(_ev1sim_wheel_io TRUE)
 endif()
@@ -506,6 +507,7 @@ if(BUILD_TESTS)
         tests/test_level_file.cpp
         tests/test_vehicle_lights.cpp
         tests/test_physical_world.cpp
+        tests/test_feedback_channel.cpp
         tests/test_wiper_renderer.cpp
         tests/test_floating_ui.cpp
         tests/test_bus_snoop.cpp
