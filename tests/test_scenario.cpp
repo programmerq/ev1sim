@@ -52,6 +52,7 @@ struct CountingHooks : public ev1sim::ScenarioHooks {
     int fail_throttle = 0, restore_throttle = 0;
     int hv_iso_calls = 0, hv_iso_lead = -1;
     int coast_down_on = 0, coast_down_off = 0;
+    int coupler_mated = 0, coupler_pulled = 0;
     double hv_iso_kohm = -1.0;
 
     void KeyOnCycle()        override { ++key_on_cycle; }
@@ -88,6 +89,9 @@ struct CountingHooks : public ev1sim::ScenarioHooks {
     }
     void CoastDownSwitch(bool on) override {
         if (on) ++coast_down_on; else ++coast_down_off;
+    }
+    void SetChargeCoupler(bool mated) override {
+        if (mated) ++coupler_mated; else ++coupler_pulled;
     }
 };
 
@@ -1649,4 +1653,68 @@ TEST_CASE("Scenario: every rolling-start ABS scenario brakes after the "
     }
     // At least one, so the case cannot pass vacuously; not an exact count.
     CHECK(rolling >= 1);
+}
+
+TEST_CASE("Scenario: set_charge_coupler mates and pulls the charge paddle",
+          "[Scenario]") {
+    using ev1sim::Scenario;
+
+    Scenario s;
+    s.set_events({
+        {1.00, "set_charge_coupler", 1.0},
+        {2.00, "set_charge_coupler", 0.0},
+    });
+
+    CountingHooks hooks;
+    DriverCommand cmd{};
+
+    s.Tick(0.50, VehicleState{}, hooks, cmd);
+    CHECK(hooks.coupler_mated == 0);
+    s.Tick(1.10, VehicleState{}, hooks, cmd);
+    CHECK(hooks.coupler_mated == 1);
+    CHECK(hooks.coupler_pulled == 0);
+    s.Tick(2.10, VehicleState{}, hooks, cmd);
+    CHECK(hooks.coupler_pulled == 1);
+}
+
+TEST_CASE("Scenario: charge_coupler_present stats field reads the paddle",
+          "[Scenario]") {
+    using ev1sim::Scenario;
+    using ev1sim::ScenarioStats;
+
+    auto tmp_csv = std::filesystem::temp_directory_path() /
+                   "ev1sim_scenario_stats_charge_coupler_test.csv";
+    Scenario s;
+    ScenarioStats st{tmp_csv.string(), {"sim_time_s", "charge_coupler_present"},
+                     0.10};
+    s.set_stats(st);
+    s.OpenStats();
+
+    ExternalSimConnector bus;
+    ev1sim::PhysicalWorld phys;
+    DriverCommand cmd{};
+    VehicleState state{};
+
+    // Row 1: paddle out. Row 2: mated. Row 3: pulled again.
+    s.MaybeSampleStats(0.0, state, phys, bus, cmd);
+    phys.charge_coupler().set_present(true);
+    s.MaybeSampleStats(0.15, state, phys, bus, cmd);
+    phys.charge_coupler().set_present(false);
+    s.MaybeSampleStats(0.30, state, phys, bus, cmd);
+
+    s.Close();
+
+    std::ifstream f(tmp_csv);
+    REQUIRE(f.is_open());
+    std::string header, row1, row2, row3;
+    std::getline(f, header);
+    std::getline(f, row1);
+    std::getline(f, row2);
+    std::getline(f, row3);
+    CHECK(header == "sim_time_s,charge_coupler_present");
+    CHECK(row1 == "0,0");
+    CHECK(row2 == "0.15,1");
+    CHECK(row3 == "0.3,0");
+    f.close();
+    std::filesystem::remove(tmp_csv);
 }

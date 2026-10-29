@@ -184,6 +184,10 @@ void Scenario::Tick(double sim_time, const VehicleState& state,
         } else if (e.action == "fail_throttle_input") {
             // value != 0 → fail, 0 → restore.
             hooks.FailThrottleInput(e.value != 0.0);
+        } else if (e.action == "set_charge_coupler") {
+            // The charge paddle: value != 0 mates it in the receptacle,
+            // 0 pulls it. Held until the next set_charge_coupler.
+            hooks.SetChargeCoupler(e.value != 0.0);
         } else if (e.action == "coast_down_switch") {
             // The shifter's coast-down button: value != 0 → coast down.
             hooks.CoastDownSwitch(e.value != 0.0);
@@ -728,6 +732,10 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
         // Sounder / piezo drive (LHJB flasher module).
         else if (f == "sounder_piezo_drive")
             m_csv << (bus.GetSounderPiezoDrive() ? 1 : 0);
+        // The charge paddle as the operator left it (published on 4060):
+        // 1 = mated in the receptacle. Set by the set_charge_coupler action.
+        else if (f == "charge_coupler_present")
+            m_csv << (physical.charge_coupler().present() ? 1 : 0);
         // Bulb feed lines by EV1-manual short name — "<abbrev>_bulb_feed_line"
         // (e.g. lhbh_bulb_feed_line, lrsl_bulb_feed_line): 1 = the junction
         // block is commanding the bulb lit. Covers all NUM_LIGHTS elements so

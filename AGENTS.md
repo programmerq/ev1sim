@@ -23,7 +23,7 @@ The blocks below are shared by all four EV1 repos; edit them only in
 and owner decision queue is [`DECISION_QUEUE.md`](DECISION_QUEUE.md). Never
 merge to `main`.
 
-<!-- BEGIN ev1-canon:pr-lifecycle v8 -->
+<!-- BEGIN ev1-canon:pr-lifecycle v9 -->
 **Branches, pushes and PRs (canonical across all four EV1 repos; this block is
 the only copy of these rules).** A new ruling replaces the wording here
 instead of being added beside it. Edit it in `ev1/CONVENTIONS.md`, bump the
@@ -62,17 +62,25 @@ free and PRs are not.
   doc, note or queue edit whose only purpose is carrying a record. With no
   such branch, the follow-up waits on a pushed branch until it grows into a
   chunk.
-- **Never make changes in several open PRs that would conflict.** Two open
-  PRs editing the same lines are what cause conflict hell; it is never a
-  reason to split work into tiny PRs. A change lives in exactly one PR, and
-  another PR that needs it bases on that branch or waits for it to merge.
+- **Stack only to avoid a merge conflict.** New work bases on `main`. A
+  change lives in exactly one PR; stack a new PR only when its diff must
+  change the same area, file or item as an open PR, and then base it on the
+  top of that PR's stack, never on a mid-stack PR (GitHub stacks are
+  linear). An open PR in your lane is not a reason to stack, and a conflict
+  is never a reason to split work into tiny PRs. A stacked PR's first body
+  line names its base PR and why.
+- **Stacking is not a crutch to work around testing.** A PR that discovers
+  failures (new scenarios exposing bugs, say) fixes them on its own branch
+  and is not ready while red. A fix to an open PR is pushed to that PR,
+  never opened as a separate stacked PR.
 
 *Draft and ready:* GitHub's convention. Draft means you or another agent is
 still working on the PR right now; ready means the work is done and it is
 ready for review. The owner reviews only ready PRs, so a draft that nobody is
 working on is abandoned work.
 - **Open a finished PR ready, and keep it mergeable.** The moment main moves,
-  merge it into every open PR you own and fix any conflict or red CI in place.
+  merge it into every open PR you own, fix any conflict or red CI in place,
+  and update any line of the PR body that main has made stale.
   A PR is draft only while you are actively making that fix, and goes back to
   ready as soon as it is green and merges clean. Never close, replace or
   retarget a PR to clear a conflict.
@@ -93,9 +101,7 @@ working on is abandoned work.
   justification class (owner-gated decision, cross-repo, genuinely
   unimplementable) in both the item and the PR body. "It belongs to another
   open PR" is not a justification: consolidate into one PR. **Identify and
-  fix, don't log.** A stacked PR is a last resort (e.g. a CI-gated generated
-  file forcing sequencing), and its title or first body line names its base
-  PR and why.
+  fix, don't log.**
 - Non-implementable findings (negative result, owner-blocked fork, errata)
   go to the repo's backlog or notes channel, named right after this block,
   and ride the next branch with code.
@@ -104,7 +110,7 @@ working on is abandoned work.
 - **Merges are the owner's click, and each merge is an invitation to the
   next work item**: when your PR merges, start the next item instead of
   stopping.
-<!-- END ev1-canon:pr-lifecycle v8 -->
+<!-- END ev1-canon:pr-lifecycle v9 -->
 
 <!-- BEGIN ev1-canon:pr-images v3 -->
 **PR-body images (canonical across all four EV1 repos).**
