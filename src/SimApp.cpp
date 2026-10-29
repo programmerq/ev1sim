@@ -52,7 +52,7 @@ inline void RestoreSigint(SigintPrev prev) { sigaction(SIGINT, &prev, nullptr); 
 }  // namespace
 
 // ---------------------------------------------------------------------------
-SimApp::SimApp(const Config& config) : m_config(config) {
+SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.input.feedback.abs) {
     const bool headless = m_config.simulation.headless;
 
     // Vehicle dynamics authority (config knob).  Validated already in
@@ -101,11 +101,17 @@ SimApp::SimApp(const Config& config) : m_config(config) {
     // SDL3 wheel + force feedback — only when enabled in the bindings config and
     // a window is present.  Degrades silently to keyboard if SDL init or device
     // open fails (important for the no-hardware / CI case).
-    if (!headless && m_config.input.wheel.enabled) {
+    const bool want_controller_rumble =
+        !m_config.input.feedback.controller_rumble.device_name_match.empty();
+    if (!headless && (m_config.input.wheel.enabled || want_controller_rumble)) {
         m_sdl = std::make_unique<ev1sim::SdlContext>();
-        if (m_sdl->ok()) {
+        if (m_sdl->ok() && m_config.input.wheel.enabled) {
             m_wheel = std::make_unique<ev1sim::WheelInputController>(
                 m_sdl.get(), m_config.input.wheel);
+        }
+        if (m_sdl->ok() && want_controller_rumble) {
+            m_controller_rumble = std::make_unique<ev1sim::ControllerRumble>(
+                m_sdl.get(), m_config.input.feedback.controller_rumble);
         }
         // ForceFeedback is attached lazily in the render loop once a wheel is
         // actually present, so it works even when the wheel is hot-plugged
@@ -1490,7 +1496,6 @@ int SimApp::RunWithVisualization() {
                 if (!m_ffb && m_config.input.ffb.enabled) {
                     m_ffb = std::make_unique<ev1sim::ForceFeedback>(
                         m_wheel->JoystickHandle(), m_config.input.ffb);
-                    m_abs_rumble = ev1sim::AbsRumble(m_config.input.ffb);
                 }
                 cmd.steering    = w.steering;
                 cmd.throttle    = w.throttle;
@@ -2171,14 +2176,10 @@ int SimApp::RunWithVisualization() {
 
         m_vis->EndScene();
 
-        // --- Horn audio (external sim commands OR'd with keyboard input) ---
-#ifdef EV1SIM_HAVE_WHEEL_IO
-        // Force feedback from the current front-axle self-aligning torque
-        // (zeroed while paused or with no haptic device).
-        // Plus a rumble while the BTCM's ABS modulates a front wheel.
-        if (m_ffb) {
-            const auto& vs = m_world->GetState();
-            m_ffb->Update(vs.steering_torque, vs.speed_mps, !m_paused);
+        // ABS feedback channel: active while the BTCM's ABS modulates a front
+        // wheel (FeedbackChannel.h).  Played as a wheel rumble and/or on a
+        // rumble controller's motors (pedal-mounted motors, a gamepad).
+        {
             bool modulating = false;
             if (!m_paused && m_external_sim->IsConnected()) {
                 using Phase = ExternalSimConnector::AbsPhaseFront::Phase;
@@ -2186,10 +2187,23 @@ int SimApp::RunWithVisualization() {
                 modulating = (abs.fl_fresh && abs.fl != Phase::APPLY) ||
                              (abs.fr_fresh && abs.fr != Phase::APPLY);
             }
-            m_abs_rumble.Update(render_dt, modulating);
-            m_ffb->SetRumble(m_abs_rumble.Magnitude());
+            m_abs_feedback.Update(render_dt, modulating);
         }
+#ifdef EV1SIM_HAVE_WHEEL_IO
+        // Force feedback from the current front-axle self-aligning torque
+        // (zeroed while paused or with no haptic device).
+        if (m_ffb) {
+            const auto& vs = m_world->GetState();
+            m_ffb->Update(vs.steering_torque, vs.speed_mps, !m_paused);
+            const auto& ffb_cfg = m_config.input.ffb;
+            m_ffb->SetRumble(
+                (ffb_cfg.abs_rumble && m_abs_feedback.Active()) ? ffb_cfg.abs_rumble_magnitude : 0.0,
+                m_config.input.feedback.abs.pulse_period_ms);
+        }
+        if (m_controller_rumble) m_controller_rumble->Update(m_abs_feedback.PulseOn());
 #endif
+
+        // --- Horn audio (external sim commands OR'd with keyboard input) ---
         bool horn_low  = cmd.horn_low;
         bool horn_high = cmd.horn_high;
         if (m_external_sim->IsConnected()) {

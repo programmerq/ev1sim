@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "FeedbackChannel.h"       // FeedbackConfig
 #include "ForceFeedback.h"         // FfbConfig
 #include "WheelInputController.h"  // WheelConfig + axis/button bindings
 
@@ -82,6 +83,8 @@ struct Config {
         // Disabled by default; a bindings config enables and maps the device.
         ev1sim::WheelConfig wheel;
         ev1sim::FfbConfig   ffb;
+        // Tactile feedback channels and the devices that play them.
+        ev1sim::FeedbackConfig feedback;
     } input;
 
     struct Telemetry {

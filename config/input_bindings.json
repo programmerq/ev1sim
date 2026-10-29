@@ -34,9 +34,19 @@
       "autocenter": false,
       "invert": false,
       "abs_rumble": true,
-      "abs_rumble_magnitude": 0.3,
-      "abs_rumble_period_ms": 60,
-      "abs_rumble_hold_ms": 250
+      "abs_rumble_magnitude": 0.3
+    },
+    "feedback": {
+      "abs": {
+        "enabled": true,
+        "hold_ms": 250,
+        "pulse_period_ms": 60
+      },
+      "controller_rumble": {
+        "device_name_match": "",
+        "abs_motor": "low",
+        "abs_magnitude": 0.6
+      }
     }
   }
 }

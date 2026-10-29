@@ -68,13 +68,33 @@ TEST_CASE("Config reads a rolling spawn speed", "[Config]") {
 // -----------------------------------------------------------------------
 TEST_CASE("Config reads the force-feedback ABS rumble keys", "[Config][ffb]") {
     auto path = WriteTempJson(R"({ "input": { "ffb": {
-        "abs_rumble": false, "abs_rumble_magnitude": 0.5,
-        "abs_rumble_period_ms": 40, "abs_rumble_hold_ms": 300 } } })");
+        "abs_rumble": false, "abs_rumble_magnitude": 0.5 } } })");
     Config cfg = Config::LoadFromFile(path);
     CHECK_FALSE(cfg.input.ffb.abs_rumble);
     CHECK_THAT(cfg.input.ffb.abs_rumble_magnitude, WithinAbs(0.5, 1e-12));
-    CHECK(cfg.input.ffb.abs_rumble_period_ms == 40);
-    CHECK(cfg.input.ffb.abs_rumble_hold_ms == 300);
+}
+
+TEST_CASE("Config reads the feedback channel and controller rumble block", "[Config][feedback]") {
+    auto path = WriteTempJson(R"({ "input": { "feedback": {
+        "abs": { "enabled": false, "hold_ms": 300, "pulse_period_ms": 40 },
+        "controller_rumble": { "device_name_match": "Xbox", "abs_motor": "both",
+                               "abs_magnitude": 0.8 } } } })");
+    Config cfg = Config::LoadFromFile(path);
+    const auto& f = cfg.input.feedback;
+    CHECK_FALSE(f.abs.enabled);
+    CHECK(f.abs.hold_ms == 300);
+    CHECK(f.abs.pulse_period_ms == 40);
+    CHECK(f.controller_rumble.device_name_match == "Xbox");
+    CHECK(f.controller_rumble.abs_motor == ev1sim::ControllerRumbleConfig::Motor::Both);
+    CHECK_THAT(f.controller_rumble.abs_magnitude, WithinAbs(0.8, 1e-12));
+}
+
+TEST_CASE("Config keeps the default motor for an unknown abs_motor", "[Config][feedback]") {
+    auto path = WriteTempJson(R"({ "input": { "feedback": {
+        "controller_rumble": { "abs_motor": "left" } } } })");
+    Config cfg = Config::LoadFromFile(path);
+    CHECK(cfg.input.feedback.controller_rumble.abs_motor ==
+          ev1sim::ControllerRumbleConfig::Motor::Low);
 }
 
 // -----------------------------------------------------------------------
