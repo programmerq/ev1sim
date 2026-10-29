@@ -260,13 +260,3 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   `config/nets/<module>.yaml` remain in `wire_table.hpp`, and the third path this
   entry implied was in these two files, `src/io/topology/feed_query.hpp`, turns
   out to sit in `tests/electricsim_stub/src/io/ev1_chassis_signals.hpp` instead.
-
-- [ ] **`ev1_chassis_signals.hpp` still carries upstream section citations.**
-  The scrub above covered two of the 17 vendored files.
-  `tests/electricsim_stub/src/io/ev1_chassis_signals.hpp` was untouched by it and
-  by the scrub before it, and still cites upstream planning documents by section
-  number in several comments.  Same constraint as before — byte-identical by
-  design, so it cannot be fixed here.  Upstream carries the worklist on
-  `BL-2026-08-10-no-private-ref-audit-on-vendorable-files`, together with the
-  automated check whose absence is why this keeps recurring; re-vendor that file
-  here once it lands.

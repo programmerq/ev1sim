@@ -52,8 +52,7 @@ namespace electricsim::io {
 // compatible, and ev1sim's OWN CI does not run this audit (it compiles against a
 // committed stub). So this is a partial guard, not end-to-end enforcement;
 // hardening it (generate the stub from this header, run the audit in ev1sim CI,
-// add a MINOR-lag drift budget) is tracked as BL-0030..BL-0035 in
-// docs/proposals/engineering_health_review_2026-06-15.md.
+// add a MINOR-lag drift budget) is planned follow-up work, not done here.
 // @design 2026-06-03 — see docs/chassis_contract_versioning.md
 #define EV1_CHASSIS_CONTRACT_VERSION_MAJOR 1
 #define EV1_CHASSIS_CONTRACT_VERSION_MINOR 9
@@ -88,28 +87,27 @@ namespace electricsim::io {
 // @design 2026-06-12 — MINOR 5 -> 6: additive signal
 //   kSigChassisBtcmRetardRequestDutyQ8 (4191) — BTCM retard-request PWM duty
 //   (uint16 Q8 %; circuit J1-18), the DISCRETE half of the DTC 042 correlation.
-//   Closes the deferred PWM leg in
-//   notes/manual_supplements.yaml#2026-06-07-btcm-pim-regen-discrete-producers.
+//   Closes the deferred PWM leg of the BTCM -> PIM regen discrete producers
+//   (the serial fields alone could not exercise the DTC 042 correlation).
 //   Backward-compatible — old consumers ignore the new ID.
 // @design 2026-06-12 — MINOR 4 -> 5: additive signals
 //   kSigChassisRsaDimLevelStep (4189) — RSA interior-dimmer step (circuit 230,
 //   IPC C12) — and kSigChassisLhjbParkLampsOn (4190) — LHJB park-lamp net
-//   present (circuit 301, IPC C4). Close the two producer gaps recorded in
-//   notes/dtc_pass/concerns.yaml#2026-06-07-ipc-dim-and-parklamp-producer-gap.
+//   present (circuit 301, IPC C4). Close the two IPC producer gaps: before
+//   them, nothing published the dim level or the park-lamp net the IPC reads.
 //   Backward-compatible — old consumers ignore the new IDs.
 // @design 2026-06-11 — MINOR 2 -> 3: additive signals
 //   kSigChassisDoorLockStateDriver/Passenger/Trunk (4165-4167), adopting into
 //   the contract the door-lock STATE feedback trio ev1sim had been publishing
 //   on 4155-4157 — IDs this header allocates to the HV bus rail. That
 //   un-contracted squat was a live cross-repo collision (every co-sim run
-//   published lock-state bytes onto the rail consumers' IDs); see
-//   notes/manual_supplements.yaml#2026-06-11-chassis-4155-doorlock-collision.
+//   published lock-state bytes onto the rail consumers' IDs).
 //   Backward-compatible — old consumers ignore the new IDs; ev1sim moves its
 //   publisher to 4165-4167 with compile-time drift guards in the same round.
 // @design 2026-06-11 — MINOR 3 -> 4: additive signals kSigChassisRoadGradePct
 //   (4168) + kSigChassisPitchDeg (4169) — terrain slope under the wheelbase
-//   and chassis body attitude from the physics sim (persona round 2, pair C
-//   survivor; unblocks cruise-on-grade / hill-hold acceptance scenarios).
+//   and chassis body attitude from the physics sim (unblocks the
+//   cruise-on-grade / hill-hold acceptance scenarios).
 //   Backward-compatible — no electricsim consumer wired yet.
 
 // ---------------------------------------------------------------------------
@@ -200,7 +198,7 @@ inline constexpr std::uint32_t kSigCruiseSw_OnOffOut       = 4049U;  // circuit 
 // selector lever to the PIM (propulsion manual p. 343).
 //
 // Encoding (Gray-coded with parity; not one-hot):
-//   PARK    A=0 B=1 C=1 D=0   (0110)  — source: pim_prnd.c / pinout.yaml §343
+//   PARK    A=0 B=1 C=1 D=0   (0110)  — source: pim_prnd.c / propulsion manual p. 343
 //   REVERSE A=0 B=0 C=1 D=1   (0011)
 //   NEUTRAL A=1 B=0 C=1 D=0   (1010)
 //   DRIVE   A=1 B=0 C=0 D=1   (1001)
@@ -534,15 +532,14 @@ inline constexpr std::uint32_t kSigChassisIpcAirBagTelltale    = 4138U;
 
 // ---------------------------------------------------------------------------
 // 4139 — historical: kSigChassisBpmPackVoltageMv (BPM pack terminal voltage,
-// uint32 mV). Retired 2026-06-15 (Phase C-b retire-not-migrate): PIM, the
+// uint32 mV). Retired 2026-06-15 (retired rather than migrated): PIM, the
 // only consumer, moved to the modelled HV-bus rail (kSigChassisHvBusVoltageMv
 // 4155) because the rail is the physically-correct node for the motor-current
 // formula (see ev1/pim/controller.cpp ~L555). The BPM publish then had no live
 // consumer and no ev1sim contract use (0 mentions in docs/3d_sim_contract.md),
 // so it was removed instead of migrated to a wire. The numeric ID is held
 // reserved here (not reused) and the constant is left as a tombstone for
-// historical context. @design 2026-06-15 claude;
-// notes/phase_c_chassis_migration_scope.md §9.1.
+// historical context. @design 2026-06-15 claude.
 
 // ---------------------------------------------------------------------------
 // IPC extra LCD telltale outputs (electricsim/IPC → ev1sim chassis bus)
@@ -598,7 +595,7 @@ inline constexpr std::uint32_t kSigChassisIpcCheckTirePressTelltale = 4145U;
 //     outgoing regen torque command (PIM IS the PCM in this sim), so
 //     the cache + scan exposure is the minimum end-to-end path.
 //
-// Per brakes manual p. 313 + docs/btcm_deferred_todos.md §7b.
+// Per brakes manual p. 313.
 // ---------------------------------------------------------------------------
 inline constexpr std::uint32_t kSigChassisBtcmRegenReductionQ8 = 4146U;
 
@@ -654,8 +651,7 @@ inline constexpr std::uint32_t kSigChassisBtcmCylPressureFR_kPa   = 4154U;
 // Signal IDs 4155–4157.  The HV-bus plant (src/models/hv_bus/hv_bus_plant)
 // publishes the sensed DC-link / PIM HV± bus-bar state so live consumers
 // (AD precharge tracking, PIM pack_voltage, APM hv_input, PSCM hv_present)
-// can read the MODELLED rail instead of their current externally-fed priors
-// (round-7 Item 1; notes/round7_work_items.md).
+// can read the MODELLED rail instead of their current externally-fed priors.
 //
 // Publish cadence: on change.  Epsilon thresholds:
 //   - bus voltage: ±100 mV (well below the ~42.5 V HV-present threshold and
@@ -688,8 +684,7 @@ inline constexpr std::uint32_t kSigChassisHvBusCurrentMa          = 4157U;
 // Electrical manual prints NO IPC DTC for any of the turn / park-lamp /
 // door-ajar / dim discrete inputs (the IPC DTC set is {011-016, 031-045};
 // DTC 031 = HTCM SERVICE NOW TELLTALE, a peer telltale request, NOT a
-// discrete-input fault).  See
-// notes/manual_supplements.yaml#2026-06-07-ipc-discrete-display-inputs.
+// discrete-input fault).
 //
 // Sources in the supervisor (update_display_inputs_), fed from the named
 // chassis-bus producers by the IPC controller:
@@ -699,8 +694,8 @@ inline constexpr std::uint32_t kSigChassisHvBusCurrentMa          = 4157U;
 //   4161 IPC_LCD_SYM_PARK_LAMP  — C4 301C   <- kSigChassisLhjbParkLampsOn (4190) faithful net
 //   4162 IPC_LCD_SYM_DOOR_AJAR  — C16 1495F <- kSigPanelAjar_DoorLeft|Right (4032/4033)
 //   4163 dim_pwm_duty_pct (0..100) — C12 230E <- kSigChassisRsaDimLevelStep (4189) RSA host-bridge
-// Park-lamp + dim producer gaps resolved by @design 2026-06-12;
-// see notes/dtc_pass/concerns.yaml#2026-06-07-ipc-dim-and-parklamp-producer-gap.
+// Park-lamp + dim producer gaps (4161 and 4163 had no chassis-bus producer)
+// resolved by @design 2026-06-12.
 //
 // Encoding: 4158–4162 uint8 bool (0=off, 1=on); 4163 uint8 duty percent (0..100).
 // @design 2026-06-07 — first free block above the HV bus signals (4155–4157).
@@ -726,8 +721,8 @@ inline constexpr std::uint32_t kSigChassisIpcDimDutyPct         = 4163U;
 // 4155–4157 — IDs this contract allocates to the HV bus rail — because the
 // trio was never adopted into the contract header and the drift guard can
 // only check IDs that exist on both sides. Live collision in every co-sim
-// run; details + the guard-gap lesson in
-// notes/manual_supplements.yaml#2026-06-11-chassis-4155-doorlock-collision.
+// run. The guard-gap lesson: a drift guard that compares IDs present on both
+// sides cannot see an ID one side publishes and the contract never declared.
 // Allocated here from the free block above the IPC discrete-display
 // telltales (4158–4163; 4164 left spare).
 // ---------------------------------------------------------------------------
@@ -763,7 +758,7 @@ inline constexpr std::uint32_t kSigChassisPitchDeg     = 4169U;
 // The RHJB DLM subscribes to all four to drive its momentary lock/unlock
 // motor pulse via ev1_rhjb_door_lock_step().
 //
-// Physical wiring per redux round-5 / elec-337 (PSMELC67861AB):
+// Physical wiring per elec-337 (PSMELC67861AB):
 //   LH LOCK   — circuit 780A, J9.C13  (↔ LHJB.J9.B6 via body harness)
 //   LH UNLOCK — circuit 781A, J9.D16  (↔ LHJB.J8.D14)
 //   RH LOCK   — circuit 780C, J3.A2   (direct from RH door switch)
@@ -875,8 +870,7 @@ inline constexpr std::uint32_t kSigChassisLhjbChargeWakePassthru = 4187U;
 //   0 -> ~500 mV (LOW, "permit") into pim_regen_tick's regen_disable_discrete_mv
 //   argument, replacing the former static idle default.  This closes the
 //   DTC 109/110 runtime loop against two BTCM-sourced-but-independently-wired
-//   signals end-to-end (notes/manual_supplements.yaml#2026-06-07-btcm-pim-regen-serial-fields
-//   suggested_action; follow-up #2026-06-07-btcm-pim-regen-discrete-producers).
+//   signals end-to-end.
 // @design 2026-06-07 — first free chassis ID above the LHJB passthrough (4187);
 //   additive (MINOR) chassis-contract bump.  The retard-request PWM discrete
 //   leg (DTC 042, PIM J1-18) is NOT published here — the BTCM host supervisor
@@ -903,9 +897,8 @@ inline constexpr std::uint32_t kSigChassisBtcmRegenDisableOut = 4188U;
 // here instead. @inferred 2026-06-12 — circuit 230 / IPC C12 is @source:manual;
 // the step encoding and default are @design 2026-06-12 (no manual printout of
 // the step count or voltage-to-step map; mirrors ipc_supervisor's kDimDutyByStep).
-// @design 2026-06-12 — closes
-//   notes/dtc_pass/concerns.yaml#2026-06-07-ipc-dim-and-parklamp-producer-gap
-//   (dim-level producer side).
+// @design 2026-06-12 — closes the IPC dim-level producer gap (nothing
+//   published circuit 230 before this signal).
 // ---------------------------------------------------------------------------
 inline constexpr std::uint32_t kSigChassisRsaDimLevelStep = 4189U;
 
@@ -923,9 +916,7 @@ inline constexpr std::uint32_t kSigChassisRsaDimLevelStep = 4189U;
 // output, kSigCombSw_ParkHeadlampOut 4042) instead.
 // @source:manual EV1 Electrical Service Manual, IPC C4 / circuit 301C
 //   (PARKLAMPS ON IN); LHJB J9.A1 / circuit 9A → tail/marker feed = same net.
-// @design 2026-06-12 — closes
-//   notes/dtc_pass/concerns.yaml#2026-06-07-ipc-dim-and-parklamp-producer-gap
-//   (park-lamp-on producer side). IPC retargets C4 ingestion from the
+// @design 2026-06-12 — closes the IPC park-lamp-on producer gap. IPC retargets C4 ingestion from the
 //   switch-proxy (4042) to this faithful net signal.
 // ---------------------------------------------------------------------------
 inline constexpr std::uint32_t kSigChassisLhjbParkLampsOn = 4190U;
@@ -960,11 +951,10 @@ inline constexpr std::uint32_t kSigChassisLhjbParkLampsOn = 4190U;
 //
 // Before this signal, PIM held a static healthy idle default (18 % / 128 Hz / 6 V)
 // for J1-18. Publishing the live value from the BTCM supervisor closes the deferred
-// PWM leg in notes/manual_supplements.yaml#2026-06-07-btcm-pim-regen-discrete-producers.
+// PWM leg of the BTCM -> PIM regen discrete producers.
 // @source:manual EV1 Service Manual prop-220/221 (DTC 042 correlation)
-// @design 2026-06-12 — closes
-//   notes/manual_supplements.yaml#2026-06-07-btcm-pim-regen-discrete-producers
-//   (retard-request PWM discrete leg, DTC 042 correlation).
+// @design 2026-06-12 — closes the retard-request PWM discrete leg (DTC 042
+//   correlation).
 // ---------------------------------------------------------------------------
 inline constexpr std::uint32_t kSigChassisBtcmRetardRequestDutyQ8 = 4191U;
 
@@ -993,8 +983,8 @@ inline constexpr std::uint32_t kSigChassisBtcmRetardRequestDutyQ8 = 4191U;
 //                       epsilon: 1 %.
 // @design 2026-06-13 — first free chassis IDs above the BTCM retard-request
 //   PWM (4191); additive (MINOR 6 → 7) chassis-contract bump.  Sourced from
-//   src/models/battery/aux_battery; see
-//   notes/manual_supplements.yaml#2026-06-13-sla-battery-shared-chemistry.
+//   src/models/battery/aux_battery (the 12 V SLA battery shares its
+//   lead-acid chemistry model with the pack modules).
 // ---------------------------------------------------------------------------
 inline constexpr std::uint32_t kSigChassisAuxBatteryTerminalMv = 4192U;
 inline constexpr std::uint32_t kSigChassisAuxBatteryPresent    = 4193U;
@@ -1016,8 +1006,7 @@ inline constexpr std::uint32_t kSigChassisAuxBatterySocPct     = 4194U;
 //     keys on and, with HV available, charges the 12 V battery (APM B+ active
 //     4133 feeds back to the host as the charge source).
 // @design 2026-06-13 — first free chassis ID above the aux-battery rail block
-//   (4192-4194); additive (MINOR 7 → 8). See
-//   notes/manual_supplements.yaml#2026-06-13-sla-battery-shared-chemistry.
+//   (4192-4194); additive (MINOR 7 → 8).
 // ---------------------------------------------------------------------------
 inline constexpr std::uint32_t kSigChassisAuxBatteryMaintWakeReq = 4195U;
 
@@ -1078,8 +1067,7 @@ inline constexpr std::uint32_t kSigChassisRhjbPmmModuleBPlus = 4196U;
 //   it into the aux battery's charge integration; falls back to the prior
 //   bool-gated assumed current when 4197 is stale/absent.
 // @design 2026-06-14 — second of the MINOR 8 → 9 additive pair (with 4196); real
-//   APM-derived charge current for the 12 V rail.  See
-//   notes/manual_supplements.yaml#2026-06-13-sla-battery-shared-chemistry.
+//   APM-derived charge current for the 12 V rail.
 // ---------------------------------------------------------------------------
 inline constexpr std::uint32_t kSigChassisApmTwelveVoltOutputMa = 4197U;
 
