@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <utility>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -57,6 +58,42 @@ void parse_wheel_config(const json& w, ev1sim::WheelConfig& out) {
                 std::cerr << "[Config] wheel button: unknown action '" << action << "'\n";
             out.buttons.push_back(b);
         }
+    }
+}
+
+void parse_rig_config(const json& r, ev1sim::RigConfig& out) {
+    if (!r.contains("devices") || !r["devices"].is_array()) return;
+    for (const auto& dj : r["devices"]) {
+        ev1sim::RigDeviceConfig d;
+        read_if(dj, "device_name_match", d.device_name_match);
+        if (dj.contains("buttons") && dj["buttons"].is_array()) {
+            for (const auto& bj : dj["buttons"]) {
+                ev1sim::RigButtonBinding b;
+                read_if(bj, "sdl_button", b.sdl_button);
+                std::string action;
+                read_if(bj, "action", action);
+                if (auto act = ev1sim::InputActionFromString(action))
+                    b.action = *act;
+                else if (!action.empty())
+                    std::cerr << "[Config] rig button: unknown action '" << action << "'\n";
+                d.buttons.push_back(b);
+            }
+        }
+        if (dj.contains("switches") && dj["switches"].is_array()) {
+            for (const auto& sj : dj["switches"]) {
+                ev1sim::RigSwitchBinding sw;
+                read_if(sj, "sdl_button", sw.sdl_button);
+                read_if(sj, "invert", sw.invert);
+                std::string target;
+                read_if(sj, "switch", target);
+                if (auto t = ev1sim::RigSwitchTargetFromString(target))
+                    sw.target = *t;
+                else if (!target.empty())
+                    std::cerr << "[Config] rig switch: unknown switch '" << target << "'\n";
+                d.switches.push_back(sw);
+            }
+        }
+        out.devices.push_back(std::move(d));
     }
 }
 
@@ -225,6 +262,7 @@ Config Config::LoadFromFile(const std::string& path) {
         if (i.contains("wheel")) parse_wheel_config(i["wheel"], cfg.input.wheel);
         if (i.contains("ffb"))   parse_ffb_config(i["ffb"], cfg.input.ffb);
         if (i.contains("feedback")) parse_feedback_config(i["feedback"], cfg.input.feedback);
+        if (i.contains("rig")) parse_rig_config(i["rig"], cfg.input.rig);
     }
 
     if (j.contains("telemetry")) {

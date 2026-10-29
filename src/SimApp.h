@@ -15,6 +15,7 @@
 #include "SounderAudio.h"
 #include "KeyboardInputController.h"
 #include "PhysicalWorld.h"
+#include "RigInputDevices.h"
 #include "RearEmbClamp.h"
 #include "SdlContext.h"
 #include "Scenario.h"
@@ -226,6 +227,7 @@ private:
     std::unique_ptr<ev1sim::WheelInputController> m_wheel;
     std::unique_ptr<ev1sim::ForceFeedback>        m_ffb;
     std::unique_ptr<ev1sim::ControllerRumble>     m_controller_rumble;
+    std::unique_ptr<ev1sim::RigInputDevices>      m_rig;
 #endif
     ev1sim::AbsFeedback                           m_abs_feedback;
 

@@ -47,6 +47,10 @@
         "abs_motor": "low",
         "abs_magnitude": 0.6
       }
+    },
+    "rig": {
+      "_comment": "Button boxes on a driving rig, each matched by a substring of its SDL name. buttons: momentary, any action name from src/InputActions.h. switches: a contact whose level sets an input; names in src/RigSwitches.h (seatbelt_driver, seatbelt_passenger, charge_coupler, hvac_ac, hvac_defrost, window_*_up/down, hvac_fan_*, hvac_mode_*); invert for a normally-closed contact. Example device: { \"device_name_match\": \"Button Box\", \"buttons\": [ { \"sdl_button\": 0, \"action\": \"hazard_toggle\" } ], \"switches\": [ { \"sdl_button\": 1, \"switch\": \"seatbelt_driver\" } ] }",
+      "devices": []
     }
   }
 }
