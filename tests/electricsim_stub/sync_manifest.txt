@@ -10,9 +10,9 @@
 # an opaque identifier, recorded so a reader can tell WHICH upstream state
 # this copy reflects — without it the manifest says the copy is consistent
 # but not what it is consistent with.
-provenance b2ad41439e12fa0cc287f8838455e6dcb71d658f
+provenance fbeeca1e9f16550752dbf0cc315f2c20a9d526b4
 count 17
-20a81f1103a46586dfef7908c792aa8c340286071840ab22599e96a26f89e108  src/io/ev1_chassis_signals.hpp
+bfed2683f2a44be7b60a40c6381f18ef74437fd2143da339c86dcf42fc3893c6  src/io/ev1_chassis_signals.hpp
 43f11cacc108aba17425ce315b20200755871045bcc92a98aecf19106fce498c  src/io/gm8192/gm8192_frame.c
 07417f47c96a1d38cf187920610c293522c105b8620de6f85fccee10aee1f359  src/io/gm8192/gm8192_frame.h
 634b74671ab20526222fd93c256bc0957695645c0ffb67299ba35d1af07cac60  src/io/gm8192/gm8192_rx_framer.cpp
@@ -20,12 +20,12 @@ count 17
 d24d694d050610443cc3cecc989178bc6e8c5be472f724d700f01f5f528ae42e  src/io/topology/env_open.cpp
 89825d539f6866cb814022fbfe9197a7bae0a5623e2032fb7479b868be06a521  src/io/topology/env_open.hpp
 f68e4031181b914cdb665797b5ffa296b9e5b4f2a2f50374e49b9a3679f790e6  src/io/topology/shm_test_helpers.hpp
-1a6081d59d8e7b506f8710fa9105ebd7c0f5d5e28a1e24ebac9336064d22ae7e  src/io/topology/topology_generated.h
+a5f3c7042aae9ba6170d41682dc5b4b7b397d5425afc7d523b588929cdc517af  src/io/topology/topology_generated.h
 1f1927b0c839c5903e22a50593d7e1a47ae440119e5ab62750374cb638587ad3  src/io/topology/wire_defaults.hpp
 b957dd474efdd69b0defaefd9a7303784bbcc2b6f31ff3390c95c8fecf7171b0  src/io/uart/uart_rx.cpp
 044f6ceb817a8673ce0e378f6d13691dba1661cf1d2c2aa3f22572e7ce43c2e6  src/io/uart/uart_rx.hpp
 5993ea0c491be788827a24783581e9db3534f3ce0b0fec42fcbc776e78605931  src/io/uart/uart_tx.cpp
 8dd8977b4775df71ff6c69f71d4ff3e8a3811797a271748820a95fb1f76670d8  src/io/uart/uart_tx.hpp
-60d2d2e5690110707a5ad4a7e220f0070d409c56b3833a6432b9bd8f1f830df3  src/io/wire_table.cpp
-7677e89295feefbf5ff40a09c18850befee178f908d315556d87912887d9fdf5  src/io/wire_table.hpp
-ff63eb9191a327a02c627ac1ee5ad4bf53ce2042dc14341edbaa0176a16f0b49  src/net_host/conductor_publisher.hpp
+3ffc4c7edd7e6a807e3b423d3d2b08bea2484d0d5c9ab2a21f4a6473dc584cf5  src/io/wire_table.cpp
+2ade1f2bef5c6e6312d7f4685b42b477ac8ed5f47e4c7abb3f7258e08b69f49a  src/io/wire_table.hpp
+a178970f8a409da17f803e3d3aedf78168499e29837e889c1da6a733fcc0845a  src/net_host/conductor_publisher.hpp

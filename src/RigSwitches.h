@@ -28,7 +28,6 @@ class PhysicalWorld;
 enum class RigSwitchTarget {
     None,
     SeatbeltDriver,       // closed = buckled
-    SeatbeltPassenger,
     ChargeCoupler,        // closed = paddle in the inlet
     AirConditioning,      // closed = A/C on
     Defrost,              // closed = rear defrost on
@@ -57,7 +56,6 @@ struct RigSwitchName {
 };
 inline constexpr RigSwitchName kRigSwitchNames[] = {
     {RigSwitchTarget::SeatbeltDriver,      "seatbelt_driver"},
-    {RigSwitchTarget::SeatbeltPassenger,   "seatbelt_passenger"},
     {RigSwitchTarget::ChargeCoupler,       "charge_coupler"},
     {RigSwitchTarget::AirConditioning,     "hvac_ac"},
     {RigSwitchTarget::Defrost,             "hvac_defrost"},

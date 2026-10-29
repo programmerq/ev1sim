@@ -15,7 +15,6 @@ void ApplyRigSwitch(PhysicalWorld& world, RigSwitchTarget target, bool closed) {
         case T::None:
         case T::Count:               break;
         case T::SeatbeltDriver:      world.seatbelts().set_driver(closed); break;
-        case T::SeatbeltPassenger:   world.seatbelts().set_passenger(closed); break;
         case T::ChargeCoupler:       world.charge_coupler().set_present(closed); break;
         case T::AirConditioning:     hvac.set_ac(closed); break;
         case T::Defrost:             hvac.set_defrost(closed); break;

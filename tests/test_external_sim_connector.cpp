@@ -48,16 +48,14 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     constexpr int kNumIpcExtraTelltale = 6; // service_now (4140), check_messages (4141),
                                             // temp (4142), battery_life (4143),
                                             // reduced_perf (4144), check_tire_press (4145)
-    constexpr int kNumBtcmChassisActuator = 8; // BTCM iso/dump/EMB/cylpress on chassis bus
+    constexpr int kNumBtcmChassisActuator = 4; // BTCM iso/cylpress on chassis bus
                                                // (4147 iso_close FL, 4148 iso_close FR,
-                                               //  4149 dump_open FL, 4150 dump_open FR,
-                                               //  4151 EMB motor LR, 4152 EMB motor RR,
                                                //  4153 cyl press FL kPa, 4154 cyl press FR kPa)
-    constexpr int kNumExtContract = 16;        // 3D-sim contract publishes on main harness:
+    constexpr int kNumExtContract = 15;        // 3D-sim contract publishes on main harness:
                                                //  6920 body_velocity_mps, 6921/6922 long/lat accel,
                                                //  6930/6931 pose X/Y, 6932 pose yaw_rad,
                                                //  6942 headlight switch, 6943 headlight dim,
-                                               //  6945 telltale test, 6946/6947 park brake set/release,
+                                               //  6945 telltale test, 6946 park brake switch,
                                                //  6960/6961 door open driver/passenger,
                                                //  6962 hood open, 6963 trunk open,
                                                //  6966 key position
@@ -66,21 +64,19 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     // from ev1sim: brake_pedal_q8 (6900), steering_deg_q8 (6901),
     // gear_selector (6902), throttle_q8 (6903), brake_switch (6904),
     // (hazard/turn moved to chassis cavities kSigTurnHazSw_* 4043-4045),
-    // seatbelt_buckled (6964), seatbelt_buckled_passenger (6965),
+    // seatbelt_switch (6964),
     // rsa_mode_sw_lock (6972), rsa_mode_sw_off_acc (6973), rsa_mode_sw_run (6974),
     // rsa_keypad_button1 (6975), button2 (6976), button3 (6977),
     // button4 (6978), button5 (6979),
-    // ipc_trip_reset (6952),
     // (cruise stalk moved to chassis cavities kSigCruiseSw_* 4047-4049),
     // (wiper switch/wash moved to chassis cavities kSigWiperSw_* 4054-4057),
     // power_window_driver_up (6980), power_window_driver_down (6981),
     // power_window_passenger_up (6982), power_window_passenger_down (6983),
     // rsa_exterior_keypad1 (6985), rsa_exterior_keypad2 (6986),
     // rsa_exterior_keypad3 (6987), rsa_exterior_keypad4 (6988),
-    // rsa_exterior_keypad5 (6989),
-    // door_handle_attempt_driver (6990), door_handle_attempt_passenger (6991).
+    // rsa_exterior_keypad5 (6989).
     // (6970 is reserved — not registered as an endpoint.)
-    constexpr int kNumDriverInputs = 27;  // wiper + turn/hazard + cruise moved to chassis cavities
+    constexpr int kNumDriverInputs = 23;
     const int expected = NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS +
                          kNumCombSw + kNumChargeCplr + kNumPrnd + kNumWiperSwCavity + kNumTurnHazSwCavity + kNumCruiseSwCavity + kNumMotor +
                          kNumSimTime +
@@ -228,14 +224,14 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
                    (e.signal_id >= 6930 && e.signal_id <= 6932) ||
                    (e.signal_id >= 6942 && e.signal_id <= 6943) ||
                     e.signal_id == 6945 ||
-                   (e.signal_id >= 6946 && e.signal_id <= 6947) ||
+                    e.signal_id == 6946 ||
                    (e.signal_id >= 6960 && e.signal_id <= 6963) ||
                     e.signal_id == 6966) {
             // 3D-sim contract publishes — main harness, ev1sim → external sim.
             // 6920 body_velocity_mps, 6921/6922 long/lat accel,
             // 6930-6932 pose X/Y/yaw,
             // 6942 headlight switch, 6943 headlight dim,
-            // 6945 telltale test, 6946/6947 park brake set/release,
+            // 6945 telltale test, 6946 park brake switch,
             // 6960-6963 door/hood/trunk open sensors,
             // 6966 key position.
             CHECK_FALSE(e.input_to_sim);
@@ -252,26 +248,22 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
             ++dynamics_count;
         } else if ((e.signal_id >= 6900 && e.signal_id <= 6904) ||
                    e.signal_id == 6964 ||
-                   e.signal_id == 6965 ||
                    (e.signal_id >= 6972 && e.signal_id <= 6974) ||
                    (e.signal_id >= 6975 && e.signal_id <= 6979) ||
-                   e.signal_id == 6952 ||
                    (e.signal_id >= 6980 && e.signal_id <= 6983) ||
-                   (e.signal_id >= 6985 && e.signal_id <= 6991)) {
+                   (e.signal_id >= 6985 && e.signal_id <= 6989)) {
             // Driver inputs on the main harness segment — outputs from ev1sim.
             // 6900=brake_pedal_q8  6901=steering_deg_q8  6902=gear_selector
             // 6903=throttle_q8     6904=brake_switch
             // (hazard/turn now publish on chassis cavities 4043-4045)
-            // 6952=ipc_trip_reset
             // (cruise stalk now publishes on chassis cavities 4047-4049)
             // (wiper switch/wash now publish on chassis cavities 4054-4057)
-            // 6964=seatbelt_buckled  6965=seatbelt_buckled_passenger
+            // 6964=seatbelt_switch (closed while unbuckled)
             // 6972..6974=rsa_mode_sw_{lock,off_acc,run}  (6971 byte retired)
             // 6975..6979=rsa_keypad_button[1..5]  (6970 reserved; not registered)
             // 6980=power_window_driver_up   6981=power_window_driver_down
             // 6982=power_window_passenger_up  6983=power_window_passenger_down
             // 6985..6989=rsa_exterior_keypad[1..5]
-            // 6990=door_handle_attempt_driver  6991=door_handle_attempt_passenger
             CHECK_FALSE(e.input_to_sim);
             ++driver_input_count;
         } else {
@@ -321,8 +313,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     // ipc_extra_telltale_count: service_now (4140) + check_messages (4141) + temp (4142)
     //                           + battery_life (4143) + reduced_perf (4144) + check_tire_press (4145).
     CHECK(ipc_extra_telltale_count == kNumIpcExtraTelltale);
-    // btcm_chassis_actuator_count: iso_close FL/FR (4147/4148) + dump_open FL/FR (4149/4150)
-    //                             + EMB motor LR/RR (4151/4152) + cyl pressure FL/FR (4153/4154).
+    // btcm_chassis_actuator_count: iso_close FL/FR (4147/4148) + cyl pressure FL/FR (4153/4154).
     CHECK(btcm_chassis_actuator_count == kNumBtcmChassisActuator);
     // ext_contract_count: body_velocity (6920) + long/lat accel (6921/6922)
     //                   + pose X/Y/yaw (6930-6932) + door/hood/trunk sensors (6960-6963).
@@ -595,12 +586,15 @@ TEST_CASE("RSA keypad endpoints have correct IDs and direction", "[ExternalSim]"
     CHECK_FALSE(btn5->input_to_sim);
 }
 
-TEST_CASE("New driver-input endpoints (6952) + cruise/wiper cavities have correct IDs and direction", "[ExternalSim]") {
-    // IPC trip-reset (6952).
-    const auto* ipc = ExternalSimConnector::FindEndpoint(6952);
-    REQUIRE(ipc != nullptr);
-    CHECK(std::string(ipc->qualified_name) == "vehicle.driver.ipc_trip_reset_button");
-    CHECK_FALSE(ipc->input_to_sim);
+TEST_CASE("Driver switch endpoints have correct IDs and direction", "[ExternalSim]") {
+    // No car input wire for these: trip reset, passenger belt, door handles,
+    // park-brake release.
+    for (std::uint32_t gone : {6952U, 6965U, 6990U, 6991U, 6947U})
+        CHECK(ExternalSimConnector::FindEndpoint(gone) == nullptr);
+    const auto* belt = ExternalSimConnector::FindEndpoint(6964);
+    REQUIRE(belt != nullptr);
+    CHECK(std::string(belt->qualified_name) == "vehicle.driver.seatbelt_switch");
+    CHECK_FALSE(belt->input_to_sim);
 
     // Cruise stalk now publishes as CHASSIS cavities (4047-4049): the raw
     // SET/COAST, RESUME/ACCEL, and ON/OFF contacts.  PIM's tap/hold decoder
@@ -620,8 +614,7 @@ TEST_CASE("New driver-input endpoints (6952) + cruise/wiper cavities have correc
     CHECK(std::string(coo->qualified_name) == "vehicle.driver.cruise_on_off_contact");
     CHECK_FALSE(coo->input_to_sim);
 
-    // Wiper/washer switch now publish as CHASSIS cavities (4054-4057), computed
-    // from the detent enum, not the old 6958/6959 driver signals.
+    // Wiper/washer switch contacts (4054-4057).
     const auto* wdelay = ExternalSimConnector::FindEndpoint(4054);
     REQUIRE(wdelay != nullptr);
     CHECK(std::string(wdelay->qualified_name) == "vehicle.driver.wiper_delay_contact");
@@ -655,8 +648,6 @@ TEST_CASE("New driver-input endpoints (6952) + cruise/wiper cavities have correc
 
 TEST_CASE("New driver-input setters store without crashing", "[ExternalSim]") {
     ExternalSimConnector c;
-    CHECK_NOTHROW(c.SetDriverIpcTripReset(true));
-    CHECK_NOTHROW(c.SetDriverIpcTripReset(false));
     // Cruise switch raw contacts (chassis cavities 4047-4049).
     CHECK_NOTHROW(c.SetCruiseSetCoastContact(true));
     CHECK_NOTHROW(c.SetCruiseSetCoastContact(false));
@@ -664,11 +655,6 @@ TEST_CASE("New driver-input setters store without crashing", "[ExternalSim]") {
     CHECK_NOTHROW(c.SetCruiseResumeAccelContact(false));
     CHECK_NOTHROW(c.SetCruiseOnOffContact(true));
     CHECK_NOTHROW(c.SetCruiseOnOffContact(false));
-    CHECK_NOTHROW(c.SetDriverWiperSwitch(0));  // OFF
-    CHECK_NOTHROW(c.SetDriverWiperSwitch(1));  // INT
-    CHECK_NOTHROW(c.SetDriverWiperSwitch(2));  // LOW
-    CHECK_NOTHROW(c.SetDriverWiperSwitch(3));  // HIGH
-    CHECK_NOTHROW(c.SetDriverWiperWashRequest(true));
     CHECK_NOTHROW(c.Tick(0.0));
 }
 
@@ -1380,11 +1366,12 @@ TEST_CASE("GetAbsPhaseFront prefers chassis-bus iso/dump over main-harness",
     c.DebugInjectDelta(5011, false);
     c.DebugInjectDelta(5012, false);
     c.DebugInjectDelta(5013, false);
-    // Chassis-bus mirror says DUMP (iso=1, dump=1) for both wheels.
+    // Chassis side says DUMP (iso closed, motor on its release leg) for both wheels.
+    using M = ExternalSimConnector::BrakeMotor;
     c.DebugInjectDelta(4147, true);   // iso_close FL
-    c.DebugInjectDelta(4149, true);   // dump_open FL
+    c.DebugInjectBtcmMotorLeads(M::FrontLeft, false, true);
     c.DebugInjectDelta(4148, true);   // iso_close FR
-    c.DebugInjectDelta(4150, true);   // dump_open FR
+    c.DebugInjectBtcmMotorLeads(M::FrontRight, false, true);
 
     auto phase = c.GetAbsPhaseFront(std::chrono::milliseconds(3000));
     using Phase = ExternalSimConnector::AbsPhaseFront::Phase;
@@ -1398,28 +1385,31 @@ TEST_CASE("GetAbsPhaseFront reads a sealed iso with the motor restoring as APPLY
           "[ExternalSim][ABS][chassis-bus]") {
     ExternalSimConnector c;
     c.DebugInjectDelta(5050, true);   // BTCM heartbeat.
-    // Both wheels sealed, no dump: the BTCM's mid-event state.
+    // Both wheels sealed, neither motor lead driven: the BTCM's mid-event state.
+    using M = ExternalSimConnector::BrakeMotor;
     c.DebugInjectDelta(4147, true);   // iso_close FL
-    c.DebugInjectDelta(4149, false);  // dump_open FL
+    c.DebugInjectBtcmMotorLeads(M::FrontLeft, false, false);
     c.DebugInjectDelta(4148, true);   // iso_close FR
-    c.DebugInjectDelta(4150, false);  // dump_open FR
+    c.DebugInjectBtcmMotorLeads(M::FrontRight, false, false);
     using Phase = ExternalSimConnector::AbsPhaseFront::Phase;
 
     auto phase = c.GetAbsPhaseFront(std::chrono::milliseconds(3000));
-    CHECK(phase.fl == Phase::HOLD);   // no motor command yet: hold
+    CHECK(phase.fl == Phase::HOLD);
     CHECK(phase.fr == Phase::HOLD);
 
-    c.DebugInjectBtcmFrontMotorCmd(1.0f, 0.0f);  // FL restoring, FR holding
+    c.DebugInjectBtcmMotorLeads(M::FrontLeft, true, false);   // FL restoring
     phase = c.GetAbsPhaseFront(std::chrono::milliseconds(3000));
     CHECK(phase.fl == Phase::APPLY);
     CHECK(phase.fr == Phase::HOLD);
 
-    // The release leg with a sealed iso still needs dump_open to read DUMP.
-    c.DebugInjectBtcmFrontMotorCmd(-1.0f, -1.0f);
-    c.DebugInjectDelta(4149, true);
+    c.DebugInjectBtcmMotorLeads(M::FrontLeft, false, true);   // FL releasing
     phase = c.GetAbsPhaseFront(std::chrono::milliseconds(3000));
     CHECK(phase.fl == Phase::DUMP);
     CHECK(phase.fr == Phase::HOLD);
+
+    c.DebugInjectDelta(4147, false);  // FL iso open: straight apply
+    phase = c.GetAbsPhaseFront(std::chrono::milliseconds(3000));
+    CHECK(phase.fl == Phase::APPLY);
 }
 
 TEST_CASE("GetAbsPhaseFront falls back to main-harness when chassis-bus silent",
@@ -1446,7 +1436,8 @@ TEST_CASE("GetAbsPhaseFront source preference is per-wheel",
     c.DebugInjectDelta(5050, true);   // BTCM heartbeat.
     // FL only on chassis bus; FR only on main harness.
     c.DebugInjectDelta(4147, true);   // FL iso_close
-    c.DebugInjectDelta(4149, true);   // FL dump_open  → FL=DUMP via chassis
+    c.DebugInjectBtcmMotorLeads(ExternalSimConnector::BrakeMotor::FrontLeft,
+                                false, true);   // FL releasing → DUMP via chassis
     c.DebugInjectDelta(5012, true);   // FR_ISO main harness
     c.DebugInjectDelta(5013, false);  // FR_DMP main harness → FR=HOLD
 
@@ -1464,8 +1455,9 @@ TEST_CASE("GetRearEmbCmd prefers chassis-bus EMB cmd over main-harness",
     c.DebugInjectDelta(5050, true);    // BTCM heartbeat.
     c.DebugInjectFloat(5014, 0.0f);    // main harness LR = idle
     c.DebugInjectFloat(5015, 0.0f);    // main harness RR = idle
-    c.DebugInjectFloat(4151, 1.0f);    // chassis LR = full apply
-    c.DebugInjectFloat(4152, -1.0f);   // chassis RR = release
+    using M = ExternalSimConnector::BrakeMotor;
+    c.DebugInjectBtcmMotorLeads(M::RearLeft,  true,  false);   // LR apply lead
+    c.DebugInjectBtcmMotorLeads(M::RearRight, false, true);    // RR release lead
 
     auto cmd = c.GetRearEmbCmd(std::chrono::milliseconds(3000));
     CHECK(cmd.lr_fresh);
@@ -1480,7 +1472,7 @@ TEST_CASE("GetRearEmbCmd falls back to main-harness when chassis-bus silent",
     c.DebugInjectDelta(5050, true);    // BTCM heartbeat.
     c.DebugInjectFloat(5014, 0.7f);    // main harness LR
     c.DebugInjectFloat(5015, -0.3f);   // main harness RR
-    // chassis 4151/4152 never injected.
+    // The rear motor leads are never written.
 
     auto cmd = c.GetRearEmbCmd(std::chrono::milliseconds(3000));
     CHECK(cmd.lr_fresh);

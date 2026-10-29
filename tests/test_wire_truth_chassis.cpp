@@ -78,6 +78,14 @@ std::unique_ptr<WireTable> create_fleet_table(const std::string& name,
 // Casting would have been one line shorter and would have quietly made the test a
 // place where conductor writes are legal. Then the day the publish edge changes,
 // these tests keep passing against an API nobody uses.
+// Reads a switch contact (an element_state cell); false if never written.
+bool read_contact(const WireTable& table, electricsim::io::ElementStateId id, bool* out) {
+    WireTable::Sample<bool> sample{};
+    if (!table.read_bit_sample(id, &sample)) return false;
+    *out = sample.written() && sample.value;
+    return true;
+}
+
 bool publish_conductor(WireTable& table, ConductorId id, bool energised) {
     electricsim::net_host::ConductorPublisher publisher(table);
     return publisher.publish(id, energised);
@@ -409,7 +417,7 @@ TEST_CASE("WireTruthChassis::mirror_signal: RSA mode buttons are three bit cells
     REQUIRE_FALSE(wire->mirror_signal(6971U, on, 1u));
 }
 
-TEST_CASE("WireTruthChassis::mirror_signal: park-brake switch presses reach the BTCM cells",
+TEST_CASE("WireTruthChassis::mirror_signal: a park-brake button push reaches the BTCM contact",
           "[wire_truth][mirror_signal]") {
     const std::string seg = unique_segment("ms_park_brake");
     auto creator = create_fleet_table(seg, electricsim::topology::kTopologyHash);
@@ -419,16 +427,10 @@ TEST_CASE("WireTruthChassis::mirror_signal: park-brake switch presses reach the 
 
     namespace topo = electricsim::topology;
     const std::uint8_t on[] = {0x01u};
-    struct { std::uint32_t id; WireId cell; } const presses[] = {
-        {6946U, topo::kWireDRIVER_PARK_BRAKE_SET_REQ},
-        {6947U, topo::kWireDRIVER_PARK_BRAKE_RELEASE_REQ},
-    };
-    for (const auto& p : presses) {
-        REQUIRE(wire->mirror_signal(p.id, on, 1u));
-        bool v = false;
-        REQUIRE(creator->read_bit(p.cell, &v));
-        CHECK(v);
-    }
+    REQUIRE(wire->mirror_signal(6946U, on, 1u));
+    bool v = false;
+    REQUIRE(read_contact(*creator, topo::kWireDRIVER_ES_PARK_BRAKE_SWITCH, &v));
+    CHECK(v);
 }
 
 namespace {
@@ -775,10 +777,10 @@ TEST_CASE("Coupler 4060 mirrors to the wire (Phase 5 prep)", "[wire_truth][mirro
     const std::uint8_t off[] = {0x00u};
     REQUIRE(wire->mirror_signal(4060U, on, 1u));   // coupler mated
     bool out = false;
-    REQUIRE(creator->read_bit(topo::kWireCHARGER_COUPLER_PRESENT, &out));
+    REQUIRE(read_contact(*creator, topo::kWireDRIVER_ES_CHARGE_COUPLER_MATED, &out));
     REQUIRE(out == true);
     REQUIRE(wire->mirror_signal(4060U, off, 1u));  // unmated
-    REQUIRE(creator->read_bit(topo::kWireCHARGER_COUPLER_PRESENT, &out));
+    REQUIRE(read_contact(*creator, topo::kWireDRIVER_ES_CHARGE_COUPLER_MATED, &out));
     REQUIRE(out == false);
 }
 
@@ -994,7 +996,7 @@ TEST_CASE("Connector dash snapshot: bus frames via BusSnoop plus the IPC lamp ce
     CHECK(snap.rsa->run == std::optional<bool>(false));
     CHECK(snap.rsa->led_park == std::optional<bool>(true));
     CHECK_FALSE(snap.rsa->led_drive.has_value());
-    CHECK_FALSE(snap.rsa->dim_step.has_value());
+    CHECK_FALSE(snap.rsa->dim_level_permille.has_value());
 
     // The bus goes quiet: past the staleness horizon the frame groups blank,
     // while the lamp keeps its cell's last written value.
@@ -1189,23 +1191,23 @@ TEST_CASE("Door-lock loop end-to-end: RHJB legs in, switch contacts out",
     const std::uint8_t closed[] = {0x01u};
     const std::uint8_t open[]   = {0x00u};
     REQUIRE(wire->mirror_signal(4170U, closed, 1u));   // LH LOCK contact closed
-    REQUIRE(rhjb->read_bit(topo::kWireDOOR_LOCK_SW_LH_LOCK_OUT, &sw));
+    REQUIRE(read_contact(*rhjb, topo::kWireDRIVER_ES_DOOR_LOCK_LH_LOCK_SWITCH, &sw));
     CHECK(sw);
     REQUIRE(wire->mirror_signal(4170U, open, 1u));     // released — the pulse edge
-    REQUIRE(rhjb->read_bit(topo::kWireDOOR_LOCK_SW_LH_LOCK_OUT, &sw));
+    REQUIRE(read_contact(*rhjb, topo::kWireDRIVER_ES_DOOR_LOCK_LH_LOCK_SWITCH, &sw));
     CHECK_FALSE(sw);
 
     // The other three contacts land on their own cells, not on the LH LOCK one.
     REQUIRE(wire->mirror_signal(4171U, closed, 1u));
     REQUIRE(wire->mirror_signal(4172U, closed, 1u));
     REQUIRE(wire->mirror_signal(4173U, closed, 1u));
-    REQUIRE(rhjb->read_bit(topo::kWireDOOR_LOCK_SW_LH_UNLOCK_OUT, &sw));
+    REQUIRE(read_contact(*rhjb, topo::kWireDRIVER_ES_DOOR_LOCK_LH_UNLOCK_SWITCH, &sw));
     CHECK(sw);
-    REQUIRE(rhjb->read_bit(topo::kWireDOOR_LOCK_SW_RH_LOCK_OUT, &sw));
+    REQUIRE(read_contact(*rhjb, topo::kWireDRIVER_ES_DOOR_LOCK_RH_LOCK_SWITCH, &sw));
     CHECK(sw);
-    REQUIRE(rhjb->read_bit(topo::kWireDOOR_LOCK_SW_RH_UNLOCK_OUT, &sw));
+    REQUIRE(read_contact(*rhjb, topo::kWireDRIVER_ES_DOOR_LOCK_RH_UNLOCK_SWITCH, &sw));
     CHECK(sw);
-    REQUIRE(rhjb->read_bit(topo::kWireDOOR_LOCK_SW_LH_LOCK_OUT, &sw));
+    REQUIRE(read_contact(*rhjb, topo::kWireDRIVER_ES_DOOR_LOCK_LH_LOCK_SWITCH, &sw));
     CHECK_FALSE(sw);   // still open — no cross-talk from the other three
 }
 
@@ -1347,7 +1349,7 @@ TEST_CASE("WireTruthChassis: a switch contact written by its producer id reads a
     auto wt = ev1sim::WireTruthChassis::Attach(name);
     REQUIRE(wt);
 
-    const auto contact = electricsim::topology::kWireLHJB_ES_BRAKE_SW;
+    const auto contact = electricsim::topology::kWireDRIVER_ES_BRAKE_SWITCH;
     WireTable::Sample<bool> s{};
     REQUIRE(wt->write_bit(ev1sim::ProducerWireId(contact), true));
     REQUIRE(creator->read_bit_sample(contact, &s));

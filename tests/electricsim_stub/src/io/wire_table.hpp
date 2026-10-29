@@ -365,6 +365,15 @@ class WireTable {
                             const SolverToken& token);
   bool read_uint32_sample(ConductorId id, Sample<std::uint32_t>* out) const;
 
+  // A LINE LEVEL: the signal a live circuit carries, in permille (0..1000) — a PWM
+  // line's duty, an analog sensor line's position, a dimmer line's level. Published by
+  // the solver from the driving element's level cause while the circuit is live, and 0
+  // while it is dark, so a receiver reading a dead line sees no signal. Same token as
+  // the bit form: the zero comes out of the same provenance computation.
+  bool publish_conductor_level(ConductorId id, std::uint16_t permille,
+                               const SolverToken& token);
+  bool read_uint16_sample(ConductorId id, Sample<std::uint16_t>* out) const;
+
   // ─── Element-state cells ────────────────────────────────────────────────
   //
   // The module-decided half of the element model: contact `closed`, converter/source
@@ -392,6 +401,13 @@ class WireTable {
   // input, which is why the read is sample-only.
   bool write_element_state_mv(ElementStateId id, std::uint32_t millivolts);
   bool read_uint32_sample(ElementStateId id, Sample<std::uint32_t>* out) const;
+
+  // The LEVEL cause: what a driving element puts on its circuit, in permille (a PWM
+  // stage's duty, a sensor's position, a dimmer's setting). The solver carries it onto
+  // the conductors bound with `level_from:` while their path is live. Unwritten is not
+  // zero: a level nobody has written publishes nothing.
+  bool write_element_state_level(ElementStateId id, std::uint16_t permille);
+  bool read_uint16_sample(ElementStateId id, Sample<std::uint16_t>* out) const;
 
   // Typed write accessors. Return false if the id is undeclared or
   // the declared type does not match. Any attached process may write,
@@ -489,6 +505,13 @@ class WireTable {
   //
   // Same lazy-cache-update path as has_cell, so NOT noexcept.
   bool write_gen(WireId id, std::uint32_t* out_gen) const;
+
+  // The pid of the process that last wrote a scalar cell; 0 = never written, or
+  // written by a binary that predates the stamp. False on an undeclared id or a
+  // kBitStream cell. The solver host reads it to treat a dead process's causes as
+  // released (SolverHost::step).
+  bool writer_pid(WireId id, std::uint32_t* out_pid) const;
+  bool writer_pid(ElementStateId id, std::uint32_t* out_pid) const;
 
   // ── Co-sim tick barrier (primitive-4 B) ──────────────────────────
   //

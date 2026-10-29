@@ -54,6 +54,11 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   at startup only and stays on sim time (`AmbientTempSensor::hour_of_day`);
   without a file, or when the script cannot reach the service, the almanac
   keeps its defaults.
+- [ ] **Trip-reset button and door handles press nothing on the car.**
+  electricsim has no input wire for either, so the I key, the Trip Reset and
+  door-handle UI buttons and Scenario's `ipc_trip_reset` / `door_handle_driver`
+  hooks change ev1sim state only.  Revives when electricsim declares the IPC
+  trip-reset input or a handle switch.
 
 ## ABS scenarios
 

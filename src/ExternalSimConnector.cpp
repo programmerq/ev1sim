@@ -141,7 +141,7 @@ constexpr int           kNumPrndSelector = 4;
 // Wiper/washer switch outputs (ev1sim → external sim, chassis segment).
 // Steering-column wiper/washer switch, connector 12092254 (BLACK).
 // Locked in lockstep with the external sim's chassis-signal header
-// kSigWiperSw_* = 4054-4057.  HI layers on the LOW "request" wire.
+// kSigWiperSw_* = 4054-4057, written as DRIVER_ES_WIPER_* contacts (WiperStalk pins).
 //   4054  vehicle.body.wiper_washer_switch.delay_out         (pin B, GRA 112)
 //   4055  vehicle.body.wiper_washer_switch.request_out       (pin C, DK GRN 113)
 //   4056  vehicle.body.wiper_washer_switch.hi_out            (pin D, PPL 92)
@@ -164,12 +164,9 @@ constexpr std::uint32_t kSigDriverThrottleQ8      = 6903U;
 // Brake switch (discrete bool, 0/1) — locked in lockstep with external sim
 // ev1_driver_inputs.hpp kSigDriverBrakeSwitch = 6904.
 constexpr std::uint32_t kSigDriverBrakeSwitch     = 6904U;
-// Driver seatbelt buckle — locked in lockstep with kSigDriverSeatbeltBuckled = 6964.
-constexpr std::uint32_t kSigDriverSeatbeltBuckled = 6964U;
-// Passenger seatbelt buckle — locked in lockstep with
-// kSigDriverSeatbeltBuckledPassenger = 6965 (mirrors driver).
-// TODO(consumer): IPC seatbelt-light telltale — deferred.
-constexpr std::uint32_t kSigDriverSeatbeltBuckledPassenger = 6965U;
+// Driver seat-belt switch (ID 6964 → DRIVER_ES_SEATBELT_SWITCH): the contact
+// is closed while the belt is UNBUCKLED.  The car has no passenger belt switch.
+constexpr std::uint32_t kSigDriverSeatbeltSwitch = 6964U;
 // Turn/hazard combination-switch CHASSIS cavities (chassis segment), locked in
 // lockstep with external sim kSigTurnHazSw_* = 4043-4046 (connector 12092237).
 // LHJB consumes these directly (turn left/right + hazard + the single horn
@@ -196,19 +193,6 @@ constexpr std::uint32_t kSigDriverRsaKeypadButton5 = 6979U;  // "9/0" button (ta
 constexpr std::uint32_t kSigDriverRsaModeSwLock    = 6972U;
 constexpr std::uint32_t kSigDriverRsaModeSwOffAcc  = 6973U;
 constexpr std::uint32_t kSigDriverRsaModeSwRun     = 6974U;
-// IPC trip-reset (ID 6952), locked in lockstep with external sim
-// kSigDriverIpcTripResetButton = 6952.  (The cruise stalk formerly published
-// pre-decoded pulses 6953-6957 here; it now publishes the raw chassis cavities
-// kSigCruiseSw_* (4047-4049) below — the same edge model as wiper/turn-hazard.)
-constexpr std::uint32_t kSigDriverIpcTripResetButton = 6952U;
-// Wiper/washer switch CHASSIS cavities, locked in lockstep with external sim
-// kSigWiperSw_* = 4054-4057. ev1sim computes these raw contacts from the
-// detent enum (driver_wiper_switch) and publishes them on the chassis segment;
-// RHJB's WSW decoder turns them back into OFF/INT/LOW/HIGH (ESM p.511).
-constexpr std::uint32_t kSigWiperSw_DelayOut          = 4054U;  // INT detent
-constexpr std::uint32_t kSigWiperSw_RequestOut        = 4055U;  // any on-state
-constexpr std::uint32_t kSigWiperSw_HiOut             = 4056U;  // HIGH detent
-constexpr std::uint32_t kSigWiperSw_WasherSwitchOut   = 4057U;  // wash button
 // Cruise-control switch CHASSIS cavities, locked in lockstep with external sim
 // kSigCruiseSw_{SetCoast,ResumeAccel,OnOff}Out = 4047/4048/4049 (circuits
 // 84/87/397 -> PIM J1).  ev1sim opens/closes these raw contacts from the
@@ -220,7 +204,6 @@ constexpr std::uint32_t kSigWiperSw_WasherSwitchOut   = 4057U;  // wash button
 constexpr std::uint32_t kSigCruiseSw_SetCoastOut    = 4047U;  // ckt 84,  PIM J1 pin 9
 constexpr std::uint32_t kSigCruiseSw_ResumeAccelOut = 4048U;  // ckt 87,  PIM J1 pin 25
 constexpr std::uint32_t kSigCruiseSw_OnOffOut       = 4049U;  // ckt 397, PIM J1 pin 10
-constexpr int           kNumNewDriverInputs         = 1;  // ipc trip-reset (6952) only
 // Power window switch signals (momentary bool, held while pressed).
 // Locked in lockstep with external sim kSigDriverPowerWindow* = 6980-6983.
 // consumer = RSA (window-motor logic), future round.
@@ -230,32 +213,18 @@ constexpr std::uint32_t kSigDriverPowerWindowPassengerUp   = 6982U;
 constexpr std::uint32_t kSigDriverPowerWindowPassengerDown = 6983U;
 constexpr int           kNumPowerWindowInputs              = 4;
 
-// RSA exterior pillar keypad signals (momentary uint8, 0=idle/1=tap/2=long).
-// Locked in lockstep with external sim kSigDriverRsaExteriorKeypad[1..5] = 6985-6989.
-// Same Option A encoding as interior keypad (6975-6979).
-// consumer = RSA exterior keypad logic, future round.
+// RSA exterior pillar keypad buttons (IDs 6985-6989 → DRIVER_ES_EXT_KEYPAD_1..5):
+// one held contact per button; the RSA times tap against long press.
 constexpr std::uint32_t kSigDriverRsaExteriorKeypad1 = 6985U;
 constexpr std::uint32_t kSigDriverRsaExteriorKeypad2 = 6986U;
 constexpr std::uint32_t kSigDriverRsaExteriorKeypad3 = 6987U;
 constexpr std::uint32_t kSigDriverRsaExteriorKeypad4 = 6988U;
 constexpr std::uint32_t kSigDriverRsaExteriorKeypad5 = 6989U;
-// Door handle pull attempt signals (momentary bool 0=idle, 1=pulled this tick).
-// Locked in lockstep with external sim kSigDriverDoorHandleAttempt{Driver,Passenger}
-// = 6990-6991.  consumer = RSA (decides if door unlocks).
-constexpr std::uint32_t kSigDriverDoorHandleAttemptDriver    = 6990U;
-constexpr std::uint32_t kSigDriverDoorHandleAttemptPassenger = 6991U;
-constexpr int           kNumExteriorKeypadInputs             = 7;  // 5 buttons + 2 handles
+constexpr int           kNumExteriorKeypadInputs     = 5;
 
-// Number of driver-input endpoints on the main harness segment.
-// 6900, 6901, 6902, 6903, 6904, 6964, 6965,
-// 6972, 6973, 6974, 6975, 6976, 6977, 6978, 6979,
-// 6952,
-// 6980, 6981, 6982, 6983,
-// 6985, 6986, 6987, 6988, 6989, 6990, 6991 = 27 total.
-// (6970 is reserved; not registered as an endpoint.  Turn/hazard 6944/6948/6949,
-//  wiper 6958/6959, and cruise 6953-6957 moved to chassis switch cavities.)
-constexpr int kNumPassengerSeatbelt = 1;  // passenger seatbelt (6965)
-constexpr int kNumDriverInputs = 14 + kNumNewDriverInputs + kNumPowerWindowInputs + kNumExteriorKeypadInputs + kNumPassengerSeatbelt;  // 14 base (3 RSA mode buttons): turn/hazard (6944/6948/6949) + cruise (6953-6957) moved to chassis cavities
+// Number of driver-input endpoints on the main harness segment:
+// 6900-6904, 6964, 6972-6979 (14 base), 6980-6983, 6985-6989 = 23 total.
+constexpr int kNumDriverInputs = 14 + kNumPowerWindowInputs + kNumExteriorKeypadInputs;
 
 // Motor state signals on the chassis segment (ev1sim → external sim, float32 LE).
 //   4070  vehicle.dynamics.motor_rpm          motor shaft RPM
@@ -432,15 +401,6 @@ constexpr int           kNumDoorLockStateSignals   = 3;
 // Level signal: 1 while the PRND selector holds a non-PARK request without brake; 0 otherwise.
 constexpr std::uint32_t kSigRsaShiftBlocked = 4088U;
 constexpr int           kNumRsaShiftBlockedSignals = 1;
-
-// BTCM retard-request PWM duty (the external BTCM → ev1sim, chassis segment).
-//   4191  vehicle.chassis.btcm.retard_request_duty_q8  uint16 Q8 % (0..25600)
-// This is the BTCM asking the propulsion side to dissipate torque as generator
-// regen (@source:manual brakes-313 REGENERATIVE BRAKING SYSTEM; the PIM reads
-// the same wire at J1-18 RETARD REQUEST IN). ev1sim subscribes so an acceptance
-// scenario can witness that regen was COMMANDED — a deceleration trace alone
-// cannot distinguish regen from friction braking.
-constexpr std::uint32_t kSigBtcmRetardRequestDutyQ8 = 4191U;
 
 // TJB rear-lamp branches (the external TJB → ev1sim, chassis segment).
 //   4198/4199  tail lamps L/R    4203/4204  stop lamps L/R
@@ -636,32 +596,29 @@ constexpr std::uint32_t kSigExtVehiclePoseYawRad      = 6932U;
 constexpr std::uint32_t kSigDriverHeadlightSwitch     = 6942U;
 constexpr std::uint32_t kSigDriverHeadlightDimRequest = 6943U;
 constexpr std::uint32_t kSigDriverTelltaleTestRequest = 6945U;
-constexpr std::uint32_t kSigDriverParkBrakeSetRequest = 6946U;
-constexpr std::uint32_t kSigDriverParkBrakeReleaseRequest = 6947U;
+// Park-brake push button (6946 → DRIVER_ES_PARK_BRAKE_SWITCH): held while pushed;
+// the BTCM toggles the brake on each push.
+constexpr std::uint32_t kSigDriverParkBrakeSwitch     = 6946U;
 // Discrete sensors — see the external sim's 3D-sim signal contract §1.4.
 constexpr std::uint32_t kSigSensorDoorOpenDriver      = 6960U;
 constexpr std::uint32_t kSigSensorDoorOpenPassenger   = 6961U;
 constexpr std::uint32_t kSigSensorHoodOpen            = 6962U;
 constexpr std::uint32_t kSigSensorTrunkOpen           = 6963U;
 constexpr std::uint32_t kSigSensorKeyPosition         = 6966U;
-constexpr int kNumExtContractSignals = 16;  // was 18; horn 6940/6941 removed (now chassis cavity 4046)
+constexpr int kNumExtContractSignals = 15;
 
-// BTCM per-wheel actuator state published on the chassis bus (IDs 4147-4154).
-// These mirror the legacy main-harness publications above but live on the
-// public chassis-bus segment that is ev1sim's primary input fabric.  Both
-// sources stream in parallel; the consumers in this file prefer chassis-bus
-// values whenever they have ever been observed for a given wheel, and fall
-// back to the main-harness equivalents otherwise.  Registered as input
+// BTCM per-wheel actuator state published on the chassis bus (IDs 4147/4148
+// iso valves, 4153/4154 cylinder pressure).  The consumers in this file prefer
+// chassis-bus values whenever they have ever been observed for a given wheel,
+// and fall back to the main-harness equivalents otherwise.  Registered as input
 // endpoints so the standard chassis-bus drain picks them up via FindEndpoint.
+// The brake motors' leads have no signal id; Tick reads them off the wire
+// (WireTruthChassis::btcm_motor_leads).
 constexpr std::uint32_t kSigChassisBtcmIsoCloseFL        = 4147U;
 constexpr std::uint32_t kSigChassisBtcmIsoCloseFR        = 4148U;
-constexpr std::uint32_t kSigChassisBtcmDumpOpenFL        = 4149U;
-constexpr std::uint32_t kSigChassisBtcmDumpOpenFR        = 4150U;
-constexpr std::uint32_t kSigChassisBtcmEmbMotorCmdLR     = 4151U;
-constexpr std::uint32_t kSigChassisBtcmEmbMotorCmdRR     = 4152U;
 constexpr std::uint32_t kSigChassisBtcmCylPressureFL_kPa = 4153U;
 constexpr std::uint32_t kSigChassisBtcmCylPressureFR_kPa = 4154U;
-constexpr int kNumBtcmActuatorChassisSignals = 8;
+constexpr int kNumBtcmActuatorChassisSignals = 4;
 
 // Mapping from signal slot (kBulbCmdBase + slot) to LightID.  Order must stay
 // locked to the electric sim's LightIdx enum for the first 17 entries.
@@ -767,12 +724,9 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // kNumDriverInputs covers all driver inputs on the main harness segment,
 // all output from ev1sim:
 //   6900 brake_pedal_q8, 6901 steering_deg_q8, 6902 gear_selector,
-//   6903 throttle_q8, 6904 brake_switch, 6944 hazard_request,
-//   6948 turn_signal_left, 6949 turn_signal_right, 6964 seatbelt_buckled,
-//   6972-6974 rsa_mode_sw_{lock,off_acc,run},
-//   6975 rsa_keypad_button1, 6976..6979 (buttons 2-5)  (17 total).
-//   + 1 new: 6952 ipc_trip_reset.  (Cruise 6953-6957 and wiper 6958/6959 moved
-//     to the chassis switch cavities below.)
+//   6903 throttle_q8, 6904 brake_switch,
+//   6964 seatbelt_switch, 6972-6974 rsa_mode_sw_{lock,off_acc,run},
+//   6975 rsa_keypad_button1, 6976..6979 (buttons 2-5).
 //   + 4 new: 6980-6983 power window switches (driver up/down, passenger up/down).
 // (Slot 6970 is reserved; not registered.)
 // +1 for the charge coupler presence (ID 4060, chassis segment).
@@ -789,7 +743,7 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // +kNumIpcBtcmTelltaleSignals for IPC BTCM/airbag telltales (4134–4138) — IPC → ev1sim.
 // +kNumIpcExtraTelltaleSignals for IPC extra LCD telltales (4140–4145) — IPC → ev1sim.
 // +kNumBtcmActuatorChassisSignals for the BTCM per-wheel actuator state
-//   on the chassis bus (4147-4154) — BTCM → ev1sim, parallel to the
+//   on the chassis bus (4147/4148, 4153/4154) — BTCM → ev1sim, parallel to the
 //   legacy main-harness 5010-5015 path.
 // +kNumExtContractSignals for the 3D-sim integration contract publish
 //   (6920-6932 physics telemetry + 6960-6963 cabin sensors) on the main
@@ -1027,28 +981,15 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.body.door_lock_state.passenger", "door_lock_state_passenger", false};
     out[i++] = {kSigDoorLockStateTrunk,
                 "vehicle.body.door_lock_state.trunk", "door_lock_state_trunk", false};
-    // BTCM per-wheel actuator state (BTCM → ev1sim, chassis segment, input_to_sim=true).
-    // Mirror of the legacy main-harness publications 5010-5015 plus two
-    // new per-wheel cylinder pressure measurements (4153/4154) with no
-    // main-harness equivalent.
+    // BTCM per-wheel actuator state (BTCM → ev1sim, chassis segment, input_to_sim=true):
+    // the front iso valves, and the per-wheel cylinder pressures (4153/4154)
+    // with no main-harness equivalent.
     out[i++] = {kSigChassisBtcmIsoCloseFL,
                 "vehicle.btcm.iso_close.fl",
                 "btcm_iso_close_fl", true};
     out[i++] = {kSigChassisBtcmIsoCloseFR,
                 "vehicle.btcm.iso_close.fr",
                 "btcm_iso_close_fr", true};
-    out[i++] = {kSigChassisBtcmDumpOpenFL,
-                "vehicle.btcm.dump_open.fl",
-                "btcm_dump_open_fl", true};
-    out[i++] = {kSigChassisBtcmDumpOpenFR,
-                "vehicle.btcm.dump_open.fr",
-                "btcm_dump_open_fr", true};
-    out[i++] = {kSigChassisBtcmEmbMotorCmdLR,
-                "vehicle.btcm.emb_motor_cmd.lr",
-                "btcm_emb_motor_cmd_lr", true};
-    out[i++] = {kSigChassisBtcmEmbMotorCmdRR,
-                "vehicle.btcm.emb_motor_cmd.rr",
-                "btcm_emb_motor_cmd_rr", true};
     out[i++] = {kSigChassisBtcmCylPressureFL_kPa,
                 "vehicle.btcm.cyl_pressure.fl_kpa",
                 "btcm_cyl_pressure_fl_kpa", true};
@@ -1072,11 +1013,8 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.driver.throttle_q8", "driver_throttle_q8", false};
     out[i++] = {kSigDriverBrakeSwitch,
                 "vehicle.driver.brake_switch", "driver_brake_switch", false};
-    out[i++] = {kSigDriverSeatbeltBuckled,
-                "vehicle.driver.seatbelt_buckled", "driver_seatbelt_buckled", false};
-    out[i++] = {kSigDriverSeatbeltBuckledPassenger,
-                "vehicle.driver.seatbelt_buckled_passenger",
-                "driver_seatbelt_buckled_passenger", false};
+    out[i++] = {kSigDriverSeatbeltSwitch,
+                "vehicle.driver.seatbelt_switch", "driver_seatbelt_switch", false};
     out[i++] = {kSigTurnHazSw_HazardOut,
                 "vehicle.driver.hazard_contact", "hazard_contact", false};
     out[i++] = {kSigTurnHazSw_LeftTurnOut,
@@ -1101,11 +1039,7 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.driver.rsa_keypad_button4", "driver_rsa_keypad_button4", false};
     out[i++] = {kSigDriverRsaKeypadButton5,
                 "vehicle.driver.rsa_keypad_button5", "driver_rsa_keypad_button5", false};
-    // New driver input: IPC trip-reset (6952).  Cruise stalk publishes as
-    // chassis cavities kSigCruiseSw_* (4047-4049); wiper/washer as kSigWiperSw_*
-    // (4054-4057), both below.
-    out[i++] = {kSigDriverIpcTripResetButton,
-                "vehicle.driver.ipc_trip_reset_button", "driver_ipc_trip_reset", false};
+    // Cruise stalk contacts (4047-4049) and wiper/washer contacts (4054-4057).
     // Cruise-control switch cavities (4047-4049) — raw contacts; PIM decodes.
     out[i++] = {kSigCruiseSw_SetCoastOut,
                 "vehicle.driver.cruise_set_coast_contact", "cruise_set_coast_contact", false};
@@ -1113,13 +1047,13 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.driver.cruise_resume_accel_contact", "cruise_resume_accel_contact", false};
     out[i++] = {kSigCruiseSw_OnOffOut,
                 "vehicle.driver.cruise_on_off_contact", "cruise_on_off_contact", false};
-    out[i++] = {kSigWiperSw_DelayOut,
+    out[i++] = {kWiperSwDelayOutId,
                 "vehicle.driver.wiper_delay_contact", "wiper_delay_contact", false};
-    out[i++] = {kSigWiperSw_RequestOut,
+    out[i++] = {kWiperSwRequestOutId,
                 "vehicle.driver.wiper_request_contact", "wiper_request_contact", false};
-    out[i++] = {kSigWiperSw_HiOut,
+    out[i++] = {kWiperSwHiOutId,
                 "vehicle.driver.wiper_hi_contact", "wiper_hi_contact", false};
-    out[i++] = {kSigWiperSw_WasherSwitchOut,
+    out[i++] = {kWiperSwWasherSwitchOutId,
                 "vehicle.driver.washer_switch_contact", "washer_switch_contact", false};
     // Power window switch signals (6980-6983) — momentary bool, held while pressed.
     // No keyboard binding; floating UI will drive press()/release() when it lands.
@@ -1136,8 +1070,7 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     out[i++] = {kSigDriverPowerWindowPassengerDown,
                 "vehicle.driver.power_window_passenger_down",
                 "power_window_passenger_down", false};
-    // RSA exterior pillar keypad (6985-6989) — momentary uint8 Option A encoding.
-    // consumer = RSA exterior keypad logic, future round.
+    // RSA exterior pillar keypad (6985-6989) — held contacts.
     out[i++] = {kSigDriverRsaExteriorKeypad1,
                 "vehicle.driver.rsa_exterior_keypad1", "rsa_exterior_keypad1", false};
     out[i++] = {kSigDriverRsaExteriorKeypad2,
@@ -1148,14 +1081,6 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.driver.rsa_exterior_keypad4", "rsa_exterior_keypad4", false};
     out[i++] = {kSigDriverRsaExteriorKeypad5,
                 "vehicle.driver.rsa_exterior_keypad5", "rsa_exterior_keypad5", false};
-    // Door handle pull attempt signals (6990-6991) — momentary bool.
-    // consumer = RSA (decides if door unlocks), future round.
-    out[i++] = {kSigDriverDoorHandleAttemptDriver,
-                "vehicle.driver.door_handle_attempt_driver",
-                "door_handle_attempt_driver", false};
-    out[i++] = {kSigDriverDoorHandleAttemptPassenger,
-                "vehicle.driver.door_handle_attempt_passenger",
-                "door_handle_attempt_passenger", false};
     // 3D-sim integration contract publishes — main harness segment,
     // ev1sim → external sim, all output (input_to_sim=false).
     // PROPOSED in the external sim's 3D-sim signal contract; consumers TBD.
@@ -1200,12 +1125,9 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     out[i++] = {kSigDriverTelltaleTestRequest,
                 "vehicle.driver.telltale_test_request",
                 "ext_telltale_test_request", false};
-    out[i++] = {kSigDriverParkBrakeSetRequest,
-                "vehicle.driver.park_brake_set_request",
-                "ext_park_brake_set_request", false};
-    out[i++] = {kSigDriverParkBrakeReleaseRequest,
-                "vehicle.driver.park_brake_release_request",
-                "ext_park_brake_release_request", false};
+    out[i++] = {kSigDriverParkBrakeSwitch,
+                "vehicle.driver.park_brake_switch",
+                "ext_park_brake_switch", false};
     // Discrete sensors (3D-sim contract §1.4) — key position.
     out[i++] = {kSigSensorKeyPosition,
                 "vehicle.sensor.key_position",
@@ -1261,7 +1183,7 @@ struct ExternalSimConnector::State {
     std::int8_t sensor_hood_open_pub           = -1;
     std::int8_t sensor_trunk_open_pub          = -1;
 
-    // 3D-sim contract buttons/discretes (6942-6947, 6966).
+    // 3D-sim contract buttons/discretes (6942-6946, 6966).
     // Values latched via the SetDriver*Request / SetSensor* setters and
     // published on change in the main-harness Tick block.
     // (Horn 6940/6941 removed — collapsed to the single chassis horn cavity
@@ -1269,14 +1191,12 @@ struct ExternalSimConnector::State {
     std::uint8_t ext_headlight_switch           = 0;   // 0=OFF, 1=PARK, 2=ON, 3=HI
     bool         ext_headlight_dim_request      = false;
     bool         ext_telltale_test_request      = false;
-    bool         ext_park_brake_set_request     = false;
-    bool         ext_park_brake_release_request = false;
+    bool         ext_park_brake_switch          = false;
     std::uint8_t ext_key_position               = 2;   // default RUN — see note in setter
     std::int8_t  ext_headlight_switch_pub   = -1;
     std::int8_t  ext_headlight_dim_pub      = -1;
     std::int8_t  ext_telltale_test_pub      = -1;
-    std::int8_t  ext_park_brake_set_pub     = -1;
-    std::int8_t  ext_park_brake_release_pub = -1;
+    std::int8_t  ext_park_brake_switch_pub  = -1;
     std::int8_t  ext_key_position_pub       = -1;
 
     // Combination switch pin outputs — latched by SetCombSwOutputs(), published
@@ -1331,14 +1251,12 @@ struct ExternalSimConnector::State {
     // Fault injection: omit the throttle delta from the driver-input group
     // while set (SetSuppressThrottlePublish — VAT safety scenarios).
     bool          suppress_throttle_publish = false;
-    // New discrete driver inputs (ID 6904, 6964, 6965) on the main harness segment.
+    // Discrete driver inputs (ID 6904, 6964) on the main harness segment.
     bool          driver_brake_switch                = false;
     bool          driver_seatbelt_buckled            = true;   // default: always buckled
-    bool          driver_seatbelt_buckled_passenger  = true;   // default: always buckled
     // Published sentinels (use 0xFF-equivalent to force first publish).
     std::int8_t   driver_brake_switch_pub               = -1;  // -1 forces first publish
     std::int8_t   driver_seatbelt_buckled_pub           = -1;  // -1 forces first publish
-    std::int8_t   driver_seatbelt_buckled_passenger_pub = -1;  // -1 forces first publish
 
     // Turn signal stalk and hazard switch (IDs 6948, 6949, 6944).
     bool          driver_turn_left        = false;
@@ -1358,27 +1276,16 @@ struct ExternalSimConnector::State {
     std::int8_t   driver_rsa_btn_pub[5]   = {-1,-1,-1,-1,-1};
     std::int8_t   driver_rsa_mode_sw_pub[3] = {-1,-1,-1};  // LOCK, OFF/ACC, RUN
 
-    // New driver input: IPC trip-reset (6952) — momentary bool.  The wiper
-    // detent is held as a uint8 enum (driver_wiper_switch) and PUBLISHED as the
-    // raw chassis cavities kSigWiperSw_* (4054-4057).
-    bool          driver_ipc_trip_reset   = false;
     // Cruise-control switch raw contacts (kSigCruiseSw_* 4047-4049): held bools
     // driven by the keyboard/UI cruise stalk.  ev1sim does NOT pre-decode; PIM's
     // tap/hold decoder turns these into SET/RESUME/SPEED_*/CANCEL.
     bool          cruise_set_coast_contact    = false;
     bool          cruise_resume_accel_contact = false;
     bool          cruise_on_off_contact       = false;
-    std::uint8_t  driver_wiper_switch     = 0;   // 0=OFF, 1=INT, 2=LOW, 3=HIGH
-    bool          driver_wiper_wash       = false;
     // Published sentinels (-1 forces first publish for bool signals).
-    std::int8_t   driver_ipc_trip_reset_pub    = -1;
     std::int8_t   cruise_set_coast_pub         = -1;
     std::int8_t   cruise_resume_accel_pub      = -1;
     std::int8_t   cruise_on_off_pub            = -1;
-    std::int8_t   driver_wiper_delay_pub       = -1;   // kSigWiperSw_DelayOut   (4054)
-    std::int8_t   driver_wiper_request_pub     = -1;   // kSigWiperSw_RequestOut (4055)
-    std::int8_t   driver_wiper_hi_pub          = -1;   // kSigWiperSw_HiOut      (4056)
-    std::int8_t   driver_wiper_wash_pub        = -1;   // kSigWiperSw_WasherSwitchOut (4057)
 
     // Power window switch states (IDs 6980-6983, main harness segment).
     // Momentary bools (0=released, 1=held this tick).
@@ -1392,18 +1299,9 @@ struct ExternalSimConnector::State {
     std::int8_t   driver_pw_passenger_up_pub  = -1;
     std::int8_t   driver_pw_passenger_down_pub = -1;
 
-    // RSA exterior pillar keypad (IDs 6985-6989, main harness segment).
-    // Momentary uint8 (0=idle, 1=tap, 2=long-press).
-    // consumer = RSA exterior keypad logic, future round.
-    std::uint8_t  driver_ext_keypad[5]     = {};
+    // RSA exterior pillar keypad (IDs 6985-6989): held contacts.
+    bool          driver_ext_keypad[5]     = {};
     std::int8_t   driver_ext_keypad_pub[5] = {-1,-1,-1,-1,-1};
-
-    // Door handle attempt signals (IDs 6990-6991, main harness segment).
-    // Momentary bool (0=idle, 1=handle pulled this tick).
-    bool          driver_door_handle_driver         = false;
-    bool          driver_door_handle_passenger      = false;
-    std::int8_t   driver_door_handle_driver_pub     = -1;
-    std::int8_t   driver_door_handle_passenger_pub  = -1;
 
     // Motor state (IDs 4070-4071, chassis segment).
     // Publish-on-change with small epsilon thresholds.
@@ -1534,8 +1432,8 @@ struct ExternalSimConnector::State {
     // PIM coast-down drag (CHASSIS_PIM_COAST_DRAG_NM), Nm at the shaft.
     float         pim_coast_drag_nm               = 0.0f;
     bool          has_pim_coast_drag_nm           = false;
-    // BTCM front modulator motor commands (CHASSIS_BTCM_FRONT_MOTOR_CMD_FL/FR),
-    // signed: +1 restore, -1 release, 0 neither.
+    // BTCM front modulator motors, from their restore and release leads:
+    // +1 restore, -1 release, 0 neither.
     float         btcm_front_motor_fl             = 0.0f;
     float         btcm_front_motor_fr             = 0.0f;
     std::uint8_t  wiper_sweep_position_pct        = 0u;
@@ -1572,10 +1470,10 @@ struct ExternalSimConnector::State {
     bool          rsa_shift_blocked       = false;
     bool          has_rsa_shift_blocked   = false;
 
-    // BTCM retard-request duty (ID 4191, chassis segment) — received from BTCM.
-    // uint16 Q8 percent, 0..25600.  0 until first received.
-    std::uint16_t btcm_retard_request_duty_q8     = 0u;
-    bool          has_btcm_retard_request_duty    = false;
+    // The retard-request line at the PIM (PIM_RETARD_REQUEST_IN), permille
+    // duty.  0 until first received.
+    std::uint16_t retard_request_permille         = 0u;
+    bool          has_retard_request_permille     = false;
 
     // TJB rear-lamp branches (IDs 4198/4199 tail, 4203/4204 stop) — from TJB.
     // bool: true = the trunk junction block is feeding that lamp.
@@ -1689,32 +1587,61 @@ struct ExternalSimConnector::State {
     std::uint64_t rear_motor_lr_ns        = 0;
     std::uint64_t rear_motor_rr_ns        = 0;
 
-    // BTCM per-wheel actuator state on the chassis bus (IDs 4147-4154).
-    // Parallel to the main-harness 5010-5015 publications above.  When
-    // the chassis-bus value has ever been observed for a given wheel
-    // (chassis_*_ns != 0), the AbsPhaseFront / RearEmbCmd consumers
-    // prefer it over the main-harness equivalent.  Liveness is still
-    // gated by the BTCM canonical-frame heartbeat (5050) because the
-    // chassis-bus signals are also on-change publications.
+    // BTCM per-wheel actuator state on the chassis bus: the front iso valves
+    // (4147/4148), the front modulator motors' release leads and the rear
+    // apply motors' commands (from their leads), and the front cylinder
+    // pressures (4153/4154).  When the chassis-bus value has ever been
+    // observed for a given wheel (chassis_*_ns != 0), the AbsPhaseFront /
+    // RearEmbCmd consumers prefer it over the main-harness equivalent.
+    // Liveness is still gated by the BTCM canonical-frame heartbeat (5050)
+    // because the chassis-bus signals are also on-change publications.
     //
     // 4153/4154 (cylinder pressure FL/FR, kPa) have no main-harness
     // equivalent; they are exposed via GetFrontWheelCylinderPressuresKpa.
     bool          chassis_btcm_iso_close_fl    = false;
     bool          chassis_btcm_iso_close_fr    = false;
-    bool          chassis_btcm_dump_open_fl    = false;
-    bool          chassis_btcm_dump_open_fr    = false;
+    bool          chassis_btcm_front_release_fl = false;
+    bool          chassis_btcm_front_release_fr = false;
     float         chassis_btcm_emb_motor_lr    = 0.0f;
     float         chassis_btcm_emb_motor_rr    = 0.0f;
     float         chassis_btcm_cyl_press_fl_kpa = 0.0f;
     float         chassis_btcm_cyl_press_fr_kpa = 0.0f;
     std::uint64_t chassis_btcm_iso_close_fl_ns = 0;
     std::uint64_t chassis_btcm_iso_close_fr_ns = 0;
-    std::uint64_t chassis_btcm_dump_open_fl_ns = 0;
-    std::uint64_t chassis_btcm_dump_open_fr_ns = 0;
+    std::uint64_t chassis_btcm_front_release_fl_ns = 0;
+    std::uint64_t chassis_btcm_front_release_fr_ns = 0;
     std::uint64_t chassis_btcm_emb_motor_lr_ns = 0;
     std::uint64_t chassis_btcm_emb_motor_rr_ns = 0;
     std::uint64_t chassis_btcm_cyl_press_fl_ns = 0;
     std::uint64_t chassis_btcm_cyl_press_fr_ns = 0;
+
+    // A brake motor's two leads: a front modulator's restore and release, a
+    // rear apply motor's apply and release. Each motor runs toward whichever
+    // lead drives it.
+    void apply_btcm_motor_leads(BrakeMotor motor, bool drive, bool release) {
+        const float cmd = (drive ? 1.0f : 0.0f) - (release ? 1.0f : 0.0f);
+        const std::uint64_t t = now_ns();
+        switch (motor) {
+            case BrakeMotor::FrontLeft:
+                btcm_front_motor_fl              = cmd;
+                chassis_btcm_front_release_fl    = release;
+                chassis_btcm_front_release_fl_ns = t;
+                break;
+            case BrakeMotor::FrontRight:
+                btcm_front_motor_fr              = cmd;
+                chassis_btcm_front_release_fr    = release;
+                chassis_btcm_front_release_fr_ns = t;
+                break;
+            case BrakeMotor::RearLeft:
+                chassis_btcm_emb_motor_lr    = cmd;
+                chassis_btcm_emb_motor_lr_ns = t;
+                break;
+            case BrakeMotor::RearRight:
+                chassis_btcm_emb_motor_rr    = cmd;
+                chassis_btcm_emb_motor_rr_ns = t;
+                break;
+        }
+    }
 
     // Charge coupler presence (ID 4060, chassis segment).
     // Stubbed false; future floating-UI panel or charge-door animation updates this.
@@ -1976,10 +1903,12 @@ bool ExternalSimConnector::HasReceivedRsaShiftBlocked() const {
 }
 
 std::uint16_t ExternalSimConnector::GetBtcmRetardRequestDutyQ8() const {
-    return m_state->btcm_retard_request_duty_q8;
+    // permille -> Q8 percent: permille / 10 * 256.
+    return static_cast<std::uint16_t>(
+        std::min<std::uint32_t>(m_state->retard_request_permille, 1000u) * 256u / 10u);
 }
 bool ExternalSimConnector::HasReceivedBtcmRetardRequestDuty() const {
-    return m_state->has_btcm_retard_request_duty;
+    return m_state->has_retard_request_permille;
 }
 
 bool ExternalSimConnector::GetTjbLampBranch(int branch) const {
@@ -2396,10 +2325,6 @@ void ExternalSimConnector::SetDriverSeatbeltBuckled(bool buckled) {
     m_state->driver_seatbelt_buckled = buckled;
 }
 
-void ExternalSimConnector::SetDriverSeatbeltBuckledPassenger(bool buckled) {
-    m_state->driver_seatbelt_buckled_passenger = buckled;
-}
-
 void ExternalSimConnector::SetDriverTurnSignalLeft(bool active) {
     m_state->driver_turn_left = active;
 }
@@ -2447,10 +2372,6 @@ void ExternalSimConnector::SetDriverRsaModeSwitches(std::uint8_t mask) {
     m_state->driver_rsa_mode_switches = static_cast<std::uint8_t>(mask & 0x07u);
 }
 
-void ExternalSimConnector::SetDriverIpcTripReset(bool pressed) {
-    m_state->driver_ipc_trip_reset = pressed;
-}
-
 void ExternalSimConnector::SetCruiseSetCoastContact(bool closed) {
     m_state->cruise_set_coast_contact = closed;
 }
@@ -2463,16 +2384,8 @@ void ExternalSimConnector::SetCruiseOnOffContact(bool closed) {
     m_state->cruise_on_off_contact = closed;
 }
 
-void ExternalSimConnector::SetDriverWiperSwitch(std::uint8_t position) {
-    m_state->driver_wiper_switch = position;
-}
-
-void ExternalSimConnector::SetDriverWiperWashRequest(bool pressed) {
-    m_state->driver_wiper_wash = pressed;
-}
-
 // ---------------------------------------------------------------------------
-// 3D-sim contract buttons / discrete sensors (6942-6947, 6966).
+// 3D-sim contract buttons / discrete sensors (6942-6946, 6966).
 // (Horn 6940/6941 removed — see SetTurnHazSwOutputs / chassis horn cavity 4046.)
 // ---------------------------------------------------------------------------
 void ExternalSimConnector::SetDriverHeadlightSwitch(std::uint8_t position) {
@@ -2485,11 +2398,8 @@ void ExternalSimConnector::SetDriverHeadlightDimRequest(bool held) {
 void ExternalSimConnector::SetDriverTelltaleTestRequest(bool pressed) {
     m_state->ext_telltale_test_request = pressed;
 }
-void ExternalSimConnector::SetDriverParkBrakeSetRequest(bool pressed) {
-    m_state->ext_park_brake_set_request = pressed;
-}
-void ExternalSimConnector::SetDriverParkBrakeReleaseRequest(bool pressed) {
-    m_state->ext_park_brake_release_request = pressed;
+void ExternalSimConnector::SetDriverParkBrakeSwitch(bool pushed) {
+    m_state->ext_park_brake_switch = pushed;
 }
 void ExternalSimConnector::SetSensorKeyPosition(std::uint8_t position) {
     m_state->ext_key_position = (position <= 3) ? position : 2;
@@ -2511,33 +2421,26 @@ void ExternalSimConnector::SetDriverPowerWindowPassengerDown(bool held) {
     m_state->driver_pw_passenger_down = held;
 }
 
-void ExternalSimConnector::SetDriverRsaExteriorKeypad1(std::uint8_t value) {
-    m_state->driver_ext_keypad[0] = value;
+void ExternalSimConnector::SetDriverRsaExteriorKeypad1(bool held) {
+    m_state->driver_ext_keypad[0] = held;
 }
 
-void ExternalSimConnector::SetDriverRsaExteriorKeypad2(std::uint8_t value) {
-    m_state->driver_ext_keypad[1] = value;
+void ExternalSimConnector::SetDriverRsaExteriorKeypad2(bool held) {
+    m_state->driver_ext_keypad[1] = held;
 }
 
-void ExternalSimConnector::SetDriverRsaExteriorKeypad3(std::uint8_t value) {
-    m_state->driver_ext_keypad[2] = value;
+void ExternalSimConnector::SetDriverRsaExteriorKeypad3(bool held) {
+    m_state->driver_ext_keypad[2] = held;
 }
 
-void ExternalSimConnector::SetDriverRsaExteriorKeypad4(std::uint8_t value) {
-    m_state->driver_ext_keypad[3] = value;
+void ExternalSimConnector::SetDriverRsaExteriorKeypad4(bool held) {
+    m_state->driver_ext_keypad[3] = held;
 }
 
-void ExternalSimConnector::SetDriverRsaExteriorKeypad5(std::uint8_t value) {
-    m_state->driver_ext_keypad[4] = value;
+void ExternalSimConnector::SetDriverRsaExteriorKeypad5(bool held) {
+    m_state->driver_ext_keypad[4] = held;
 }
 
-void ExternalSimConnector::SetDriverDoorHandleAttemptDriver(bool attempted) {
-    m_state->driver_door_handle_driver = attempted;
-}
-
-void ExternalSimConnector::SetDriverDoorHandleAttemptPassenger(bool attempted) {
-    m_state->driver_door_handle_passenger = attempted;
-}
 
 void ExternalSimConnector::SetMotorRpm(float rpm) {
     m_state->motor_rpm = rpm;
@@ -2594,7 +2497,7 @@ ExternalSimConnector::AbsPhaseFront ExternalSimConnector::GetAbsPhaseFront(
     // phase data before any has arrived.
     //
     // Source preference: BTCM publishes the same actuator state on
-    // two segments — chassis bus (4147-4150) and main harness
+    // two segments — chassis side (iso 4147/4148 + motor leads) and main harness
     // (5010-5013).  We prefer chassis-bus values per-wheel: if any
     // chassis-bus update has arrived for that wheel (either iso or
     // dump timestamp != 0), the chassis source is authoritative.
@@ -2637,10 +2540,10 @@ ExternalSimConnector::AbsPhaseFront ExternalSimConnector::GetAbsPhaseFront(
     // try main-harness; otherwise stale-APPLY.
     const bool fl_chassis_seen =
         (st.chassis_btcm_iso_close_fl_ns != 0) ||
-        (st.chassis_btcm_dump_open_fl_ns != 0);
+        (st.chassis_btcm_front_release_fl_ns != 0);
     const bool fr_chassis_seen =
         (st.chassis_btcm_iso_close_fr_ns != 0) ||
-        (st.chassis_btcm_dump_open_fr_ns != 0);
+        (st.chassis_btcm_front_release_fr_ns != 0);
 
     const bool fl_main_seen =
         pin_ever_seen(st.sol_fl_iso_ns, st.sol_fl_dmp_ns);
@@ -2653,7 +2556,7 @@ ExternalSimConnector::AbsPhaseFront ExternalSimConnector::GetAbsPhaseFront(
     auto decode_fl = [&]() -> AbsPhaseFront::Phase {
         if (fl_chassis_seen) {
             return decode_phase(st.chassis_btcm_iso_close_fl,
-                                st.chassis_btcm_dump_open_fl,
+                                st.chassis_btcm_front_release_fl,
                                 st.btcm_front_motor_fl);
         }
         if (fl_main_seen) {
@@ -2664,7 +2567,7 @@ ExternalSimConnector::AbsPhaseFront ExternalSimConnector::GetAbsPhaseFront(
     auto decode_fr = [&]() -> AbsPhaseFront::Phase {
         if (fr_chassis_seen) {
             return decode_phase(st.chassis_btcm_iso_close_fr,
-                                st.chassis_btcm_dump_open_fr,
+                                st.chassis_btcm_front_release_fr,
                                 st.btcm_front_motor_fr);
         }
         if (fr_main_seen) {
@@ -2696,7 +2599,7 @@ ExternalSimConnector::RearEmbCmd ExternalSimConnector::GetRearEmbCmd(
     // stay valid as long as the producer is alive.  Same freshness
     // model as GetAbsPhaseFront above.
     //
-    // Source preference (per wheel): chassis-bus value (4151/4152) wins
+    // Source preference (per wheel): the motor leads on the wire win
     // when ever-seen; otherwise main-harness value (5014/5015).  Same
     // rationale as GetAbsPhaseFront — keep both paths live so the
     // public chassis-bus subscription can become primary without
@@ -2785,10 +2688,8 @@ void ExternalSimConnector::DebugInjectDelta(std::uint32_t signal_id, bool value)
         (void)value;
         m_state->btcm_uart_frame_ns = m_state->now_ns();
     } else if (signal_id == kSigChassisBtcmIsoCloseFL ||
-               signal_id == kSigChassisBtcmIsoCloseFR ||
-               signal_id == kSigChassisBtcmDumpOpenFL ||
-               signal_id == kSigChassisBtcmDumpOpenFR) {
-        // Chassis-bus mirror of the BTCM iso/dump solenoid state.
+               signal_id == kSigChassisBtcmIsoCloseFR) {
+        // Chassis-bus mirror of the BTCM iso solenoid state.
         // See struct State and GetAbsPhaseFront for the per-wheel
         // source-preference rule.
         const std::uint64_t now_ns = m_state->now_ns();
@@ -2800,14 +2701,6 @@ void ExternalSimConnector::DebugInjectDelta(std::uint32_t signal_id, bool value)
             case kSigChassisBtcmIsoCloseFR:
                 m_state->chassis_btcm_iso_close_fr    = value;
                 m_state->chassis_btcm_iso_close_fr_ns = now_ns;
-                break;
-            case kSigChassisBtcmDumpOpenFL:
-                m_state->chassis_btcm_dump_open_fl    = value;
-                m_state->chassis_btcm_dump_open_fl_ns = now_ns;
-                break;
-            case kSigChassisBtcmDumpOpenFR:
-                m_state->chassis_btcm_dump_open_fr    = value;
-                m_state->chassis_btcm_dump_open_fr_ns = now_ns;
                 break;
             default: break;
         }
@@ -2856,12 +2749,6 @@ void ExternalSimConnector::DebugInjectFloat(std::uint32_t signal_id, float value
     } else if (signal_id == kSigIpcTripDistanceM) {
         m_state->ipc_trip_distance_m     = value;
         m_state->has_ipc_trip_distance_m = true;
-    } else if (signal_id == kSigChassisBtcmEmbMotorCmdLR) {
-        m_state->chassis_btcm_emb_motor_lr    = value;
-        m_state->chassis_btcm_emb_motor_lr_ns = now_ns;
-    } else if (signal_id == kSigChassisBtcmEmbMotorCmdRR) {
-        m_state->chassis_btcm_emb_motor_rr    = value;
-        m_state->chassis_btcm_emb_motor_rr_ns = now_ns;
     } else if (signal_id == kSigChassisBtcmCylPressureFL_kPa) {
         m_state->chassis_btcm_cyl_press_fl_kpa = value;
         m_state->chassis_btcm_cyl_press_fl_ns  = now_ns;
@@ -2877,9 +2764,9 @@ void ExternalSimConnector::DebugInjectPimCoastDragNm(float drag_nm) {
     m_state->has_pim_coast_drag_nm = true;
 }
 
-void ExternalSimConnector::DebugInjectBtcmFrontMotorCmd(float fl, float fr) {
-    m_state->btcm_front_motor_fl = fl;
-    m_state->btcm_front_motor_fr = fr;
+void ExternalSimConnector::DebugInjectBtcmMotorLeads(BrakeMotor motor, bool drive,
+                                                     bool release) {
+    m_state->apply_btcm_motor_leads(motor, drive, release);
 }
 
 void ExternalSimConnector::DebugInjectWiperSweepPositionPct(std::uint8_t pct) {
@@ -2978,13 +2865,8 @@ void ExternalSimConnector::DebugInjectU8(std::uint32_t signal_id,
     // All other uint8 signals are not currently subscribed as inputs.
 }
 
-void ExternalSimConnector::DebugInjectU16(std::uint32_t signal_id,
-                                           std::uint16_t value) {
-    if (signal_id == kSigBtcmRetardRequestDutyQ8) {
-        m_state->btcm_retard_request_duty_q8  = value;
-        m_state->has_btcm_retard_request_duty = true;
-    }
-    // Other uint16 signals are not currently subscribed as inputs.
+void ExternalSimConnector::DebugInjectU16(std::uint32_t, std::uint16_t) {
+    // No uint16 signals are currently subscribed as inputs.
 }
 
 void ExternalSimConnector::DebugInjectU32(std::uint32_t signal_id,
@@ -3128,10 +3010,6 @@ EV1SIM_CHASSIS_ID_MATCHES(kSigIpcReducedPerfTelltale,    kSigChassisIpcReducedPe
 EV1SIM_CHASSIS_ID_MATCHES(kSigIpcCheckTirePressTelltale, kSigChassisIpcCheckTirePressTelltale);
 EV1SIM_CHASSIS_ID_MATCHES(kSigChassisBtcmIsoCloseFL,     kSigChassisBtcmIsoCloseFL);
 EV1SIM_CHASSIS_ID_MATCHES(kSigChassisBtcmIsoCloseFR,     kSigChassisBtcmIsoCloseFR);
-EV1SIM_CHASSIS_ID_MATCHES(kSigChassisBtcmDumpOpenFL,     kSigChassisBtcmDumpOpenFL);
-EV1SIM_CHASSIS_ID_MATCHES(kSigChassisBtcmDumpOpenFR,     kSigChassisBtcmDumpOpenFR);
-EV1SIM_CHASSIS_ID_MATCHES(kSigChassisBtcmEmbMotorCmdLR,  kSigChassisBtcmEmbMotorCmdLR);
-EV1SIM_CHASSIS_ID_MATCHES(kSigChassisBtcmEmbMotorCmdRR,  kSigChassisBtcmEmbMotorCmdRR);
 EV1SIM_CHASSIS_ID_MATCHES(kSigChassisBtcmCylPressureFL_kPa, kSigChassisBtcmCylPressureFL_kPa);
 EV1SIM_CHASSIS_ID_MATCHES(kSigChassisBtcmCylPressureFR_kPa, kSigChassisBtcmCylPressureFR_kPa);
 EV1SIM_CHASSIS_ID_MATCHES(kTurnHazSwRightTurnOutId, kSigTurnHazSw_RightTurnOut);
@@ -3353,8 +3231,6 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             st.driver_pw_passenger_up_pub   = -1;
             st.driver_pw_passenger_down_pub = -1;
             for (int ei = 0; ei < 5; ++ei) st.driver_ext_keypad_pub[ei] = -1;
-            st.driver_door_handle_driver_pub    = -1;
-            st.driver_door_handle_passenger_pub = -1;
             st.sensor_door_open_driver_pub      = -1;
             st.sensor_door_open_passenger_pub   = -1;
             st.sensor_hood_open_pub             = -1;
@@ -3362,8 +3238,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             st.ext_headlight_switch_pub         = -1;
             st.ext_headlight_dim_pub            = -1;
             st.ext_telltale_test_pub            = -1;
-            st.ext_park_brake_set_pub           = -1;
-            st.ext_park_brake_release_pub       = -1;
+            st.ext_park_brake_switch_pub        = -1;
             st.ext_key_position_pub             = -1;
             std::cout << "[ExternalSim] wire-truth substrate attached "
                          "(sole bus; chassis + ECU cells read from the WireTable)\n"
@@ -3535,10 +3410,26 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             st.has_pim_coast_drag_nm = true;
         }
 
-        // BTCM front modulator motor commands; GetAbsPhaseFront reads them
-        // with the chassis iso/dump bits.
-        if (auto m = st.wire->btcm_front_motor_cmd_fl()) st.btcm_front_motor_fl = *m;
-        if (auto m = st.wire->btcm_front_motor_cmd_fr()) st.btcm_front_motor_fr = *m;
+        // BTCM brake motor leads; GetAbsPhaseFront reads the front ones with
+        // the chassis iso bits, GetRearEmbCmd the rear ones.
+        {
+            using Wm = ev1sim::WireTruthChassis::BtcmBrakeMotor;
+            constexpr std::pair<Wm, BrakeMotor> kMotors[] = {
+                {Wm::FrontLeft, BrakeMotor::FrontLeft},
+                {Wm::FrontRight, BrakeMotor::FrontRight},
+                {Wm::RearLeft, BrakeMotor::RearLeft},
+                {Wm::RearRight, BrakeMotor::RearRight},
+            };
+            for (const auto& [wire_motor, motor] : kMotors) {
+                if (auto leads = st.wire->btcm_motor_leads(wire_motor))
+                    st.apply_btcm_motor_leads(motor, leads->drive, leads->release);
+            }
+        }
+        // Retard request at the PIM, permille duty; 0 while the line is dark.
+        if (auto duty = st.wire->pim_retard_request_permille()) {
+            st.retard_request_permille     = *duty;
+            st.has_retard_request_permille = true;
+        }
 
         // Wiper blade position -> CHASSIS_WIPER_SWEEP_POSITION; nullopt until
         // the RHJB writes it. SimApp swings the 3D wipers with it.
@@ -3756,6 +3647,12 @@ void ExternalSimConnector::Tick(double sim_time_s) {
     if (st.coast_down_switch_armed && st.wire) {
         st.wire->publish_coast_down_switch(st.coast_down_switch_on);
     }
+    // The shifter's reverse contact (lever in R, the selector's 0011 code),
+    // level-held every tick; it lights the backup lamps.
+    if (st.wire) {
+        st.wire->publish_reverse_select_switch(!st.prnd_a && !st.prnd_b &&
+                                               st.prnd_c && st.prnd_d);
+    }
     // RSA dimmer: one queued click per button per tick, so two clicks never
     // land between the same two RSA reads.
     for (int up = 0; up < 2; ++up) {
@@ -3808,8 +3705,8 @@ void ExternalSimConnector::Tick(double sim_time_s) {
     //    AD state, BTCM liveness). The solenoid (kSigSol* 5010-5013) and rear-EMB
     //    (kSigRearMotor* 5014-5015) main-harness deltas were dropped as REDUNDANT:
     //    BTCM publishes the SAME actuator state on the chassis cells
-    //    (CHASSIS_BTCM_ISO_CLOSE_* 4147-4150 / DUMP_OPEN_* / EMB_MOTOR_CMD_*
-    //    4151-4152), GetAbsPhaseFront/GetRearEmbCmd PREFER the chassis source
+    //    (CHASSIS_BTCM_ISO_CLOSE_* 4147/4148 and the BTCM_FRONT_MOD_* /
+    //    BTCM_REAR_EMB_* motor leads), GetAbsPhaseFront/GetRearEmbCmd PREFER the chassis source
     //    per-wheel, and the chassis cells already arrive via apply_consumer_overlay
     //    above. The st.sol_*/st.rear_motor_* fallback fields stay (the source-
     //    preference logic still consults them) but are simply never written now;
@@ -3868,17 +3765,11 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             drv.push_back(MakeBoolDelta(kSigDriverBrakeSwitch, st.driver_brake_switch));
             st.driver_brake_switch_pub = brake_sw_val;
         }
+        // The belt switch is closed while the belt is unbuckled.
         const std::int8_t seatbelt_val = st.driver_seatbelt_buckled ? 1 : 0;
         if (seatbelt_val != st.driver_seatbelt_buckled_pub) {
-            drv.push_back(MakeBoolDelta(kSigDriverSeatbeltBuckled, st.driver_seatbelt_buckled));
+            drv.push_back(MakeBoolDelta(kSigDriverSeatbeltSwitch, !st.driver_seatbelt_buckled));
             st.driver_seatbelt_buckled_pub = seatbelt_val;
-        }
-        // Passenger seatbelt (6965) — publish on change.
-        const std::int8_t seatbelt_p_val = st.driver_seatbelt_buckled_passenger ? 1 : 0;
-        if (seatbelt_p_val != st.driver_seatbelt_buckled_passenger_pub) {
-            drv.push_back(MakeBoolDelta(kSigDriverSeatbeltBuckledPassenger,
-                                        st.driver_seatbelt_buckled_passenger));
-            st.driver_seatbelt_buckled_passenger_pub = seatbelt_p_val;
         }
         // Turn/hazard combination switch — published on the CHASSIS cavities
         // kSigTurnHazSw_* (4043-4045) that LHJB consumes; publish on change.
@@ -3923,7 +3814,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                 }
             }
         }
-        // IPC trip-reset (6952), cruise switch cavities (4047-4049), wiper.
+        // RSA buttons, power windows, exterior keypad, contract buttons.
         // Momentary/level bools: publish on change only (sentinel -1 forces first publish).
         auto publish_bool_change = [&](std::uint32_t sig_id, bool cur_val, std::int8_t& pub) {
             const std::int8_t v = cur_val ? 1 : 0;
@@ -3932,8 +3823,6 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                 pub = v;
             }
         };
-        publish_bool_change(kSigDriverIpcTripResetButton, st.driver_ipc_trip_reset,
-                            st.driver_ipc_trip_reset_pub);
         // RSA mode buttons (6972-6974) — one bool per press area, published on
         // change.  All three are evaluated in the same pass, so a mask with two
         // bits set lands on the wire in one tick.
@@ -3946,20 +3835,6 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         publish_bool_change(kSigDriverRsaModeSwRun,
                             (st.driver_rsa_mode_switches & 0x04u) != 0u,
                             st.driver_rsa_mode_sw_pub[2]);
-        // Wiper switch — published as the three raw contact cavities computed
-        // from the detent enum, matching RHJB's WSW decoder (ESM p.511):
-        // OFF=000, INT=110, LOW=010, HIGH=011.  Washer on its own cavity (4057).
-        {
-            const std::uint8_t e = st.driver_wiper_switch;  // 0=OFF,1=INT,2=LOW,3=HIGH
-            publish_bool_change(kSigWiperSw_DelayOut,   (e == 1U),
-                                st.driver_wiper_delay_pub);
-            publish_bool_change(kSigWiperSw_RequestOut, (e >= 1U && e <= 3U),
-                                st.driver_wiper_request_pub);
-            publish_bool_change(kSigWiperSw_HiOut,      (e == 3U),
-                                st.driver_wiper_hi_pub);
-        }
-        publish_bool_change(kSigWiperSw_WasherSwitchOut, st.driver_wiper_wash,
-                            st.driver_wiper_wash_pub);
         // Power window switches (6980-6983) — momentary bool, held while pressed.
         // Default false (no UI source yet); floating UI will set press()/release().
         publish_bool_change(kSigDriverPowerWindowDriverUp,
@@ -3970,7 +3845,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                             st.driver_pw_passenger_up,  st.driver_pw_passenger_up_pub);
         publish_bool_change(kSigDriverPowerWindowPassengerDown,
                             st.driver_pw_passenger_down, st.driver_pw_passenger_down_pub);
-        // RSA exterior keypad (6985-6989) — uint8 Option A encoding.
+        // RSA exterior keypad (6985-6989) — held contacts.
         {
             constexpr std::uint32_t kExtIds[5] = {
                 kSigDriverRsaExteriorKeypad1, kSigDriverRsaExteriorKeypad2,
@@ -3978,18 +3853,10 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                 kSigDriverRsaExteriorKeypad5,
             };
             for (int bi = 0; bi < 5; ++bi) {
-                const std::int8_t bval = static_cast<std::int8_t>(st.driver_ext_keypad[bi]);
-                if (st.driver_ext_keypad_pub[bi] < 0 || bval != st.driver_ext_keypad_pub[bi]) {
-                    drv.push_back(MakeU8Delta(kExtIds[bi], st.driver_ext_keypad[bi]));
-                    st.driver_ext_keypad_pub[bi] = bval;
-                }
+                publish_bool_change(kExtIds[bi], st.driver_ext_keypad[bi],
+                                    st.driver_ext_keypad_pub[bi]);
             }
         }
-        // Door handle attempt signals (6990-6991) — momentary bool.
-        publish_bool_change(kSigDriverDoorHandleAttemptDriver,
-                            st.driver_door_handle_driver,    st.driver_door_handle_driver_pub);
-        publish_bool_change(kSigDriverDoorHandleAttemptPassenger,
-                            st.driver_door_handle_passenger, st.driver_door_handle_passenger_pub);
         // 3D-sim contract panel-sensor mirrors (6960-6963) — parallel
         // publication of the chassis-bus panel ajar sensors (4030-4033)
         // on the main harness segment so consumers there don't need to
@@ -4007,7 +3874,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         publish_bool_change(kSigSensorTrunkOpen,
                             st.panel[static_cast<int>(PanelID::TRUNK)],
                             st.sensor_trunk_open_pub);
-        // 3D-sim contract buttons + key position (6942-6947, 6966).
+        // 3D-sim contract buttons + key position (6942-6946, 6966).
         // (Horn 6940/6941 removed — single chassis horn cavity 4046.)
         publish_bool_change(kSigDriverHeadlightDimRequest,
                             st.ext_headlight_dim_request,
@@ -4015,12 +3882,9 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         publish_bool_change(kSigDriverTelltaleTestRequest,
                             st.ext_telltale_test_request,
                             st.ext_telltale_test_pub);
-        publish_bool_change(kSigDriverParkBrakeSetRequest,
-                            st.ext_park_brake_set_request,
-                            st.ext_park_brake_set_pub);
-        publish_bool_change(kSigDriverParkBrakeReleaseRequest,
-                            st.ext_park_brake_release_request,
-                            st.ext_park_brake_release_pub);
+        publish_bool_change(kSigDriverParkBrakeSwitch,
+                            st.ext_park_brake_switch,
+                            st.ext_park_brake_switch_pub);
         // Headlight switch + key position — uint8 enums.
         {
             const std::int8_t hsw_val =

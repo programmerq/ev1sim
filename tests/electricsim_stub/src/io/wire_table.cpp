@@ -125,7 +125,12 @@ static_assert(sizeof(Header) == kHeaderSize, "Header must be 64 bytes");
 //                              the "absent producer reads as zero" failure
 //                              class (round-3 reviews; round-4 design memo
 //                              docs/wire_truth_written_ness.md).
-//   bytes 8..63   padding    — false-sharing isolation. Reserved for the
+//   bytes 8..15   value64    — kUint64 storage.
+//   bytes 16..19  writer_pid — the pid of the process that last wrote the cell
+//                              (0 = never written, or written by a binary that
+//                              predates the stamp). The solver host reads it to
+//                              release a dead process's causes.
+//   bytes 20..63  padding    — false-sharing isolation. Reserved for the
 //                              multi-word (bytes[N]) seqlock sketched for a
 //                              future per-cell or per-group wake mechanism;
 //                              the seqlock's sequence counter unifies with
@@ -142,6 +147,7 @@ struct alignas(64) Cell {
   std::atomic<std::uint32_t> value;      // scalar types <= 32 bits
   std::atomic<std::uint32_t> write_gen;
   std::atomic<std::uint64_t> value64;    // kUint64 storage (Phase C-a)
+  std::atomic<std::uint32_t> writer_pid; // last writer; see the layout above
 };
 static_assert(sizeof(Cell) == 64, "Cell must be 64 bytes");
 // value64 lives in the previously-unused tail of the 64-byte slot, so
@@ -506,7 +512,19 @@ RawSample64 read_raw_sample64(const Cell* cell) {
 // bumps is no longer concerned about producer liveness.
 //
 // @design 2026-06-11 claude — round-4 self-review fix.
+//
+// Every scalar write passes through here, so the writer's pid is stamped here,
+// before the release on write_gen publishes it with the value.
+std::uint32_t self_pid() {
+#if defined(_WIN32)
+  return 0u;
+#else
+  return static_cast<std::uint32_t>(::getpid());
+#endif
+}
+
 void bump_write_gen_saturating(Cell& cell) {
+  cell.writer_pid.store(self_pid(), std::memory_order_relaxed);
   std::uint32_t old = cell.write_gen.load(std::memory_order_relaxed);
   for (;;) {
     if (old == UINT32_MAX) return;  // already saturated; leave it
@@ -1519,6 +1537,16 @@ bool WireTable::read_uint32_sample(ConductorId id, Sample<std::uint32_t>* out) c
   return read_uint32_sample(static_cast<WireId>(id), out);
 }
 
+bool WireTable::publish_conductor_level(ConductorId id, std::uint16_t permille,
+                                        const SolverToken& token) {
+  (void)token;
+  return write_uint16(static_cast<WireId>(id), permille);
+}
+
+bool WireTable::read_uint16_sample(ConductorId id, Sample<std::uint16_t>* out) const {
+  return read_uint16_sample(static_cast<WireId>(id), out);
+}
+
 bool WireTable::write_element_state(ElementStateId id, bool closed) {
   return write_bit(static_cast<WireId>(id), closed);
 }
@@ -1533,6 +1561,14 @@ bool WireTable::write_element_state_mv(ElementStateId id, std::uint32_t millivol
 
 bool WireTable::read_uint32_sample(ElementStateId id, Sample<std::uint32_t>* out) const {
   return read_uint32_sample(static_cast<WireId>(id), out);
+}
+
+bool WireTable::write_element_state_level(ElementStateId id, std::uint16_t permille) {
+  return write_uint16(static_cast<WireId>(id), permille);
+}
+
+bool WireTable::read_uint16_sample(ElementStateId id, Sample<std::uint16_t>* out) const {
+  return read_uint16_sample(static_cast<WireId>(id), out);
 }
 
 bool WireTable::write_byte(WireId id, std::uint8_t value) {
@@ -1980,6 +2016,24 @@ std::uint32_t WireTable::barrier_ack_count() const {
 bool WireTable::has_cell(WireId id) const {
   std::uint32_t idx = 0;
   return impl_->resolve_index(id, &idx);
+}
+
+bool WireTable::writer_pid(WireId id, std::uint32_t* out_pid) const {
+  std::uint32_t idx = 0;
+  if (!impl_->resolve_index(id, &idx)) return false;
+  if (impl_->directory[idx].type ==
+      static_cast<std::uint8_t>(WireType::kBitStream)) {
+    return false;
+  }
+  // Acquire on write_gen first, pairing with the writer's release, so the pid
+  // read belongs to a write at least as new as the generation observed.
+  (void)impl_->cell_at(idx)->write_gen.load(std::memory_order_acquire);
+  *out_pid = impl_->cell_at(idx)->writer_pid.load(std::memory_order_relaxed);
+  return true;
+}
+
+bool WireTable::writer_pid(ElementStateId id, std::uint32_t* out_pid) const {
+  return writer_pid(static_cast<WireId>(id), out_pid);
 }
 
 bool WireTable::write_gen(WireId id, std::uint32_t* out_gen) const {

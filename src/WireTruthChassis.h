@@ -265,8 +265,8 @@ public:
     std::optional<bool>          ipc_wait_telltale() const;  // CHASSIS_IPC_WAIT_TELLTALE
 
     // The RSA console's output cells in one read (RSA_RUN1_OUT, CHASSIS_RSA_ACC_OUT,
-    // _VALID_CODE, _SECURITY_INDICATOR, _SHIFT_BLOCKED, _BTSI_SOLENOID, the four
-    // _SELECTOR_LED_* and _DIM_LEVEL_STEP). Unwritten cells stay nullopt.
+    // _VALID_CODE, _SECURITY_INDICATOR, _SHIFT_BLOCKED, _BTSI_ENERGISED, the four
+    // _SELECTOR_LED_* and RSA_ES_DIM_LEVEL_DRV). Unwritten cells stay nullopt.
     ev1sim::DashRsaConsole rsa_console() const;
     // The IPC's COMMAND to ground circuit 2029 (IPC_ES_WAIT_TT_DRV, an
     // element_state cause the IPC writes). Read-only here, as every cell ev1sim
@@ -315,10 +315,23 @@ public:
     // shaft's rotation). nullopt until the PIM writes CHASSIS_PIM_COAST_DRAG_NM.
     std::optional<float> pim_coast_drag_nm() const;        // CHASSIS_PIM_COAST_DRAG_NM
 
-    // The BTCM front modulator motor commands, signed [-1,+1] (+1 restore,
-    // -1 release, 0 neither). nullopt until the BTCM writes them.
-    std::optional<float> btcm_front_motor_cmd_fl() const;  // CHASSIS_BTCM_FRONT_MOTOR_CMD_FL
-    std::optional<float> btcm_front_motor_cmd_fr() const;  // CHASSIS_BTCM_FRONT_MOTOR_CMD_FR
+    // The BTCM's four brake motors, each driven through two leads: a front
+    // modulator's restore and release leads, a rear apply motor's apply and
+    // release leads. A lead reads 1 while it drives current through its motor
+    // (BTCM_FRONT_MOD_{LF,RF}_{RESTORE,RELEASE}, BTCM_REAR_EMB_{LR,RR}_
+    // {APPLY,RELEASE}, conductors the solver publishes). nullopt until the
+    // solver has written both leads of that motor.
+    enum class BtcmBrakeMotor { FrontLeft, FrontRight, RearLeft, RearRight };
+    struct BtcmMotorLeads {
+        bool drive   = false;  // restore (front) or apply (rear)
+        bool release = false;
+    };
+    std::optional<BtcmMotorLeads> btcm_motor_leads(BtcmBrakeMotor motor) const;
+
+    // The retard-request line at the PIM (PIM_RETARD_REQUEST_IN): the BTCM's
+    // request duty in permille while the line is live, 0 while dark. nullopt
+    // until the solver writes it.
+    std::optional<std::uint16_t> pim_retard_request_permille() const;
 
     // The wiper blades' position, percent of one full sweep cycle (0 = park,
     // 50 = end of sweep), from the RHJB's wiper-motor plant. nullopt until the
@@ -328,6 +341,11 @@ public:
     // The shifter's coast-down button position (1 = coast down), read by the
     // RSA. ev1sim is this cell's producer. Returns false if not attached.
     bool publish_coast_down_switch(bool on);               // DRIVER_COAST_DOWN_SWITCH
+
+    // PRND switch #2's REVERSE SELECT contact (DRIVER_ES_REVERSE_SELECT_SWITCH),
+    // closed while the lever is in R; it lights the back-up lamps. ev1sim is
+    // this cell's producer. Returns false if not attached.
+    bool publish_reverse_select_switch(bool closed);
 
     // One click (press then release) of the RSA's DIM UP or DIM DOWN button;
     // the RSA moves its dimmer step one level per click. Returns false if not

@@ -24,13 +24,11 @@ void CombinationSwitch::set_flash_to_pass(bool held) {
 }
 
 bool CombinationSwitch::pin_low_beam_out() const {
-    return m_position == Position::ON;
+    return m_position == Position::ON || m_position == Position::HI;
 }
 
 bool CombinationSwitch::pin_flash_to_pass_out() const {
-    // At HI position, the lever is mechanically interlocked — suppress pin B.
-    if (m_position == Position::HI) return false;
-    return m_flash_to_pass;
+    return m_position == Position::HI || m_flash_to_pass;
 }
 
 bool CombinationSwitch::pin_park_headlamp_out() const {
@@ -697,17 +695,9 @@ const char* RsaKeypadDriver::expected_state_name() const {
 // ---------------------------------------------------------------------------
 
 void RsaExteriorKeypad::press_button(int button_idx, bool long_press) {
-    if (button_idx < 0 || button_idx >= 5) return;
-    m_tap_value[button_idx] = static_cast<std::uint8_t>(long_press ? 2u : 1u);
-}
-
-std::uint8_t RsaExteriorKeypad::button_value(int idx) const {
-    if (idx < 0 || idx >= 5) return 0;
-    return m_tap_value[idx];
-}
-
-void RsaExteriorKeypad::clear_oneshots() {
-    for (int i = 0; i < 5; ++i) m_tap_value[i] = 0;
+    if (button_idx < 0 || button_idx >= 5 || m_count >= kQueueLen) return;
+    m_queue[(m_head + m_count) % kQueueLen] = {static_cast<std::uint8_t>(button_idx), long_press};
+    ++m_count;
 }
 
 // Digit-to-button+long_press mapping (same as interior keypad notation):
@@ -731,52 +721,37 @@ static void ext_keypad_digit_to_entry_(char c, int& btn_out, bool& long_out) {
 
 void RsaExteriorKeypad::enter_code_sequence(const char* code_str) {
     if (!code_str) return;
+    constexpr int kCodeLen = 5;
     int len = 0;
-    while (code_str[len] != '\0' && len <= kMaxCodeLen) ++len;
-    if (len != kMaxCodeLen) return;
-
-    m_seq_len   = kMaxCodeLen;
-    m_seq_pos   = 0;
-    m_seq_timer = 0.0;  // first digit fires on the very next tick
-    m_seq_active = true;
-    for (int i = 0; i < kMaxCodeLen; ++i) {
+    while (code_str[len] != '\0' && len <= kCodeLen) ++len;
+    if (len != kCodeLen) return;
+    for (int i = 0; i < kCodeLen; ++i) {
         int btn = 0;
         bool lp = false;
         ext_keypad_digit_to_entry_(code_str[i], btn, lp);
-        m_seq[i].button_idx = static_cast<std::uint8_t>(btn);
-        m_seq[i].long_press = lp;
+        press_button(btn, lp);
     }
 }
 
 void RsaExteriorKeypad::update(double dt_s) {
-    if (!m_seq_active) return;
-    m_seq_timer -= dt_s;
-    // timer <= 0 means fire immediately (including first digit at t=0)
-}
-
-bool RsaExteriorKeypad::consume_sequence_fire() {
-    if (!m_seq_active) return false;
-    if (m_seq_timer > 0.0) return false;
-
-    // Fire the current digit.
-    const auto& e = m_seq[m_seq_pos];
-    m_tap_value[e.button_idx] = static_cast<std::uint8_t>(e.long_press ? 2u : 1u);
-
-    ++m_seq_pos;
-    if (m_seq_pos >= m_seq_len) {
-        m_seq_active = false;
-        m_seq_len    = 0;
-        m_seq_pos    = 0;
-    } else {
-        // Schedule next digit after 100 ms.
-        static constexpr double kSeqIntervalS = 0.100;
-        m_seq_timer = kSeqIntervalS;
+    constexpr double kTimeEpsS = 1e-9;   // sim time is a sum of float steps
+    if (m_phase != Phase::Idle) m_timer -= dt_s;
+    if (m_phase == Phase::Held && m_timer <= kTimeEpsS) {
+        m_phase = Phase::Gap;
+        m_timer = kGapS;
     }
-    return true;
-}
-
-bool RsaExteriorKeypad::sequence_in_progress() const {
-    return m_seq_active;
+    if (m_phase == Phase::Gap && m_timer <= kTimeEpsS) {
+        m_phase  = Phase::Idle;
+        m_button = -1;
+    }
+    if (m_phase == Phase::Idle && m_count > 0) {
+        const Press p = m_queue[m_head];
+        m_head = (m_head + 1) % kQueueLen;
+        --m_count;
+        m_phase  = Phase::Held;
+        m_button = p.button_idx;
+        m_timer  = p.long_press ? kLongHoldS : kTapHoldS;
+    }
 }
 
 // ---------------------------------------------------------------------------

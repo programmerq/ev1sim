@@ -342,9 +342,7 @@ inline constexpr std::uint32_t kSigChassisThrottleCmdQ8      = 4073U;
 // two-stage spring on a sim-racing rig (a real spring resists motion, the
 // simulator computes the resulting hydraulic pressure).
 //
-// BTCM consumes this as the primary brake-effort input.  The existing
-// kSigDriverBrakeSwitch (6904) keeps its role as the ABS pump-prime
-// threshold — a binary "any meaningful pedal application" signal.
+// BTCM consumes this as the primary brake-effort input.
 //
 // Default calibration in ev1sim/src/PhysicalWorld.h `BrakePedal::Calibration`:
 //   dead_band  = 0.07
@@ -426,7 +424,7 @@ inline constexpr std::uint32_t kSigChassisDefrostGridActive  = 4083U;
 // ---------------------------------------------------------------------------
 // Door lock commands (electricsim/RSA → ev1sim chassis bus)
 // Signal IDs 4084-4085.  RSA publishes these when it decides to lock or
-// unlock a door (e.g. after exterior keypad auth + door handle attempt).
+// unlock a door (a valid exterior keypad code unlocks both).
 // Encoding: uint8 — 0=unlocked, 1=locked.
 // ---------------------------------------------------------------------------
 inline constexpr std::uint32_t kSigChassisDoorLockCmdDriver    = 4084U;  // driver door
@@ -471,12 +469,15 @@ inline constexpr std::uint32_t kSigChassisAmbientHumidityPct   = 4091U;
 
 // ---------------------------------------------------------------------------
 // IPC seatbelt telltale outputs (electricsim/IPC → ev1sim chassis bus)
-// Signal IDs 4130–4131.  IPC publishes these on change each tick so
-// the 3D sim and floating UI can reflect the lamp state independently
-// of the full IPC LCD summary (5600).
+// Signal ID 4130.  IPC publishes it on change each tick so the 3D sim and
+// floating UI can reflect the lamp state independently of the full IPC LCD
+// summary (5600).
 // Encoding: uint8 bool — 0=lamp off, 1=lamp on.
-// Lit when the corresponding seat is unbuckled AND vehicle speed exceeds
-// ~8 km/h (IPC_SUPERVISOR_SEATBELT_SPEED_THRESHOLD_MPS).
+// Lit when the driver belt is unbuckled AND vehicle speed exceeds ~8 km/h
+// (IPC_SUPERVISOR_SEATBELT_SPEED_THRESHOLD_MPS).
+// 4131 is reserved: the cluster has no passenger belt input (elec-249), so
+// nothing publishes it. The constant stays while ev1sim's drift guard names it
+// (scripts/audit_cross_repo_contract.py); do not reuse the slot.
 // ---------------------------------------------------------------------------
 inline constexpr std::uint32_t kSigChassisIpcSeatbeltTelltaleDriver    = 4130U;
 inline constexpr std::uint32_t kSigChassisIpcSeatbeltTelltalePassenger = 4131U;
@@ -571,37 +572,12 @@ inline constexpr std::uint32_t kSigChassisIpcBatteryLifeTelltale   = 4143U;
 inline constexpr std::uint32_t kSigChassisIpcReducedPerfTelltale   = 4144U;
 inline constexpr std::uint32_t kSigChassisIpcCheckTirePressTelltale = 4145U;
 
-// ---------------------------------------------------------------------------
-// BTCM Enhanced Drive Control regen-reduction factor (BTCM → chassis bus)
-// Signal ID 4146. Encoding: uint8 Q8 (0..255). 255 = no derate (full
-// requested regen authority passes through), 0 = full cut (PCM regen
-// request multiplied to zero).
-//
-// BTCM controller publishes this on change from the firmware's
-// `g_abs_diag.edc_derate_factor_q8` snapshot. Default at startup is 255
-// (no derate) so consumers default to "regen unchanged" until the BTCM
-// has actually run a tick and reported.
-//
-// Source: ev1/btcm/abs_algo.c::abs_edc_update. "ABS for regen" — when
-// drive-wheel slip during coastdown indicates the regen torque is
-// dragging the fronts below ground speed, the BTCM ramps this factor
-// down so the PCM (PIM) backs off enough regen authority to let the
-// wheels spin back up.
-//
-// Consumers:
-//   - PIM caches and exposes via supervisor.scan for observability.
-//     A future revision can multiply outgoing regen-torque commands by
-//     (q8 / 255.0f) directly. Today the PIM does not produce an
-//     outgoing regen torque command (PIM IS the PCM in this sim), so
-//     the cache + scan exposure is the minimum end-to-end path.
-//
-// Per brakes manual p. 313.
-// ---------------------------------------------------------------------------
-inline constexpr std::uint32_t kSigChassisBtcmRegenReductionQ8 = 4146U;
+// 4146 is retired: the BTCM's EDC derate reaches the PCM as the positive half
+// of the retard request line, circuit 2017 (prop-210; ev1/btcm/btcm_retard_request.h).
 
 // ---------------------------------------------------------------------------
 // BTCM brake actuator state (electricsim/BTCM → ev1sim chassis bus)
-// Signal IDs 4147–4154.  BTCM publishes per-wheel actuator state on the
+// Signal IDs 4147, 4148, 4153, 4154.  BTCM publishes per-wheel actuator state on the
 // chassis bus on change after each main-loop iteration so ev1sim's Project
 // Chrono physics can drive per-corner brake torque from the BTCM-modulated
 // actuator state instead of the local brake pedal.  This makes ABS modulation
@@ -615,12 +591,6 @@ inline constexpr std::uint32_t kSigChassisBtcmRegenReductionQ8 = 4146U;
 //     pin state (1 = solenoid energized = iso valve closed, isolating the
 //     caliper from the master cylinder so the front-modulator motor controls
 //     per-wheel pressure).
-//   - Dump-open booleans mirror the BTCM `kSigSolFL_DMP` / `kSigSolFR_DMP`
-//     bypass-to-accumulator pin state (1 = solenoid energized = bypass open,
-//     bleeding caliper pressure to the accumulator for pressure reduction).
-//   - EMB motor command floats are signed in [-1.0, +1.0] (matching the
-//     `kSigRearMotorLR` / `kSigRearMotorRR` main-bus encoding): positive =
-//     apply direction, negative = release direction, zero = hold/off.
 //   - Cylinder pressure floats are the BTCM's view (i.e. echoed sensor value)
 //     of LF/RF wheel cylinder pressure in kPa.  ev1sim uses these to drive
 //     per-corner caliper torque under ABS modulation.  Source: the
@@ -630,19 +600,16 @@ inline constexpr std::uint32_t kSigChassisBtcmRegenReductionQ8 = 4146U;
 //     the rest of the brake chain).
 //
 // Publish cadence: on change.  Epsilon thresholds:
-//   - iso/dump bools: exact change (no epsilon).
-//   - EMB motor command: ±0.01 (matches the ±1.0 range and avoids flooding
-//     on numerical noise from the firmware H-bridge duty math).
+//   - iso bools: exact change (no epsilon).
 //   - Cylinder pressure: ±1.0 kPa (≈ 0.001 MPa, well below the resolution
 //     of the firmware's Q-format scratch, but enough to keep an ABS dump
 //     cycle visible as discrete steps).
 // ---------------------------------------------------------------------------
 inline constexpr std::uint32_t kSigChassisBtcmIsoCloseFL          = 4147U;
 inline constexpr std::uint32_t kSigChassisBtcmIsoCloseFR          = 4148U;
-inline constexpr std::uint32_t kSigChassisBtcmDumpOpenFL          = 4149U;
-inline constexpr std::uint32_t kSigChassisBtcmDumpOpenFR          = 4150U;
-inline constexpr std::uint32_t kSigChassisBtcmEmbMotorCmdLR       = 4151U;
-inline constexpr std::uint32_t kSigChassisBtcmEmbMotorCmdRR       = 4152U;
+// 4149-4152 are retired: there is no dump valve, and the four brake motors
+// reach ev1sim as their half-bridge lead conductors (BTCM_FRONT_MOD_* /
+// BTCM_REAR_EMB_*): restore/apply lead driving minus release lead driving.
 inline constexpr std::uint32_t kSigChassisBtcmCylPressureFL_kPa   = 4153U;
 inline constexpr std::uint32_t kSigChassisBtcmCylPressureFR_kPa   = 4154U;
 
@@ -921,42 +888,9 @@ inline constexpr std::uint32_t kSigChassisRsaDimLevelStep = 4189U;
 // ---------------------------------------------------------------------------
 inline constexpr std::uint32_t kSigChassisLhjbParkLampsOn = 4190U;
 
-// ---------------------------------------------------------------------------
-// BTCM retard-request PWM duty (BTCM → chassis bus, → PIM J1-18 RETARD REQUEST IN).
-// Signal ID 4191.  Encoding: uint16 little-endian, Q8 percent (0..25600 ≈ 0..100 %).
-//
-// On the real EV1 the BTCM drives a 128 Hz PWM waveform on circuit J1-18;
-// the duty encodes the amount of regen torque it is requesting from the PCM.
-// The PIM measures this waveform and uses it as one leg of the DTC 042 correlation
-// (discrete duty > 20.7 % AND serial duty < 19.1 % for 2 s → DTC 042 set).
-//
-// Derivation from sup.regen_rtd_req_dc (uint8 0-255, a request MAGNITUDE):
-// see ev1/btcm/btcm_retard_request.h, which owns this line's one encoding.
-// The magnitude becomes the serial count (btcm_retard_count_from_request_dc)
-// and the published duty is derived FROM that count
-// (btcm_retard_duty_q8_from_request_dc), so prop-210's "serial data copy of
-// the discrete lines" is equal by construction rather than by two mappings
-// agreeing — which is what keeps DTC 042 structurally unable to false-fire on
-// a legitimate request.
-//
-// THE PRINTED ANCHORS, not a zero-based ratio: prop-210's band runs 10 %..90 %
-// with 18 % as "No retard or regen request", so an idle module publishes
-// 4608 Q8 (18.00 %) and a full request 23040 Q8 (90.00 %). This comment used
-// to give the derivation as duty_q8 = dc * 25600 / 255, "0 at idle" — the
-// zero-based mapping btcm_retard_request.h explicitly retires, because 0 %
-// is a level the real line cannot carry and one the propulsion module's own
-// out-of-range predicate (DTC 107, below 5 %) calls a fault with no debounce
-// and no auto-clear. Corrected 2026-09-09; the id and the encoding width are
-// unchanged.
-//
-// Before this signal, PIM held a static healthy idle default (18 % / 128 Hz / 6 V)
-// for J1-18. Publishing the live value from the BTCM supervisor closes the deferred
-// PWM leg of the BTCM -> PIM regen discrete producers.
-// @source:manual EV1 Service Manual prop-220/221 (DTC 042 correlation)
-// @design 2026-06-12 — closes the retard-request PWM discrete leg (DTC 042
-//   correlation).
-// ---------------------------------------------------------------------------
-inline constexpr std::uint32_t kSigChassisBtcmRetardRequestDutyQ8 = 4191U;
+// 4191 is retired: the retard request is circuit 2017, a PWM line the solver
+// carries from the BTCM's stage (BTCM_ES_RETARD_REQUEST_DUTY) to the PIM
+// (PIM_RETARD_REQUEST_IN), config/nets/btcm.yaml and config/nets/pim.yaml.
 
 // ---------------------------------------------------------------------------
 // 12 V auxiliary-battery rail (electricsim/aux_battery host → chassis bus)
@@ -1111,29 +1045,8 @@ inline constexpr std::uint32_t kSigChassisTjbRrTurnLamp   = 4202U;
 inline constexpr std::uint32_t kSigChassisTjbLrStopLamp   = 4203U;
 inline constexpr std::uint32_t kSigChassisTjbRrStopLamp   = 4204U;
 
-// ---------------------------------------------------------------------------
-// PIM retard-ACHIEVED PWM duty (PIM -> chassis bus, -> BTCM RETARD ACHIEVED IN).
-// Signal ID 4205.  Encoding: uint16 little-endian, Q8 percent (0..25600).
-//
-// prop-210 (INPUTS AND OUTPUTS), verbatim: "Retard Achieved:  This line is used
-// by the PCM to report to the BTCM the amount of retard/regen achieved by the
-// Drive Motor."  The answering half of 4191 (the BTCM's retard REQUEST); the
-// pair is the regen handshake the BTCM polices with DTC 141 / 167 / 168.
-//
-// The value is the fraction of the propulsion torque that was AVAILABLE to
-// remove which the request actually removed (prop-209: "the maximum retard
-// available is equal to the propulsion torque at the time of retard request"),
-// encoded across a 6 %..95 % duty band that sits inside the range the
-// consumer's own out-of-range diagnostic declares valid (5 %..95 %), with the
-// floor moved one percent in so a healthy zero-achieved report is not one
-// integer count from that check.  Derivation + provenance:
-// ev1/pim/pim_retard_achieved.h.
-//
-// Publisher: the PIM controller (ev1/pim/controller.cpp).
-// Consumer: the BTCM controller (ev1/btcm/controller.cpp) -> btcm_regen_rx_achieved().
-// @source:manual EV1 propulsion system manual prop-209 / prop-210.
-// @design 2026-09-08 claude -- ID allocation 4205, next free chassis id.
-// ---------------------------------------------------------------------------
-inline constexpr std::uint32_t kSigChassisPimRetardAchievedDutyQ8 = 4205U;
+// 4205 is retired: the retard achieved report is circuit 2038, a PWM line the
+// solver carries from the PIM's stage (PIM_ES_RETARD_ACHIEVED_DUTY) to the BTCM
+// (BTCM_RETARD_ACHIEVED_IN), config/nets/pim.yaml and config/nets/btcm.yaml.
 
 }  // namespace electricsim::io
