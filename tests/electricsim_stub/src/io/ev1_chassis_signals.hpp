@@ -610,6 +610,12 @@ inline constexpr std::uint32_t kSigChassisBtcmIsoCloseFR          = 4148U;
 // 4149-4152 are retired: there is no dump valve, and the four brake motors
 // reach ev1sim as their half-bridge lead conductors (BTCM_FRONT_MOD_* /
 // BTCM_REAR_EMB_*): restore/apply lead driving minus release lead driving.
+// Nothing publishes them. The constants stay while ev1sim's drift guard names
+// them (scripts/audit_cross_repo_contract.py); do not reuse the slots.
+inline constexpr std::uint32_t kSigChassisBtcmDumpOpenFL          = 4149U;
+inline constexpr std::uint32_t kSigChassisBtcmDumpOpenFR          = 4150U;
+inline constexpr std::uint32_t kSigChassisBtcmEmbMotorCmdLR       = 4151U;
+inline constexpr std::uint32_t kSigChassisBtcmEmbMotorCmdRR       = 4152U;
 inline constexpr std::uint32_t kSigChassisBtcmCylPressureFL_kPa   = 4153U;
 inline constexpr std::uint32_t kSigChassisBtcmCylPressureFR_kPa   = 4154U;
 

@@ -26,15 +26,15 @@
 namespace electricsim::topology {
 
 inline constexpr std::uint32_t kFormatVersion = 2U;
-inline constexpr std::uint32_t kTopologyHash = 0x917E96E7U;
-inline constexpr std::size_t kWireCount = 512;
+inline constexpr std::uint32_t kTopologyHash = 0xC6C69B8EU;
+inline constexpr std::size_t kWireCount = 514;
 
 // Per-class cell counts. Emitted so a
 // receipt can print the classification without re-parsing YAML,
 // and so a test can assert against them. The legacy count is held
 // by a DECREASING ratchet in the generator that fails on !=.
-inline constexpr std::size_t kConductorCellCount = 157;
-inline constexpr std::size_t kElementStateCellCount = 118;
+inline constexpr std::size_t kConductorCellCount = 158;
+inline constexpr std::size_t kElementStateCellCount = 119;
 inline constexpr std::size_t kSemanticCellCount = 87;
 inline constexpr std::size_t kUnclassifiedLegacyCellCount = 150;
 
@@ -486,6 +486,8 @@ inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_RETARD_REQUEST_D
 inline constexpr ::electricsim::io::ConductorId kWirePIM_RETARD_REQUEST_IN{1304U};
 inline constexpr ::electricsim::io::ElementStateId kWirePIM_ES_RETARD_ACHIEVED_DUTY{1305U};
 inline constexpr ::electricsim::io::ConductorId kWireBTCM_RETARD_ACHIEVED_IN{1306U};
+inline constexpr ::electricsim::io::ElementStateId kWirePIM_ES_VSS_OUT_FREQ{1325U};
+inline constexpr ::electricsim::io::ConductorId kWireIPC_VSS_INPUT_389{1326U};
 inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_BRAKE_SW_OUT{414U};
 inline constexpr ::electricsim::io::ElementStateId kWireCHASSIS_ES_AUX_BATTERY_TERMINAL_MV{415U};
 inline constexpr ::electricsim::io::WireId kWireAD_CHASSIS_GROUND_REF_MV = 417U;
@@ -1442,6 +1444,10 @@ inline constexpr auto kWirePIM_ES_RETARD_ACHIEVED_DUTY_Default = static_cast<std
 inline constexpr InitPolicy kWirePIM_ES_RETARD_ACHIEVED_DUTY_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireBTCM_RETARD_ACHIEVED_IN_Default = static_cast<std::uint16_t>(0x0U);
 inline constexpr InitPolicy kWireBTCM_RETARD_ACHIEVED_IN_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWirePIM_ES_VSS_OUT_FREQ_Default = static_cast<std::uint16_t>(0x0U);
+inline constexpr InitPolicy kWirePIM_ES_VSS_OUT_FREQ_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireIPC_VSS_INPUT_389_Default = static_cast<std::uint16_t>(0x0U);
+inline constexpr InitPolicy kWireIPC_VSS_INPUT_389_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireBTCM_ES_BRAKE_SW_OUT_Default = false;
 inline constexpr InitPolicy kWireBTCM_ES_BRAKE_SW_OUT_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireCHASSIS_ES_AUX_BATTERY_TERMINAL_MV_Default = 0x0U;
@@ -2033,6 +2039,8 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWirePIM_RETARD_REQUEST_IN), ::electricsim::io::WireType::kUint16) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWirePIM_ES_RETARD_ACHIEVED_DUTY), ::electricsim::io::WireType::kUint16) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_RETARD_ACHIEVED_IN), ::electricsim::io::WireType::kUint16) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWirePIM_ES_VSS_OUT_FREQ), ::electricsim::io::WireType::kUint16) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireIPC_VSS_INPUT_389), ::electricsim::io::WireType::kUint16) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_BRAKE_SW_OUT), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireCHASSIS_ES_AUX_BATTERY_TERMINAL_MV), ::electricsim::io::WireType::kUint32) && ok;
   ok = table.declare(kWireAD_CHASSIS_GROUND_REF_MV, ::electricsim::io::WireType::kUint32) && ok;
@@ -2553,6 +2561,8 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case static_cast<::electricsim::io::WireId>(kWirePIM_RETARD_REQUEST_IN): return "PIM_RETARD_REQUEST_IN";
     case static_cast<::electricsim::io::WireId>(kWirePIM_ES_RETARD_ACHIEVED_DUTY): return "PIM_ES_RETARD_ACHIEVED_DUTY";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_RETARD_ACHIEVED_IN): return "BTCM_RETARD_ACHIEVED_IN";
+    case static_cast<::electricsim::io::WireId>(kWirePIM_ES_VSS_OUT_FREQ): return "PIM_ES_VSS_OUT_FREQ";
+    case static_cast<::electricsim::io::WireId>(kWireIPC_VSS_INPUT_389): return "IPC_VSS_INPUT_389";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_BRAKE_SW_OUT): return "BTCM_ES_BRAKE_SW_OUT";
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_ES_AUX_BATTERY_TERMINAL_MV): return "CHASSIS_ES_AUX_BATTERY_TERMINAL_MV";
     case kWireAD_CHASSIS_GROUND_REF_MV: return "AD_CHASSIS_GROUND_REF_MV";
@@ -3072,6 +3082,8 @@ inline ::electricsim::io::WireId wire_id_for(::std::string_view name) noexcept {
   if (name == "PIM_RETARD_REQUEST_IN") return static_cast<::electricsim::io::WireId>(kWirePIM_RETARD_REQUEST_IN);
   if (name == "PIM_ES_RETARD_ACHIEVED_DUTY") return static_cast<::electricsim::io::WireId>(kWirePIM_ES_RETARD_ACHIEVED_DUTY);
   if (name == "BTCM_RETARD_ACHIEVED_IN") return static_cast<::electricsim::io::WireId>(kWireBTCM_RETARD_ACHIEVED_IN);
+  if (name == "PIM_ES_VSS_OUT_FREQ") return static_cast<::electricsim::io::WireId>(kWirePIM_ES_VSS_OUT_FREQ);
+  if (name == "IPC_VSS_INPUT_389") return static_cast<::electricsim::io::WireId>(kWireIPC_VSS_INPUT_389);
   if (name == "BTCM_ES_BRAKE_SW_OUT") return static_cast<::electricsim::io::WireId>(kWireBTCM_ES_BRAKE_SW_OUT);
   if (name == "CHASSIS_ES_AUX_BATTERY_TERMINAL_MV") return static_cast<::electricsim::io::WireId>(kWireCHASSIS_ES_AUX_BATTERY_TERMINAL_MV);
   if (name == "AD_CHASSIS_GROUND_REF_MV") return kWireAD_CHASSIS_GROUND_REF_MV;
@@ -3596,6 +3608,8 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case static_cast<::electricsim::io::WireId>(kWirePIM_RETARD_REQUEST_IN): return "";
     case static_cast<::electricsim::io::WireId>(kWirePIM_ES_RETARD_ACHIEVED_DUTY): return "pim_ecu";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_RETARD_ACHIEVED_IN): return "";
+    case static_cast<::electricsim::io::WireId>(kWirePIM_ES_VSS_OUT_FREQ): return "pim_ecu";
+    case static_cast<::electricsim::io::WireId>(kWireIPC_VSS_INPUT_389): return "";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_BRAKE_SW_OUT): return "btcm_ecu";
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_ES_AUX_BATTERY_TERMINAL_MV): return "aux_battery_host";
     case kWireAD_CHASSIS_GROUND_REF_MV: return "";
@@ -4125,6 +4139,8 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWirePIM_RETARD_REQUEST_IN), &gen) && gen == 0) { visitor(::std::string_view{"PIM_RETARD_REQUEST_IN"}, static_cast<::electricsim::io::WireId>(kWirePIM_RETARD_REQUEST_IN)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWirePIM_ES_RETARD_ACHIEVED_DUTY), &gen) && gen == 0) { visitor(::std::string_view{"PIM_ES_RETARD_ACHIEVED_DUTY"}, static_cast<::electricsim::io::WireId>(kWirePIM_ES_RETARD_ACHIEVED_DUTY)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_RETARD_ACHIEVED_IN), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_RETARD_ACHIEVED_IN"}, static_cast<::electricsim::io::WireId>(kWireBTCM_RETARD_ACHIEVED_IN)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWirePIM_ES_VSS_OUT_FREQ), &gen) && gen == 0) { visitor(::std::string_view{"PIM_ES_VSS_OUT_FREQ"}, static_cast<::electricsim::io::WireId>(kWirePIM_ES_VSS_OUT_FREQ)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireIPC_VSS_INPUT_389), &gen) && gen == 0) { visitor(::std::string_view{"IPC_VSS_INPUT_389"}, static_cast<::electricsim::io::WireId>(kWireIPC_VSS_INPUT_389)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_BRAKE_SW_OUT), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_ES_BRAKE_SW_OUT"}, static_cast<::electricsim::io::WireId>(kWireBTCM_ES_BRAKE_SW_OUT)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireCHASSIS_ES_AUX_BATTERY_TERMINAL_MV), &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_ES_AUX_BATTERY_TERMINAL_MV"}, static_cast<::electricsim::io::WireId>(kWireCHASSIS_ES_AUX_BATTERY_TERMINAL_MV)); ++count; }
   if (table.write_gen(kWireAD_CHASSIS_GROUND_REF_MV, &gen) && gen == 0) { visitor(::std::string_view{"AD_CHASSIS_GROUND_REF_MV"}, kWireAD_CHASSIS_GROUND_REF_MV); ++count; }
@@ -4650,6 +4666,8 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case static_cast<::electricsim::io::WireId>(kWirePIM_RETARD_REQUEST_IN): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWirePIM_ES_RETARD_ACHIEVED_DUTY): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireBTCM_RETARD_ACHIEVED_IN): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWirePIM_ES_VSS_OUT_FREQ): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireIPC_VSS_INPUT_389): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_BRAKE_SW_OUT): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_ES_AUX_BATTERY_TERMINAL_MV): return ::electricsim::io::CellClass::kElementState;
     case kWireAD_CHASSIS_GROUND_REF_MV: return ::electricsim::io::CellClass::kSemantic;
