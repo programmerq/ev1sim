@@ -1939,7 +1939,7 @@ int SimApp::RunWithVisualization() {
                 m_physical->door_handles().passenger_attempt());
             m_physical->door_handles().clear_oneshots();
             // 3D-sim contract buttons + key position (6940-6947, 6966).
-            PushExtContractDriverInputs(cmd);
+            PushExtContractDriverInputs(cmd, t);
         }
         // Ambient temp + humidity (chassis bus 4090-4091).
         PublishAmbient(t);
@@ -2571,7 +2571,7 @@ int SimApp::RunHeadless() {
                 m_physical->door_handles().passenger_attempt());
             m_physical->door_handles().clear_oneshots();
             // 3D-sim contract buttons + key position (6940-6947, 6966).
-            PushExtContractDriverInputs(cmd);
+            PushExtContractDriverInputs(cmd, t);
         }
         // Ambient temp + humidity (chassis bus 4090-4091).
         PublishAmbient(t);
@@ -2719,7 +2719,7 @@ int SimApp::RunHeadless() {
 // always constructs PhysicalWorld), but defensive null-checks make these
 // safe in tests that mock SimApp.
 // ---------------------------------------------------------------------------
-void SimApp::PushExtContractDriverInputs(const DriverCommand& cmd) {
+void SimApp::PushExtContractDriverInputs(const DriverCommand& cmd, double sim_time_s) {
     if (!m_external_sim) return;
     // (Horn 6940/6941 removed — the driver horn is a single contact (circuit
     //  28), published as the chassis horn cavity 4046 alongside the turn/hazard
@@ -2735,15 +2735,15 @@ void SimApp::PushExtContractDriverInputs(const DriverCommand& cmd) {
     }
     // Telltale test (6945) — no UI source yet; stub at false.
     m_external_sim->SetDriverTelltaleTestRequest(false);
-    // Park brake set/release (6946/6947) — edge-detect on the level
-    // state from DriverCommand.parking_brake.  A false→true transition
-    // fires the one-tick set request; true→false fires release.
-    const bool pb_now = cmd.parking_brake;
-    const bool pb_set_edge     = pb_now && !m_park_brake_prev;
-    const bool pb_release_edge = !pb_now &&  m_park_brake_prev;
-    m_external_sim->SetDriverParkBrakeSetRequest(pb_set_edge);
-    m_external_sim->SetDriverParkBrakeReleaseRequest(pb_release_edge);
-    m_park_brake_prev = pb_now;
+    // Park brake (6946/6947): each change of DriverCommand.parking_brake is
+    // one held push of the park-brake button (ParkBrakeButton), shown on the
+    // set or release request by the direction it moves the brake.
+    if (m_physical) {
+        auto& pb = m_physical->park_brake_button();
+        pb.update(cmd.parking_brake, sim_time_s);
+        m_external_sim->SetDriverParkBrakeSetRequest(pb.pushed() && pb.requested());
+        m_external_sim->SetDriverParkBrakeReleaseRequest(pb.pushed() && !pb.requested());
+    }
     // Key position (6966) — ev1sim does not model a key-cycle state
     // machine; the simulator runs as if the vehicle is always RUN (2).
     // Future work: derive ACC/START transitions when an ignition model

@@ -322,12 +322,9 @@ public:
     /// yet — defaults to false.  Reserved for a future bulb-check button.
     void SetDriverTelltaleTestRequest(bool pressed);
 
-    /// Park-brake set / release momentary requests (6946/6947).  These
-    /// are derived edge events from DriverCommand.parking_brake: a
-    /// false→true transition fires set; true→false fires release.
-    /// Both are one-tick pulses; the caller is responsible for emitting
-    /// exactly one set pulse per engage event and one release pulse per
-    /// disengage event.
+    /// Park-brake set / release requests (6946/6947): held while the
+    /// park-brake button (PhysicalWorld ParkBrakeButton) is pushed, on the
+    /// request matching the direction that push moves the brake.
     void SetDriverParkBrakeSetRequest(bool pressed);
     void SetDriverParkBrakeReleaseRequest(bool pressed);
 

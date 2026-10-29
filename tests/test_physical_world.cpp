@@ -1802,3 +1802,46 @@ TEST_CASE("Lock knobs on the body diagram follow the door-lock motors' stroke",
     dev->drop();
 }
 
+
+// ---------------------------------------------------------------------------
+// ParkBrakeButton: each change of the requested level is one held push.
+// ---------------------------------------------------------------------------
+TEST_CASE("ParkBrakeButton: a change of request is one push held for kPushS", "[physical][park_brake]") {
+    ParkBrakeButton b;
+    b.update(false, 0.0);
+    CHECK_FALSE(b.pushed());
+    b.update(true, 1.0);
+    CHECK(b.pushed());
+    CHECK(b.requested());
+    b.update(true, 1.0 + ParkBrakeButton::kPushS * 0.5);
+    CHECK(b.pushed());
+    b.update(true, 1.0 + ParkBrakeButton::kPushS);
+    CHECK_FALSE(b.pushed());
+    b.update(true, 5.0);
+    CHECK_FALSE(b.pushed());
+}
+
+TEST_CASE("ParkBrakeButton: the starting level is not a push", "[physical][park_brake]") {
+    ParkBrakeButton b;
+    b.update(true, 0.0);
+    CHECK_FALSE(b.pushed());
+}
+
+TEST_CASE("ParkBrakeButton: changes faster than a press each become a push, with a release between",
+          "[physical][park_brake]") {
+    const double p = ParkBrakeButton::kPushS, g = ParkBrakeButton::kGapS;
+    ParkBrakeButton b;
+    b.update(false, 0.0);
+    b.update(true, 1.0);            // push 1 starts
+    b.update(false, 1.0 + p * 0.5); // second change while push 1 is held
+    CHECK(b.pushed());
+    b.update(false, 1.0 + p);       // push 1 ends, gap starts
+    CHECK_FALSE(b.pushed());
+    b.update(false, 1.0 + p + g * 0.5);
+    CHECK_FALSE(b.pushed());
+    b.update(false, 1.0 + p + g);   // push 2
+    CHECK(b.pushed());
+    CHECK_FALSE(b.requested());
+    b.update(false, 1.0 + 2 * p + g);
+    CHECK_FALSE(b.pushed());
+}
