@@ -313,7 +313,6 @@ never hardcodes it — code resolves the `kWire…` symbol). `dir` is ev1sim's r
 | sig | WireId `kWire…` | # | type | dir |
 |--|--|--|--|--|
 | 4130 | CHASSIS_IPC_SEATBELT_TELLTALE_DRIVER | 150 | bit | ECU->ev1sim (consume) |
-| 4131 | CHASSIS_IPC_SEATBELT_TELLTALE_PASSENGER | 151 | bit | ECU->ev1sim (consume) |
 | 4132 | CHASSIS_IPC_TRIP_DISTANCE_M | 152 | float32 | ECU->ev1sim (consume) |
 | 4134 | CHASSIS_IPC_BRAKE_TELLTALE | 153 | bit | ECU->ev1sim (consume) |
 | 4135 | CHASSIS_IPC_PARK_BRAKE_TELLTALE | 154 | bit | ECU->ev1sim (consume) |

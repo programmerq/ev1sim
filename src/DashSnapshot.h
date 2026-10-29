@@ -98,7 +98,6 @@ struct DashOdometer {
 // Each lamp is nullopt until its cell has been written.
 struct DashLamps {
     std::optional<bool> seatbelt_driver;     // 4130
-    std::optional<bool> seatbelt_passenger;  // 4131
     std::optional<bool> brake;               // 4134
     std::optional<bool> park_brake;          // 4135
     std::optional<bool> antilock;            // 4136

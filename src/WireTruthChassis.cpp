@@ -564,9 +564,8 @@ static const std::unordered_map<std::uint32_t, ConsumerCell>& ConsumerRegistry()
         {4087U, {kWireCHASSIS_POWER_WINDOW_MOTOR_PASSENGER, WireType::kByte}},
         // RSA shift-blocked cue (bit)
         {4088U, {kWireCHASSIS_RSA_SHIFT_BLOCKED,        WireType::kBit}},
-        // IPC seatbelt telltales (bit)
+        // IPC seatbelt telltale (bit)
         {4130U, {ReadOnlyWireId(kWireCHASSIS_IPC_SEATBELT_TELLTALE_DRIVER),    WireType::kBit}},
-        {4131U, {ReadOnlyWireId(kWireCHASSIS_IPC_SEATBELT_TELLTALE_PASSENGER), WireType::kBit}},
         // IPC trip distance (float32)
         {4132U, {kWireCHASSIS_IPC_TRIP_DISTANCE_M,      WireType::kFloat32}},
         // IPC BTCM / airbag telltales (bit)

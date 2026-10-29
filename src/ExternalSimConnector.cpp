@@ -339,16 +339,14 @@ constexpr std::uint32_t kSigHvacBlowerLevel  = 4082U;
 constexpr std::uint32_t kSigDefrostGridActive = 4083U;
 constexpr int           kNumHvacSignals       = 2;
 
-// IPC LCD seatbelt telltale outputs (the external IPC → ev1sim, chassis segment).
+// IPC LCD seatbelt telltale output (the external IPC → ev1sim, chassis segment).
 //   4130  vehicle.ipc.seatbelt_telltale_driver    uint8 bool: 0=lamp off, 1=lamp on
-//   4131  vehicle.ipc.seatbelt_telltale_passenger uint8 bool: 0=lamp off, 1=lamp on
 // Locked in lockstep with the external sim's chassis-signal header
-// kSigChassisIpcSeatbeltTelltaleDriver = 4130,
-// kSigChassisIpcSeatbeltTelltalePassenger = 4131.
-// Lit when the corresponding seat is unbuckled AND vehicle speed > ~8 km/h.
+// kSigChassisIpcSeatbeltTelltaleDriver = 4130.  The car has no passenger
+// seat-belt telltale.
+// Lit when the driver is unbuckled AND vehicle speed > ~8 km/h.
 constexpr std::uint32_t kSigIpcSeatbeltTelltaleDriver    = 4130U;
-constexpr std::uint32_t kSigIpcSeatbeltTelltalePassenger = 4131U;
-constexpr int           kNumIpcTelltaleSignals           = 2;
+constexpr int           kNumIpcTelltaleSignals           = 1;
 
 // IPC trip distance (the external IPC → ev1sim, chassis segment).
 //   4132  vehicle.ipc.trip_distance_m   float32 LE, metres
@@ -786,7 +784,7 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // +kNumAmbientSignals for ambient temp (4090) + ambient humidity (4091).
 // +kNumDoorLockPwSignals for door lock cmds (4084/4085) + power window motor cmds (4086/4087).
 // +kNumRsaShiftBlockedSignals for RSA shift-blocked cue (4088) — RSA → ev1sim.
-// +kNumIpcTelltaleSignals for IPC seatbelt telltales (4130/4131) — IPC → ev1sim.
+// +kNumIpcTelltaleSignals for the IPC seatbelt telltale (4130) — IPC → ev1sim.
 // +kNumIpcTripDistSignals for IPC trip distance (4132) — IPC → ev1sim.
 // +kNumIpcBtcmTelltaleSignals for IPC BTCM/airbag telltales (4134–4138) — IPC → ev1sim.
 // +kNumIpcExtraTelltaleSignals for IPC extra LCD telltales (4140–4145) — IPC → ev1sim.
@@ -909,9 +907,6 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     out[i++] = {kSigIpcSeatbeltTelltaleDriver,
                 "vehicle.ipc.seatbelt_telltale_driver",
                 "ipc_seatbelt_telltale_driver", true};
-    out[i++] = {kSigIpcSeatbeltTelltalePassenger,
-                "vehicle.ipc.seatbelt_telltale_passenger",
-                "ipc_seatbelt_telltale_passenger", true};
     // IPC trip distance (IPC → ev1sim, chassis segment, input_to_sim=true).
     // Encoding: float32 LE, metres.  Published on change (epsilon ~0.5 m).
     out[i++] = {kSigIpcTripDistanceM,
@@ -1461,12 +1456,10 @@ struct ExternalSimConnector::State {
     bool          hvac_defrost_grid_active     = false;
     bool          has_hvac_defrost_grid_active = false;
 
-    // IPC LCD seatbelt telltales (IDs 4130/4131, chassis segment) — received from IPC.
-    // bool: false=lamp off, true=lamp on.  Lit when seat unbuckled AND speed > ~8 km/h.
+    // IPC LCD seatbelt telltale (ID 4130, chassis segment) — received from IPC.
+    // bool: false=lamp off, true=lamp on.  Lit when driver unbuckled AND speed > ~8 km/h.
     bool          ipc_seatbelt_telltale_driver         = false;
     bool          has_ipc_seatbelt_telltale_driver     = false;
-    bool          ipc_seatbelt_telltale_passenger      = false;
-    bool          has_ipc_seatbelt_telltale_passenger  = false;
 
     // IPC trip distance (ID 4132, chassis segment) — received from IPC.
     // float32 LE, metres.  Published on change (epsilon ~0.5 m).  Resets to 0
@@ -2088,12 +2081,6 @@ bool ExternalSimConnector::HasReceivedIpcSeatbeltTelltaleDriver() const {
     return m_state->has_ipc_seatbelt_telltale_driver;
 }
 
-bool ExternalSimConnector::GetIpcSeatbeltTelltalePassenger() const {
-    return m_state->ipc_seatbelt_telltale_passenger;
-}
-bool ExternalSimConnector::HasReceivedIpcSeatbeltTelltalePassenger() const {
-    return m_state->has_ipc_seatbelt_telltale_passenger;
-}
 
 float ExternalSimConnector::GetIpcTripDistanceM() const {
     return m_state->ipc_trip_distance_m;
@@ -2201,7 +2188,6 @@ ev1sim::DashSnapshot ExternalSimConnector::GetDashSnapshot() const {
     };
     ev1sim::DashLamps l;
     l.seatbelt_driver    = lamp(st.has_ipc_seatbelt_telltale_driver, st.ipc_seatbelt_telltale_driver);
-    l.seatbelt_passenger = lamp(st.has_ipc_seatbelt_telltale_passenger, st.ipc_seatbelt_telltale_passenger);
     l.brake              = lamp(st.has_ipc_brake_telltale, st.ipc_brake_telltale);
     l.park_brake         = lamp(st.has_ipc_park_brake_telltale, st.ipc_park_brake_telltale);
     l.antilock           = lamp(st.has_ipc_antilock_telltale, st.ipc_antilock_telltale);
@@ -2935,9 +2921,6 @@ void ExternalSimConnector::DebugInjectU8(std::uint32_t signal_id,
     } else if (signal_id == kSigIpcSeatbeltTelltaleDriver) {
         m_state->ipc_seatbelt_telltale_driver     = (value != 0u);
         m_state->has_ipc_seatbelt_telltale_driver = true;
-    } else if (signal_id == kSigIpcSeatbeltTelltalePassenger) {
-        m_state->ipc_seatbelt_telltale_passenger     = (value != 0u);
-        m_state->has_ipc_seatbelt_telltale_passenger = true;
     } else if (signal_id == kSigIpcBrakeTelltale) {
         m_state->ipc_brake_telltale     = (value != 0u);
         m_state->has_ipc_brake_telltale = true;
@@ -3129,7 +3112,6 @@ EV1SIM_CHASSIS_ID_MATCHES(kSigRsaShiftBlocked,           kSigChassisRsaShiftBloc
 EV1SIM_CHASSIS_ID_MATCHES(kSigAmbientTempC,              kSigChassisAmbientTempC);
 EV1SIM_CHASSIS_ID_MATCHES(kSigAmbientHumidityPct,        kSigChassisAmbientHumidityPct);
 EV1SIM_CHASSIS_ID_MATCHES(kSigIpcSeatbeltTelltaleDriver,    kSigChassisIpcSeatbeltTelltaleDriver);
-EV1SIM_CHASSIS_ID_MATCHES(kSigIpcSeatbeltTelltalePassenger, kSigChassisIpcSeatbeltTelltalePassenger);
 EV1SIM_CHASSIS_ID_MATCHES(kSigIpcTripDistanceM,          kSigChassisIpcTripDistanceM);
 EV1SIM_CHASSIS_ID_MATCHES(kSigIpcBrakeTelltale,          kSigChassisIpcBrakeTelltale);
 EV1SIM_CHASSIS_ID_MATCHES(kSigIpcParkBrakeTelltale,      kSigChassisIpcParkBrakeTelltale);
