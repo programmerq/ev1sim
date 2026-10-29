@@ -257,10 +257,10 @@ TEST_CASE("Door-lock rocker contacts publish onto the wire through Tick",
     CHECK_FALSE(contact(topo::kWireDRIVER_ES_DOOR_LOCK_RH_LOCK_SWITCH));
 }
 
-// The seat-belt switch and the shifter's reverse contact, through the same
-// Tick publish path: the belt contact is closed while UNBUCKLED, and the
-// reverse contact follows the PRND lines' R code.
-TEST_CASE("Seat-belt and reverse-select contacts publish onto the wire through Tick",
+// The seat-belt switch and the shifter's reverse and park contacts, through
+// the same Tick publish path: the belt contact is closed while UNBUCKLED, and
+// the reverse and park contacts follow the PRND lines' R and P codes.
+TEST_CASE("Seat-belt, reverse and park contacts publish onto the wire through Tick",
           "[wire_truth][attach_outcome]") {
     namespace topo = electricsim::topology;
     const std::string seg = unique_segment("belt_rev");
@@ -285,12 +285,14 @@ TEST_CASE("Seat-belt and reverse-select contacts publish onto the wire through T
     REQUIRE(c.IsConnected());
     CHECK_FALSE(contact(topo::kWireDRIVER_ES_SEATBELT_SWITCH));
     CHECK_FALSE(contact(topo::kWireDRIVER_ES_REVERSE_SELECT_SWITCH));
+    CHECK(contact(topo::kWireDRIVER_ES_PARK_SELECT_SWITCH));
 
     c.SetDriverSeatbeltBuckled(false);
     c.SetPrndSelector(false, false, true, true);    // R
     c.Tick(0.1);
     CHECK(contact(topo::kWireDRIVER_ES_SEATBELT_SWITCH));
     CHECK(contact(topo::kWireDRIVER_ES_REVERSE_SELECT_SWITCH));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_PARK_SELECT_SWITCH));
 
     c.SetPrndSelector(true, false, false, true);    // D
     c.Tick(0.2);

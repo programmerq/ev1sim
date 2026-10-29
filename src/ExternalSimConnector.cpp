@@ -131,8 +131,8 @@ constexpr std::uint32_t kChargeCouplerPresentId = 4060;
 //   4052  vehicle.driver.prnd_selector_c
 //   4053  vehicle.driver.prnd_selector_d  (even-parity bit)
 constexpr std::uint32_t kPrndSelectorAId = 4050;
-// PRND switch PARK SELECT contact -> BPM (electricsim BPM_PARK_SELECT).
-constexpr std::uint32_t kSigBpmParkSelect = 5142;
+// PRND switch #2 PARK contact (electricsim DRIVER_ES_PARK_SELECT_SWITCH).
+constexpr std::uint32_t kSigParkSelectSwitch = 5142;
 constexpr std::uint32_t kPrndSelectorBId = 4051;
 constexpr std::uint32_t kPrndSelectorCId = 4052;
 constexpr std::uint32_t kPrndSelectorDId = 4053;
@@ -1656,7 +1656,7 @@ struct ExternalSimConnector::State {
     bool prnd_c     = true;
     bool prnd_d     = false;
     std::int8_t prnd_a_pub = -1;   // -1 forces first publish
-    std::int8_t bpm_park_select_pub = -1;
+    std::int8_t park_select_switch_pub = -1;
     std::int8_t prnd_b_pub = -1;
     std::int8_t prnd_c_pub = -1;
     std::int8_t prnd_d_pub = -1;
@@ -3570,14 +3570,12 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         pub_prnd(kPrndSelectorBId, st.prnd_b, st.prnd_b_pub);
         pub_prnd(kPrndSelectorCId, st.prnd_c, st.prnd_c_pub);
         pub_prnd(kPrndSelectorDId, st.prnd_d, st.prnd_d_pub);
-        // The PRND switch's own PARK SELECT contact (circuit 275 -> BPM
-        // inline cavity 3, 275B; electricsim ev1-connections/
-        // ev1_prnd_switch_2.yaml cavity C) — a separate contact on the same
-        // lever, closed in Park. The BPM compares it with the PCM's serial
-        // PRND for DTC 285 and uses both for its batt-714 park gate. Park is
-        // the selector's 0110 code (propulsion manual p. 343).
+        // The PRND switch's own PARK contact (circuit 275 to the BPM and the
+        // RSA; electricsim ev1-connections/ev1_prnd_switch_2.yaml cavity C) —
+        // a separate contact on the same lever, closed in Park. Park is the
+        // selector's 0110 code (propulsion manual p. 343).
         const bool park = !st.prnd_a && st.prnd_b && st.prnd_c && !st.prnd_d;
-        pub_prnd(kSigBpmParkSelect, park, st.bpm_park_select_pub);
+        pub_prnd(kSigParkSelectSwitch, park, st.park_select_switch_pub);
     }
 
     // Power-steering pump HV interlock-closed (ID 4098) — publish delta on change.

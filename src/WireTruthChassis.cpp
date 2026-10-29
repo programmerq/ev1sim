@@ -104,8 +104,8 @@ static const std::unordered_map<std::uint32_t, ProducerCell>& ProducerRegistry()
         {4051U, {kWireDRIVER_ES_PRND_B,             WireType::kBit}},
         {4052U, {kWireDRIVER_ES_PRND_C,             WireType::kBit}},
         {4053U, {kWireDRIVER_ES_PRND_D,             WireType::kBit}},
-        // PRND switch PARK SELECT contact (circuit 275) -> BPM
-        {5142U, {kWireBPM_PARK_SELECT,              WireType::kBit}},
+        // PRND switch #2 PARK contact (circuit 275 to the BPM and RSA)
+        {5142U, {kWireDRIVER_ES_PARK_SELECT_SWITCH, WireType::kBit}},
         // Wiper/washer stalk contacts
         {4054U, {kWireDRIVER_ES_WIPER_DELAY_SWITCH,   WireType::kBit}},
         {4055U, {kWireDRIVER_ES_WIPER_REQUEST_SWITCH, WireType::kBit}},
