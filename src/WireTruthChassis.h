@@ -36,7 +36,10 @@
 #include <optional>
 #include <string>
 
-namespace electricsim::io { class WireTable; }  // opaque here; see table()
+namespace electricsim::io {
+class WireTable;                          // opaque here; see table()
+enum class ElementStateId : std::uint32_t;
+}
 
 namespace ev1sim {
 
@@ -116,6 +119,8 @@ public:
     //                      keeps its own last/default value.
     //   - true/false    -> the live wire value.
     std::optional<bool>          read_bit(std::uint32_t wire_id) const;
+    // The same read for a switch or contactor contact (an element_state cell).
+    std::optional<bool>          read_contact(electricsim::io::ElementStateId id) const;
 
     // Generic typed reads for byte, float32, and uint32 cells. Same contract
     // as read_bit: nullopt when not attached, undeclared, type-mismatched, or
@@ -213,12 +218,9 @@ public:
     // other than the cell's declared default (the line's rest level).
     static bool rsa_run_commanded_level(bool level);
 
-    // Auto-Disconnect main HV contactor closed (AD_MAIN_CONTACTOR — the AD's
-    // own commanded output, the authoritative successor of kSigAdMainContactor
-    // 5224). Re-pointed 2026-07-04 off the APM_HV_CONTACTOR_CLOSED echo cell it
-    // was mis-mapped to in the wire-truth port: the echo is only written when an APM
-    // is in the fleet, so AD-only fleets read a permanent 0 (see .cpp comment).
-    std::optional<bool> ad_main_contactor_closed() const;  // AD_MAIN_CONTACTOR
+    // Auto-Disconnect main HV contactor closed: the AD's own contactor
+    // command, the contact the HV bus plant reads. nullopt until the AD writes it.
+    std::optional<bool> ad_main_contactor_closed() const;  // HV_ES_MAIN_CONTACTOR
 
     // Auto-Disconnect state enum, reconstructed from the three discrete AD state
     // lines (AD_STATE_A/B/C) + the AD power-supply discrete (AD_POWER_SUPPLY),
@@ -265,8 +267,8 @@ public:
     std::optional<bool>          ipc_wait_telltale() const;  // CHASSIS_IPC_WAIT_TELLTALE
 
     // The RSA console's output cells in one read (RSA_RUN1_OUT, CHASSIS_RSA_ACC_OUT,
-    // _VALID_CODE, _SECURITY_INDICATOR, _SHIFT_BLOCKED, _BTSI_SOLENOID, the four
-    // _SELECTOR_LED_* and _DIM_LEVEL_STEP). Unwritten cells stay nullopt.
+    // _VALID_CODE, _SECURITY_INDICATOR, _SHIFT_BLOCKED, _BTSI_ENERGISED, the four
+    // _SELECTOR_LED_* and RSA_ES_DIM_LEVEL_DRV). Unwritten cells stay nullopt.
     ev1sim::DashRsaConsole rsa_console() const;
     // The IPC's COMMAND to ground circuit 2029 (IPC_ES_WAIT_TT_DRV, an
     // element_state cause the IPC writes). Read-only here, as every cell ev1sim
@@ -307,18 +309,31 @@ public:
     std::optional<bool>  pim_cruise_active() const;        // PIM_CRUISE_ACTIVE
     std::optional<float> pim_cruise_setpoint_mps() const;  // PIM_CRUISE_SETPOINT_MPS
 
-    // Auto-Disconnect precharge relay closed — external sim declared this cell
-    // (was kSigAdPrechargeRelay 5225). nullopt until AD writes it.
-    std::optional<bool>  ad_precharge_relay() const;       // AD_PRECHARGE_RELAY
+    // Auto-Disconnect precharge contactor closed, the contact the HV bus plant
+    // reads. nullopt until the AD writes it.
+    std::optional<bool>  ad_precharge_relay() const;       // HV_ES_PRECHARGE_CONTACTOR
 
     // The PIM's coast-down drag, Nm at the motor shaft (>= 0, opposing the
     // shaft's rotation). nullopt until the PIM writes CHASSIS_PIM_COAST_DRAG_NM.
     std::optional<float> pim_coast_drag_nm() const;        // CHASSIS_PIM_COAST_DRAG_NM
 
-    // The BTCM front modulator motor commands, signed [-1,+1] (+1 restore,
-    // -1 release, 0 neither). nullopt until the BTCM writes them.
-    std::optional<float> btcm_front_motor_cmd_fl() const;  // CHASSIS_BTCM_FRONT_MOTOR_CMD_FL
-    std::optional<float> btcm_front_motor_cmd_fr() const;  // CHASSIS_BTCM_FRONT_MOTOR_CMD_FR
+    // The BTCM's four brake motors, each driven through two leads: a front
+    // modulator's restore and release leads, a rear apply motor's apply and
+    // release leads. A lead reads 1 while it drives current through its motor
+    // (BTCM_FRONT_MOD_{LF,RF}_{RESTORE,RELEASE}, BTCM_REAR_EMB_{LR,RR}_
+    // {APPLY,RELEASE}, conductors the solver publishes). nullopt until the
+    // solver has written both leads of that motor.
+    enum class BtcmBrakeMotor { FrontLeft, FrontRight, RearLeft, RearRight };
+    struct BtcmMotorLeads {
+        bool drive   = false;  // restore (front) or apply (rear)
+        bool release = false;
+    };
+    std::optional<BtcmMotorLeads> btcm_motor_leads(BtcmBrakeMotor motor) const;
+
+    // The retard-request line at the PIM (PIM_RETARD_REQUEST_IN): the BTCM's
+    // request duty in permille while the line is live, 0 while dark. nullopt
+    // until the solver writes it.
+    std::optional<std::uint16_t> pim_retard_request_permille() const;
 
     // The wiper blades' position, percent of one full sweep cycle (0 = park,
     // 50 = end of sweep), from the RHJB's wiper-motor plant. nullopt until the
@@ -328,6 +343,17 @@ public:
     // The shifter's coast-down button position (1 = coast down), read by the
     // RSA. ev1sim is this cell's producer. Returns false if not attached.
     bool publish_coast_down_switch(bool on);               // DRIVER_COAST_DOWN_SWITCH
+
+    // Accelerator pedal travel, permille of full travel
+    // (DRIVER_ES_PEDAL_TRAVEL); the solver turns it into the PIM's pedal
+    // position tracks. ev1sim is this cell's producer. Returns false if not
+    // attached.
+    bool publish_pedal_travel(std::uint16_t permille);
+
+    // PRND switch #2's REVERSE SELECT contact (DRIVER_ES_REVERSE_SELECT_SWITCH),
+    // closed while the lever is in R; it lights the back-up lamps. ev1sim is
+    // this cell's producer. Returns false if not attached.
+    bool publish_reverse_select_switch(bool closed);
 
     // One click (press then release) of the RSA's DIM UP or DIM DOWN button;
     // the RSA moves its dimmer step one level per click. Returns false if not

@@ -218,16 +218,6 @@ TEST_CASE("FloatingUI callback: seatbelt driver toggle", "[FloatingUI][Callbacks
           == L"Seatbelt D: BUCKLED");
 }
 
-TEST_CASE("FloatingUI callback: seatbelt passenger toggle leaves driver unchanged",
-          "[FloatingUI][Callbacks]") {
-    ev1sim::PhysicalWorld world;
-    REQUIRE(world.seatbelts().passenger_buckled());
-
-    world.seatbelts().toggle_passenger();
-    CHECK_FALSE(world.seatbelts().passenger_buckled());
-    CHECK(world.seatbelts().driver_buckled());  // driver unaffected
-}
-
 // ---------------------------------------------------------------------------
 // UI mode toggle state machine in KeyboardInputController
 // ---------------------------------------------------------------------------

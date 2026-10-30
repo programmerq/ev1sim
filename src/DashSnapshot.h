@@ -124,12 +124,12 @@ struct DashRsaConsole {
     std::optional<bool> valid_code;     // CHASSIS_RSA_VALID_CODE
     std::optional<bool> security;       // CHASSIS_RSA_SECURITY_INDICATOR
     std::optional<bool> shift_blocked;  // CHASSIS_RSA_SHIFT_BLOCKED
-    std::optional<bool> btsi_solenoid;  // CHASSIS_RSA_BTSI_SOLENOID
+    std::optional<bool> btsi_solenoid;  // CHASSIS_RSA_BTSI_ENERGISED
     std::optional<bool> led_park;       // CHASSIS_RSA_SELECTOR_LED_PARK
     std::optional<bool> led_reverse;    // CHASSIS_RSA_SELECTOR_LED_REVERSE
     std::optional<bool> led_neutral;    // CHASSIS_RSA_SELECTOR_LED_NEUTRAL
     std::optional<bool> led_drive;      // CHASSIS_RSA_SELECTOR_LED_DRIVE
-    std::optional<std::uint8_t> dim_step;  // CHASSIS_RSA_DIM_LEVEL_STEP, 0..10
+    std::optional<std::uint16_t> dim_level_permille;  // RSA_ES_DIM_LEVEL_DRV, permille of 12 V
     std::optional<std::uint8_t> lock_driver;     // CHASSIS_DOOR_LOCK_CMD_DRIVER, 0 unlocked, 1 locked
     std::optional<std::uint8_t> lock_passenger;  // CHASSIS_DOOR_LOCK_CMD_PASSENGER
 };

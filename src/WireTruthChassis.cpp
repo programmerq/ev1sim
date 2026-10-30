@@ -59,8 +59,7 @@ namespace ev1sim {
 
 // ---------------------------------------------------------------------------
 // Producer registry — maps every ev1sim-produced ring signal_id to the
-// corresponding external WireId + WireType.  Generated from
-// /tmp/producer_cells.tsv (88 entries).  Using the real kWire* constants from
+// corresponding external WireId + WireType.  Using the real kWire* constants from
 // topology_generated.h is the drift guard: a renamed/removed constant fails
 // to compile, forcing this table to be updated in lockstep with the topology.
 // @design 2026-06-15 — table-driven dual-write (Phase C-b producer batch).
@@ -75,47 +74,46 @@ struct ProducerCell {
 
 static const std::unordered_map<std::uint32_t, ProducerCell>& ProducerRegistry() {
     static const std::unordered_map<std::uint32_t, ProducerCell> kRegistry = {
-        // Panel ajar switches (bit)
+        // The driver's switches are contacts (element_state cells, 1 = the
+        // contact is closed): ev1sim closes them and the external sim's wiring
+        // solver carries each one to the module pins it feeds. The signal ids
+        // are ev1sim's handles for them, the same pairing the external sim's
+        // combination-switch bridge uses (hardware/combo_switch/host/
+        // bridge_channel_map.hpp).
+        // Hood and trunk ajar switches (bit)
         {4030U, {kWirePANEL_AJAR_HOOD,              WireType::kBit}},
         {4031U, {kWirePANEL_AJAR_TRUNK,             WireType::kBit}},
-        {4032U, {kWirePANEL_AJAR_DOOR_LEFT,         WireType::kBit}},
-        {4033U, {kWirePANEL_AJAR_DOOR_RIGHT,        WireType::kBit}},
-        // Combination switch outputs (bit)
-        {4040U, {kWireCOMB_SW_LOW_BEAM_OUT,          WireType::kBit}},
-        {4041U, {kWireCOMB_SW_FLASH_TO_PASS_OUT,     WireType::kBit}},
-        {4042U, {kWireCOMB_SW_PARK_HEADLAMP_OUT,     WireType::kBit}},
-        // Turn/hazard switch outputs (bit)
-        {4043U, {kWireTURN_HAZ_SW_RIGHT_TURN_OUT,   WireType::kBit}},
-        {4044U, {kWireTURN_HAZ_SW_LEFT_TURN_OUT,    WireType::kBit}},
-        {4045U, {kWireTURN_HAZ_SW_HAZARD_OUT,       WireType::kBit}},
-        {4046U, {kWireTURN_HAZ_SW_HORN_OUT,         WireType::kBit}},
-        // Cruise switch outputs (bit)
-        {4047U, {kWireCRUISE_SW_SET_COAST_OUT,      WireType::kBit}},
-        {4048U, {kWireCRUISE_SW_RESUME_ACCEL_OUT,   WireType::kBit}},
-        {4049U, {kWireCRUISE_SW_ON_OFF_OUT,         WireType::kBit}},
-        // PRND selector lines (bit)
-        {4050U, {kWirePRND_SELECTOR_A,              WireType::kBit}},
-        {4051U, {kWirePRND_SELECTOR_B,              WireType::kBit}},
-        {4052U, {kWirePRND_SELECTOR_C,              WireType::kBit}},
-        {4053U, {kWirePRND_SELECTOR_D,              WireType::kBit}},
+        // Door jamb switches, closed while the door is open
+        {4032U, {kWireDRIVER_ES_DOOR_JAMB_LH_SWITCH, WireType::kBit}},
+        {4033U, {kWireDRIVER_ES_DOOR_JAMB_RH_SWITCH, WireType::kBit}},
+        // Headlamp switch contacts
+        {4040U, {kWireDRIVER_ES_LOW_BEAM_SWITCH,     WireType::kBit}},
+        {4041U, {kWireDRIVER_ES_FLASH_TO_PASS_SWITCH, WireType::kBit}},
+        {4042U, {kWireDRIVER_ES_PARK_LAMP_SWITCH,    WireType::kBit}},
+        // Turn/hazard switch and horn pad contacts
+        {4043U, {kWireDRIVER_ES_TURN_RIGHT_SWITCH,  WireType::kBit}},
+        {4044U, {kWireDRIVER_ES_TURN_LEFT_SWITCH,   WireType::kBit}},
+        {4045U, {kWireDRIVER_ES_HAZARD_SWITCH,      WireType::kBit}},
+        {4046U, {kWireDRIVER_ES_HORN_SWITCH,        WireType::kBit}},
+        // Cruise stalk contacts
+        {4047U, {kWireDRIVER_ES_CRUISE_SET_COAST_SWITCH,   WireType::kBit}},
+        {4048U, {kWireDRIVER_ES_CRUISE_RESUME_ACCEL_SWITCH, WireType::kBit}},
+        {4049U, {kWireDRIVER_ES_CRUISE_ON_SWITCH,          WireType::kBit}},
+        // PRND switch channels, 1 = the line reads high
+        {4050U, {kWireDRIVER_ES_PRND_A,             WireType::kBit}},
+        {4051U, {kWireDRIVER_ES_PRND_B,             WireType::kBit}},
+        {4052U, {kWireDRIVER_ES_PRND_C,             WireType::kBit}},
+        {4053U, {kWireDRIVER_ES_PRND_D,             WireType::kBit}},
         // PRND switch PARK SELECT contact (circuit 275) -> BPM
         {5142U, {kWireBPM_PARK_SELECT,              WireType::kBit}},
-        // Wiper switch outputs (bit)
-        {4054U, {kWireWIPER_SW_DELAY_OUT,           WireType::kBit}},
-        {4055U, {kWireWIPER_SW_REQUEST_OUT,         WireType::kBit}},
-        {4056U, {kWireWIPER_SW_HI_OUT,              WireType::kBit}},
-        {4057U, {kWireWIPER_SW_WASHER_SWITCH_OUT,   WireType::kBit}},
-        // Charger coupler (bit) — MULTI-PRODUCER: both ev1sim (operator UI) and
-        // the in-repo charger demo peer write it. The wire mirror is plain
-        // last-writer-wins, identical to the ring's existing behavior for this
-        // cell (the external sim's topology declares it multi-producer); ev1sim already
-        // publishes 4060 on the ring on-change, this extends the same write to
-        // the wire so the coupler consumers (bpm/pim/lhjb/ad) see the operator
-        // UI's toggle once they are wire-authoritative. Required before ev1sim
-        // can drop its ring writes (else the coupler would have no wire writer).
-        // @design 2026-06-16 — Phase 5 prep; external sim, flag if you want
-        // arbitration beyond last-writer-wins.
-        {4060U, {kWireCHARGER_COUPLER_PRESENT,      WireType::kBit}},
+        // Wiper/washer stalk contacts
+        {4054U, {kWireDRIVER_ES_WIPER_DELAY_SWITCH,   WireType::kBit}},
+        {4055U, {kWireDRIVER_ES_WIPER_REQUEST_SWITCH, WireType::kBit}},
+        {4056U, {kWireDRIVER_ES_WIPER_HI_SWITCH,      WireType::kBit}},
+        {4057U, {kWireDRIVER_ES_WASHER_SWITCH,        WireType::kBit}},
+        // Charge paddle fully inserted, closing the receptacle's coupler-present
+        // and wake-up contacts
+        {4060U, {kWireDRIVER_ES_CHARGE_COUPLER_MATED, WireType::kBit}},
         // Motor state (float32)
         {4070U, {kWireCHASSIS_MOTOR_RPM,            WireType::kFloat32}},
         {4071U, {kWireCHASSIS_MOTOR_TORQUE_NM,      WireType::kFloat32}},
@@ -151,18 +149,17 @@ static const std::unordered_map<std::uint32_t, ProducerCell>& ProducerRegistry()
         // ev1sim's own outputs use — and were migrated in an earlier external sim
         // step. ev1sim neither produces nor publishes them, so mirroring them
         // here would be a wrong-owner write onto a cell external sim drives.
-        // (docs/wire_truth_migration_scope.md §1: ev1sim produces 84 cells.)
         // Door lock state + road grade / pitch (bit / float32)
         {4165U, {kWireCHASSIS_DOOR_LOCK_STATE_DRIVER,    WireType::kBit}},
         {4166U, {kWireCHASSIS_DOOR_LOCK_STATE_PASSENGER, WireType::kBit}},
         {4167U, {kWireCHASSIS_DOOR_LOCK_STATE_TRUNK,     WireType::kBit}},
         {4168U, {kWireCHASSIS_ROAD_GRADE_PCT,            WireType::kFloat32}},
         {4169U, {kWireCHASSIS_PITCH_DEG,                 WireType::kFloat32}},
-        // Door lock switch outputs (bit)
-        {4170U, {kWireDOOR_LOCK_SW_LH_LOCK_OUT,    WireType::kBit}},
-        {4171U, {kWireDOOR_LOCK_SW_LH_UNLOCK_OUT,  WireType::kBit}},
-        {4172U, {kWireDOOR_LOCK_SW_RH_LOCK_OUT,    WireType::kBit}},
-        {4173U, {kWireDOOR_LOCK_SW_RH_UNLOCK_OUT,  WireType::kBit}},
+        // Door lock switch throws (bit)
+        {4170U, {kWireDRIVER_ES_DOOR_LOCK_LH_LOCK_SWITCH,   WireType::kBit}},
+        {4171U, {kWireDRIVER_ES_DOOR_LOCK_LH_UNLOCK_SWITCH, WireType::kBit}},
+        {4172U, {kWireDRIVER_ES_DOOR_LOCK_RH_LOCK_SWITCH,   WireType::kBit}},
+        {4173U, {kWireDRIVER_ES_DOOR_LOCK_RH_UNLOCK_SWITCH, WireType::kBit}},
         // (4187 LHJB_CHARGE_WAKE_PASSTHRU also excluded — see the HV-bus note
         //  above: it is lhjb_ecu-driven, not an ev1sim output.)
         // Driver inputs — main segment (byte / uint16 / bit / float32)
@@ -170,19 +167,19 @@ static const std::unordered_map<std::uint32_t, ProducerCell>& ProducerRegistry()
         {6901U, {kWireDRIVER_STEERING_DEG_Q8,           WireType::kUint16}},
         {6902U, {kWireDRIVER_GEAR_SELECTOR,             WireType::kByte}},
         {6903U, {kWireDRIVER_THROTTLE_Q8,               WireType::kByte}},
-        {6904U, {kWireDRIVER_BRAKE_SWITCH,              WireType::kBit}},
+        // Brake pedal switch, 1 = pedal pressed
+        {6904U, {kWireDRIVER_ES_BRAKE_SWITCH,           WireType::kBit}},
         // External wheel speed (float32)
         {6910U, {kWireEXT_WHEEL_SPEED_FL,               WireType::kFloat32}},
         {6911U, {kWireEXT_WHEEL_SPEED_FR,               WireType::kFloat32}},
         {6912U, {kWireEXT_WHEEL_SPEED_RL,               WireType::kFloat32}},
         {6913U, {kWireEXT_WHEEL_SPEED_RR,               WireType::kFloat32}},
         // Driver buttons (bit / byte)
-        // Park-brake switch: one-tick SET / RELEASE presses (BTCM).
-        {6946U, {kWireDRIVER_PARK_BRAKE_SET_REQ,         WireType::kBit}},
-        {6947U, {kWireDRIVER_PARK_BRAKE_RELEASE_REQ,     WireType::kBit}},
-        {6952U, {kWireDRIVER_IPC_TRIP_RESET_BUTTON,      WireType::kBit}},
-        {6964U, {kWireDRIVER_SEATBELT_BUCKLED,           WireType::kBit}},
-        {6965U, {kWireDRIVER_SEATBELT_BUCKLED_PASSENGER, WireType::kBit}},
+        // Park brake switch, 1 while held pushed; the BTCM applies or
+        // releases on each push.
+        {6946U, {kWireDRIVER_ES_PARK_BRAKE_SWITCH,       WireType::kBit}},
+        // Driver's buckle switch, closed while UNBUCKLED (elec-265).
+        {6964U, {kWireDRIVER_ES_SEATBELT_SWITCH,         WireType::kBit}},
         // RSA mode buttons: one bit cell per press area (LOCK / OFF-ACC / RUN,
         // ESM ELPD 441; the RSA's LOCK/OFF-ACC/RUN MODE SW inputs, ELPD 45-46).
         // Replace the 6971 byte press-enum, which ev1sim no longer publishes.
@@ -210,15 +207,13 @@ static const std::unordered_map<std::uint32_t, ProducerCell>& ProducerRegistry()
         {6981U, {kWireDRIVER_POWER_WINDOW_DRIVER_DOWN,    WireType::kBit}},
         {6982U, {kWireDRIVER_POWER_WINDOW_PASSENGER_UP,   WireType::kBit}},
         {6983U, {kWireDRIVER_POWER_WINDOW_PASSENGER_DOWN, WireType::kBit}},
-        // RSA exterior keypad (byte)
-        {6985U, {kWireDRIVER_RSA_EXTERIOR_KEYPAD1, WireType::kByte}},
-        {6986U, {kWireDRIVER_RSA_EXTERIOR_KEYPAD2, WireType::kByte}},
-        {6987U, {kWireDRIVER_RSA_EXTERIOR_KEYPAD3, WireType::kByte}},
-        {6988U, {kWireDRIVER_RSA_EXTERIOR_KEYPAD4, WireType::kByte}},
-        {6989U, {kWireDRIVER_RSA_EXTERIOR_KEYPAD5, WireType::kByte}},
-        // Door handle attempt (bit)
-        {6990U, {kWireDRIVER_DOOR_HANDLE_ATTEMPT_DRIVER,    WireType::kBit}},
-        {6991U, {kWireDRIVER_DOOR_HANDLE_ATTEMPT_PASSENGER, WireType::kBit}},
+        // RSA exterior keypad buttons, 1 while held; the RSA times tap
+        // against long press from the line.
+        {6985U, {kWireDRIVER_ES_EXT_KEYPAD_1, WireType::kBit}},
+        {6986U, {kWireDRIVER_ES_EXT_KEYPAD_2, WireType::kBit}},
+        {6987U, {kWireDRIVER_ES_EXT_KEYPAD_3, WireType::kBit}},
+        {6988U, {kWireDRIVER_ES_EXT_KEYPAD_4, WireType::kBit}},
+        {6989U, {kWireDRIVER_ES_EXT_KEYPAD_5, WireType::kBit}},
     };
     return kRegistry;
 }
@@ -302,6 +297,14 @@ std::optional<bool> WireTruthChassis::read_bit(std::uint32_t wire_id) const {
     electricsim::io::WireTable::Sample<bool> sample;
     if (!impl_->table->read_bit_sample(wire_id, &sample)) return std::nullopt;
     if (!sample.written()) return std::nullopt;  // producer hasn't moved yet
+    return sample.value;
+}
+
+std::optional<bool> WireTruthChassis::read_contact(electricsim::io::ElementStateId id) const {
+    if (!attached()) return std::nullopt;
+    electricsim::io::WireTable::Sample<bool> sample;
+    if (!impl_->table->read_bit_sample(id, &sample)) return std::nullopt;
+    if (!sample.written()) return std::nullopt;
     return sample.value;
 }
 
@@ -499,12 +502,10 @@ std::optional<std::uint32_t> WireTruthChassis::read_uint32(std::uint32_t wire_id
 
 // ---------------------------------------------------------------------------
 // Consumer registry — maps every ev1sim-CONSUMED ring signal_id to the
-// corresponding external WireId + WireType.  Generated from
-// /tmp/consumer_cells_v2.tsv (66 entries).  Using the real kWire* constants
+// corresponding external WireId + WireType.  Using the real kWire* constants
 // from topology_generated.h is the drift guard: a renamed/removed constant
 // fails to compile, forcing this table to be updated in lockstep with the
-// topology.  NOTE: types are bit/byte/float32/uint32 ONLY (no uint16/uint64
-// in the consumer set).
+// topology.
 // @design 2026-06-15 — consumer overlay batch.
 // ---------------------------------------------------------------------------
 struct ConsumerCell {
@@ -583,10 +584,6 @@ static const std::unordered_map<std::uint32_t, ConsumerCell>& ConsumerRegistry()
         // BTCM actuator state — chassis bus (bit / float32)
         {4147U, {ReadOnlyWireId(kWireCHASSIS_BTCM_ISO_CLOSE_FL),        WireType::kBit}},
         {4148U, {ReadOnlyWireId(kWireCHASSIS_BTCM_ISO_CLOSE_FR),        WireType::kBit}},
-        {4149U, {ReadOnlyWireId(kWireCHASSIS_BTCM_DUMP_OPEN_FL),        WireType::kBit}},
-        {4150U, {ReadOnlyWireId(kWireCHASSIS_BTCM_DUMP_OPEN_FR),        WireType::kBit}},
-        {4151U, {kWireCHASSIS_BTCM_EMB_MOTOR_CMD_LR,    WireType::kFloat32}},
-        {4152U, {kWireCHASSIS_BTCM_EMB_MOTOR_CMD_RR,    WireType::kFloat32}},
         {4153U, {kWireCHASSIS_BTCM_CYL_PRESSURE_FL_K_PA, WireType::kFloat32}},
         {4154U, {kWireCHASSIS_BTCM_CYL_PRESSURE_FR_K_PA, WireType::kFloat32}},
         // IPC turn / high-beam / park-lamp / door-ajar telltales + dim duty (bit / byte)
@@ -604,14 +601,6 @@ static const std::unordered_map<std::uint32_t, ConsumerCell>& ConsumerRegistry()
         {4184U, {ReadOnlyWireId(kWireCHASSIS_RHJB_DLM_RH_LOCK),         WireType::kBit}},
         {4185U, {ReadOnlyWireId(kWireCHASSIS_RHJB_DLM_RH_UNLOCK),       WireType::kBit}},
         {4186U, {kWireCHASSIS_RHJB_DILM_LEVEL,          WireType::kByte}},
-        // BTCM retard-request PWM duty (uint16, Q8 percent 0..25600). This is
-        // the wire the BTCM asks the propulsion side for regen torque on
-        // (@source:manual brakes-313 "the drive unit motor is electrically
-        // converted into a generator"; PIM J1-18 RETARD REQUEST IN). Consumed
-        // here so an acceptance scenario can witness "regen was COMMANDED"
-        // rather than inferring it from the deceleration trace, which friction
-        // braking produces identically.
-        {4191U, {kWireCHASSIS_BTCM_RETARD_REQUEST_DUTY_Q8, WireType::kUint16}},
         // TJB rear-lamp branches (bit). The LHJB's BULB_FEED_LINE_LRSL/_RRSL
         // (4014/4016, already consumed above) are the feeds INTO the trunk
         // junction block; these two are what the TJB actually hands the rear
@@ -724,18 +713,9 @@ std::optional<bool> WireTruthChassis::rsa_run_active() const {
 }
 
 std::optional<bool> WireTruthChassis::ad_main_contactor_closed() const {
-    // Read the AD's OWN commanded main-contactor output (AD_MAIN_CONTACTOR),
-    // not the APM's downstream echo (APM_HV_CONTACTOR_CLOSED) it was
-    // mis-mapped to during the wire-truth port. The ring signal this getter
-    // replaces (kSigAdMainContactor 5224) was published BY THE AD, and the
-    // echo cell is only written when an APM is in the fleet — the VAT
-    // safety_ad_precharge_timeout fleet is [hv_bus, ad], so the echo stayed
-    // unwritten and the healthy-run "main contactor closed" discriminator
-    // read a permanent 0 while the AD's own log showed main=1. Found
-    // 2026-07-04 triaging the nightly. @design 2026-07-04 — authoritative
-    // source, matching the sibling getters (ad_precharge_relay, ad_state_enum),
-    // which already read the AD's own cells.
-    return read_bit(electricsim::topology::kWireAD_MAIN_CONTACTOR);
+    // The AD's own main-contactor command, as the HV bus plant reads it
+    // (HV_ES_MAIN_CONTACTOR), not the APM's downstream echo.
+    return read_contact(electricsim::topology::kWireHV_ES_MAIN_CONTACTOR);
 }
 
 std::optional<std::uint32_t> WireTruthChassis::ad_state_enum() const {
@@ -819,12 +799,17 @@ ev1sim::DashRsaConsole WireTruthChassis::rsa_console() const {
     c.valid_code    = read_bit(kWireCHASSIS_RSA_VALID_CODE);
     c.security      = read_bit(kWireCHASSIS_RSA_SECURITY_INDICATOR);
     c.shift_blocked = read_bit(kWireCHASSIS_RSA_SHIFT_BLOCKED);
-    c.btsi_solenoid = read_bit(kWireCHASSIS_RSA_BTSI_SOLENOID);
+    c.btsi_solenoid = read_bit(ReadOnlyWireId(kWireCHASSIS_RSA_BTSI_ENERGISED));
     c.led_park      = read_bit(kWireCHASSIS_RSA_SELECTOR_LED_PARK);
     c.led_reverse   = read_bit(kWireCHASSIS_RSA_SELECTOR_LED_REVERSE);
     c.led_neutral   = read_bit(kWireCHASSIS_RSA_SELECTOR_LED_NEUTRAL);
     c.led_drive     = read_bit(kWireCHASSIS_RSA_SELECTOR_LED_DRIVE);
-    c.dim_step      = read_byte(kWireCHASSIS_RSA_DIM_LEVEL_STEP);
+    {
+        electricsim::io::WireTable::Sample<std::uint16_t> dim;
+        if (attached() && impl_->table->read_uint16_sample(kWireRSA_ES_DIM_LEVEL_DRV, &dim) &&
+            dim.written())
+            c.dim_level_permille = dim.value;
+    }
     c.lock_driver   = read_byte(kWireCHASSIS_DOOR_LOCK_CMD_DRIVER);
     c.lock_passenger = read_byte(kWireCHASSIS_DOOR_LOCK_CMD_PASSENGER);
     return c;
@@ -875,19 +860,44 @@ std::optional<float> WireTruthChassis::pim_cruise_setpoint_mps() const {
 }
 
 std::optional<bool> WireTruthChassis::ad_precharge_relay() const {
-    return read_bit(electricsim::topology::kWireAD_PRECHARGE_RELAY);
+    return read_contact(electricsim::topology::kWireHV_ES_PRECHARGE_CONTACTOR);
 }
 
 std::optional<float> WireTruthChassis::pim_coast_drag_nm() const {
     return read_float32(electricsim::topology::kWireCHASSIS_PIM_COAST_DRAG_NM);
 }
 
-std::optional<float> WireTruthChassis::btcm_front_motor_cmd_fl() const {
-    return read_float32(electricsim::topology::kWireCHASSIS_BTCM_FRONT_MOTOR_CMD_FL);
+std::optional<WireTruthChassis::BtcmMotorLeads> WireTruthChassis::btcm_motor_leads(
+    BtcmBrakeMotor motor) const {
+    using namespace electricsim::topology;
+    WireId drive = 0;
+    WireId release = 0;
+    switch (motor) {
+        case BtcmBrakeMotor::FrontLeft:
+            drive   = ReadOnlyWireId(kWireBTCM_FRONT_MOD_LF_RESTORE);
+            release = ReadOnlyWireId(kWireBTCM_FRONT_MOD_LF_RELEASE);
+            break;
+        case BtcmBrakeMotor::FrontRight:
+            drive   = ReadOnlyWireId(kWireBTCM_FRONT_MOD_RF_RESTORE);
+            release = ReadOnlyWireId(kWireBTCM_FRONT_MOD_RF_RELEASE);
+            break;
+        case BtcmBrakeMotor::RearLeft:
+            drive   = ReadOnlyWireId(kWireBTCM_REAR_EMB_LR_APPLY);
+            release = ReadOnlyWireId(kWireBTCM_REAR_EMB_LR_RELEASE);
+            break;
+        case BtcmBrakeMotor::RearRight:
+            drive   = ReadOnlyWireId(kWireBTCM_REAR_EMB_RR_APPLY);
+            release = ReadOnlyWireId(kWireBTCM_REAR_EMB_RR_RELEASE);
+            break;
+    }
+    const auto d = read_bit(drive);
+    const auto r = read_bit(release);
+    if (!d || !r) return std::nullopt;
+    return BtcmMotorLeads{*d, *r};
 }
 
-std::optional<float> WireTruthChassis::btcm_front_motor_cmd_fr() const {
-    return read_float32(electricsim::topology::kWireCHASSIS_BTCM_FRONT_MOTOR_CMD_FR);
+std::optional<std::uint16_t> WireTruthChassis::pim_retard_request_permille() const {
+    return read_uint16(ReadOnlyWireId(electricsim::topology::kWirePIM_RETARD_REQUEST_IN));
 }
 
 std::optional<std::uint8_t> WireTruthChassis::wiper_sweep_position_pct() const {
@@ -897,6 +907,19 @@ std::optional<std::uint8_t> WireTruthChassis::wiper_sweep_position_pct() const {
 bool WireTruthChassis::publish_coast_down_switch(bool on) {
     if (!attached()) return false;
     return write_bit(ProducerWireId(electricsim::topology::kWireDRIVER_COAST_DOWN_SWITCH), on);
+}
+
+bool WireTruthChassis::publish_pedal_travel(std::uint16_t permille) {
+    if (!attached()) return false;
+    return impl_->table->write_element_state_level(
+        electricsim::topology::kWireDRIVER_ES_PEDAL_TRAVEL,
+        std::min<std::uint16_t>(permille, 1000u));
+}
+
+bool WireTruthChassis::publish_reverse_select_switch(bool closed) {
+    if (!attached()) return false;
+    return write_bit(ProducerWireId(electricsim::topology::kWireDRIVER_ES_REVERSE_SELECT_SWITCH),
+                     closed);
 }
 
 bool WireTruthChassis::publish_rsa_dim_click(bool up) {
@@ -952,6 +975,9 @@ std::uint32_t WireTruthChassis::CompiledTopologyHash() { return 0U; }
 
 bool WireTruthChassis::attached() const { return false; }
 std::optional<bool> WireTruthChassis::read_bit(std::uint32_t) const {
+    return std::nullopt;
+}
+std::optional<bool> WireTruthChassis::read_contact(electricsim::io::ElementStateId) const {
     return std::nullopt;
 }
 std::optional<std::uint8_t> WireTruthChassis::read_byte(std::uint32_t) const {
@@ -1056,16 +1082,19 @@ std::optional<bool> WireTruthChassis::ad_precharge_relay() const {
 std::optional<float> WireTruthChassis::pim_coast_drag_nm() const {
     return std::nullopt;
 }
-std::optional<float> WireTruthChassis::btcm_front_motor_cmd_fl() const {
+std::optional<WireTruthChassis::BtcmMotorLeads> WireTruthChassis::btcm_motor_leads(
+    BtcmBrakeMotor) const {
     return std::nullopt;
 }
-std::optional<float> WireTruthChassis::btcm_front_motor_cmd_fr() const {
+std::optional<std::uint16_t> WireTruthChassis::pim_retard_request_permille() const {
     return std::nullopt;
 }
 std::optional<std::uint8_t> WireTruthChassis::wiper_sweep_position_pct() const {
     return std::nullopt;
 }
 bool WireTruthChassis::publish_coast_down_switch(bool) { return false; }
+bool WireTruthChassis::publish_pedal_travel(std::uint16_t) { return false; }
+bool WireTruthChassis::publish_reverse_select_switch(bool) { return false; }
 bool WireTruthChassis::publish_rsa_dim_click(bool) { return false; }
 
 }  // namespace ev1sim

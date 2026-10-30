@@ -53,8 +53,8 @@ std::wstring FormatRsaSecurity(const std::optional<bool>& security);
 std::wstring FormatRsaShiftLock(const std::optional<bool>& shift_blocked);
 /// "BTSI solenoid: ENERGIZED" / "BTSI solenoid: off" / "BTSI solenoid: ---".
 std::wstring FormatRsaBtsi(const std::optional<bool>& btsi_solenoid);
-/// "Backlight 70%" from the 0..10 dimmer step (clamped), or "Backlight ---".
-std::wstring FormatRsaBacklight(const std::optional<std::uint8_t>& dim_step);
+/// "Backlight 70%" from the DIM LEVEL OUT in permille (clamped), or "Backlight ---".
+std::wstring FormatRsaBacklight(const std::optional<std::uint16_t>& dim_level_permille);
 /// "Door locks: LOCKED" / "unlocked" when both doors agree, "Door locks: DRV
 /// locked, PAS unlocked" when not, "Door locks: ---" until both are written.
 std::wstring FormatRsaDoorLocks(const std::optional<std::uint8_t>& driver,

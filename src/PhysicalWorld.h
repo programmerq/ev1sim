@@ -12,7 +12,8 @@ namespace ev1sim {
 /// The combination (turn/headlamp/cruise) stalk on the left column.
 /// Models the four rotary positions plus the momentary flash-to-pass lever.
 ///
-/// Pin truth table per the EV1 service manual (6-way blue 12084699 connector):
+/// Pin truth table per the EV1 service manual (6-way blue 12084699 connector;
+/// @source:manual p557 — B is "high beam or flash-to-pass", C "headlamps on"):
 ///
 ///   Position  flash_to_pass  low_beam_out (C)  flash_to_pass_out (B)  park_headlamp_out (F)
 ///   --------  -------------  ----------------  ---------------------  ---------------------
@@ -22,12 +23,9 @@ namespace ev1sim {
 ///   PARK      true           0                 1                      1
 ///   ON        false          1                 0                      1
 ///   ON        true           1                 1                      1
-///   HI        false          0                 0                      1
-///   HI        true (locked)  0                 0                      1  (interlock suppresses B)
+///   HI        either         1                 1                      1
 ///
-/// Note: hi-beam-on is NOT a fourth output pin.  LHJB derives it internally
-/// as (pos == HI) || (flash_to_pass_out == 1).  Do not add a fourth chassis
-/// bus signal for it — that would be wrong per the schematic.
+/// The LHJB reads the high beam from pin B alone, so HI closes B.
 class CombinationSwitch {
 public:
     enum class Position { OFF, PARK, ON, HI };
@@ -37,8 +35,7 @@ public:
 
     /// Set flash-to-pass momentary lever state.
     /// pass true while the key is held, false on release.
-    /// At HI position the lever is mechanically interlocked; the held bit is
-    /// ignored and pin_flash_to_pass_out() always returns false.
+    /// At HI pin B is already closed, so the held bit changes nothing there.
     void set_flash_to_pass(bool held);
 
     Position position()           const { return m_position; }
@@ -187,22 +184,16 @@ private:
     Position m_position = Position::P;   // default: Park
 };
 
-/// Charge coupler presence sensor.
-///
-/// Models the J1772/Avcon paddle mating detection on the EV1 charge port.
-/// Stubbed false for now — present() always returns false until a future
-/// floating-UI panel or animation hook calls set_present(true).
-///
-/// TODO: when the charge-door animation is added, hook into this component
-/// and publish kSigChargerCouplerPresent (chassis ID 4060) to signal the
-/// external sim side that the paddle is mated.
+/// Charge coupler presence: the paddle mated in the charge port.  Toggled from
+/// the floating UI or a rig switch; published as chassis ID 4060
+/// (DRIVER_ES_CHARGE_COUPLER_MATED).
 class ChargeCoupler {
 public:
     bool present() const { return m_present; }
     void set_present(bool p) { m_present = p; }
 
 private:
-    bool m_present = false;  // future UI toggle
+    bool m_present = false;
 };
 
 /// Turn-signal stalk (right column, left of steering wheel).
@@ -310,7 +301,7 @@ private:
     bool m_held = false;
 };
 
-/// Park-brake push button: one momentary button whose two linked contacts
+/// Park-brake push button: one momentary contact (DRIVER_ES_PARK_BRAKE_SWITCH)
 /// the BTCM reads, each push toggling apply/release.  The driver's request is
 /// a level (DriverCommand::parking_brake); every change of it becomes one
 /// push held for kPushS, with a kGapS release before any further push, so
@@ -325,7 +316,6 @@ public:
         if (!m_seen) {
             m_seen = true;
             m_requested = requested;   // the car starts where the driver does
-            m_applied   = requested;
         } else if (requested != m_requested) {
             m_requested = requested;
             ++m_pushes_owed;
@@ -338,21 +328,16 @@ public:
             (m_since_s < 0.0 || sim_time_s - m_since_s >= kGapS - kTimeEpsS)) {
             m_pushed = true;
             m_since_s = sim_time_s;
-            m_applied = !m_applied;    // each push toggles the brake
             --m_pushes_owed;
         }
     }
     bool pushed() const { return m_pushed; }
-    /// The level the current (or last) push moves the brake toward (true = apply),
-    /// fixed when the push starts.
-    bool push_applies() const { return m_applied; }
 
 private:
     static constexpr double kTimeEpsS = 1e-9;   // sim time is a sum of float steps
 
     bool   m_seen        = false;
     bool   m_requested   = false;   // latest driver request
-    bool   m_applied     = false;   // brake level after the pushes started so far
     bool   m_pushed      = false;
     int    m_pushes_owed = 0;
     double m_since_s     = -1.0;   // start of the current push or gap; < 0 = never pushed
@@ -545,8 +530,8 @@ private:
 /// IPC cluster trip-reset button (momentary dash button).
 ///
 /// Single-shot press: press() marks a pending event; consume_press_event()
-/// returns true once and clears the flag.  SimApp drives the consume path
-/// each frame and publishes kSigDriverIpcTripResetButton (6952) when true.
+/// returns true once and clears the flag.  The car has no trip-reset input
+/// wire yet, so SimApp consumes the press without publishing it.
 class IpcTripResetButton {
 public:
     /// Signal a button press (user tapped the I key in ev1sim).
@@ -669,20 +654,18 @@ public:
 
     Position position() const { return m_position; }
 
-    // Wiper/washer switch (connector 12092254) output cavities, published
-    // wire-level on the chassis bus.  HI layers on top of the LOW "request"
-    // wire so the consuming decode `hi?HIGH : request?LOW : delay?INT : OFF`
-    // is order-robust regardless of whether request is also asserted at HIGH.
-    //   pin B, GRA 112   "WIPER DELAY OUT"    INT only      (chassis ID 4054)
-    //   pin C, DK GRN 113 "REQUEST OUT"        LOW or HIGH   (chassis ID 4055)
-    //   pin D, PPL 92    "HI OUT"             HIGH only     (chassis ID 4056)
-    //   pin E, PNK 228C  "WASHER-SWITCH OUT"  wash pressed   (chassis ID 4057)
-    // TODO(verify): confirm the position->cavity truth table against EV1 ESM
-    // p.643; RHJB's decode must mirror exactly what lands here.
-    bool pin_delay_out()   const { return m_position == Position::INT; }
-    bool pin_request_out() const {
+    // Wiper/washer switch (connector 12092254) output cavities, written as
+    // DRIVER_ES_WIPER_* contacts (@design electricsim topology, elec-511):
+    //   pin B, GRA 112   "WIPER DELAY OUT"    LOW or HIGH          (chassis ID 4054)
+    //   pin C, DK GRN 113 "REQUEST OUT"        INT, LOW or HIGH     (chassis ID 4055)
+    //   pin D, PPL 92    "HI OUT"             HIGH only            (chassis ID 4056)
+    //   pin E, PNK 228C  "WASHER-SWITCH OUT"  wash pressed         (chassis ID 4057)
+    // INT also reads a delay-ladder rung on the RHJB; ev1sim has no delay
+    // collar, so it leaves that rung unwritten and the RHJB uses its default.
+    bool pin_delay_out() const {
         return m_position == Position::LOW || m_position == Position::HIGH;
     }
+    bool pin_request_out() const { return m_position != Position::OFF; }
     bool pin_hi_out()            const { return m_position == Position::HIGH; }
     bool pin_washer_switch_out() const { return m_wash; }
 
@@ -866,108 +849,68 @@ private:
     double m_humidity_pct = 55.0;
 };
 
-/// Seatbelt buckle sensors — driver seat and passenger seat.
-///
-/// Models the two reed-switch-style buckle sensors in the EV1.  Both default
-/// to buckled (true) matching the pre-UI behaviour where ev1sim always reported
-/// the driver as buckled.
-///
-/// Signals:
-///   kSigDriverSeatbeltBuckled (6964)          — driver
-///   kSigDriverSeatbeltBuckledPassenger (6965) — passenger
-///
-/// TODO(consumer): IPC seatbelt-light telltale should wire passenger signal
-/// (6965) — deferred to a future external sim round.
+/// Driver seat-belt buckle.  Defaults to buckled.  Published as the belt
+/// switch (kSigDriverSeatbeltSwitch 6964), closed while UNBUCKLED; the car has
+/// no passenger belt switch.
 class Seatbelts {
 public:
-    bool driver_buckled()    const { return m_driver;    }
-    bool passenger_buckled() const { return m_passenger; }
-
-    void set_driver(bool buckled)    { m_driver    = buckled; }
-    void set_passenger(bool buckled) { m_passenger = buckled; }
-
+    bool driver_buckled() const { return m_driver; }
+    void set_driver(bool buckled) { m_driver = buckled; }
     /// Toggle driver buckle state: BUCKLED ↔ UNBUCKLED.
-    void toggle_driver()    { m_driver    = !m_driver;    }
-    /// Toggle passenger buckle state: BUCKLED ↔ UNBUCKLED.
-    void toggle_passenger() { m_passenger = !m_passenger; }
+    void toggle_driver() { m_driver = !m_driver; }
 
 private:
-    bool m_driver    = true;   // default: buckled (matches pre-UI behaviour)
-    bool m_passenger = true;   // default: buckled
+    bool m_driver = true;
 };
 
 /// RSA exterior pillar keypad (5 buttons: 1/2, 3/4, 5/6, 7/8, 9/0).
 ///
-/// Mirrors the encoding of the interior RsaKeypadDriver but driven directly
-/// by the floating-UI panel (mouse-clickable) rather than the K key scheduler.
-///
-/// Long-press encoding (Option A, same as interior):
-///   0 = idle, 1 = tap (lower digit), 2 = long-press (higher digit)
-///
-/// press_button(idx, long_press) queues a momentary value for the next tick.
-/// clear_oneshots() resets all button values to idle after they are consumed.
-/// enter_code_sequence(code_str) queues a sequence of individual taps/longs
-/// that fire one per tick — used by the "Enter 11111" convenience button.
+/// Each button is one contact the RSA reads as a level while it is held
+/// (DRIVER_ES_EXT_KEYPAD_1..5).  The RSA tells the lower digit from the higher
+/// one by how long the button stays down, so a queued press becomes a hold of
+/// kTapHoldS (lower digit) or kLongHoldS (higher digit), and queued presses are
+/// separated by a kGapS release.  Both holds sit well clear of the RSA's
+/// long-press time (electricsim rsa_ext_keypad_lines.hpp kKeypadLongPressMs).
 class RsaExteriorKeypad {
 public:
-    /// Queue a momentary button press on button idx (0..4).
-    /// If long_press=false, sets value=1 (tap); if true, sets value=2 (long-press).
+    static constexpr double kTapHoldS  = 0.2;   // @inferred — a deliberate tap
+    static constexpr double kLongHoldS = 0.8;   // @inferred — a held button
+    static constexpr double kGapS      = 0.2;   // @inferred — release between presses
+
+    /// Queue a press of button idx (0..4): a tap, or a long press.
     void press_button(int button_idx, bool long_press);
 
-    /// Read current value for button idx (0=idle, 1=tap, 2=long-press).
-    std::uint8_t button_value(int idx) const;
-
-    /// Convenience: true if button idx has a tap queued.
-    bool button_tap(int idx) const  { return button_value(idx) == 1; }
-    /// Convenience: true if button idx has a long-press queued.
-    bool button_long(int idx) const { return button_value(idx) == 2; }
-
-    /// Reset all button values to idle (call after consuming them each tick).
-    void clear_oneshots();
-
-    /// Queue the full 5-digit code as a sequence of button presses.
+    /// Queue the full 5-digit code (manual p.442), one press per digit:
+    /// 1→btn0 tap, 2→btn0 long, 3→btn1 tap, … 9→btn4 tap, 0→btn4 long.
     /// code_str must be exactly 5 digit characters (0-9).
-    /// Digits map to buttons: 1→btn0 tap, 2→btn0 long, 3→btn1 tap,
-    /// 4→btn1 long, 5→btn2 tap, 6→btn2 long, 7→btn3 tap, 8→btn3 long,
-    /// 9→btn4 tap, 0→btn4 long.
-    /// Each press fires on a separate tick driven by tick_sequence()/
-    /// consume_sequence_fires() below.
     void enter_code_sequence(const char* code_str);
 
-    /// Tick the sequence emitter by dt_s seconds (100 ms between digits).
+    /// Advance the press timeline by dt_s; held() then reports this tick's contacts.
     void update(double dt_s);
 
-    /// Consume any sequence fires for this tick — merges into pending button values.
-    /// Returns true if a sequence digit fired this tick.
-    bool consume_sequence_fire();
+    /// True while button idx's contact is closed.
+    bool held(int idx) const { return m_phase == Phase::Held && idx == m_button; }
 
-    /// True if a code sequence is currently in progress.
-    bool sequence_in_progress() const;
+    /// True while a press is held, releasing, or queued.
+    bool sequence_in_progress() const { return m_phase != Phase::Idle || m_count > 0; }
 
 private:
-    // Per-button momentary values (0=idle, 1=tap, 2=long).
-    std::uint8_t m_tap_value[5] = {};
+    enum class Phase { Idle, Held, Gap };
+    struct Press { std::uint8_t button_idx; bool long_press; };
+    static constexpr int kQueueLen = 16;
 
-    // Sequence emitter (for enter_code_sequence). Five digits, manual p.442.
-    static constexpr int kMaxCodeLen = 5;
-    struct SeqEntry { std::uint8_t button_idx; bool long_press; };
-    SeqEntry m_seq[kMaxCodeLen];
-    int      m_seq_len    = 0;
-    int      m_seq_pos    = 0;
-    double   m_seq_timer  = 0.0;  // seconds until next digit fires
-    bool     m_seq_active = false;
+    Press  m_queue[kQueueLen] = {};
+    int    m_head   = 0;
+    int    m_count  = 0;
+    Phase  m_phase  = Phase::Idle;
+    int    m_button = -1;
+    double m_timer  = 0.0;   // seconds left in the current hold or gap
 };
 
 /// Door handle pull attempts (driver door + passenger door).
 ///
-/// Momentary one-shot events — each tick the attempt flag is set, consumed by
-/// SimApp which checks DoorLocks state and decides what to do.
-///
-/// Behavior when consumed (SimApp integration):
-///   - If the corresponding door is LOCKED: emit log "Door X: LOCKED — try keypad code"
-///     and publish the attempt signal (6990/6991) momentarily.
-///   - If the corresponding door is UNLOCKED: open the door (toggle VehiclePanels
-///     ajar state) and publish the attempt signal momentarily.
+/// Momentary one-shot events consumed by SimApp, which opens the door when it
+/// is unlocked.  The handles have no wire on the car, so nothing is published.
 class DoorHandles {
 public:
     /// Queue a momentary driver-door handle pull attempt.

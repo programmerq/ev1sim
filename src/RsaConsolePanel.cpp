@@ -40,11 +40,11 @@ std::wstring FormatRsaBtsi(const std::optional<bool>& btsi_solenoid) {
     return Labelled(L"BTSI solenoid: ", btsi_solenoid, L"ENERGIZED", L"off");
 }
 
-std::wstring FormatRsaBacklight(const std::optional<std::uint8_t>& dim_step) {
-    if (!dim_step) return L"Backlight ---";
-    // The RSA's interior-dimmer step is 0..10; shown as a percentage the way
-    // the external sim's wire-mode panel scales it (step * 10).
-    const unsigned pct = std::min<unsigned>(*dim_step, 10u) * 10u;
+std::wstring FormatRsaBacklight(const std::optional<std::uint16_t>& dim_level_permille) {
+    if (!dim_level_permille) return L"Backlight ---";
+    // The RSA's DIM LEVEL OUT is permille of 12 V; shown in percent the way the
+    // external sim's wire-mode panel scales it (permille / 10).
+    const unsigned pct = std::min<unsigned>(*dim_level_permille, 1000u) / 10u;
     wchar_t buf[32];
     std::swprintf(buf, sizeof(buf) / sizeof(buf[0]), L"Backlight %u%%", pct);
     return buf;
@@ -105,7 +105,7 @@ RsaConsoleView BuildRsaConsoleView(const std::optional<DashRsaConsole>& rsa,
     v.security   = FormatRsaSecurity(c.security);
     v.shift_lock = FormatRsaShiftLock(c.shift_blocked);
     v.btsi       = FormatRsaBtsi(c.btsi_solenoid);
-    v.backlight  = FormatRsaBacklight(c.dim_step);
+    v.backlight  = FormatRsaBacklight(c.dim_level_permille);
     v.door_locks = FormatRsaDoorLocks(c.lock_driver, c.lock_passenger);
     return v;
 }

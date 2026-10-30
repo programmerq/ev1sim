@@ -206,16 +206,10 @@ public:
     /// (0=released, 1=applied).  Published on main harness segment.
     void SetDriverBrakeSwitch(bool pressed);
 
-    /// Outgoing seatbelt buckle state (ID 6964).  Encoded as 1-byte uint8
-    /// (0=unbuckled, 1=buckled).  Published on main harness segment.
+    /// Driver seat-belt buckle state; published as the belt switch (ID 6964),
+    /// whose contact is closed while the belt is unbuckled.
     /// Driven by PhysicalWorld::Seatbelts.driver_buckled() each tick.
     void SetDriverSeatbeltBuckled(bool buckled);
-
-    /// Outgoing passenger seatbelt buckle state (ID 6965).  Mirrors driver
-    /// (6964) for the passenger seat.  Published on main harness segment.
-    /// Driven by PhysicalWorld::Seatbelts.passenger_buckled() each tick.
-    /// TODO(consumer): IPC seatbelt-light telltale — deferred to future round.
-    void SetDriverSeatbeltBuckledPassenger(bool buckled);
 
     /// Outgoing turn-signal stalk position (IDs 6948, 6949).
     /// Encoded as 1-byte uint8 boolean each (0=inactive, 1=active).
@@ -273,11 +267,6 @@ public:
     /// RUN / OFF/ACC / LOCK MODE SW inputs).
     void SetDriverRsaModeSwitches(std::uint8_t mask);
 
-    /// Outgoing IPC trip-reset button (ID 6952, main harness segment).
-    /// Momentary 1-byte uint8 bool (0=idle, 1=pressed this tick).
-    /// Published by ev1sim on the I key.
-    void SetDriverIpcTripReset(bool pressed);
-
     /// Outgoing cruise-control switch RAW CONTACTS — chassis cavities
     /// kSigCruiseSw_{SetCoast,ResumeAccel,OnOff}Out (4047/4048/4049, circuits
     /// 84/87/397 at PIM J1).  Each is a 1-byte uint8 bool: 1 = contact closed.
@@ -289,16 +278,6 @@ public:
     void SetCruiseSetCoastContact(bool closed);
     void SetCruiseResumeAccelContact(bool closed);
     void SetCruiseOnOffContact(bool closed);
-
-    /// Outgoing wiper stalk position (ID 6958, main harness segment).
-    /// 1-byte uint8 enum: 0=OFF, 1=INT, 2=LOW, 3=HIGH.
-    /// V key in ev1sim cycles: OFF → INT → LOW → HIGH → OFF.
-    void SetDriverWiperSwitch(std::uint8_t position);
-
-    /// Outgoing wiper wash request (ID 6959, main harness segment).
-    /// Momentary 1-byte uint8 bool (0=idle, 1=pressed this tick).
-    /// M key in ev1sim.
-    void SetDriverWiperWashRequest(bool pressed);
 
     /// 3D-sim integration contract — driver buttons and discrete sensors
     /// (main harness segment).  See the external sim's 3D-sim signal contract
@@ -322,11 +301,9 @@ public:
     /// yet — defaults to false.  Reserved for a future bulb-check button.
     void SetDriverTelltaleTestRequest(bool pressed);
 
-    /// Park-brake set / release requests (6946/6947): held while the
-    /// park-brake button (PhysicalWorld ParkBrakeButton) is pushed, on the
-    /// request matching the direction that push moves the brake.
-    void SetDriverParkBrakeSetRequest(bool pressed);
-    void SetDriverParkBrakeReleaseRequest(bool pressed);
+    /// Park-brake push button (6946): held while PhysicalWorld's
+    /// ParkBrakeButton is pushed; the BTCM toggles the brake on each push.
+    void SetDriverParkBrakeSwitch(bool pushed);
 
     /// Key position (6966): 0=OFF, 1=ACC, 2=RUN, 3=START.  ev1sim does
     /// not model a key-cycle state machine — the simulator behaves as if
@@ -345,27 +322,14 @@ public:
     void SetDriverPowerWindowPassengerUp(bool held);
     void SetDriverPowerWindowPassengerDown(bool held);
 
-    /// Outgoing RSA exterior pillar keypad button signals (IDs 6985-6989, main harness).
-    /// Same Option A encoding as interior keypad (6975-6979):
-    ///   0 = idle, 1 = tap (lower digit), 2 = long-press (higher digit)
-    ///   ExteriorKeypad1 (6985): "1/2" button
-    ///   ExteriorKeypad2 (6986): "3/4" button
-    ///   ExteriorKeypad3 (6987): "5/6" button
-    ///   ExteriorKeypad4 (6988): "7/8" button
-    ///   ExteriorKeypad5 (6989): "9/0" button
-    /// Consumer = RSA exterior keypad logic (future round).
-    void SetDriverRsaExteriorKeypad1(std::uint8_t value);
-    void SetDriverRsaExteriorKeypad2(std::uint8_t value);
-    void SetDriverRsaExteriorKeypad3(std::uint8_t value);
-    void SetDriverRsaExteriorKeypad4(std::uint8_t value);
-    void SetDriverRsaExteriorKeypad5(std::uint8_t value);
-
-    /// Outgoing door handle pull attempt signals (IDs 6990-6991, main harness).
-    /// Momentary 1-byte uint8 bool (0=idle, 1=handle pulled this tick).
-    /// ev1sim publishes these when the floating-UI door handle buttons are clicked.
-    /// Consumer = RSA (decides whether to unlock based on authorization state).
-    void SetDriverDoorHandleAttemptDriver(bool attempted);
-    void SetDriverDoorHandleAttemptPassenger(bool attempted);
+    /// RSA exterior pillar keypad buttons (IDs 6985-6989): one held contact
+    /// per button, "1/2", "3/4", "5/6", "7/8", "9/0".  The RSA reads a release
+    /// before its long-press time as the lower digit, a longer hold as the higher.
+    void SetDriverRsaExteriorKeypad1(bool held);
+    void SetDriverRsaExteriorKeypad2(bool held);
+    void SetDriverRsaExteriorKeypad3(bool held);
+    void SetDriverRsaExteriorKeypad4(bool held);
+    void SetDriverRsaExteriorKeypad5(bool held);
 
     /// Outgoing motor RPM (ID 4070, chassis segment, float32 LE).
     /// Motor shaft speed in RPM (positive forward).
@@ -398,21 +362,23 @@ public:
     /// Returns true if we have received at least one RSA run-mode broadcast.
     bool HasReceivedRunMode() const;
 
-    /// ABS phase decoded from BTCM front solenoid (iso_close, dump_open) tuples.
+    /// The BTCM's four brake motors, each driven through two leads.
+    enum class BrakeMotor { FrontLeft, FrontRight, RearLeft, RearRight };
+
+    /// ABS phase decoded from the BTCM's front iso valve and modulator motor.
     ///
-    /// The connector subscribes to two parallel publications of the same
-    /// actuator state:
-    ///   * Chassis-bus segment (preferred): IDs 4147-4150
-    ///       4147 iso_close FL, 4148 iso_close FR, 4149 dump_open FL,
-    ///       4150 dump_open FR (all uint8 bool, "1" = closed/open).
+    /// The connector reads two sources for the same actuator state:
+    ///   * Chassis bus (preferred): iso_close FL/FR (4147/4148) and the
+    ///     front modulator motors' restore and release leads
+    ///     (BTCM_FRONT_MOD_{LF,RF}_{RESTORE,RELEASE}).
     ///   * Main-harness segment (legacy fallback): IDs 5010-5013
     ///       kSigSolFL_ISO/DMP and kSigSolFR_ISO/DMP.
     /// Whichever source first delivers data for a given wheel becomes
     /// authoritative for that wheel; if a chassis-bus update has ever
     /// arrived for a wheel it is preferred over the main-harness value.
     ///
-    /// Decoding table (iso=iso_close, dump=dump_open, motor = the chassis
-    /// CHASSIS_BTCM_FRONT_MOTOR_CMD_FL/FR, 0 when never written):
+    /// Decoding table (iso=iso_close, dump=the release lead (main harness:
+    /// DMP), motor = restore lead minus release lead, 0 on the main harness):
     ///   iso=0, dump=0           → APPLY  (pedal pass-through, full local brake)
     ///   iso=1, dump=0, motor>0  → APPLY  (the modulator motor restoring the
     ///                                     sealed caliper toward the pedal)
@@ -420,7 +386,7 @@ public:
     ///   iso=1, dump=1           → DUMP   (release toward zero)
     ///   iso=0, dump=1           → invalid; treated as APPLY
     /// The BTCM keeps the iso sealed for the whole anti-lock event, so its
-    /// re-apply arrives as iso=1 with motor +1 (electricsim
+    /// re-apply arrives as iso=1 with the restore lead driven (electricsim
     /// docs/3d_sim_contract.md §2.4).
     struct AbsPhaseFront {
         enum class Phase { APPLY, HOLD, DUMP };
@@ -436,8 +402,9 @@ public:
     AbsPhaseFront GetAbsPhaseFront(
         std::chrono::milliseconds freshness_window) const;
 
-    /// Rear EMB motor commands from BTCM, subscribed in parallel on two segments:
-    ///   * Chassis-bus (preferred): IDs 4151 (LR) / 4152 (RR), float32 LE.
+    /// Rear EMB motor commands from BTCM, read from two sources:
+    ///   * Chassis bus (preferred): the rear apply motors' apply and release
+    ///     leads (BTCM_REAR_EMB_{LR,RR}_{APPLY,RELEASE}), apply minus release.
     ///   * Main harness (legacy fallback): kSigRearMotorLR/RR = 5014/5015.
     /// Float in [-1, +1]: +1=apply, 0=idle, -1=release.  Whichever source
     /// has ever delivered a value for a given wheel becomes authoritative;
@@ -547,9 +514,10 @@ public:
     bool GetRsaShiftBlocked() const;
     bool HasReceivedRsaShiftBlocked() const;
 
-    /// BTCM retard-request PWM duty (chassis 4191), Q8 percent 0..25600 —
-    /// the BTCM asking the propulsion side for generator regen torque
-    /// (@source:manual brakes-313). 0 until first received.
+    /// The BTCM's retard-request duty as it reaches the PIM
+    /// (PIM_RETARD_REQUEST_IN), Q8 percent 0..25600 — the BTCM asking the
+    /// propulsion side for generator regen torque (@source:manual brakes-313).
+    /// 0 until first received.
     std::uint16_t GetBtcmRetardRequestDutyQ8() const;
     bool          HasReceivedBtcmRetardRequestDuty() const;
 
@@ -629,7 +597,7 @@ public:
 
     /// Incoming IPC trip distance (ID 4132, chassis segment).
     /// Published by IPC controller on change (epsilon ~0.5 m) after each supervisor tick.
-    /// float32 LE, metres.  Resets to 0.0 on trip-reset button press (kSigDriverIpcTripResetButton).
+    /// float32 LE, metres.
     /// Returns -1.0f (sentinel) if never received.
     float GetIpcTripDistanceM() const;
     bool  HasReceivedIpcTripDistance() const;
@@ -845,9 +813,10 @@ public:
     /// signal id).  Used by unit tests; not part of the runtime path.
     void DebugInjectPimCoastDragNm(float drag_nm);
 
-    /// Inject the BTCM front motor commands (CHASSIS_BTCM_FRONT_MOTOR_CMD_FL/FR
-    /// have no signal id).  Used by unit tests; not part of the runtime path.
-    void DebugInjectBtcmFrontMotorCmd(float fl, float fr);
+    /// Inject one BTCM brake motor's two lead levels (drive = restore on a
+    /// front modulator, apply on a rear motor), as Tick reads them off the
+    /// wire.  Used by unit tests; not part of the runtime path.
+    void DebugInjectBtcmMotorLeads(BrakeMotor motor, bool drive, bool release);
 
     /// Inject the wiper blade position (CHASSIS_WIPER_SWEEP_POSITION has no
     /// signal id).  Used by unit tests; not part of the runtime path.

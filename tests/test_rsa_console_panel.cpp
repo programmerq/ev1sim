@@ -32,11 +32,11 @@ TEST_CASE("RSA console door locks: the RSA's two lock commands", "[rsa_console]"
     REQUIRE(FormatRsaDoorLocks(U{0}, U{1}) == L"Door locks: DRV unlocked, PAS locked");
 }
 
-TEST_CASE("RSA console backlight: dimmer step 0..10 as a percentage", "[rsa_console]") {
+TEST_CASE("RSA console backlight: drive level in permille as a percentage", "[rsa_console]") {
     REQUIRE(FormatRsaBacklight(std::nullopt) == L"Backlight ---");
-    REQUIRE(FormatRsaBacklight(std::uint8_t{0}) == L"Backlight 0%");
-    REQUIRE(FormatRsaBacklight(std::uint8_t{7}) == L"Backlight 70%");
-    REQUIRE(FormatRsaBacklight(std::uint8_t{200}) == L"Backlight 100%");  // clamped
+    REQUIRE(FormatRsaBacklight(std::uint16_t{0}) == L"Backlight 0%");
+    REQUIRE(FormatRsaBacklight(std::uint16_t{705}) == L"Backlight 70%");
+    REQUIRE(FormatRsaBacklight(std::uint16_t{2000}) == L"Backlight 100%");  // clamped
 }
 
 TEST_CASE("RSA console view: every LED unknown before the RSA writes", "[rsa_console]") {
@@ -151,7 +151,7 @@ TEST_CASE("RSA console panel: updates from a snapshot; draws on a null driver", 
     DashSnapshot snap;
     snap.rsa = DashRsaConsole{};
     snap.rsa->shift_blocked = true;
-    snap.rsa->dim_step = std::uint8_t{5};
+    snap.rsa->dim_level_permille = std::uint16_t{500};
     snap.rsa->lock_driver = std::uint8_t{1};
     snap.rsa->lock_passenger = std::uint8_t{1};
     panel.Update(snap);

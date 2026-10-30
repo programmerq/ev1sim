@@ -76,15 +76,30 @@ class ConductorPublisher {
     return ok;
   }
 
+  // Publish one conductor cell's LINE LEVEL, in permille — see
+  // WireTable::publish_conductor_level. Counted into `published_` and into its own
+  // counter, not into `energised_`, for the same reason as publish_mv().
+  bool publish_level(io::ConductorId id, std::uint16_t permille) {
+    const bool ok = table_->publish_conductor_level(id, permille, token_);
+    if (ok) {
+      ++published_;
+      ++published_level_;
+    } else {
+      ++refused_;
+    }
+    return ok;
+  }
+
   // Receipt counters. `refused` is not decoration: publish_conductor returns false on
   // an undeclared id or a type mismatch, and a host that published nothing all tick
   // because every id was wrong would otherwise look identical to a dark vehicle.
   std::uint64_t published() const noexcept { return published_; }
   std::uint64_t published_energised() const noexcept { return energised_; }
   std::uint64_t published_millivolts() const noexcept { return published_mv_; }
+  std::uint64_t published_levels() const noexcept { return published_level_; }
   std::uint64_t refused() const noexcept { return refused_; }
   void reset_counters() noexcept {
-    published_ = energised_ = published_mv_ = refused_ = 0;
+    published_ = energised_ = published_mv_ = published_level_ = refused_ = 0;
   }
 
  private:
@@ -96,6 +111,7 @@ class ConductorPublisher {
   std::uint64_t published_ = 0;
   std::uint64_t energised_ = 0;
   std::uint64_t published_mv_ = 0;
+  std::uint64_t published_level_ = 0;
   std::uint64_t refused_ = 0;
 };
 

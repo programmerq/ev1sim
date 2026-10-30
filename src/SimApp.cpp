@@ -294,7 +294,7 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
                 });
 
             // --- Exterior Keypad section: 5 buttons (tap = lower digit) ---
-            // Button labels are static; clicking sends a tap (value=1).
+            // Button labels are static; clicking queues a tap (a short hold).
             for (int ki = 0; ki < 5; ++ki) {
                 m_floating_ui->AddButton(
                     [ki]() -> std::wstring {
@@ -449,19 +449,6 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
                     m_physical->seatbelts().toggle_driver();
                     std::cout << "[UI] Seatbelt D: "
                               << (m_physical->seatbelts().driver_buckled()
-                                      ? "BUCKLED" : "UNBUCKLED") << "\n";
-                });
-
-            // --- Seatbelt: Passenger toggle ---
-            m_floating_ui->AddButton(
-                [this]() -> std::wstring {
-                    return FormatSeatbeltLabel(L"P",
-                        m_physical->seatbelts().passenger_buckled());
-                },
-                [this]() {
-                    m_physical->seatbelts().toggle_passenger();
-                    std::cout << "[UI] Seatbelt P: "
-                              << (m_physical->seatbelts().passenger_buckled()
                                       ? "BUCKLED" : "UNBUCKLED") << "\n";
                 });
 
@@ -1825,12 +1812,10 @@ int SimApp::RunWithVisualization() {
                 m_physical->brake_pedal().update(driver_brake_raw);
             m_external_sim->SetBrakeMasterPressureKpa(
                 static_cast<float>(pressure_kpa));
-            // Seatbelt driver (6964) + passenger (6965): driven by
-            // PhysicalWorld::Seatbelts; default buckled, toggleable via UI.
+            // Driver seat belt (6964): PhysicalWorld::Seatbelts; default
+            // buckled, toggleable via UI.
             m_external_sim->SetDriverSeatbeltBuckled(
                 m_physical->seatbelts().driver_buckled());
-            m_external_sim->SetDriverSeatbeltBuckledPassenger(
-                m_physical->seatbelts().passenger_buckled());
             // Turn signal stalk (6948, 6949) and hazard switch (6944).
             m_external_sim->SetDriverTurnSignalLeft(
                 m_physical->turn_signal_stalk().active_left());
@@ -1851,9 +1836,8 @@ int SimApp::RunWithVisualization() {
                 m_external_sim->SetDriverRsaKeypadButton5(fires.button_value[4]);
                 m_external_sim->SetDriverRsaModeSwitches(fires.mode_switches);
             }
-            // IPC trip-reset (6952): consume one-shot event and publish.
-            m_external_sim->SetDriverIpcTripReset(
-                m_physical->ipc_trip_reset().consume_press_event());
+            // The trip-reset button has no car input wire yet; drop the press.
+            m_physical->ipc_trip_reset().consume_press_event();
             // RSA DIM UP / DIM DOWN clicks from the console.
             for (const bool up : {false, true}) {
                 for (int n = m_physical->rsa_dimmer().take(up); n > 0; --n)
@@ -1872,10 +1856,7 @@ int SimApp::RunWithVisualization() {
                 m_physical->cruise_stalk().resume_accel_contact());
             m_external_sim->SetCruiseOnOffContact(
                 m_physical->cruise_stalk().on_off_contact());
-            m_external_sim->SetDriverWiperSwitch(
-                static_cast<std::uint8_t>(m_physical->wiper_stalk().position()));
-            m_external_sim->SetDriverWiperWashRequest(
-                m_physical->wiper_stalk().consume_wash());
+            m_physical->wiper_stalk().consume_wash();  // pin E went out above
             // Power window switches (6980-6983) — no keyboard source;
             // floating UI panel will call press()/release() when expanded.
             {
@@ -1908,27 +1889,18 @@ int SimApp::RunWithVisualization() {
                                                  dl.passenger() == S::LOCKED,
                                                  dl.trunk()     == S::LOCKED);
             }
-            // RSA exterior keypad (6985-6989) and door handle attempts (6990-6991).
-            // Tick the sequence emitter then consume any pending fires.
-            m_physical->rsa_exterior_keypad().update(render_dt);
-            m_physical->rsa_exterior_keypad().consume_sequence_fire();
-            m_external_sim->SetDriverRsaExteriorKeypad1(
-                m_physical->rsa_exterior_keypad().button_value(0));
-            m_external_sim->SetDriverRsaExteriorKeypad2(
-                m_physical->rsa_exterior_keypad().button_value(1));
-            m_external_sim->SetDriverRsaExteriorKeypad3(
-                m_physical->rsa_exterior_keypad().button_value(2));
-            m_external_sim->SetDriverRsaExteriorKeypad4(
-                m_physical->rsa_exterior_keypad().button_value(3));
-            m_external_sim->SetDriverRsaExteriorKeypad5(
-                m_physical->rsa_exterior_keypad().button_value(4));
-            m_physical->rsa_exterior_keypad().clear_oneshots();
-            m_external_sim->SetDriverDoorHandleAttemptDriver(
-                m_physical->door_handles().driver_attempt());
-            m_external_sim->SetDriverDoorHandleAttemptPassenger(
-                m_physical->door_handles().passenger_attempt());
-            m_physical->door_handles().clear_oneshots();
-            // 3D-sim contract buttons + key position (6940-6947, 6966).
+            // RSA exterior keypad (6985-6989): advance the held-contact timeline.
+            {
+                auto& kp = m_physical->rsa_exterior_keypad();
+                kp.update(render_dt);
+                m_external_sim->SetDriverRsaExteriorKeypad1(kp.held(0));
+                m_external_sim->SetDriverRsaExteriorKeypad2(kp.held(1));
+                m_external_sim->SetDriverRsaExteriorKeypad3(kp.held(2));
+                m_external_sim->SetDriverRsaExteriorKeypad4(kp.held(3));
+                m_external_sim->SetDriverRsaExteriorKeypad5(kp.held(4));
+            }
+            m_physical->door_handles().clear_oneshots();   // SimApp's UI callbacks consumed them
+            // 3D-sim contract buttons + key position (6942-6946, 6966).
             PushExtContractDriverInputs(cmd, t);
         }
         // Ambient temp + humidity (chassis bus 4090-4091).
@@ -2457,13 +2429,10 @@ int SimApp::RunHeadless() {
                 m_physical->brake_pedal().update(driver_brake_raw);
             m_external_sim->SetBrakeMasterPressureKpa(
                 static_cast<float>(pressure_kpa));
-            // Seatbelt driver (6964) + passenger (6965): driven by
-            // PhysicalWorld::Seatbelts; default buckled.  No UI toggle in
-            // headless mode — state stays at default (both buckled).
+            // Driver seat belt (6964): PhysicalWorld::Seatbelts; no UI toggle
+            // in headless mode, so it stays buckled.
             m_external_sim->SetDriverSeatbeltBuckled(
                 m_physical->seatbelts().driver_buckled());
-            m_external_sim->SetDriverSeatbeltBuckledPassenger(
-                m_physical->seatbelts().passenger_buckled());
             // Turn signal stalk (6948, 6949) and hazard switch (6944).
             // In headless mode no keyboard cycles them; publish stable defaults
             // (both false) so LHJB sees a defined initial state.
@@ -2486,12 +2455,11 @@ int SimApp::RunHeadless() {
                 m_external_sim->SetDriverRsaKeypadButton5(fires.button_value[4]);
                 m_external_sim->SetDriverRsaModeSwitches(fires.mode_switches);
             }
-            // IPC trip-reset (6952) + cruise stalk cavities (4047-4049), wiper.
+            // Cruise stalk cavities (4047-4049), wiper.
             // Headless: no keyboard/UI input; evolve the cruise model with both
             // contacts open so the ON/OFF latch stays disarmed and the bus sees
             // stable zeros.
-            m_external_sim->SetDriverIpcTripReset(
-                m_physical->ipc_trip_reset().consume_press_event());
+            m_physical->ipc_trip_reset().consume_press_event();   // no car input wire
             // RSA DIM UP / DIM DOWN clicks from the console.
             for (const bool up : {false, true}) {
                 for (int n = m_physical->rsa_dimmer().take(up); n > 0; --n)
@@ -2504,10 +2472,7 @@ int SimApp::RunHeadless() {
                 m_physical->cruise_stalk().resume_accel_contact());
             m_external_sim->SetCruiseOnOffContact(
                 m_physical->cruise_stalk().on_off_contact());
-            m_external_sim->SetDriverWiperSwitch(
-                static_cast<std::uint8_t>(m_physical->wiper_stalk().position()));
-            m_external_sim->SetDriverWiperWashRequest(
-                m_physical->wiper_stalk().consume_wash());
+            m_physical->wiper_stalk().consume_wash();  // pin E went out above
             // Power window switches (6980-6983) — no keyboard source;
             // floating UI panel will call press()/release() when expanded.
             {
@@ -2540,27 +2505,19 @@ int SimApp::RunHeadless() {
                                                  dl.passenger() == S::LOCKED,
                                                  dl.trunk()     == S::LOCKED);
             }
-            // RSA exterior keypad (6985-6989) and door handle attempts (6990-6991).
-            // Headless: no UI source; tick the sequence emitter and publish zeros.
-            m_physical->rsa_exterior_keypad().update(tick_dt);
-            m_physical->rsa_exterior_keypad().consume_sequence_fire();
-            m_external_sim->SetDriverRsaExteriorKeypad1(
-                m_physical->rsa_exterior_keypad().button_value(0));
-            m_external_sim->SetDriverRsaExteriorKeypad2(
-                m_physical->rsa_exterior_keypad().button_value(1));
-            m_external_sim->SetDriverRsaExteriorKeypad3(
-                m_physical->rsa_exterior_keypad().button_value(2));
-            m_external_sim->SetDriverRsaExteriorKeypad4(
-                m_physical->rsa_exterior_keypad().button_value(3));
-            m_external_sim->SetDriverRsaExteriorKeypad5(
-                m_physical->rsa_exterior_keypad().button_value(4));
-            m_physical->rsa_exterior_keypad().clear_oneshots();
-            m_external_sim->SetDriverDoorHandleAttemptDriver(
-                m_physical->door_handles().driver_attempt());
-            m_external_sim->SetDriverDoorHandleAttemptPassenger(
-                m_physical->door_handles().passenger_attempt());
-            m_physical->door_handles().clear_oneshots();
-            // 3D-sim contract buttons + key position (6940-6947, 6966).
+            // RSA exterior keypad (6985-6989): advance the held-contact timeline
+            // (headless presses come from Scenario's enter-code hook).
+            {
+                auto& kp = m_physical->rsa_exterior_keypad();
+                kp.update(tick_dt);
+                m_external_sim->SetDriverRsaExteriorKeypad1(kp.held(0));
+                m_external_sim->SetDriverRsaExteriorKeypad2(kp.held(1));
+                m_external_sim->SetDriverRsaExteriorKeypad3(kp.held(2));
+                m_external_sim->SetDriverRsaExteriorKeypad4(kp.held(3));
+                m_external_sim->SetDriverRsaExteriorKeypad5(kp.held(4));
+            }
+            m_physical->door_handles().clear_oneshots();   // SimApp's UI callbacks consumed them
+            // 3D-sim contract buttons + key position (6942-6946, 6966).
             PushExtContractDriverInputs(cmd, t);
         }
         // Ambient temp + humidity (chassis bus 4090-4091).
@@ -2725,14 +2682,12 @@ void SimApp::PushExtContractDriverInputs(const DriverCommand& cmd, double sim_ti
     }
     // Telltale test (6945) — no UI source yet; stub at false.
     m_external_sim->SetDriverTelltaleTestRequest(false);
-    // Park brake (6946/6947): each change of DriverCommand.parking_brake is
-    // one held push of the park-brake button (ParkBrakeButton), shown on the
-    // set or release request by the direction it moves the brake.
+    // Park brake (6946): each change of DriverCommand.parking_brake is one
+    // held push of the park-brake button (ParkBrakeButton).
     if (m_physical) {
         auto& pb = m_physical->park_brake_button();
         pb.update(cmd.parking_brake, sim_time_s);
-        m_external_sim->SetDriverParkBrakeSetRequest(pb.pushed() && pb.push_applies());
-        m_external_sim->SetDriverParkBrakeReleaseRequest(pb.pushed() && !pb.push_applies());
+        m_external_sim->SetDriverParkBrakeSwitch(pb.pushed());
     }
     // Key position (6966) — ev1sim does not model a key-cycle state
     // machine; the simulator runs as if the vehicle is always RUN (2).

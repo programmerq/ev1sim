@@ -224,35 +224,35 @@ never hardcodes it — code resolves the `kWire…` symbol). `dir` is ev1sim's r
 |--|--|--|--|--|
 | 4030 | PANEL_AJAR_HOOD | 92 | bit | ev1sim->ECU (produce) |
 | 4031 | PANEL_AJAR_TRUNK | 93 | bit | ev1sim->ECU (produce) |
-| 4032 | PANEL_AJAR_DOOR_LEFT | 94 | bit | ev1sim->ECU (produce) |
-| 4033 | PANEL_AJAR_DOOR_RIGHT | 95 | bit | ev1sim->ECU (produce) |
+| 4032 | DRIVER_ES_DOOR_JAMB_LH_SWITCH | 1100 | bit (element_state) | ev1sim->ECU (produce) |
+| 4033 | DRIVER_ES_DOOR_JAMB_RH_SWITCH | 1101 | bit (element_state) | ev1sim->ECU (produce) |
 
 #### Group D — Driver stalk/switch outputs (ev1sim->ECU) — 22 cells
 
 | sig | WireId `kWire…` | # | type | dir |
 |--|--|--|--|--|
-| 4040 | COMB_SW_LOW_BEAM_OUT | 96 | bit | ev1sim->ECU (produce) |
-| 4041 | COMB_SW_FLASH_TO_PASS_OUT | 97 | bit | ev1sim->ECU (produce) |
-| 4042 | COMB_SW_PARK_HEADLAMP_OUT | 98 | bit | ev1sim->ECU (produce) |
-| 4043 | TURN_HAZ_SW_RIGHT_TURN_OUT | 99 | bit | ev1sim->ECU (produce) |
-| 4044 | TURN_HAZ_SW_LEFT_TURN_OUT | 100 | bit | ev1sim->ECU (produce) |
-| 4045 | TURN_HAZ_SW_HAZARD_OUT | 101 | bit | ev1sim->ECU (produce) |
-| 4046 | TURN_HAZ_SW_HORN_OUT | 102 | bit | ev1sim->ECU (produce) |
-| 4047 | CRUISE_SW_SET_COAST_OUT | 103 | bit | ev1sim->ECU (produce) |
-| 4048 | CRUISE_SW_RESUME_ACCEL_OUT | 104 | bit | ev1sim->ECU (produce) |
-| 4049 | CRUISE_SW_ON_OFF_OUT | 105 | bit | ev1sim->ECU (produce) |
-| 4050 | PRND_SELECTOR_A | 106 | bit | ev1sim->ECU (produce) |
-| 4051 | PRND_SELECTOR_B | 107 | bit | ev1sim->ECU (produce) |
-| 4052 | PRND_SELECTOR_C | 108 | bit | ev1sim->ECU (produce) |
-| 4053 | PRND_SELECTOR_D | 109 | bit | ev1sim->ECU (produce) |
-| 4054 | WIPER_SW_DELAY_OUT | 110 | bit | ev1sim->ECU (produce) |
-| 4055 | WIPER_SW_REQUEST_OUT | 111 | bit | ev1sim->ECU (produce) |
-| 4056 | WIPER_SW_HI_OUT | 112 | bit | ev1sim->ECU (produce) |
-| 4057 | WIPER_SW_WASHER_SWITCH_OUT | 113 | bit | ev1sim->ECU (produce) |
-| 4170 | DOOR_LOCK_SW_LH_LOCK_OUT | 186 | bit | ev1sim->ECU (produce) |
-| 4171 | DOOR_LOCK_SW_LH_UNLOCK_OUT | 187 | bit | ev1sim->ECU (produce) |
-| 4172 | DOOR_LOCK_SW_RH_LOCK_OUT | 188 | bit | ev1sim->ECU (produce) |
-| 4173 | DOOR_LOCK_SW_RH_UNLOCK_OUT | 189 | bit | ev1sim->ECU (produce) |
+| 4040 | DRIVER_ES_LOW_BEAM_SWITCH | 1006 | bit (element_state) | ev1sim->ECU (produce) |
+| 4041 | DRIVER_ES_FLASH_TO_PASS_SWITCH | 1007 | bit (element_state) | ev1sim->ECU (produce) |
+| 4042 | DRIVER_ES_PARK_LAMP_SWITCH | 1011 | bit (element_state) | ev1sim->ECU (produce) |
+| 4043 | DRIVER_ES_TURN_RIGHT_SWITCH | 1009 | bit (element_state) | ev1sim->ECU (produce) |
+| 4044 | DRIVER_ES_TURN_LEFT_SWITCH | 1008 | bit (element_state) | ev1sim->ECU (produce) |
+| 4045 | DRIVER_ES_HAZARD_SWITCH | 1010 | bit (element_state) | ev1sim->ECU (produce) |
+| 4046 | DRIVER_ES_HORN_SWITCH | 1012 | bit (element_state) | ev1sim->ECU (produce) |
+| 4047 | DRIVER_ES_CRUISE_SET_COAST_SWITCH | 1226 | bit (element_state) | ev1sim->ECU (produce) |
+| 4048 | DRIVER_ES_CRUISE_RESUME_ACCEL_SWITCH | 1227 | bit (element_state) | ev1sim->ECU (produce) |
+| 4049 | DRIVER_ES_CRUISE_ON_SWITCH | 1225 | bit (element_state) | ev1sim->ECU (produce) |
+| 4050 | DRIVER_ES_PRND_A | 1215 | bit (element_state) | ev1sim->ECU (produce) |
+| 4051 | DRIVER_ES_PRND_B | 1216 | bit (element_state) | ev1sim->ECU (produce) |
+| 4052 | DRIVER_ES_PRND_C | 1217 | bit (element_state) | ev1sim->ECU (produce) |
+| 4053 | DRIVER_ES_PRND_D | 1218 | bit (element_state) | ev1sim->ECU (produce) |
+| 4054 | DRIVER_ES_WIPER_DELAY_SWITCH | 1103 | bit (element_state) | ev1sim->ECU (produce) |
+| 4055 | DRIVER_ES_WIPER_REQUEST_SWITCH | 1104 | bit (element_state) | ev1sim->ECU (produce) |
+| 4056 | DRIVER_ES_WIPER_HI_SWITCH | 1105 | bit (element_state) | ev1sim->ECU (produce) |
+| 4057 | DRIVER_ES_WASHER_SWITCH | 1106 | bit (element_state) | ev1sim->ECU (produce) |
+| 4170 | DRIVER_ES_DOOR_LOCK_LH_LOCK_SWITCH | 1111 | bit (element_state) | ev1sim->ECU (produce) |
+| 4171 | DRIVER_ES_DOOR_LOCK_LH_UNLOCK_SWITCH | 1112 | bit (element_state) | ev1sim->ECU (produce) |
+| 4172 | DRIVER_ES_DOOR_LOCK_RH_LOCK_SWITCH | 1113 | bit (element_state) | ev1sim->ECU (produce) |
+| 4173 | DRIVER_ES_DOOR_LOCK_RH_UNLOCK_SWITCH | 1114 | bit (element_state) | ev1sim->ECU (produce) |
 
 #### Group F — Motor / brake-master / sim-time (mixed) — 5 cells
 
@@ -308,7 +308,7 @@ never hardcodes it — code resolves the `kWire…` symbol). `dir` is ev1sim's r
 | 4122 | CHASSIS_SLIP_RATIO_RL | 148 | float32 | ev1sim->ECU (produce) |
 | 4123 | CHASSIS_SLIP_RATIO_RR | 149 | float32 | ev1sim->ECU (produce) |
 
-#### Group J — IPC telltales / LCD-derived (ECU->ev1sim) — 27 cells
+#### Group J — IPC telltales / LCD-derived (ECU->ev1sim) — 24 rows
 
 | sig | WireId `kWire…` | # | type | dir |
 |--|--|--|--|--|
@@ -326,10 +326,7 @@ never hardcodes it — code resolves the `kWire…` symbol). `dir` is ev1sim's r
 | 4145 | CHASSIS_IPC_CHECK_TIRE_PRESS_TELLTALE | 163 | bit | ECU->ev1sim (consume) |
 | 4147 | CHASSIS_BTCM_ISO_CLOSE_FL | 171 | bit | ECU->ev1sim (consume) |
 | 4148 | CHASSIS_BTCM_ISO_CLOSE_FR | 172 | bit | ECU->ev1sim (consume) |
-| 4149 | CHASSIS_BTCM_DUMP_OPEN_FL | 173 | bit | ECU->ev1sim (consume) |
-| 4150 | CHASSIS_BTCM_DUMP_OPEN_FR | 174 | bit | ECU->ev1sim (consume) |
-| 4151 | CHASSIS_BTCM_EMB_MOTOR_CMD_LR | 175 | float32 | ECU->ev1sim (consume) |
-| 4152 | CHASSIS_BTCM_EMB_MOTOR_CMD_RR | 176 | float32 | ECU->ev1sim (consume) |
+| — | BTCM_FRONT_MOD_{LF,RF}_{RESTORE,RELEASE}, BTCM_REAR_EMB_{LR,RR}_{APPLY,RELEASE} | 1309-1316 | conductor | ECU->ev1sim (read) |
 | 4153 | CHASSIS_BTCM_CYL_PRESSURE_FL_K_PA | 177 | float32 | ECU->ev1sim (consume) |
 | 4154 | CHASSIS_BTCM_CYL_PRESSURE_FR_K_PA | 178 | float32 | ECU->ev1sim (consume) |
 | 4158 | CHASSIS_IPC_LEFT_TURN_TELLTALE | 164 | bit | ECU->ev1sim (consume) |
@@ -364,7 +361,7 @@ never hardcodes it — code resolves the `kWire…` symbol). `dir` is ev1sim's r
 | 4193 | CHASSIS_AUX_BATTERY_PRESENT | 202 | bit | ECU->ev1sim (consume) |
 | 4194 | CHASSIS_AUX_BATTERY_SOC_PCT | 203 | byte | ECU->ev1sim (consume) |
 
-#### Group M — Driver inputs (main segment) (ev1sim->ECU) — 29 cells
+#### Group M — Driver inputs (main segment) (ev1sim->ECU) — 25 cells
 
 | sig | WireId `kWire…` | # | type | dir |
 |--|--|--|--|--|
@@ -372,14 +369,12 @@ never hardcodes it — code resolves the `kWire…` symbol). `dir` is ev1sim's r
 | 6901 | DRIVER_STEERING_DEG_Q8 | 207 | uint16 | ev1sim->ECU (produce) |
 | 6902 | DRIVER_GEAR_SELECTOR | 208 | byte | ev1sim->ECU (produce) |
 | 6903 | DRIVER_THROTTLE_Q8 | 209 | byte | ev1sim->ECU (produce) |
-| 6904 | DRIVER_BRAKE_SWITCH | 210 | bit | ev1sim->ECU (produce) |
+| 6904 | DRIVER_ES_BRAKE_SWITCH | 1307 | bit (element_state) | ev1sim->ECU (produce) |
 | 6910 | EXT_WHEEL_SPEED_FL | 213 | float32 | ev1sim->ECU (produce) |
 | 6911 | EXT_WHEEL_SPEED_FR | 214 | float32 | ev1sim->ECU (produce) |
 | 6912 | EXT_WHEEL_SPEED_RL | 215 | float32 | ev1sim->ECU (produce) |
 | 6913 | EXT_WHEEL_SPEED_RR | 216 | float32 | ev1sim->ECU (produce) |
-| 6952 | DRIVER_IPC_TRIP_RESET_BUTTON | 217 | bit | ev1sim->ECU (produce) |
-| 6964 | DRIVER_SEATBELT_BUCKLED | 211 | bit | ev1sim->ECU (produce) |
-| 6965 | DRIVER_SEATBELT_BUCKLED_PASSENGER | 212 | bit | ev1sim->ECU (produce) |
+| 6964 | DRIVER_ES_SEATBELT_SWITCH | 1117 | bit (element_state) | ev1sim->ECU (produce) |
 | 6971 | DRIVER_RSA_MODE_BUTTON | 218 | byte | ev1sim->ECU (produce) |
 | 6975 | DRIVER_RSA_KEYPAD_BUTTON1 | 219 | bit | ev1sim->ECU (produce) |
 | 6976 | DRIVER_RSA_KEYPAD_BUTTON2 | 220 | bit | ev1sim->ECU (produce) |
@@ -390,13 +385,11 @@ never hardcodes it — code resolves the `kWire…` symbol). `dir` is ev1sim's r
 | 6981 | DRIVER_POWER_WINDOW_DRIVER_DOWN | 225 | bit | ev1sim->ECU (produce) |
 | 6982 | DRIVER_POWER_WINDOW_PASSENGER_UP | 226 | bit | ev1sim->ECU (produce) |
 | 6983 | DRIVER_POWER_WINDOW_PASSENGER_DOWN | 227 | bit | ev1sim->ECU (produce) |
-| 6985 | DRIVER_RSA_EXTERIOR_KEYPAD1 | 228 | byte | ev1sim->ECU (produce) |
-| 6986 | DRIVER_RSA_EXTERIOR_KEYPAD2 | 229 | byte | ev1sim->ECU (produce) |
-| 6987 | DRIVER_RSA_EXTERIOR_KEYPAD3 | 230 | byte | ev1sim->ECU (produce) |
-| 6988 | DRIVER_RSA_EXTERIOR_KEYPAD4 | 231 | byte | ev1sim->ECU (produce) |
-| 6989 | DRIVER_RSA_EXTERIOR_KEYPAD5 | 232 | byte | ev1sim->ECU (produce) |
-| 6990 | DRIVER_DOOR_HANDLE_ATTEMPT_DRIVER | 233 | bit | ev1sim->ECU (produce) |
-| 6991 | DRIVER_DOOR_HANDLE_ATTEMPT_PASSENGER | 234 | bit | ev1sim->ECU (produce) |
+| 6985 | DRIVER_ES_EXT_KEYPAD_1 | 1210 | bit (element_state) | ev1sim->ECU (produce) |
+| 6986 | DRIVER_ES_EXT_KEYPAD_2 | 1211 | bit (element_state) | ev1sim->ECU (produce) |
+| 6987 | DRIVER_ES_EXT_KEYPAD_3 | 1212 | bit (element_state) | ev1sim->ECU (produce) |
+| 6988 | DRIVER_ES_EXT_KEYPAD_4 | 1213 | bit (element_state) | ev1sim->ECU (produce) |
+| 6989 | DRIVER_ES_EXT_KEYPAD_5 | 1214 | bit (element_state) | ev1sim->ECU (produce) |
 
 ---
 
@@ -614,8 +607,7 @@ pure redundancy); **22** are pure ev1sim output with no in-tree reader
 FRONT_BRAKE_PRESSURE/REAR_BRAKE_POSITION (4107/08), STEERING_TORQUE (4109),
 SLIP_RATIO_{FL,FR,RL,RR} (4120-23), DOOR_LOCK_STATE_{DRIVER,PASSENGER,TRUNK}
 (4165-67), ROAD_GRADE_PCT (4168), PITCH_DEG (4169), DRIVER_STEERING_DEG_Q8
-(6901), DRIVER_GEAR_SELECTOR (6902). (DRIVER_SEATBELT_BUCKLED_PASSENGER 6965
-moved to `consumers: [ipc]` — IPC now wire-reads it — so it joins the 62.)
+(6901), DRIVER_GEAR_SELECTOR (6902).
 
 **Status — DONE (2026-06-16): ev1sim is off the chassis ring.**
 1. **Coupler 4060 — DONE.** Mirrored to the wire (last-writer-wins). Every

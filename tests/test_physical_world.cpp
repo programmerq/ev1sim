@@ -438,6 +438,44 @@ TEST_CASE("WiperStalk: default position is OFF", "[PhysicalWorld]") {
     CHECK_FALSE(ws.consume_wash());
 }
 
+TEST_CASE("WiperStalk: contacts per position match the RHJB's reading", "[PhysicalWorld]") {
+    using P = WiperStalk::Position;
+    struct Row { P pos; bool delay, request, hi; };
+    const Row rows[] = {
+        {P::OFF,  false, false, false},
+        {P::INT,  false, true,  false},
+        {P::LOW,  true,  true,  false},
+        {P::HIGH, true,  true,  true },
+    };
+    WiperStalk ws;
+    for (const Row& r : rows) {
+        while (ws.position() != r.pos) ws.cycle_position();
+        CHECK(ws.pin_delay_out()   == r.delay);
+        CHECK(ws.pin_request_out() == r.request);
+        CHECK(ws.pin_hi_out()      == r.hi);
+    }
+}
+
+TEST_CASE("CombinationSwitch: HI closes low beam and the high-beam/flash contact",
+          "[PhysicalWorld]") {
+    using P = CombinationSwitch::Position;
+    struct Row { P pos; bool flash, low, b, park; };
+    const Row rows[] = {
+        {P::OFF,  false, false, false, false}, {P::OFF,  true, false, true,  false},
+        {P::PARK, false, false, false, true }, {P::PARK, true, false, true,  true },
+        {P::ON,   false, true,  false, true }, {P::ON,   true, true,  true,  true },
+        {P::HI,   false, true,  true,  true }, {P::HI,   true, true,  true,  true },
+    };
+    CombinationSwitch cs;
+    for (const Row& r : rows) {
+        while (cs.position() != r.pos) cs.cycle_h();
+        cs.set_flash_to_pass(r.flash);
+        CHECK(cs.pin_low_beam_out()      == r.low);
+        CHECK(cs.pin_flash_to_pass_out() == r.b);
+        CHECK(cs.pin_park_headlamp_out() == r.park);
+    }
+}
+
 TEST_CASE("WiperStalk: cycle_position cycles OFF → INT → LOW → HIGH → OFF", "[PhysicalWorld]") {
     WiperStalk ws;
     using P = WiperStalk::Position;
@@ -989,83 +1027,83 @@ TEST_CASE("test_rsa_keypad_custom_code_is_emitted",
 // RsaExteriorKeypad
 // ---------------------------------------------------------------------------
 
-TEST_CASE("test_rsa_exterior_keypad_button_press", "[PhysicalWorld][RsaExteriorKeypad]") {
+TEST_CASE("RsaExteriorKeypad: a tap holds one contact for kTapHoldS, a long press for kLongHoldS",
+          "[PhysicalWorld][RsaExteriorKeypad]") {
     RsaExteriorKeypad kp;
+    for (int i = 0; i < 5; ++i) CHECK_FALSE(kp.held(i));
 
-    // Default: all idle.
-    for (int i = 0; i < 5; ++i) {
-        CHECK(kp.button_value(i) == 0);
-        CHECK_FALSE(kp.button_tap(i));
-        CHECK_FALSE(kp.button_long(i));
-    }
-
-    // Press button 0 (tap).
-    kp.press_button(0, /*long_press=*/false);
-    CHECK(kp.button_value(0) == 1);
-    CHECK(kp.button_tap(0));
-    CHECK_FALSE(kp.button_long(0));
-    // Other buttons unaffected.
-    for (int i = 1; i < 5; ++i)
-        CHECK(kp.button_value(i) == 0);
-
-    // clear_oneshots resets all to idle.
-    kp.clear_oneshots();
-    for (int i = 0; i < 5; ++i)
-        CHECK(kp.button_value(i) == 0);
-}
-
-TEST_CASE("test_rsa_exterior_keypad_long_press", "[PhysicalWorld][RsaExteriorKeypad]") {
-    RsaExteriorKeypad kp;
-
-    kp.press_button(2, /*long_press=*/true);
-    CHECK(kp.button_value(2) == 2);
-    CHECK_FALSE(kp.button_tap(2));
-    CHECK(kp.button_long(2));
-
-    kp.clear_oneshots();
-    CHECK(kp.button_value(2) == 0);
-}
-
-TEST_CASE("test_rsa_exterior_keypad_enter_code_sequence", "[PhysicalWorld][RsaExteriorKeypad]") {
-    RsaExteriorKeypad kp;
-
-    // "11111" = five taps of button 0.
-    kp.enter_code_sequence("11111");
-    CHECK(kp.sequence_in_progress());
-
-    // First fire: timer=0, should fire immediately.
-    kp.update(0.0);
-    bool fired = kp.consume_sequence_fire();
-    CHECK(fired);
-    // button 0 should be tap (value=1).
-    CHECK(kp.button_value(0) == 1);
-    kp.clear_oneshots();
-
-    // Sequence still in progress (4 more digits).
-    CHECK(kp.sequence_in_progress());
-
-    // Advance through remaining 4 digits.
-    for (int i = 0; i < 4; ++i) {
-        // Advance time past 100ms interval.
-        kp.update(0.11);
-        bool f = kp.consume_sequence_fire();
-        CHECK(f);
-        kp.clear_oneshots();
-    }
-
-    // All 5 digits consumed — sequence done.
+    // The press starts on the next update; the hold is counted from there.
+    kp.press_button(2, /*long_press=*/false);
+    kp.update(0.01);
+    CHECK(kp.held(2));
+    for (int i : {0, 1, 3, 4}) CHECK_FALSE(kp.held(i));
+    kp.update(RsaExteriorKeypad::kTapHoldS - 0.01);
+    CHECK(kp.held(2));
+    kp.update(0.01);
+    CHECK_FALSE(kp.held(2));
+    CHECK(kp.sequence_in_progress());          // releasing
+    kp.update(RsaExteriorKeypad::kGapS);
     CHECK_FALSE(kp.sequence_in_progress());
+
+    kp.press_button(4, /*long_press=*/true);
+    kp.update(0.01);
+    kp.update(RsaExteriorKeypad::kTapHoldS);   // still held past a tap
+    CHECK(kp.held(4));
+    kp.update(RsaExteriorKeypad::kLongHoldS - RsaExteriorKeypad::kTapHoldS);
+    CHECK_FALSE(kp.held(4));
 }
 
-TEST_CASE("test_rsa_exterior_keypad_out_of_range_button_ignored", "[PhysicalWorld][RsaExteriorKeypad]") {
+TEST_CASE("RsaExteriorKeypad: holds straddle the RSA's 500 ms long-press time",
+          "[PhysicalWorld][RsaExteriorKeypad]") {
+    CHECK(RsaExteriorKeypad::kTapHoldS < 0.5);
+    CHECK(RsaExteriorKeypad::kLongHoldS > 0.5);
+}
+
+TEST_CASE("RsaExteriorKeypad: enter_code_sequence holds each digit's button in turn",
+          "[PhysicalWorld][RsaExteriorKeypad]") {
     RsaExteriorKeypad kp;
-    // button_idx out of range — should not crash, returns 0.
+    kp.enter_code_sequence("12090");   // btn0 tap, btn0 long, btn4 long, btn4 tap, btn4 long
+    CHECK(kp.sequence_in_progress());
+
+    const double dt = 0.01;
+    struct Hold { int button; double s; };
+    std::vector<Hold> holds;
+    int cur = -1;
+    double since = 0.0, t = 0.0;
+    for (int step = 0; step < 1000 && kp.sequence_in_progress(); ++step) {
+        kp.update(dt);
+        t += dt;
+        int now = -1;
+        for (int i = 0; i < 5; ++i) if (kp.held(i)) { CHECK(now == -1); now = i; }
+        if (now != cur) {
+            if (cur >= 0) holds.push_back({cur, t - since});
+            cur = now;
+            since = t;
+        }
+    }
+    CHECK_FALSE(kp.sequence_in_progress());
+    REQUIRE(holds.size() == 5);
+    const int buttons[5] = {0, 0, 4, 4, 4};
+    const bool longs[5]  = {false, true, true, false, true};
+    for (int i = 0; i < 5; ++i) {
+        CHECK(holds[i].button == buttons[i]);
+        CHECK_THAT(holds[i].s, Catch::Matchers::WithinAbs(longs[i] ? RsaExteriorKeypad::kLongHoldS
+                                                               : RsaExteriorKeypad::kTapHoldS,
+                                                     dt * 1.5));
+    }
+}
+
+TEST_CASE("RsaExteriorKeypad: out-of-range buttons and bad codes queue nothing",
+          "[PhysicalWorld][RsaExteriorKeypad]") {
+    RsaExteriorKeypad kp;
     kp.press_button(-1, false);
     kp.press_button(5, false);
-    for (int i = 0; i < 5; ++i)
-        CHECK(kp.button_value(i) == 0);
-    CHECK(kp.button_value(-1) == 0);
-    CHECK(kp.button_value(5) == 0);
+    kp.enter_code_sequence("1234");
+    kp.enter_code_sequence(nullptr);
+    CHECK_FALSE(kp.sequence_in_progress());
+    kp.update(0.01);
+    for (int i = 0; i < 5; ++i) CHECK_FALSE(kp.held(i));
+    CHECK_FALSE(kp.held(-1));
 }
 
 // ---------------------------------------------------------------------------
@@ -1141,49 +1179,13 @@ TEST_CASE("test_door_handles_attempt_when_unlocked_opens_panel",
 // Seatbelts
 // ---------------------------------------------------------------------------
 
-TEST_CASE("Seatbelts: default state is both buckled", "[PhysicalWorld][Seatbelts]") {
+TEST_CASE("Seatbelts: driver defaults buckled; set and toggle", "[PhysicalWorld][Seatbelts]") {
     Seatbelts sb;
     CHECK(sb.driver_buckled());
-    CHECK(sb.passenger_buckled());
-}
-
-TEST_CASE("Seatbelts: set_driver / set_passenger are independent", "[PhysicalWorld][Seatbelts]") {
-    Seatbelts sb;
     sb.set_driver(false);
     CHECK_FALSE(sb.driver_buckled());
-    CHECK(sb.passenger_buckled());  // passenger unchanged
-
-    sb.set_passenger(false);
-    CHECK_FALSE(sb.driver_buckled());
-    CHECK_FALSE(sb.passenger_buckled());
-
-    sb.set_driver(true);
-    CHECK(sb.driver_buckled());
-    CHECK_FALSE(sb.passenger_buckled());  // passenger still unbuckled
-}
-
-TEST_CASE("Seatbelts: toggle_driver flips driver only", "[PhysicalWorld][Seatbelts]") {
-    Seatbelts sb;
-    // Default: both buckled.
-    sb.toggle_driver();
-    CHECK_FALSE(sb.driver_buckled());
-    CHECK(sb.passenger_buckled());  // unchanged
-
     sb.toggle_driver();
     CHECK(sb.driver_buckled());
-    CHECK(sb.passenger_buckled());
-}
-
-TEST_CASE("Seatbelts: toggle_passenger flips passenger only", "[PhysicalWorld][Seatbelts]") {
-    Seatbelts sb;
-    // Default: both buckled.
-    sb.toggle_passenger();
-    CHECK(sb.driver_buckled());      // unchanged
-    CHECK_FALSE(sb.passenger_buckled());
-
-    sb.toggle_passenger();
-    CHECK(sb.driver_buckled());
-    CHECK(sb.passenger_buckled());
 }
 
 // ---------------------------------------------------------------------------
@@ -1812,7 +1814,6 @@ TEST_CASE("ParkBrakeButton: a change of request is one push held for kPushS", "[
     CHECK_FALSE(b.pushed());
     b.update(true, 1.0);
     CHECK(b.pushed());
-    CHECK(b.push_applies());
     b.update(true, 1.0 + ParkBrakeButton::kPushS * 0.5);
     CHECK(b.pushed());
     b.update(true, 1.0 + ParkBrakeButton::kPushS);
@@ -1834,15 +1835,13 @@ TEST_CASE("ParkBrakeButton: changes faster than a press each become a push, with
     b.update(false, 0.0);
     b.update(true, 1.0);            // push 1 starts
     b.update(false, 1.0 + p * 0.5); // second change while push 1 is held
-    CHECK(b.pushed());
-    CHECK(b.push_applies());        // push 1 still applies; the release waits its turn
+    CHECK(b.pushed());              // push 1 still held; push 2 waits its turn
     b.update(false, 1.0 + p);       // push 1 ends, gap starts
     CHECK_FALSE(b.pushed());
     b.update(false, 1.0 + p + g * 0.5);
     CHECK_FALSE(b.pushed());
     b.update(false, 1.0 + p + g);   // push 2
     CHECK(b.pushed());
-    CHECK_FALSE(b.push_applies());
     b.update(false, 1.0 + 2 * p + g);
     CHECK_FALSE(b.pushed());
 }

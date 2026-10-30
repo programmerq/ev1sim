@@ -209,10 +209,10 @@ TEST_CASE("Door-lock rocker contacts publish onto the wire through Tick",
     opts.enabled = true;                 // as --external-sim does
     ExternalSimConnector c(opts);
 
-    auto contact = [&](electricsim::io::WireId id) {
-        bool v = false;
-        REQUIRE(rhjb->read_bit(id, &v));
-        return v;
+    auto contact = [&](electricsim::io::ElementStateId id) {
+        electricsim::io::WireTable::Sample<bool> s{};
+        REQUIRE(rhjb->read_bit_sample(id, &s));
+        return s.written() && s.value;
     };
 
     // First tick with every contact open: ev1sim is the only producer of these
@@ -220,39 +220,120 @@ TEST_CASE("Door-lock rocker contacts publish onto the wire through Tick",
     // detect an edge against.
     c.Tick(0.0);
     REQUIRE(c.IsConnected());   // the attach is what marks it connected
-    CHECK_FALSE(contact(topo::kWireDOOR_LOCK_SW_LH_LOCK_OUT));
-    CHECK_FALSE(contact(topo::kWireDOOR_LOCK_SW_LH_UNLOCK_OUT));
-    CHECK_FALSE(contact(topo::kWireDOOR_LOCK_SW_RH_LOCK_OUT));
-    CHECK_FALSE(contact(topo::kWireDOOR_LOCK_SW_RH_UNLOCK_OUT));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_DOOR_LOCK_LH_LOCK_SWITCH));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_DOOR_LOCK_LH_UNLOCK_SWITCH));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_DOOR_LOCK_RH_LOCK_SWITCH));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_DOOR_LOCK_RH_UNLOCK_SWITCH));
 
     // A LOCK press on the driver's rocker only — each contact must land on its
     // own cell, so a cross-wire between the four is visible here.
     c.SetDoorLockSwitchContacts(true, false, false, false);
     c.Tick(0.1);
-    CHECK(contact(topo::kWireDOOR_LOCK_SW_LH_LOCK_OUT));
-    CHECK_FALSE(contact(topo::kWireDOOR_LOCK_SW_LH_UNLOCK_OUT));
-    CHECK_FALSE(contact(topo::kWireDOOR_LOCK_SW_RH_LOCK_OUT));
-    CHECK_FALSE(contact(topo::kWireDOOR_LOCK_SW_RH_UNLOCK_OUT));
+    CHECK(contact(topo::kWireDRIVER_ES_DOOR_LOCK_LH_LOCK_SWITCH));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_DOOR_LOCK_LH_UNLOCK_SWITCH));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_DOOR_LOCK_RH_LOCK_SWITCH));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_DOOR_LOCK_RH_UNLOCK_SWITCH));
 
     // Released: the falling edge has to reach the wire too, or a one-shot
     // controller can never be re-triggered.
     c.SetDoorLockSwitchContacts(false, false, false, false);
     c.Tick(0.2);
-    CHECK_FALSE(contact(topo::kWireDOOR_LOCK_SW_LH_LOCK_OUT));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_DOOR_LOCK_LH_LOCK_SWITCH));
 
     // The other three, one at a time, each on its own cell.
     c.SetDoorLockSwitchContacts(false, true, false, false);
     c.Tick(0.3);
-    CHECK(contact(topo::kWireDOOR_LOCK_SW_LH_UNLOCK_OUT));
-    CHECK_FALSE(contact(topo::kWireDOOR_LOCK_SW_LH_LOCK_OUT));
+    CHECK(contact(topo::kWireDRIVER_ES_DOOR_LOCK_LH_UNLOCK_SWITCH));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_DOOR_LOCK_LH_LOCK_SWITCH));
 
     c.SetDoorLockSwitchContacts(false, false, true, false);
     c.Tick(0.4);
-    CHECK(contact(topo::kWireDOOR_LOCK_SW_RH_LOCK_OUT));
-    CHECK_FALSE(contact(topo::kWireDOOR_LOCK_SW_LH_UNLOCK_OUT));
+    CHECK(contact(topo::kWireDRIVER_ES_DOOR_LOCK_RH_LOCK_SWITCH));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_DOOR_LOCK_LH_UNLOCK_SWITCH));
 
     c.SetDoorLockSwitchContacts(false, false, false, true);
     c.Tick(0.5);
-    CHECK(contact(topo::kWireDOOR_LOCK_SW_RH_UNLOCK_OUT));
-    CHECK_FALSE(contact(topo::kWireDOOR_LOCK_SW_RH_LOCK_OUT));
+    CHECK(contact(topo::kWireDRIVER_ES_DOOR_LOCK_RH_UNLOCK_SWITCH));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_DOOR_LOCK_RH_LOCK_SWITCH));
+}
+
+// The seat-belt switch and the shifter's reverse contact, through the same
+// Tick publish path: the belt contact is closed while UNBUCKLED, and the
+// reverse contact follows the PRND lines' R code.
+TEST_CASE("Seat-belt and reverse-select contacts publish onto the wire through Tick",
+          "[wire_truth][attach_outcome]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("belt_rev");
+    auto table = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(table != nullptr);
+
+    ScopedWiresName guard(seg.c_str());
+    ExternalSimConnector::Options opts;
+    opts.enabled = true;
+    ExternalSimConnector c(opts);
+
+    auto contact = [&](electricsim::io::ElementStateId id) {
+        electricsim::io::WireTable::Sample<bool> s{};
+        REQUIRE(table->read_bit_sample(id, &s));
+        REQUIRE(s.written());
+        return s.value;
+    };
+
+    c.SetDriverSeatbeltBuckled(true);
+    c.SetPrndSelector(false, true, true, false);    // P
+    c.Tick(0.0);
+    REQUIRE(c.IsConnected());
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_SEATBELT_SWITCH));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_REVERSE_SELECT_SWITCH));
+
+    c.SetDriverSeatbeltBuckled(false);
+    c.SetPrndSelector(false, false, true, true);    // R
+    c.Tick(0.1);
+    CHECK(contact(topo::kWireDRIVER_ES_SEATBELT_SWITCH));
+    CHECK(contact(topo::kWireDRIVER_ES_REVERSE_SELECT_SWITCH));
+
+    c.SetPrndSelector(true, false, false, true);    // D
+    c.Tick(0.2);
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_REVERSE_SELECT_SWITCH));
+}
+
+// The accelerator pedal reaches the PIM only through the solver, so the
+// connector must write its travel (permille) on the pedal element every Tick,
+// and withhold it during the fail_throttle_input fault window.
+TEST_CASE("Accelerator pedal travel publishes onto the wire through Tick",
+          "[wire_truth][attach_outcome]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("pedal");
+    auto table = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(table != nullptr);
+
+    ScopedWiresName guard(seg.c_str());
+    ExternalSimConnector::Options opts;
+    opts.enabled = true;
+    ExternalSimConnector c(opts);
+
+    auto travel = [&]() {
+        electricsim::io::WireTable::Sample<std::uint16_t> s{};
+        REQUIRE(table->read_uint16_sample(topo::kWireDRIVER_ES_PEDAL_TRAVEL, &s));
+        REQUIRE(s.written());
+        return s.value;
+    };
+
+    c.SetDriverThrottleQ8(0);
+    c.Tick(0.0);
+    REQUIRE(c.IsConnected());
+    CHECK(travel() == 0u);
+
+    c.SetDriverThrottleQ8(153);   // 0.6 of full travel
+    c.Tick(0.1);
+    CHECK(travel() == 600u);
+
+    c.SetDriverThrottleQ8(255);
+    c.Tick(0.2);
+    CHECK(travel() == 1000u);
+
+    c.SetSuppressThrottlePublish(true);
+    c.SetDriverThrottleQ8(0);
+    c.Tick(0.3);
+    CHECK(travel() == 1000u);    // withheld during the fault window
 }

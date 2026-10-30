@@ -261,7 +261,7 @@ private:
     bool m_abs_fr_was_fresh = false;  ///< was FR fresh on the previous tick?
 
     /// Push 3D-sim integration contract driver-side inputs to the
-    /// external sim connector (6940-6947, 6966).  Pulls headlight switch
+    /// external sim connector (6942-6946, 6966).  Pulls headlight switch
     /// + dim from CombinationSwitch; horn and park-brake state from the
     /// passed DriverCommand; telltale test + key position are stubbed
     /// (no ev1sim UI source).  The park brake goes through
