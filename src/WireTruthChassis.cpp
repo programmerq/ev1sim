@@ -15,6 +15,7 @@
 #include "WireTruthIds.h"                 // ProducerWireId
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
@@ -925,6 +926,17 @@ bool WireTruthChassis::publish_pedal_travel(std::uint16_t permille) {
         std::min<std::uint16_t>(permille, 1000u));
 }
 
+bool WireTruthChassis::publish_outside_air_temp(float temp_c) {
+    if (!attached()) return false;
+    // Span @source: config/topology.yaml CHASSIS_ES_OUTSIDE_AIR_TEMP (-40..+80 C).
+    constexpr float kMinC = -40.0f;
+    constexpr float kSpanC = 120.0f;
+    const float frac = std::clamp((temp_c - kMinC) / kSpanC, 0.0f, 1.0f);
+    return impl_->table->write_element_state_level(
+        electricsim::topology::kWireCHASSIS_ES_OUTSIDE_AIR_TEMP,
+        static_cast<std::uint16_t>(std::lround(frac * 1000.0f)));
+}
+
 bool WireTruthChassis::publish_reverse_select_switch(bool closed) {
     if (!attached()) return false;
     return write_bit(ProducerWireId(electricsim::topology::kWireDRIVER_ES_REVERSE_SELECT_SWITCH),
@@ -1103,6 +1115,7 @@ std::optional<std::uint8_t> WireTruthChassis::wiper_sweep_position_pct() const {
 }
 bool WireTruthChassis::publish_coast_down_switch(bool) { return false; }
 bool WireTruthChassis::publish_pedal_travel(std::uint16_t) { return false; }
+bool WireTruthChassis::publish_outside_air_temp(float) { return false; }
 bool WireTruthChassis::publish_reverse_select_switch(bool) { return false; }
 bool WireTruthChassis::publish_rsa_dim_click(bool) { return false; }
 

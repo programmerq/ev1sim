@@ -3654,6 +3654,11 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         st.wire->publish_pedal_travel(static_cast<std::uint16_t>(
             (static_cast<unsigned>(st.driver_throttle_q8) * 1000u + 127u) / 255u));
     }
+    // Outside air at the HTCM's sensor, level-held every tick from the same
+    // air temperature as the chassis-bus ambient publish.
+    if (st.wire) {
+        st.wire->publish_outside_air_temp(st.ambient_temp_c);
+    }
     // The shifter's reverse contact (lever in R, the selector's 0011 code),
     // level-held every tick; it lights the backup lamps.
     if (st.wire) {

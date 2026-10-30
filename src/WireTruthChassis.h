@@ -352,6 +352,11 @@ public:
     // attached.
     bool publish_pedal_travel(std::uint16_t permille);
 
+    // The air at the HTCM's outside-air sensor (CHASSIS_ES_OUTSIDE_AIR_TEMP),
+    // written as permille of the sensor's -40..+80 C span and clamped to it.
+    // ev1sim is this cell's producer. Returns false if not attached.
+    bool publish_outside_air_temp(float temp_c);
+
     // PRND switch #2's REVERSE SELECT contact (DRIVER_ES_REVERSE_SELECT_SWITCH),
     // closed while the lever is in R; it lights the back-up lamps. ev1sim is
     // this cell's producer. Returns false if not attached.

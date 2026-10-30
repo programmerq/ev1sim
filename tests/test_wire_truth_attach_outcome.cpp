@@ -337,3 +337,43 @@ TEST_CASE("Accelerator pedal travel publishes onto the wire through Tick",
     c.Tick(0.3);
     CHECK(travel() == 1000u);    // withheld during the fault window
 }
+
+// The HTCM reads outside air only through its sensor element, so the
+// connector writes the ambient temperature there every Tick as permille of
+// -40..+80 C, clamped at the rails.
+TEST_CASE("Outside air temperature publishes onto the wire through Tick",
+          "[wire_truth][attach_outcome]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("oat");
+    auto table = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(table != nullptr);
+
+    ScopedWiresName guard(seg.c_str());
+    ExternalSimConnector::Options opts;
+    opts.enabled = true;
+    ExternalSimConnector c(opts);
+
+    auto level = [&]() {
+        electricsim::io::WireTable::Sample<std::uint16_t> s{};
+        REQUIRE(table->read_uint16_sample(topo::kWireCHASSIS_ES_OUTSIDE_AIR_TEMP, &s));
+        REQUIRE(s.written());
+        return s.value;
+    };
+
+    c.SetAmbientTempC(20.0f);
+    c.Tick(0.0);
+    REQUIRE(c.IsConnected());
+    CHECK(level() == 500u);
+
+    c.SetAmbientTempC(-40.0f);
+    c.Tick(0.1);
+    CHECK(level() == 0u);
+
+    c.SetAmbientTempC(35.0f);
+    c.Tick(0.2);
+    CHECK(level() == 625u);
+
+    c.SetAmbientTempC(95.0f);
+    c.Tick(0.3);
+    CHECK(level() == 1000u);
+}
