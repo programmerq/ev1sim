@@ -257,10 +257,10 @@ TEST_CASE("Door-lock rocker contacts publish onto the wire through Tick",
     CHECK_FALSE(contact(topo::kWireDRIVER_ES_DOOR_LOCK_RH_LOCK_SWITCH));
 }
 
-// The seat-belt switch and the shifter's reverse contact, through the same
-// Tick publish path: the belt contact is closed while UNBUCKLED, and the
-// reverse contact follows the PRND lines' R code.
-TEST_CASE("Seat-belt and reverse-select contacts publish onto the wire through Tick",
+// The seat-belt switch and the shifter's reverse and park contacts, through
+// the same Tick publish path: the belt contact is closed while UNBUCKLED, and
+// the reverse and park contacts follow the PRND lines' R and P codes.
+TEST_CASE("Seat-belt, reverse and park contacts publish onto the wire through Tick",
           "[wire_truth][attach_outcome]") {
     namespace topo = electricsim::topology;
     const std::string seg = unique_segment("belt_rev");
@@ -285,12 +285,14 @@ TEST_CASE("Seat-belt and reverse-select contacts publish onto the wire through T
     REQUIRE(c.IsConnected());
     CHECK_FALSE(contact(topo::kWireDRIVER_ES_SEATBELT_SWITCH));
     CHECK_FALSE(contact(topo::kWireDRIVER_ES_REVERSE_SELECT_SWITCH));
+    CHECK(contact(topo::kWireDRIVER_ES_PARK_SELECT_SWITCH));
 
     c.SetDriverSeatbeltBuckled(false);
     c.SetPrndSelector(false, false, true, true);    // R
     c.Tick(0.1);
     CHECK(contact(topo::kWireDRIVER_ES_SEATBELT_SWITCH));
     CHECK(contact(topo::kWireDRIVER_ES_REVERSE_SELECT_SWITCH));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_PARK_SELECT_SWITCH));
 
     c.SetPrndSelector(true, false, false, true);    // D
     c.Tick(0.2);
@@ -336,4 +338,44 @@ TEST_CASE("Accelerator pedal travel publishes onto the wire through Tick",
     c.SetDriverThrottleQ8(0);
     c.Tick(0.3);
     CHECK(travel() == 1000u);    // withheld during the fault window
+}
+
+// The HTCM reads outside air only through its sensor element, so the
+// connector writes the ambient temperature there every Tick as permille of
+// -40..+80 C, clamped at the rails.
+TEST_CASE("Outside air temperature publishes onto the wire through Tick",
+          "[wire_truth][attach_outcome]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("oat");
+    auto table = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(table != nullptr);
+
+    ScopedWiresName guard(seg.c_str());
+    ExternalSimConnector::Options opts;
+    opts.enabled = true;
+    ExternalSimConnector c(opts);
+
+    auto level = [&]() {
+        electricsim::io::WireTable::Sample<std::uint16_t> s{};
+        REQUIRE(table->read_uint16_sample(topo::kWireCHASSIS_ES_OUTSIDE_AIR_TEMP, &s));
+        REQUIRE(s.written());
+        return s.value;
+    };
+
+    c.SetAmbientTempC(20.0f);
+    c.Tick(0.0);
+    REQUIRE(c.IsConnected());
+    CHECK(level() == 500u);
+
+    c.SetAmbientTempC(-40.0f);
+    c.Tick(0.1);
+    CHECK(level() == 0u);
+
+    c.SetAmbientTempC(35.0f);
+    c.Tick(0.2);
+    CHECK(level() == 625u);
+
+    c.SetAmbientTempC(95.0f);
+    c.Tick(0.3);
+    CHECK(level() == 1000u);
 }

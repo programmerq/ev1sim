@@ -1466,6 +1466,19 @@ TEST_CASE("GetRearEmbCmd prefers chassis-bus EMB cmd over main-harness",
     CHECK(cmd.rr == -1.0f);
 }
 
+TEST_CASE("GetRearEmbCmd carries the rear motors' duty as a signed fraction",
+          "[ExternalSim][ABS][chassis-bus]") {
+    ExternalSimConnector c;
+    c.DebugInjectDelta(5050, true);    // BTCM heartbeat.
+    using M = ExternalSimConnector::BrakeMotor;
+    c.DebugInjectBtcmMotorLeads(M::RearLeft,  0.4f, 0.0f);
+    c.DebugInjectBtcmMotorLeads(M::RearRight, 0.0f, 0.25f);
+
+    auto cmd = c.GetRearEmbCmd(std::chrono::milliseconds(3000));
+    CHECK(cmd.lr ==  0.4f);
+    CHECK(cmd.rr == -0.25f);
+}
+
 TEST_CASE("GetRearEmbCmd falls back to main-harness when chassis-bus silent",
           "[ExternalSim][ABS][chassis-bus]") {
     ExternalSimConnector c;

@@ -14,6 +14,8 @@
 #include "wire_table.hpp"                 // electricsim::io::WireTable
 #include "WireTruthIds.h"                 // ProducerWireId
 
+#include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
@@ -104,8 +106,8 @@ static const std::unordered_map<std::uint32_t, ProducerCell>& ProducerRegistry()
         {4051U, {kWireDRIVER_ES_PRND_B,             WireType::kBit}},
         {4052U, {kWireDRIVER_ES_PRND_C,             WireType::kBit}},
         {4053U, {kWireDRIVER_ES_PRND_D,             WireType::kBit}},
-        // PRND switch PARK SELECT contact (circuit 275) -> BPM
-        {5142U, {kWireBPM_PARK_SELECT,              WireType::kBit}},
+        // PRND switch #2 PARK contact (circuit 275 to the BPM and RSA)
+        {5142U, {kWireDRIVER_ES_PARK_SELECT_SWITCH, WireType::kBit}},
         // Wiper/washer stalk contacts
         {4054U, {kWireDRIVER_ES_WIPER_DELAY_SWITCH,   WireType::kBit}},
         {4055U, {kWireDRIVER_ES_WIPER_REQUEST_SWITCH, WireType::kBit}},
@@ -870,30 +872,38 @@ std::optional<float> WireTruthChassis::pim_coast_drag_nm() const {
 std::optional<WireTruthChassis::BtcmMotorLeads> WireTruthChassis::btcm_motor_leads(
     BtcmBrakeMotor motor) const {
     using namespace electricsim::topology;
-    WireId drive = 0;
-    WireId release = 0;
+    const auto bit_leads = [&](WireId drive, WireId release)
+        -> std::optional<BtcmMotorLeads> {
+        const auto d = read_bit(drive);
+        const auto r = read_bit(release);
+        if (!d || !r) return std::nullopt;
+        return BtcmMotorLeads{*d ? 1.0f : 0.0f, *r ? 1.0f : 0.0f};
+    };
+    const auto duty_leads = [&](WireId drive, WireId release)
+        -> std::optional<BtcmMotorLeads> {
+        const auto d = read_uint16(drive);
+        const auto r = read_uint16(release);
+        if (!d || !r) return std::nullopt;
+        const auto frac = [](std::uint16_t permille) {
+            return static_cast<float>(std::min<std::uint16_t>(permille, 1000u)) / 1000.0f;
+        };
+        return BtcmMotorLeads{frac(*d), frac(*r)};
+    };
     switch (motor) {
         case BtcmBrakeMotor::FrontLeft:
-            drive   = ReadOnlyWireId(kWireBTCM_FRONT_MOD_LF_RESTORE);
-            release = ReadOnlyWireId(kWireBTCM_FRONT_MOD_LF_RELEASE);
-            break;
+            return bit_leads(ReadOnlyWireId(kWireBTCM_FRONT_MOD_LF_RESTORE),
+                             ReadOnlyWireId(kWireBTCM_FRONT_MOD_LF_RELEASE));
         case BtcmBrakeMotor::FrontRight:
-            drive   = ReadOnlyWireId(kWireBTCM_FRONT_MOD_RF_RESTORE);
-            release = ReadOnlyWireId(kWireBTCM_FRONT_MOD_RF_RELEASE);
-            break;
+            return bit_leads(ReadOnlyWireId(kWireBTCM_FRONT_MOD_RF_RESTORE),
+                             ReadOnlyWireId(kWireBTCM_FRONT_MOD_RF_RELEASE));
         case BtcmBrakeMotor::RearLeft:
-            drive   = ReadOnlyWireId(kWireBTCM_REAR_EMB_LR_APPLY);
-            release = ReadOnlyWireId(kWireBTCM_REAR_EMB_LR_RELEASE);
-            break;
+            return duty_leads(ReadOnlyWireId(kWireBTCM_REAR_EMB_LR_APPLY),
+                              ReadOnlyWireId(kWireBTCM_REAR_EMB_LR_RELEASE));
         case BtcmBrakeMotor::RearRight:
-            drive   = ReadOnlyWireId(kWireBTCM_REAR_EMB_RR_APPLY);
-            release = ReadOnlyWireId(kWireBTCM_REAR_EMB_RR_RELEASE);
-            break;
+            return duty_leads(ReadOnlyWireId(kWireBTCM_REAR_EMB_RR_APPLY),
+                              ReadOnlyWireId(kWireBTCM_REAR_EMB_RR_RELEASE));
     }
-    const auto d = read_bit(drive);
-    const auto r = read_bit(release);
-    if (!d || !r) return std::nullopt;
-    return BtcmMotorLeads{*d, *r};
+    return std::nullopt;
 }
 
 std::optional<std::uint16_t> WireTruthChassis::pim_retard_request_permille() const {
@@ -914,6 +924,17 @@ bool WireTruthChassis::publish_pedal_travel(std::uint16_t permille) {
     return impl_->table->write_element_state_level(
         electricsim::topology::kWireDRIVER_ES_PEDAL_TRAVEL,
         std::min<std::uint16_t>(permille, 1000u));
+}
+
+bool WireTruthChassis::publish_outside_air_temp(float temp_c) {
+    if (!attached()) return false;
+    // Span @source: config/topology.yaml CHASSIS_ES_OUTSIDE_AIR_TEMP (-40..+80 C).
+    constexpr float kMinC = -40.0f;
+    constexpr float kSpanC = 120.0f;
+    const float frac = std::clamp((temp_c - kMinC) / kSpanC, 0.0f, 1.0f);
+    return impl_->table->write_element_state_level(
+        electricsim::topology::kWireCHASSIS_ES_OUTSIDE_AIR_TEMP,
+        static_cast<std::uint16_t>(std::lround(frac * 1000.0f)));
 }
 
 bool WireTruthChassis::publish_reverse_select_switch(bool closed) {
@@ -1094,6 +1115,7 @@ std::optional<std::uint8_t> WireTruthChassis::wiper_sweep_position_pct() const {
 }
 bool WireTruthChassis::publish_coast_down_switch(bool) { return false; }
 bool WireTruthChassis::publish_pedal_travel(std::uint16_t) { return false; }
+bool WireTruthChassis::publish_outside_air_temp(float) { return false; }
 bool WireTruthChassis::publish_reverse_select_switch(bool) { return false; }
 bool WireTruthChassis::publish_rsa_dim_click(bool) { return false; }
 

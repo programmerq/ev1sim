@@ -22,7 +22,7 @@ inline constexpr double kRearBrakeMaxTorqueNm = 480.0;
 /// (motor and gear assembly) ... rather than a hydraulic wheel cylinder"
 /// (@source:manual brakes-312 REAR BRAKE APPLY SYSTEM).  So the BTCM command
 /// is a motor drive, not a force: the BTCM drives two output pins per corner
-/// (apply, release) and electricsim publishes them as +1, -1 or 0.  The model
+/// (apply, release) and electricsim publishes their signed duty in [-1, 1].  The model
 /// integrates that drive into actuator travel and derives the shoe force from
 /// where the actuator is:
 ///
@@ -43,8 +43,9 @@ inline constexpr double kRearBrakeMaxTorqueNm = 480.0;
 ///       the anti-lock kernel holds it, which on a low-grip stop is most of
 ///       the stop.
 ///
-/// A fractional command scales the motor speed; the wire carries direction
-/// only, so in the car it is always a full-speed drive.
+/// A fractional command scales the motor speed: the BTCM current-controls the
+/// apply motor (US5163743 Fig 10), and its duty reaches ev1sim on the lead
+/// conductors as (APPLY − RELEASE) / 1000.
 ///
 /// A stale or absent BTCM means the actuator is at home and the force is zero:
 /// the EV1 rear brake has no hydraulic backup, and a module that is not
