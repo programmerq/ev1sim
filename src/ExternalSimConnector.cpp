@@ -131,8 +131,8 @@ constexpr std::uint32_t kChargeCouplerPresentId = 4060;
 //   4052  vehicle.driver.prnd_selector_c
 //   4053  vehicle.driver.prnd_selector_d  (even-parity bit)
 constexpr std::uint32_t kPrndSelectorAId = 4050;
-// PRND switch PARK SELECT contact -> BPM (electricsim BPM_PARK_SELECT).
-constexpr std::uint32_t kSigBpmParkSelect = 5142;
+// PRND switch #2 PARK contact (electricsim DRIVER_ES_PARK_SELECT_SWITCH).
+constexpr std::uint32_t kSigParkSelectSwitch = 5142;
 constexpr std::uint32_t kPrndSelectorBId = 4051;
 constexpr std::uint32_t kPrndSelectorCId = 4052;
 constexpr std::uint32_t kPrndSelectorDId = 4053;
@@ -1618,18 +1618,18 @@ struct ExternalSimConnector::State {
     // A brake motor's two leads: a front modulator's restore and release, a
     // rear apply motor's apply and release. Each motor runs toward whichever
     // lead drives it.
-    void apply_btcm_motor_leads(BrakeMotor motor, bool drive, bool release) {
-        const float cmd = (drive ? 1.0f : 0.0f) - (release ? 1.0f : 0.0f);
+    void apply_btcm_motor_leads(BrakeMotor motor, float drive, float release) {
+        const float cmd = drive - release;
         const std::uint64_t t = now_ns();
         switch (motor) {
             case BrakeMotor::FrontLeft:
                 btcm_front_motor_fl              = cmd;
-                chassis_btcm_front_release_fl    = release;
+                chassis_btcm_front_release_fl    = release > 0.0f;
                 chassis_btcm_front_release_fl_ns = t;
                 break;
             case BrakeMotor::FrontRight:
                 btcm_front_motor_fr              = cmd;
-                chassis_btcm_front_release_fr    = release;
+                chassis_btcm_front_release_fr    = release > 0.0f;
                 chassis_btcm_front_release_fr_ns = t;
                 break;
             case BrakeMotor::RearLeft:
@@ -1656,7 +1656,7 @@ struct ExternalSimConnector::State {
     bool prnd_c     = true;
     bool prnd_d     = false;
     std::int8_t prnd_a_pub = -1;   // -1 forces first publish
-    std::int8_t bpm_park_select_pub = -1;
+    std::int8_t park_select_switch_pub = -1;
     std::int8_t prnd_b_pub = -1;
     std::int8_t prnd_c_pub = -1;
     std::int8_t prnd_d_pub = -1;
@@ -2764,8 +2764,8 @@ void ExternalSimConnector::DebugInjectPimCoastDragNm(float drag_nm) {
     m_state->has_pim_coast_drag_nm = true;
 }
 
-void ExternalSimConnector::DebugInjectBtcmMotorLeads(BrakeMotor motor, bool drive,
-                                                     bool release) {
+void ExternalSimConnector::DebugInjectBtcmMotorLeads(BrakeMotor motor, float drive,
+                                                     float release) {
     m_state->apply_btcm_motor_leads(motor, drive, release);
 }
 
@@ -3570,14 +3570,12 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         pub_prnd(kPrndSelectorBId, st.prnd_b, st.prnd_b_pub);
         pub_prnd(kPrndSelectorCId, st.prnd_c, st.prnd_c_pub);
         pub_prnd(kPrndSelectorDId, st.prnd_d, st.prnd_d_pub);
-        // The PRND switch's own PARK SELECT contact (circuit 275 -> BPM
-        // inline cavity 3, 275B; electricsim ev1-connections/
-        // ev1_prnd_switch_2.yaml cavity C) — a separate contact on the same
-        // lever, closed in Park. The BPM compares it with the PCM's serial
-        // PRND for DTC 285 and uses both for its batt-714 park gate. Park is
-        // the selector's 0110 code (propulsion manual p. 343).
+        // The PRND switch's own PARK contact (circuit 275 to the BPM and the
+        // RSA; electricsim ev1-connections/ev1_prnd_switch_2.yaml cavity C) —
+        // a separate contact on the same lever, closed in Park. Park is the
+        // selector's 0110 code (propulsion manual p. 343).
         const bool park = !st.prnd_a && st.prnd_b && st.prnd_c && !st.prnd_d;
-        pub_prnd(kSigBpmParkSelect, park, st.bpm_park_select_pub);
+        pub_prnd(kSigParkSelectSwitch, park, st.park_select_switch_pub);
     }
 
     // Power-steering pump HV interlock-closed (ID 4098) — publish delta on change.
@@ -3653,6 +3651,11 @@ void ExternalSimConnector::Tick(double sim_time_s) {
     if (st.wire && !st.suppress_throttle_publish) {
         st.wire->publish_pedal_travel(static_cast<std::uint16_t>(
             (static_cast<unsigned>(st.driver_throttle_q8) * 1000u + 127u) / 255u));
+    }
+    // Outside air at the HTCM's sensor, level-held every tick from the same
+    // air temperature as the chassis-bus ambient publish.
+    if (st.wire) {
+        st.wire->publish_outside_air_temp(st.ambient_temp_c);
     }
     // The shifter's reverse contact (lever in R, the selector's 0011 code),
     // level-held every tick; it lights the backup lamps.
