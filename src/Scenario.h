@@ -177,10 +177,9 @@ public:
     // Combination-switch flash-to-pass lever, held until released.
     virtual void FlashToPass(bool held) = 0;
     // Fault injection (used by external acceptance scenarios): fail=true
-    // suppresses the driver THROTTLE publish (6903) on the main harness —
-    // models the accelerator-pedal acquisition feed going dead at the
-    // consuming controller. fail=false restores it (next heartbeat
-    // republishes).
+    // withholds the accelerator pedal-travel write (DRIVER_ES_PEDAL_TRAVEL) —
+    // models the pedal feed going dead at the PIM. fail=false restores it
+    // (written again on the next tick).
     virtual void FailThrottleInput(bool fail) = 0;
     // Vehicle-plant fault injection (scenario action "hv_isolation_fault"):
     // an insulation fault from ONE HV lead to chassis. lead 1 = HV+, 2 = HV-,
