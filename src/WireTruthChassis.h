@@ -344,7 +344,7 @@ public:
 
     // The shifter's coast-down button position (1 = coast down), read by the
     // RSA. ev1sim is this cell's producer. Returns false if not attached.
-    bool publish_coast_down_switch(bool on);               // DRIVER_COAST_DOWN_SWITCH
+    bool publish_coast_down_switch(bool on);               // DRIVER_ES_COAST_DOWN_SWITCH
 
     // Accelerator pedal travel, permille of full travel
     // (DRIVER_ES_PEDAL_TRAVEL); the solver turns it into the PIM's pedal
@@ -362,10 +362,9 @@ public:
     // this cell's producer. Returns false if not attached.
     bool publish_reverse_select_switch(bool closed);
 
-    // One click (press then release) of the RSA's DIM UP or DIM DOWN button;
-    // the RSA moves its dimmer step one level per click. Returns false if not
-    // attached.
-    bool publish_rsa_dim_click(bool up);                   // DRIVER_RSA_DIM_UP / _DOWN
+    // The RSA's DIM UP / DIM DOWN buttons as held contacts; the RSA moves its
+    // dimmer step one level per press. Returns false if not attached.
+    bool publish_rsa_dim_buttons(bool up_held, bool down_held);  // DRIVER_ES_RSA_DIM_UP / _DOWN
 
 private:
     WireTruthChassis();

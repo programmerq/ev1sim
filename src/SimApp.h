@@ -273,6 +273,13 @@ private:
     /// sim instant.  One implementation for both run loops.
     void PublishAmbient(double sim_time_s);
 
+    /// Play the RSA's faceplate button presses out as held contacts for this
+    /// step: the K-key / console keypad and mode presses (RsaKeypadDriver)
+    /// and the dimmer clicks go through PhysicalWorld::rsa_console_buttons(),
+    /// whose held state is handed to the connector.  One implementation for
+    /// both run loops.
+    void PublishRsaConsoleButtons(double dt_s);
+
     // Freshness window for BTCM liveness signal (kSigBtcmUartFrame
     // heartbeat).  See ExternalSimConnector::GetAbsPhaseFront for the
     // architecture: liveness comes from the BTCM's 5 Hz

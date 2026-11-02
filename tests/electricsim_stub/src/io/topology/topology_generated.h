@@ -26,17 +26,17 @@
 namespace electricsim::topology {
 
 inline constexpr std::uint32_t kFormatVersion = 2U;
-inline constexpr std::uint32_t kTopologyHash = 0x28D2111DU;
-inline constexpr std::size_t kWireCount = 520;
+inline constexpr std::uint32_t kTopologyHash = 0x23FC68A3U;
+inline constexpr std::size_t kWireCount = 548;
 
 // Per-class cell counts. Emitted so a
 // receipt can print the classification without re-parsing YAML,
 // and so a test can assert against them. The legacy count is held
 // by a DECREASING ratchet in the generator that fails on !=.
-inline constexpr std::size_t kConductorCellCount = 163;
-inline constexpr std::size_t kElementStateCellCount = 122;
-inline constexpr std::size_t kSemanticCellCount = 87;
-inline constexpr std::size_t kUnclassifiedLegacyCellCount = 148;
+inline constexpr std::size_t kConductorCellCount = 189;
+inline constexpr std::size_t kElementStateCellCount = 144;
+inline constexpr std::size_t kSemanticCellCount = 76;
+inline constexpr std::size_t kUnclassifiedLegacyCellCount = 139;
 
 // Named cell ids, each stated by its cell's `id:`; changing an
 // id or adding/removing a net changes kTopologyHash.
@@ -276,20 +276,47 @@ inline constexpr ::electricsim::io::WireId kWireEXT_WHEEL_SPEED_FL = 223U;
 inline constexpr ::electricsim::io::WireId kWireEXT_WHEEL_SPEED_FR = 224U;
 inline constexpr ::electricsim::io::WireId kWireEXT_WHEEL_SPEED_RL = 225U;
 inline constexpr ::electricsim::io::WireId kWireEXT_WHEEL_SPEED_RR = 226U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_KEYPAD_BUTTON1 = 228U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_KEYPAD_BUTTON2 = 229U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_KEYPAD_BUTTON3 = 230U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_KEYPAD_BUTTON4 = 231U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_KEYPAD_BUTTON5 = 232U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_POWER_WINDOW_DRIVER_UP = 233U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_POWER_WINDOW_DRIVER_DOWN = 234U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_POWER_WINDOW_PASSENGER_UP = 235U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_POWER_WINDOW_PASSENGER_DOWN = 236U;
 inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_EXT_KEYPAD_1{1210U};
 inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_EXT_KEYPAD_2{1211U};
 inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_EXT_KEYPAD_3{1212U};
 inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_EXT_KEYPAD_4{1213U};
 inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_EXT_KEYPAD_5{1214U};
+inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_RSA_KEYPAD_1{1238U};
+inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_RSA_KEYPAD_2{1239U};
+inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_RSA_KEYPAD_3{1240U};
+inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_RSA_KEYPAD_4{1241U};
+inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_RSA_KEYPAD_5{1242U};
+inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_WINDOW_DRIVER_UP{1243U};
+inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_WINDOW_DRIVER_DOWN{1244U};
+inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_WINDOW_PASSENGER_UP{1245U};
+inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_WINDOW_PASSENGER_DOWN{1246U};
+inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_RSA_MODE_LOCK{1247U};
+inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_RSA_MODE_OFF_ACC{1248U};
+inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_RSA_MODE_RUN{1249U};
+inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_RSA_HVAC_HEAT{1250U};
+inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_RSA_HVAC_VENT{1251U};
+inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_RSA_HVAC_AC{1252U};
+inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_RSA_DIM_UP{1253U};
+inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_RSA_DIM_DOWN{1254U};
+inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_COAST_DOWN_SWITCH{1255U};
+inline constexpr ::electricsim::io::ConductorId kWireRSA_KEYPAD_1_IN{1256U};
+inline constexpr ::electricsim::io::ConductorId kWireRSA_KEYPAD_2_IN{1257U};
+inline constexpr ::electricsim::io::ConductorId kWireRSA_KEYPAD_3_IN{1258U};
+inline constexpr ::electricsim::io::ConductorId kWireRSA_KEYPAD_4_IN{1259U};
+inline constexpr ::electricsim::io::ConductorId kWireRSA_KEYPAD_5_IN{1260U};
+inline constexpr ::electricsim::io::ConductorId kWireRSA_WINDOW_DRIVER_UP_IN{1261U};
+inline constexpr ::electricsim::io::ConductorId kWireRSA_WINDOW_DRIVER_DOWN_IN{1262U};
+inline constexpr ::electricsim::io::ConductorId kWireRSA_WINDOW_PASSENGER_UP_IN{1263U};
+inline constexpr ::electricsim::io::ConductorId kWireRSA_WINDOW_PASSENGER_DOWN_IN{1264U};
+inline constexpr ::electricsim::io::ConductorId kWireRSA_MODE_LOCK_IN{1265U};
+inline constexpr ::electricsim::io::ConductorId kWireRSA_MODE_OFF_ACC_IN{1266U};
+inline constexpr ::electricsim::io::ConductorId kWireRSA_MODE_RUN_IN{1267U};
+inline constexpr ::electricsim::io::ConductorId kWireRSA_HVAC_HEAT_IN{1268U};
+inline constexpr ::electricsim::io::ConductorId kWireRSA_HVAC_VENT_IN{1269U};
+inline constexpr ::electricsim::io::ConductorId kWireRSA_HVAC_AC_IN{1270U};
+inline constexpr ::electricsim::io::ConductorId kWireRSA_DIM_UP_IN{1271U};
+inline constexpr ::electricsim::io::ConductorId kWireRSA_DIM_DOWN_IN{1272U};
+inline constexpr ::electricsim::io::ConductorId kWireRSA_COAST_DOWN_IN{1273U};
 inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_RSA_EXT_KEYPAD1_IN{1200U};
 inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_RSA_EXT_KEYPAD2_IN{1201U};
 inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_RSA_EXT_KEYPAD3_IN{1202U};
@@ -298,8 +325,6 @@ inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_RSA_EXT_KEYPAD5_IN{
 inline constexpr ::electricsim::io::ElementStateId kWireRSA_ES_EKP_BACKLIGHT{1205U};
 inline constexpr ::electricsim::io::WireId kWirePIM_CRUISE_ACTIVE = 244U;
 inline constexpr ::electricsim::io::WireId kWirePIM_CRUISE_SETPOINT_MPS = 245U;
-inline constexpr ::electricsim::io::WireId kWireAD_PRECHARGE_RELAY = 247U;
-inline constexpr ::electricsim::io::WireId kWireAD_MAIN_CONTACTOR = 248U;
 inline constexpr ::electricsim::io::WireId kWireAD_ISOLATION_KOHM = 249U;
 inline constexpr ::electricsim::io::WireId kWireAD_MAIN_CONTACTOR_FB = 250U;
 inline constexpr ::electricsim::io::WireId kWireAD_PRECHARGE_CONTACTOR_FB = 251U;
@@ -406,10 +431,7 @@ inline constexpr ::electricsim::io::ElementStateId kWireLHJB_ES_RUN1_FEED{343U};
 inline constexpr ::electricsim::io::ElementStateId kWireLHJB_ES_HEADLAMP_LOW_DRV{348U};
 inline constexpr ::electricsim::io::ElementStateId kWireLHJB_ES_HEADLAMP_HIGH_DRV{349U};
 inline constexpr ::electricsim::io::ElementStateId kWireLHJB_ES_TURN_LF_DRV{350U};
-inline constexpr ::electricsim::io::ElementStateId kWireLHJB_ES_TURN_RF_DRV{351U};
 inline constexpr ::electricsim::io::ElementStateId kWireLHJB_ES_TURN_LR_DRV{352U};
-inline constexpr ::electricsim::io::ElementStateId kWireLHJB_ES_TURN_RR_DRV{353U};
-inline constexpr ::electricsim::io::ElementStateId kWireLHJB_ES_HORN_RELAY{354U};
 inline constexpr ::electricsim::io::ConductorId kWireLHJB_FEED_MCU_SUPPLY{357U};
 inline constexpr ::electricsim::io::ConductorId kWireLHJB_FEED_BPLUS_FUSEBLOCK{358U};
 inline constexpr ::electricsim::io::ConductorId kWireLHJB_FEED_STOP_ALWAYS_HOT{359U};
@@ -419,6 +441,18 @@ inline constexpr ::electricsim::io::ConductorId kWireLHJB_IN_HIGH_BEAM{1001U};
 inline constexpr ::electricsim::io::ConductorId kWireLHJB_IN_TURN_LEFT{1002U};
 inline constexpr ::electricsim::io::ConductorId kWireLHJB_IN_TURN_RIGHT{1003U};
 inline constexpr ::electricsim::io::ConductorId kWireLHJB_IN_HORN_CMD{1004U};
+inline constexpr ::electricsim::io::ElementStateId kWireLHJB_ES_RIGHT_TURN_OUT{1013U};
+inline constexpr ::electricsim::io::ElementStateId kWireLHJB_ES_HAZ_WARN_OUT{1014U};
+inline constexpr ::electricsim::io::ElementStateId kWireLHJB_ES_DRL_ON_OUT{1015U};
+inline constexpr ::electricsim::io::ElementStateId kWireRHJB_ES_HEADLAMP_HIGH_DRV{1016U};
+inline constexpr ::electricsim::io::ElementStateId kWireRHJB_ES_HEADLAMP_LOW_DRV{1017U};
+inline constexpr ::electricsim::io::ElementStateId kWireRHJB_ES_TURN_RF_DRV{1018U};
+inline constexpr ::electricsim::io::ElementStateId kWireRHJB_ES_TURN_RR_DRV{1019U};
+inline constexpr ::electricsim::io::ConductorId kWireRHJB_IN_HIGH_BEAM_524A{1020U};
+inline constexpr ::electricsim::io::ConductorId kWireRHJB_IN_LOW_BEAM_525A{1021U};
+inline constexpr ::electricsim::io::ConductorId kWireRHJB_IN_RIGHT_TURN_1966A{1022U};
+inline constexpr ::electricsim::io::ConductorId kWireRHJB_IN_HAZ_WARN_1697A{1023U};
+inline constexpr ::electricsim::io::ConductorId kWireRHJB_IN_DRL_ON_838A{1024U};
 inline constexpr ::electricsim::io::ConductorId kWireLHJB_IN_PARK_LAMPS{1005U};
 inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_LOW_BEAM_SWITCH{1006U};
 inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_FLASH_TO_PASS_SWITCH{1007U};
@@ -459,6 +493,9 @@ inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_CHECK_TIRE_PRESS_
 inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_AIR_BAG_TT_DRV{389U};
 inline constexpr ::electricsim::io::ElementStateId kWireRSA_ES_DIM_LEVEL_DRV{1123U};
 inline constexpr ::electricsim::io::ConductorId kWireIPC_DOOR_AJAR_INPUT_1495{1118U};
+inline constexpr ::electricsim::io::ConductorId kWireIPC_LR_TURN_INPUT_1334{1235U};
+inline constexpr ::electricsim::io::ConductorId kWireIPC_RR_TURN_INPUT_1335{1236U};
+inline constexpr ::electricsim::io::ConductorId kWireIPC_HIGH_BEAM_INPUT_1192{1237U};
 inline constexpr ::electricsim::io::ConductorId kWireSDM_RUN1_INPUT_1139{1127U};
 inline constexpr ::electricsim::io::ConductorId kWireRSA_PARK_LAMPS_INPUT_301E{1125U};
 inline constexpr ::electricsim::io::ConductorId kWireIPC_DIM_LEVEL_INPUT_230{1124U};
@@ -540,9 +577,6 @@ inline constexpr ::electricsim::io::ElementStateId kWireAD_ES_STATE_A_RELEASED{4
 inline constexpr ::electricsim::io::ElementStateId kWireAD_ES_STATE_B_RELEASED{442U};
 inline constexpr ::electricsim::io::ElementStateId kWireAD_ES_STATE_C_RELEASED{443U};
 inline constexpr ::electricsim::io::ElementStateId kWireAD_ES_POWER_SUPPLY_OUT{444U};
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_MODE_SW_LOCK = 445U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_MODE_SW_OFF_ACC = 446U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_MODE_SW_RUN = 447U;
 inline constexpr ::electricsim::io::WireId kWireHV_ISOLATION_FAULT_LEAD = 448U;
 inline constexpr ::electricsim::io::WireId kWireHV_ISOLATION_FAULT_KOHM = 449U;
 inline constexpr ::electricsim::io::WireId kWireCHASSIS_BPM_AD_DTC_BITMAP = 450U;
@@ -553,15 +587,9 @@ inline constexpr ::electricsim::io::ConductorId kWireCHASSIS_IPC_WAIT_TELLTALE{4
 inline constexpr ::electricsim::io::WireId kWireHV_BUS_PACK_CURRENT_MA = 455U;
 inline constexpr ::electricsim::io::WireId kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO = 456U;
 inline constexpr ::electricsim::io::WireId kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI = 457U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_HVAC_HEAT = 458U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_HVAC_VENT = 459U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_HVAC_AC = 460U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_DIM_UP = 461U;
-inline constexpr ::electricsim::io::WireId kWireDRIVER_RSA_DIM_DOWN = 462U;
 inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_BATTERY_RECOVERY_SWITCH{463U};
 inline constexpr ::electricsim::io::ConductorId kWireAPM_VEHICLE_WAKE_UP_IN{464U};
 inline constexpr ::electricsim::io::ConductorId kWireAD_FEED_LOGIC_SUPPLY{465U};
-inline constexpr ::electricsim::io::WireId kWireDRIVER_COAST_DOWN_SWITCH = 466U;
 inline constexpr ::electricsim::io::ConductorId kWireBTCM_FEED_FRONT_BRAKE_FUSE_542{467U};
 inline constexpr ::electricsim::io::ConductorId kWireBTCM_FEED_REAR_BRAKE_FUSE_642{468U};
 inline constexpr ::electricsim::io::ConductorId kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B{469U};
@@ -1030,24 +1058,6 @@ inline constexpr auto kWireEXT_WHEEL_SPEED_RL_Default = 0.0f;
 inline constexpr InitPolicy kWireEXT_WHEEL_SPEED_RL_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireEXT_WHEEL_SPEED_RR_Default = 0.0f;
 inline constexpr InitPolicy kWireEXT_WHEEL_SPEED_RR_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_RSA_KEYPAD_BUTTON1_Default = static_cast<std::uint8_t>(0x0U);
-inline constexpr InitPolicy kWireDRIVER_RSA_KEYPAD_BUTTON1_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_RSA_KEYPAD_BUTTON2_Default = static_cast<std::uint8_t>(0x0U);
-inline constexpr InitPolicy kWireDRIVER_RSA_KEYPAD_BUTTON2_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_RSA_KEYPAD_BUTTON3_Default = static_cast<std::uint8_t>(0x0U);
-inline constexpr InitPolicy kWireDRIVER_RSA_KEYPAD_BUTTON3_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_RSA_KEYPAD_BUTTON4_Default = static_cast<std::uint8_t>(0x0U);
-inline constexpr InitPolicy kWireDRIVER_RSA_KEYPAD_BUTTON4_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_RSA_KEYPAD_BUTTON5_Default = static_cast<std::uint8_t>(0x0U);
-inline constexpr InitPolicy kWireDRIVER_RSA_KEYPAD_BUTTON5_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_POWER_WINDOW_DRIVER_UP_Default = static_cast<std::uint8_t>(0x0U);
-inline constexpr InitPolicy kWireDRIVER_POWER_WINDOW_DRIVER_UP_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_POWER_WINDOW_DRIVER_DOWN_Default = static_cast<std::uint8_t>(0x0U);
-inline constexpr InitPolicy kWireDRIVER_POWER_WINDOW_DRIVER_DOWN_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_POWER_WINDOW_PASSENGER_UP_Default = static_cast<std::uint8_t>(0x0U);
-inline constexpr InitPolicy kWireDRIVER_POWER_WINDOW_PASSENGER_UP_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_POWER_WINDOW_PASSENGER_DOWN_Default = static_cast<std::uint8_t>(0x0U);
-inline constexpr InitPolicy kWireDRIVER_POWER_WINDOW_PASSENGER_DOWN_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireDRIVER_ES_EXT_KEYPAD_1_Default = false;
 inline constexpr InitPolicy kWireDRIVER_ES_EXT_KEYPAD_1_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireDRIVER_ES_EXT_KEYPAD_2_Default = false;
@@ -1058,6 +1068,78 @@ inline constexpr auto kWireDRIVER_ES_EXT_KEYPAD_4_Default = false;
 inline constexpr InitPolicy kWireDRIVER_ES_EXT_KEYPAD_4_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireDRIVER_ES_EXT_KEYPAD_5_Default = false;
 inline constexpr InitPolicy kWireDRIVER_ES_EXT_KEYPAD_5_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireDRIVER_ES_RSA_KEYPAD_1_Default = false;
+inline constexpr InitPolicy kWireDRIVER_ES_RSA_KEYPAD_1_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireDRIVER_ES_RSA_KEYPAD_2_Default = false;
+inline constexpr InitPolicy kWireDRIVER_ES_RSA_KEYPAD_2_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireDRIVER_ES_RSA_KEYPAD_3_Default = false;
+inline constexpr InitPolicy kWireDRIVER_ES_RSA_KEYPAD_3_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireDRIVER_ES_RSA_KEYPAD_4_Default = false;
+inline constexpr InitPolicy kWireDRIVER_ES_RSA_KEYPAD_4_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireDRIVER_ES_RSA_KEYPAD_5_Default = false;
+inline constexpr InitPolicy kWireDRIVER_ES_RSA_KEYPAD_5_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireDRIVER_ES_WINDOW_DRIVER_UP_Default = false;
+inline constexpr InitPolicy kWireDRIVER_ES_WINDOW_DRIVER_UP_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireDRIVER_ES_WINDOW_DRIVER_DOWN_Default = false;
+inline constexpr InitPolicy kWireDRIVER_ES_WINDOW_DRIVER_DOWN_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireDRIVER_ES_WINDOW_PASSENGER_UP_Default = false;
+inline constexpr InitPolicy kWireDRIVER_ES_WINDOW_PASSENGER_UP_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireDRIVER_ES_WINDOW_PASSENGER_DOWN_Default = false;
+inline constexpr InitPolicy kWireDRIVER_ES_WINDOW_PASSENGER_DOWN_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireDRIVER_ES_RSA_MODE_LOCK_Default = false;
+inline constexpr InitPolicy kWireDRIVER_ES_RSA_MODE_LOCK_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireDRIVER_ES_RSA_MODE_OFF_ACC_Default = false;
+inline constexpr InitPolicy kWireDRIVER_ES_RSA_MODE_OFF_ACC_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireDRIVER_ES_RSA_MODE_RUN_Default = false;
+inline constexpr InitPolicy kWireDRIVER_ES_RSA_MODE_RUN_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireDRIVER_ES_RSA_HVAC_HEAT_Default = false;
+inline constexpr InitPolicy kWireDRIVER_ES_RSA_HVAC_HEAT_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireDRIVER_ES_RSA_HVAC_VENT_Default = false;
+inline constexpr InitPolicy kWireDRIVER_ES_RSA_HVAC_VENT_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireDRIVER_ES_RSA_HVAC_AC_Default = false;
+inline constexpr InitPolicy kWireDRIVER_ES_RSA_HVAC_AC_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireDRIVER_ES_RSA_DIM_UP_Default = false;
+inline constexpr InitPolicy kWireDRIVER_ES_RSA_DIM_UP_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireDRIVER_ES_RSA_DIM_DOWN_Default = false;
+inline constexpr InitPolicy kWireDRIVER_ES_RSA_DIM_DOWN_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireDRIVER_ES_COAST_DOWN_SWITCH_Default = false;
+inline constexpr InitPolicy kWireDRIVER_ES_COAST_DOWN_SWITCH_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRSA_KEYPAD_1_IN_Default = false;
+inline constexpr InitPolicy kWireRSA_KEYPAD_1_IN_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRSA_KEYPAD_2_IN_Default = false;
+inline constexpr InitPolicy kWireRSA_KEYPAD_2_IN_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRSA_KEYPAD_3_IN_Default = false;
+inline constexpr InitPolicy kWireRSA_KEYPAD_3_IN_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRSA_KEYPAD_4_IN_Default = false;
+inline constexpr InitPolicy kWireRSA_KEYPAD_4_IN_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRSA_KEYPAD_5_IN_Default = false;
+inline constexpr InitPolicy kWireRSA_KEYPAD_5_IN_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRSA_WINDOW_DRIVER_UP_IN_Default = false;
+inline constexpr InitPolicy kWireRSA_WINDOW_DRIVER_UP_IN_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRSA_WINDOW_DRIVER_DOWN_IN_Default = false;
+inline constexpr InitPolicy kWireRSA_WINDOW_DRIVER_DOWN_IN_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRSA_WINDOW_PASSENGER_UP_IN_Default = false;
+inline constexpr InitPolicy kWireRSA_WINDOW_PASSENGER_UP_IN_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRSA_WINDOW_PASSENGER_DOWN_IN_Default = false;
+inline constexpr InitPolicy kWireRSA_WINDOW_PASSENGER_DOWN_IN_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRSA_MODE_LOCK_IN_Default = false;
+inline constexpr InitPolicy kWireRSA_MODE_LOCK_IN_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRSA_MODE_OFF_ACC_IN_Default = false;
+inline constexpr InitPolicy kWireRSA_MODE_OFF_ACC_IN_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRSA_MODE_RUN_IN_Default = false;
+inline constexpr InitPolicy kWireRSA_MODE_RUN_IN_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRSA_HVAC_HEAT_IN_Default = false;
+inline constexpr InitPolicy kWireRSA_HVAC_HEAT_IN_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRSA_HVAC_VENT_IN_Default = false;
+inline constexpr InitPolicy kWireRSA_HVAC_VENT_IN_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRSA_HVAC_AC_IN_Default = false;
+inline constexpr InitPolicy kWireRSA_HVAC_AC_IN_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRSA_DIM_UP_IN_Default = false;
+inline constexpr InitPolicy kWireRSA_DIM_UP_IN_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRSA_DIM_DOWN_IN_Default = false;
+inline constexpr InitPolicy kWireRSA_DIM_DOWN_IN_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRSA_COAST_DOWN_IN_Default = false;
+inline constexpr InitPolicy kWireRSA_COAST_DOWN_IN_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireCHASSIS_RSA_EXT_KEYPAD1_IN_Default = false;
 inline constexpr InitPolicy kWireCHASSIS_RSA_EXT_KEYPAD1_IN_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireCHASSIS_RSA_EXT_KEYPAD2_IN_Default = false;
@@ -1074,10 +1156,6 @@ inline constexpr auto kWirePIM_CRUISE_ACTIVE_Default = false;
 inline constexpr InitPolicy kWirePIM_CRUISE_ACTIVE_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWirePIM_CRUISE_SETPOINT_MPS_Default = 0.0f;
 inline constexpr InitPolicy kWirePIM_CRUISE_SETPOINT_MPS_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireAD_PRECHARGE_RELAY_Default = false;
-inline constexpr InitPolicy kWireAD_PRECHARGE_RELAY_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireAD_MAIN_CONTACTOR_Default = false;
-inline constexpr InitPolicy kWireAD_MAIN_CONTACTOR_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireAD_ISOLATION_KOHM_Default = 0x0U;
 inline constexpr InitPolicy kWireAD_ISOLATION_KOHM_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireAD_MAIN_CONTACTOR_FB_Default = false;
@@ -1290,14 +1368,8 @@ inline constexpr auto kWireLHJB_ES_HEADLAMP_HIGH_DRV_Default = false;
 inline constexpr InitPolicy kWireLHJB_ES_HEADLAMP_HIGH_DRV_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireLHJB_ES_TURN_LF_DRV_Default = false;
 inline constexpr InitPolicy kWireLHJB_ES_TURN_LF_DRV_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireLHJB_ES_TURN_RF_DRV_Default = false;
-inline constexpr InitPolicy kWireLHJB_ES_TURN_RF_DRV_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireLHJB_ES_TURN_LR_DRV_Default = false;
 inline constexpr InitPolicy kWireLHJB_ES_TURN_LR_DRV_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireLHJB_ES_TURN_RR_DRV_Default = false;
-inline constexpr InitPolicy kWireLHJB_ES_TURN_RR_DRV_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireLHJB_ES_HORN_RELAY_Default = false;
-inline constexpr InitPolicy kWireLHJB_ES_HORN_RELAY_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireLHJB_FEED_MCU_SUPPLY_Default = false;
 inline constexpr InitPolicy kWireLHJB_FEED_MCU_SUPPLY_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireLHJB_FEED_BPLUS_FUSEBLOCK_Default = false;
@@ -1316,6 +1388,30 @@ inline constexpr auto kWireLHJB_IN_TURN_RIGHT_Default = false;
 inline constexpr InitPolicy kWireLHJB_IN_TURN_RIGHT_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireLHJB_IN_HORN_CMD_Default = false;
 inline constexpr InitPolicy kWireLHJB_IN_HORN_CMD_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireLHJB_ES_RIGHT_TURN_OUT_Default = false;
+inline constexpr InitPolicy kWireLHJB_ES_RIGHT_TURN_OUT_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireLHJB_ES_HAZ_WARN_OUT_Default = false;
+inline constexpr InitPolicy kWireLHJB_ES_HAZ_WARN_OUT_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireLHJB_ES_DRL_ON_OUT_Default = false;
+inline constexpr InitPolicy kWireLHJB_ES_DRL_ON_OUT_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRHJB_ES_HEADLAMP_HIGH_DRV_Default = false;
+inline constexpr InitPolicy kWireRHJB_ES_HEADLAMP_HIGH_DRV_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRHJB_ES_HEADLAMP_LOW_DRV_Default = false;
+inline constexpr InitPolicy kWireRHJB_ES_HEADLAMP_LOW_DRV_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRHJB_ES_TURN_RF_DRV_Default = false;
+inline constexpr InitPolicy kWireRHJB_ES_TURN_RF_DRV_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRHJB_ES_TURN_RR_DRV_Default = false;
+inline constexpr InitPolicy kWireRHJB_ES_TURN_RR_DRV_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRHJB_IN_HIGH_BEAM_524A_Default = false;
+inline constexpr InitPolicy kWireRHJB_IN_HIGH_BEAM_524A_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRHJB_IN_LOW_BEAM_525A_Default = false;
+inline constexpr InitPolicy kWireRHJB_IN_LOW_BEAM_525A_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRHJB_IN_RIGHT_TURN_1966A_Default = false;
+inline constexpr InitPolicy kWireRHJB_IN_RIGHT_TURN_1966A_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRHJB_IN_HAZ_WARN_1697A_Default = false;
+inline constexpr InitPolicy kWireRHJB_IN_HAZ_WARN_1697A_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRHJB_IN_DRL_ON_838A_Default = false;
+inline constexpr InitPolicy kWireRHJB_IN_DRL_ON_838A_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireLHJB_IN_PARK_LAMPS_Default = false;
 inline constexpr InitPolicy kWireLHJB_IN_PARK_LAMPS_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireDRIVER_ES_LOW_BEAM_SWITCH_Default = false;
@@ -1396,6 +1492,12 @@ inline constexpr auto kWireRSA_ES_DIM_LEVEL_DRV_Default = static_cast<std::uint1
 inline constexpr InitPolicy kWireRSA_ES_DIM_LEVEL_DRV_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireIPC_DOOR_AJAR_INPUT_1495_Default = false;
 inline constexpr InitPolicy kWireIPC_DOOR_AJAR_INPUT_1495_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireIPC_LR_TURN_INPUT_1334_Default = false;
+inline constexpr InitPolicy kWireIPC_LR_TURN_INPUT_1334_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireIPC_RR_TURN_INPUT_1335_Default = false;
+inline constexpr InitPolicy kWireIPC_RR_TURN_INPUT_1335_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireIPC_HIGH_BEAM_INPUT_1192_Default = false;
+inline constexpr InitPolicy kWireIPC_HIGH_BEAM_INPUT_1192_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireSDM_RUN1_INPUT_1139_Default = false;
 inline constexpr InitPolicy kWireSDM_RUN1_INPUT_1139_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireRSA_PARK_LAMPS_INPUT_301E_Default = false;
@@ -1558,12 +1660,6 @@ inline constexpr auto kWireAD_ES_STATE_C_RELEASED_Default = false;
 inline constexpr InitPolicy kWireAD_ES_STATE_C_RELEASED_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireAD_ES_POWER_SUPPLY_OUT_Default = false;
 inline constexpr InitPolicy kWireAD_ES_POWER_SUPPLY_OUT_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_RSA_MODE_SW_LOCK_Default = false;
-inline constexpr InitPolicy kWireDRIVER_RSA_MODE_SW_LOCK_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_RSA_MODE_SW_OFF_ACC_Default = false;
-inline constexpr InitPolicy kWireDRIVER_RSA_MODE_SW_OFF_ACC_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_RSA_MODE_SW_RUN_Default = false;
-inline constexpr InitPolicy kWireDRIVER_RSA_MODE_SW_RUN_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireHV_ISOLATION_FAULT_LEAD_Default = static_cast<std::uint8_t>(0x0U);
 inline constexpr InitPolicy kWireHV_ISOLATION_FAULT_LEAD_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireHV_ISOLATION_FAULT_KOHM_Default = 0x0U;
@@ -1584,24 +1680,12 @@ inline constexpr auto kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO_Default = 0x0ULL;
 inline constexpr InitPolicy kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI_Default = 0x0ULL;
 inline constexpr InitPolicy kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_RSA_HVAC_HEAT_Default = false;
-inline constexpr InitPolicy kWireDRIVER_RSA_HVAC_HEAT_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_RSA_HVAC_VENT_Default = false;
-inline constexpr InitPolicy kWireDRIVER_RSA_HVAC_VENT_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_RSA_HVAC_AC_Default = false;
-inline constexpr InitPolicy kWireDRIVER_RSA_HVAC_AC_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_RSA_DIM_UP_Default = false;
-inline constexpr InitPolicy kWireDRIVER_RSA_DIM_UP_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_RSA_DIM_DOWN_Default = false;
-inline constexpr InitPolicy kWireDRIVER_RSA_DIM_DOWN_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireDRIVER_ES_BATTERY_RECOVERY_SWITCH_Default = false;
 inline constexpr InitPolicy kWireDRIVER_ES_BATTERY_RECOVERY_SWITCH_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireAPM_VEHICLE_WAKE_UP_IN_Default = false;
 inline constexpr InitPolicy kWireAPM_VEHICLE_WAKE_UP_IN_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireAD_FEED_LOGIC_SUPPLY_Default = false;
 inline constexpr InitPolicy kWireAD_FEED_LOGIC_SUPPLY_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireDRIVER_COAST_DOWN_SWITCH_Default = false;
-inline constexpr InitPolicy kWireDRIVER_COAST_DOWN_SWITCH_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireBTCM_FEED_FRONT_BRAKE_FUSE_542_Default = false;
 inline constexpr InitPolicy kWireBTCM_FEED_FRONT_BRAKE_FUSE_542_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireBTCM_FEED_REAR_BRAKE_FUSE_642_Default = false;
@@ -1847,20 +1931,47 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(kWireEXT_WHEEL_SPEED_FR, ::electricsim::io::WireType::kFloat32) && ok;
   ok = table.declare(kWireEXT_WHEEL_SPEED_RL, ::electricsim::io::WireType::kFloat32) && ok;
   ok = table.declare(kWireEXT_WHEEL_SPEED_RR, ::electricsim::io::WireType::kFloat32) && ok;
-  ok = table.declare(kWireDRIVER_RSA_KEYPAD_BUTTON1, ::electricsim::io::WireType::kByte) && ok;
-  ok = table.declare(kWireDRIVER_RSA_KEYPAD_BUTTON2, ::electricsim::io::WireType::kByte) && ok;
-  ok = table.declare(kWireDRIVER_RSA_KEYPAD_BUTTON3, ::electricsim::io::WireType::kByte) && ok;
-  ok = table.declare(kWireDRIVER_RSA_KEYPAD_BUTTON4, ::electricsim::io::WireType::kByte) && ok;
-  ok = table.declare(kWireDRIVER_RSA_KEYPAD_BUTTON5, ::electricsim::io::WireType::kByte) && ok;
-  ok = table.declare(kWireDRIVER_POWER_WINDOW_DRIVER_UP, ::electricsim::io::WireType::kByte) && ok;
-  ok = table.declare(kWireDRIVER_POWER_WINDOW_DRIVER_DOWN, ::electricsim::io::WireType::kByte) && ok;
-  ok = table.declare(kWireDRIVER_POWER_WINDOW_PASSENGER_UP, ::electricsim::io::WireType::kByte) && ok;
-  ok = table.declare(kWireDRIVER_POWER_WINDOW_PASSENGER_DOWN, ::electricsim::io::WireType::kByte) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_1), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_2), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_3), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_4), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_5), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_1), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_2), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_3), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_4), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_5), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_WINDOW_DRIVER_UP), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_WINDOW_DRIVER_DOWN), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_WINDOW_PASSENGER_UP), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_WINDOW_PASSENGER_DOWN), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_MODE_LOCK), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_MODE_OFF_ACC), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_MODE_RUN), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_HVAC_HEAT), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_HVAC_VENT), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_HVAC_AC), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_DIM_UP), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_DIM_DOWN), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_COAST_DOWN_SWITCH), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_1_IN), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_2_IN), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_3_IN), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_4_IN), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_5_IN), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRSA_WINDOW_DRIVER_UP_IN), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRSA_WINDOW_DRIVER_DOWN_IN), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRSA_WINDOW_PASSENGER_UP_IN), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRSA_WINDOW_PASSENGER_DOWN_IN), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRSA_MODE_LOCK_IN), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRSA_MODE_OFF_ACC_IN), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRSA_MODE_RUN_IN), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRSA_HVAC_HEAT_IN), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRSA_HVAC_VENT_IN), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRSA_HVAC_AC_IN), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRSA_DIM_UP_IN), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRSA_DIM_DOWN_IN), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRSA_COAST_DOWN_IN), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireCHASSIS_RSA_EXT_KEYPAD1_IN), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireCHASSIS_RSA_EXT_KEYPAD2_IN), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireCHASSIS_RSA_EXT_KEYPAD3_IN), ::electricsim::io::WireType::kBit) && ok;
@@ -1869,8 +1980,6 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRSA_ES_EKP_BACKLIGHT), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(kWirePIM_CRUISE_ACTIVE, ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(kWirePIM_CRUISE_SETPOINT_MPS, ::electricsim::io::WireType::kFloat32) && ok;
-  ok = table.declare(kWireAD_PRECHARGE_RELAY, ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(kWireAD_MAIN_CONTACTOR, ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(kWireAD_ISOLATION_KOHM, ::electricsim::io::WireType::kUint32) && ok;
   ok = table.declare(kWireAD_MAIN_CONTACTOR_FB, ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(kWireAD_PRECHARGE_CONTACTOR_FB, ::electricsim::io::WireType::kBit) && ok;
@@ -1977,10 +2086,7 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireLHJB_ES_HEADLAMP_LOW_DRV), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireLHJB_ES_HEADLAMP_HIGH_DRV), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireLHJB_ES_TURN_LF_DRV), ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireLHJB_ES_TURN_RF_DRV), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireLHJB_ES_TURN_LR_DRV), ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireLHJB_ES_TURN_RR_DRV), ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireLHJB_ES_HORN_RELAY), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_MCU_SUPPLY), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_BPLUS_FUSEBLOCK), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_STOP_ALWAYS_HOT), ::electricsim::io::WireType::kBit) && ok;
@@ -1990,6 +2096,18 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireLHJB_IN_TURN_LEFT), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireLHJB_IN_TURN_RIGHT), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireLHJB_IN_HORN_CMD), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireLHJB_ES_RIGHT_TURN_OUT), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireLHJB_ES_HAZ_WARN_OUT), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireLHJB_ES_DRL_ON_OUT), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRHJB_ES_HEADLAMP_HIGH_DRV), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRHJB_ES_HEADLAMP_LOW_DRV), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRHJB_ES_TURN_RF_DRV), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRHJB_ES_TURN_RR_DRV), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRHJB_IN_HIGH_BEAM_524A), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRHJB_IN_LOW_BEAM_525A), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRHJB_IN_RIGHT_TURN_1966A), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRHJB_IN_HAZ_WARN_1697A), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRHJB_IN_DRL_ON_838A), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireLHJB_IN_PARK_LAMPS), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_LOW_BEAM_SWITCH), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_FLASH_TO_PASS_SWITCH), ::electricsim::io::WireType::kBit) && ok;
@@ -2030,6 +2148,9 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireIPC_ES_AIR_BAG_TT_DRV), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRSA_ES_DIM_LEVEL_DRV), ::electricsim::io::WireType::kUint16) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireIPC_DOOR_AJAR_INPUT_1495), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireIPC_LR_TURN_INPUT_1334), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireIPC_RR_TURN_INPUT_1335), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireIPC_HIGH_BEAM_INPUT_1192), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireSDM_RUN1_INPUT_1139), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRSA_PARK_LAMPS_INPUT_301E), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireIPC_DIM_LEVEL_INPUT_230), ::electricsim::io::WireType::kUint16) && ok;
@@ -2111,9 +2232,6 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_B_RELEASED), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_C_RELEASED), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireAD_ES_POWER_SUPPLY_OUT), ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(kWireDRIVER_RSA_MODE_SW_LOCK, ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(kWireDRIVER_RSA_MODE_SW_OFF_ACC, ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(kWireDRIVER_RSA_MODE_SW_RUN, ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(kWireHV_ISOLATION_FAULT_LEAD, ::electricsim::io::WireType::kByte) && ok;
   ok = table.declare(kWireHV_ISOLATION_FAULT_KOHM, ::electricsim::io::WireType::kUint32) && ok;
   ok = table.declare(kWireCHASSIS_BPM_AD_DTC_BITMAP, ::electricsim::io::WireType::kUint16) && ok;
@@ -2124,15 +2242,9 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(kWireHV_BUS_PACK_CURRENT_MA, ::electricsim::io::WireType::kUint32) && ok;
   ok = table.declare(kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO, ::electricsim::io::WireType::kUint64) && ok;
   ok = table.declare(kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI, ::electricsim::io::WireType::kUint64) && ok;
-  ok = table.declare(kWireDRIVER_RSA_HVAC_HEAT, ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(kWireDRIVER_RSA_HVAC_VENT, ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(kWireDRIVER_RSA_HVAC_AC, ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(kWireDRIVER_RSA_DIM_UP, ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(kWireDRIVER_RSA_DIM_DOWN, ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_BATTERY_RECOVERY_SWITCH), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireAPM_VEHICLE_WAKE_UP_IN), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireAD_FEED_LOGIC_SUPPLY), ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(kWireDRIVER_COAST_DOWN_SWITCH, ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_FUSE_542), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_FUSE_642), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B), ::electricsim::io::WireType::kBit) && ok;
@@ -2375,20 +2487,47 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case kWireEXT_WHEEL_SPEED_FR: return "EXT_WHEEL_SPEED_FR";
     case kWireEXT_WHEEL_SPEED_RL: return "EXT_WHEEL_SPEED_RL";
     case kWireEXT_WHEEL_SPEED_RR: return "EXT_WHEEL_SPEED_RR";
-    case kWireDRIVER_RSA_KEYPAD_BUTTON1: return "DRIVER_RSA_KEYPAD_BUTTON1";
-    case kWireDRIVER_RSA_KEYPAD_BUTTON2: return "DRIVER_RSA_KEYPAD_BUTTON2";
-    case kWireDRIVER_RSA_KEYPAD_BUTTON3: return "DRIVER_RSA_KEYPAD_BUTTON3";
-    case kWireDRIVER_RSA_KEYPAD_BUTTON4: return "DRIVER_RSA_KEYPAD_BUTTON4";
-    case kWireDRIVER_RSA_KEYPAD_BUTTON5: return "DRIVER_RSA_KEYPAD_BUTTON5";
-    case kWireDRIVER_POWER_WINDOW_DRIVER_UP: return "DRIVER_POWER_WINDOW_DRIVER_UP";
-    case kWireDRIVER_POWER_WINDOW_DRIVER_DOWN: return "DRIVER_POWER_WINDOW_DRIVER_DOWN";
-    case kWireDRIVER_POWER_WINDOW_PASSENGER_UP: return "DRIVER_POWER_WINDOW_PASSENGER_UP";
-    case kWireDRIVER_POWER_WINDOW_PASSENGER_DOWN: return "DRIVER_POWER_WINDOW_PASSENGER_DOWN";
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_1): return "DRIVER_ES_EXT_KEYPAD_1";
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_2): return "DRIVER_ES_EXT_KEYPAD_2";
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_3): return "DRIVER_ES_EXT_KEYPAD_3";
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_4): return "DRIVER_ES_EXT_KEYPAD_4";
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_5): return "DRIVER_ES_EXT_KEYPAD_5";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_1): return "DRIVER_ES_RSA_KEYPAD_1";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_2): return "DRIVER_ES_RSA_KEYPAD_2";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_3): return "DRIVER_ES_RSA_KEYPAD_3";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_4): return "DRIVER_ES_RSA_KEYPAD_4";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_5): return "DRIVER_ES_RSA_KEYPAD_5";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_WINDOW_DRIVER_UP): return "DRIVER_ES_WINDOW_DRIVER_UP";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_WINDOW_DRIVER_DOWN): return "DRIVER_ES_WINDOW_DRIVER_DOWN";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_WINDOW_PASSENGER_UP): return "DRIVER_ES_WINDOW_PASSENGER_UP";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_WINDOW_PASSENGER_DOWN): return "DRIVER_ES_WINDOW_PASSENGER_DOWN";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_MODE_LOCK): return "DRIVER_ES_RSA_MODE_LOCK";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_MODE_OFF_ACC): return "DRIVER_ES_RSA_MODE_OFF_ACC";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_MODE_RUN): return "DRIVER_ES_RSA_MODE_RUN";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_HVAC_HEAT): return "DRIVER_ES_RSA_HVAC_HEAT";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_HVAC_VENT): return "DRIVER_ES_RSA_HVAC_VENT";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_HVAC_AC): return "DRIVER_ES_RSA_HVAC_AC";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_DIM_UP): return "DRIVER_ES_RSA_DIM_UP";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_DIM_DOWN): return "DRIVER_ES_RSA_DIM_DOWN";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_COAST_DOWN_SWITCH): return "DRIVER_ES_COAST_DOWN_SWITCH";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_1_IN): return "RSA_KEYPAD_1_IN";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_2_IN): return "RSA_KEYPAD_2_IN";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_3_IN): return "RSA_KEYPAD_3_IN";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_4_IN): return "RSA_KEYPAD_4_IN";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_5_IN): return "RSA_KEYPAD_5_IN";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_WINDOW_DRIVER_UP_IN): return "RSA_WINDOW_DRIVER_UP_IN";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_WINDOW_DRIVER_DOWN_IN): return "RSA_WINDOW_DRIVER_DOWN_IN";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_WINDOW_PASSENGER_UP_IN): return "RSA_WINDOW_PASSENGER_UP_IN";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_WINDOW_PASSENGER_DOWN_IN): return "RSA_WINDOW_PASSENGER_DOWN_IN";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_MODE_LOCK_IN): return "RSA_MODE_LOCK_IN";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_MODE_OFF_ACC_IN): return "RSA_MODE_OFF_ACC_IN";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_MODE_RUN_IN): return "RSA_MODE_RUN_IN";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_HVAC_HEAT_IN): return "RSA_HVAC_HEAT_IN";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_HVAC_VENT_IN): return "RSA_HVAC_VENT_IN";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_HVAC_AC_IN): return "RSA_HVAC_AC_IN";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_DIM_UP_IN): return "RSA_DIM_UP_IN";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_DIM_DOWN_IN): return "RSA_DIM_DOWN_IN";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_COAST_DOWN_IN): return "RSA_COAST_DOWN_IN";
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_RSA_EXT_KEYPAD1_IN): return "CHASSIS_RSA_EXT_KEYPAD1_IN";
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_RSA_EXT_KEYPAD2_IN): return "CHASSIS_RSA_EXT_KEYPAD2_IN";
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_RSA_EXT_KEYPAD3_IN): return "CHASSIS_RSA_EXT_KEYPAD3_IN";
@@ -2397,8 +2536,6 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case static_cast<::electricsim::io::WireId>(kWireRSA_ES_EKP_BACKLIGHT): return "RSA_ES_EKP_BACKLIGHT";
     case kWirePIM_CRUISE_ACTIVE: return "PIM_CRUISE_ACTIVE";
     case kWirePIM_CRUISE_SETPOINT_MPS: return "PIM_CRUISE_SETPOINT_MPS";
-    case kWireAD_PRECHARGE_RELAY: return "AD_PRECHARGE_RELAY";
-    case kWireAD_MAIN_CONTACTOR: return "AD_MAIN_CONTACTOR";
     case kWireAD_ISOLATION_KOHM: return "AD_ISOLATION_KOHM";
     case kWireAD_MAIN_CONTACTOR_FB: return "AD_MAIN_CONTACTOR_FB";
     case kWireAD_PRECHARGE_CONTACTOR_FB: return "AD_PRECHARGE_CONTACTOR_FB";
@@ -2505,10 +2642,7 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_HEADLAMP_LOW_DRV): return "LHJB_ES_HEADLAMP_LOW_DRV";
     case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_HEADLAMP_HIGH_DRV): return "LHJB_ES_HEADLAMP_HIGH_DRV";
     case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_TURN_LF_DRV): return "LHJB_ES_TURN_LF_DRV";
-    case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_TURN_RF_DRV): return "LHJB_ES_TURN_RF_DRV";
     case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_TURN_LR_DRV): return "LHJB_ES_TURN_LR_DRV";
-    case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_TURN_RR_DRV): return "LHJB_ES_TURN_RR_DRV";
-    case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_HORN_RELAY): return "LHJB_ES_HORN_RELAY";
     case static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_MCU_SUPPLY): return "LHJB_FEED_MCU_SUPPLY";
     case static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_BPLUS_FUSEBLOCK): return "LHJB_FEED_BPLUS_FUSEBLOCK";
     case static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_STOP_ALWAYS_HOT): return "LHJB_FEED_STOP_ALWAYS_HOT";
@@ -2518,6 +2652,18 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case static_cast<::electricsim::io::WireId>(kWireLHJB_IN_TURN_LEFT): return "LHJB_IN_TURN_LEFT";
     case static_cast<::electricsim::io::WireId>(kWireLHJB_IN_TURN_RIGHT): return "LHJB_IN_TURN_RIGHT";
     case static_cast<::electricsim::io::WireId>(kWireLHJB_IN_HORN_CMD): return "LHJB_IN_HORN_CMD";
+    case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_RIGHT_TURN_OUT): return "LHJB_ES_RIGHT_TURN_OUT";
+    case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_HAZ_WARN_OUT): return "LHJB_ES_HAZ_WARN_OUT";
+    case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_DRL_ON_OUT): return "LHJB_ES_DRL_ON_OUT";
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_ES_HEADLAMP_HIGH_DRV): return "RHJB_ES_HEADLAMP_HIGH_DRV";
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_ES_HEADLAMP_LOW_DRV): return "RHJB_ES_HEADLAMP_LOW_DRV";
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_ES_TURN_RF_DRV): return "RHJB_ES_TURN_RF_DRV";
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_ES_TURN_RR_DRV): return "RHJB_ES_TURN_RR_DRV";
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_IN_HIGH_BEAM_524A): return "RHJB_IN_HIGH_BEAM_524A";
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_IN_LOW_BEAM_525A): return "RHJB_IN_LOW_BEAM_525A";
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_IN_RIGHT_TURN_1966A): return "RHJB_IN_RIGHT_TURN_1966A";
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_IN_HAZ_WARN_1697A): return "RHJB_IN_HAZ_WARN_1697A";
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_IN_DRL_ON_838A): return "RHJB_IN_DRL_ON_838A";
     case static_cast<::electricsim::io::WireId>(kWireLHJB_IN_PARK_LAMPS): return "LHJB_IN_PARK_LAMPS";
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_LOW_BEAM_SWITCH): return "DRIVER_ES_LOW_BEAM_SWITCH";
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_FLASH_TO_PASS_SWITCH): return "DRIVER_ES_FLASH_TO_PASS_SWITCH";
@@ -2558,6 +2704,9 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case static_cast<::electricsim::io::WireId>(kWireIPC_ES_AIR_BAG_TT_DRV): return "IPC_ES_AIR_BAG_TT_DRV";
     case static_cast<::electricsim::io::WireId>(kWireRSA_ES_DIM_LEVEL_DRV): return "RSA_ES_DIM_LEVEL_DRV";
     case static_cast<::electricsim::io::WireId>(kWireIPC_DOOR_AJAR_INPUT_1495): return "IPC_DOOR_AJAR_INPUT_1495";
+    case static_cast<::electricsim::io::WireId>(kWireIPC_LR_TURN_INPUT_1334): return "IPC_LR_TURN_INPUT_1334";
+    case static_cast<::electricsim::io::WireId>(kWireIPC_RR_TURN_INPUT_1335): return "IPC_RR_TURN_INPUT_1335";
+    case static_cast<::electricsim::io::WireId>(kWireIPC_HIGH_BEAM_INPUT_1192): return "IPC_HIGH_BEAM_INPUT_1192";
     case static_cast<::electricsim::io::WireId>(kWireSDM_RUN1_INPUT_1139): return "SDM_RUN1_INPUT_1139";
     case static_cast<::electricsim::io::WireId>(kWireRSA_PARK_LAMPS_INPUT_301E): return "RSA_PARK_LAMPS_INPUT_301E";
     case static_cast<::electricsim::io::WireId>(kWireIPC_DIM_LEVEL_INPUT_230): return "IPC_DIM_LEVEL_INPUT_230";
@@ -2639,9 +2788,6 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_B_RELEASED): return "AD_ES_STATE_B_RELEASED";
     case static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_C_RELEASED): return "AD_ES_STATE_C_RELEASED";
     case static_cast<::electricsim::io::WireId>(kWireAD_ES_POWER_SUPPLY_OUT): return "AD_ES_POWER_SUPPLY_OUT";
-    case kWireDRIVER_RSA_MODE_SW_LOCK: return "DRIVER_RSA_MODE_SW_LOCK";
-    case kWireDRIVER_RSA_MODE_SW_OFF_ACC: return "DRIVER_RSA_MODE_SW_OFF_ACC";
-    case kWireDRIVER_RSA_MODE_SW_RUN: return "DRIVER_RSA_MODE_SW_RUN";
     case kWireHV_ISOLATION_FAULT_LEAD: return "HV_ISOLATION_FAULT_LEAD";
     case kWireHV_ISOLATION_FAULT_KOHM: return "HV_ISOLATION_FAULT_KOHM";
     case kWireCHASSIS_BPM_AD_DTC_BITMAP: return "CHASSIS_BPM_AD_DTC_BITMAP";
@@ -2652,15 +2798,9 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case kWireHV_BUS_PACK_CURRENT_MA: return "HV_BUS_PACK_CURRENT_MA";
     case kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO: return "CHASSIS_PIM_ACTIVE_DTC_BITMAP_LO";
     case kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI: return "CHASSIS_PIM_ACTIVE_DTC_BITMAP_HI";
-    case kWireDRIVER_RSA_HVAC_HEAT: return "DRIVER_RSA_HVAC_HEAT";
-    case kWireDRIVER_RSA_HVAC_VENT: return "DRIVER_RSA_HVAC_VENT";
-    case kWireDRIVER_RSA_HVAC_AC: return "DRIVER_RSA_HVAC_AC";
-    case kWireDRIVER_RSA_DIM_UP: return "DRIVER_RSA_DIM_UP";
-    case kWireDRIVER_RSA_DIM_DOWN: return "DRIVER_RSA_DIM_DOWN";
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_BATTERY_RECOVERY_SWITCH): return "DRIVER_ES_BATTERY_RECOVERY_SWITCH";
     case static_cast<::electricsim::io::WireId>(kWireAPM_VEHICLE_WAKE_UP_IN): return "APM_VEHICLE_WAKE_UP_IN";
     case static_cast<::electricsim::io::WireId>(kWireAD_FEED_LOGIC_SUPPLY): return "AD_FEED_LOGIC_SUPPLY";
-    case kWireDRIVER_COAST_DOWN_SWITCH: return "DRIVER_COAST_DOWN_SWITCH";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_FUSE_542): return "BTCM_FEED_FRONT_BRAKE_FUSE_542";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_FUSE_642): return "BTCM_FEED_REAR_BRAKE_FUSE_642";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B): return "BTCM_FEED_FRONT_BRAKE_BPLUS_1633B";
@@ -2902,20 +3042,47 @@ inline ::electricsim::io::WireId wire_id_for(::std::string_view name) noexcept {
   if (name == "EXT_WHEEL_SPEED_FR") return kWireEXT_WHEEL_SPEED_FR;
   if (name == "EXT_WHEEL_SPEED_RL") return kWireEXT_WHEEL_SPEED_RL;
   if (name == "EXT_WHEEL_SPEED_RR") return kWireEXT_WHEEL_SPEED_RR;
-  if (name == "DRIVER_RSA_KEYPAD_BUTTON1") return kWireDRIVER_RSA_KEYPAD_BUTTON1;
-  if (name == "DRIVER_RSA_KEYPAD_BUTTON2") return kWireDRIVER_RSA_KEYPAD_BUTTON2;
-  if (name == "DRIVER_RSA_KEYPAD_BUTTON3") return kWireDRIVER_RSA_KEYPAD_BUTTON3;
-  if (name == "DRIVER_RSA_KEYPAD_BUTTON4") return kWireDRIVER_RSA_KEYPAD_BUTTON4;
-  if (name == "DRIVER_RSA_KEYPAD_BUTTON5") return kWireDRIVER_RSA_KEYPAD_BUTTON5;
-  if (name == "DRIVER_POWER_WINDOW_DRIVER_UP") return kWireDRIVER_POWER_WINDOW_DRIVER_UP;
-  if (name == "DRIVER_POWER_WINDOW_DRIVER_DOWN") return kWireDRIVER_POWER_WINDOW_DRIVER_DOWN;
-  if (name == "DRIVER_POWER_WINDOW_PASSENGER_UP") return kWireDRIVER_POWER_WINDOW_PASSENGER_UP;
-  if (name == "DRIVER_POWER_WINDOW_PASSENGER_DOWN") return kWireDRIVER_POWER_WINDOW_PASSENGER_DOWN;
   if (name == "DRIVER_ES_EXT_KEYPAD_1") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_1);
   if (name == "DRIVER_ES_EXT_KEYPAD_2") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_2);
   if (name == "DRIVER_ES_EXT_KEYPAD_3") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_3);
   if (name == "DRIVER_ES_EXT_KEYPAD_4") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_4);
   if (name == "DRIVER_ES_EXT_KEYPAD_5") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_5);
+  if (name == "DRIVER_ES_RSA_KEYPAD_1") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_1);
+  if (name == "DRIVER_ES_RSA_KEYPAD_2") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_2);
+  if (name == "DRIVER_ES_RSA_KEYPAD_3") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_3);
+  if (name == "DRIVER_ES_RSA_KEYPAD_4") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_4);
+  if (name == "DRIVER_ES_RSA_KEYPAD_5") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_5);
+  if (name == "DRIVER_ES_WINDOW_DRIVER_UP") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_WINDOW_DRIVER_UP);
+  if (name == "DRIVER_ES_WINDOW_DRIVER_DOWN") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_WINDOW_DRIVER_DOWN);
+  if (name == "DRIVER_ES_WINDOW_PASSENGER_UP") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_WINDOW_PASSENGER_UP);
+  if (name == "DRIVER_ES_WINDOW_PASSENGER_DOWN") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_WINDOW_PASSENGER_DOWN);
+  if (name == "DRIVER_ES_RSA_MODE_LOCK") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_MODE_LOCK);
+  if (name == "DRIVER_ES_RSA_MODE_OFF_ACC") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_MODE_OFF_ACC);
+  if (name == "DRIVER_ES_RSA_MODE_RUN") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_MODE_RUN);
+  if (name == "DRIVER_ES_RSA_HVAC_HEAT") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_HVAC_HEAT);
+  if (name == "DRIVER_ES_RSA_HVAC_VENT") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_HVAC_VENT);
+  if (name == "DRIVER_ES_RSA_HVAC_AC") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_HVAC_AC);
+  if (name == "DRIVER_ES_RSA_DIM_UP") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_DIM_UP);
+  if (name == "DRIVER_ES_RSA_DIM_DOWN") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_DIM_DOWN);
+  if (name == "DRIVER_ES_COAST_DOWN_SWITCH") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_COAST_DOWN_SWITCH);
+  if (name == "RSA_KEYPAD_1_IN") return static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_1_IN);
+  if (name == "RSA_KEYPAD_2_IN") return static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_2_IN);
+  if (name == "RSA_KEYPAD_3_IN") return static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_3_IN);
+  if (name == "RSA_KEYPAD_4_IN") return static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_4_IN);
+  if (name == "RSA_KEYPAD_5_IN") return static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_5_IN);
+  if (name == "RSA_WINDOW_DRIVER_UP_IN") return static_cast<::electricsim::io::WireId>(kWireRSA_WINDOW_DRIVER_UP_IN);
+  if (name == "RSA_WINDOW_DRIVER_DOWN_IN") return static_cast<::electricsim::io::WireId>(kWireRSA_WINDOW_DRIVER_DOWN_IN);
+  if (name == "RSA_WINDOW_PASSENGER_UP_IN") return static_cast<::electricsim::io::WireId>(kWireRSA_WINDOW_PASSENGER_UP_IN);
+  if (name == "RSA_WINDOW_PASSENGER_DOWN_IN") return static_cast<::electricsim::io::WireId>(kWireRSA_WINDOW_PASSENGER_DOWN_IN);
+  if (name == "RSA_MODE_LOCK_IN") return static_cast<::electricsim::io::WireId>(kWireRSA_MODE_LOCK_IN);
+  if (name == "RSA_MODE_OFF_ACC_IN") return static_cast<::electricsim::io::WireId>(kWireRSA_MODE_OFF_ACC_IN);
+  if (name == "RSA_MODE_RUN_IN") return static_cast<::electricsim::io::WireId>(kWireRSA_MODE_RUN_IN);
+  if (name == "RSA_HVAC_HEAT_IN") return static_cast<::electricsim::io::WireId>(kWireRSA_HVAC_HEAT_IN);
+  if (name == "RSA_HVAC_VENT_IN") return static_cast<::electricsim::io::WireId>(kWireRSA_HVAC_VENT_IN);
+  if (name == "RSA_HVAC_AC_IN") return static_cast<::electricsim::io::WireId>(kWireRSA_HVAC_AC_IN);
+  if (name == "RSA_DIM_UP_IN") return static_cast<::electricsim::io::WireId>(kWireRSA_DIM_UP_IN);
+  if (name == "RSA_DIM_DOWN_IN") return static_cast<::electricsim::io::WireId>(kWireRSA_DIM_DOWN_IN);
+  if (name == "RSA_COAST_DOWN_IN") return static_cast<::electricsim::io::WireId>(kWireRSA_COAST_DOWN_IN);
   if (name == "CHASSIS_RSA_EXT_KEYPAD1_IN") return static_cast<::electricsim::io::WireId>(kWireCHASSIS_RSA_EXT_KEYPAD1_IN);
   if (name == "CHASSIS_RSA_EXT_KEYPAD2_IN") return static_cast<::electricsim::io::WireId>(kWireCHASSIS_RSA_EXT_KEYPAD2_IN);
   if (name == "CHASSIS_RSA_EXT_KEYPAD3_IN") return static_cast<::electricsim::io::WireId>(kWireCHASSIS_RSA_EXT_KEYPAD3_IN);
@@ -2924,8 +3091,6 @@ inline ::electricsim::io::WireId wire_id_for(::std::string_view name) noexcept {
   if (name == "RSA_ES_EKP_BACKLIGHT") return static_cast<::electricsim::io::WireId>(kWireRSA_ES_EKP_BACKLIGHT);
   if (name == "PIM_CRUISE_ACTIVE") return kWirePIM_CRUISE_ACTIVE;
   if (name == "PIM_CRUISE_SETPOINT_MPS") return kWirePIM_CRUISE_SETPOINT_MPS;
-  if (name == "AD_PRECHARGE_RELAY") return kWireAD_PRECHARGE_RELAY;
-  if (name == "AD_MAIN_CONTACTOR") return kWireAD_MAIN_CONTACTOR;
   if (name == "AD_ISOLATION_KOHM") return kWireAD_ISOLATION_KOHM;
   if (name == "AD_MAIN_CONTACTOR_FB") return kWireAD_MAIN_CONTACTOR_FB;
   if (name == "AD_PRECHARGE_CONTACTOR_FB") return kWireAD_PRECHARGE_CONTACTOR_FB;
@@ -3032,10 +3197,7 @@ inline ::electricsim::io::WireId wire_id_for(::std::string_view name) noexcept {
   if (name == "LHJB_ES_HEADLAMP_LOW_DRV") return static_cast<::electricsim::io::WireId>(kWireLHJB_ES_HEADLAMP_LOW_DRV);
   if (name == "LHJB_ES_HEADLAMP_HIGH_DRV") return static_cast<::electricsim::io::WireId>(kWireLHJB_ES_HEADLAMP_HIGH_DRV);
   if (name == "LHJB_ES_TURN_LF_DRV") return static_cast<::electricsim::io::WireId>(kWireLHJB_ES_TURN_LF_DRV);
-  if (name == "LHJB_ES_TURN_RF_DRV") return static_cast<::electricsim::io::WireId>(kWireLHJB_ES_TURN_RF_DRV);
   if (name == "LHJB_ES_TURN_LR_DRV") return static_cast<::electricsim::io::WireId>(kWireLHJB_ES_TURN_LR_DRV);
-  if (name == "LHJB_ES_TURN_RR_DRV") return static_cast<::electricsim::io::WireId>(kWireLHJB_ES_TURN_RR_DRV);
-  if (name == "LHJB_ES_HORN_RELAY") return static_cast<::electricsim::io::WireId>(kWireLHJB_ES_HORN_RELAY);
   if (name == "LHJB_FEED_MCU_SUPPLY") return static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_MCU_SUPPLY);
   if (name == "LHJB_FEED_BPLUS_FUSEBLOCK") return static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_BPLUS_FUSEBLOCK);
   if (name == "LHJB_FEED_STOP_ALWAYS_HOT") return static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_STOP_ALWAYS_HOT);
@@ -3045,6 +3207,18 @@ inline ::electricsim::io::WireId wire_id_for(::std::string_view name) noexcept {
   if (name == "LHJB_IN_TURN_LEFT") return static_cast<::electricsim::io::WireId>(kWireLHJB_IN_TURN_LEFT);
   if (name == "LHJB_IN_TURN_RIGHT") return static_cast<::electricsim::io::WireId>(kWireLHJB_IN_TURN_RIGHT);
   if (name == "LHJB_IN_HORN_CMD") return static_cast<::electricsim::io::WireId>(kWireLHJB_IN_HORN_CMD);
+  if (name == "LHJB_ES_RIGHT_TURN_OUT") return static_cast<::electricsim::io::WireId>(kWireLHJB_ES_RIGHT_TURN_OUT);
+  if (name == "LHJB_ES_HAZ_WARN_OUT") return static_cast<::electricsim::io::WireId>(kWireLHJB_ES_HAZ_WARN_OUT);
+  if (name == "LHJB_ES_DRL_ON_OUT") return static_cast<::electricsim::io::WireId>(kWireLHJB_ES_DRL_ON_OUT);
+  if (name == "RHJB_ES_HEADLAMP_HIGH_DRV") return static_cast<::electricsim::io::WireId>(kWireRHJB_ES_HEADLAMP_HIGH_DRV);
+  if (name == "RHJB_ES_HEADLAMP_LOW_DRV") return static_cast<::electricsim::io::WireId>(kWireRHJB_ES_HEADLAMP_LOW_DRV);
+  if (name == "RHJB_ES_TURN_RF_DRV") return static_cast<::electricsim::io::WireId>(kWireRHJB_ES_TURN_RF_DRV);
+  if (name == "RHJB_ES_TURN_RR_DRV") return static_cast<::electricsim::io::WireId>(kWireRHJB_ES_TURN_RR_DRV);
+  if (name == "RHJB_IN_HIGH_BEAM_524A") return static_cast<::electricsim::io::WireId>(kWireRHJB_IN_HIGH_BEAM_524A);
+  if (name == "RHJB_IN_LOW_BEAM_525A") return static_cast<::electricsim::io::WireId>(kWireRHJB_IN_LOW_BEAM_525A);
+  if (name == "RHJB_IN_RIGHT_TURN_1966A") return static_cast<::electricsim::io::WireId>(kWireRHJB_IN_RIGHT_TURN_1966A);
+  if (name == "RHJB_IN_HAZ_WARN_1697A") return static_cast<::electricsim::io::WireId>(kWireRHJB_IN_HAZ_WARN_1697A);
+  if (name == "RHJB_IN_DRL_ON_838A") return static_cast<::electricsim::io::WireId>(kWireRHJB_IN_DRL_ON_838A);
   if (name == "LHJB_IN_PARK_LAMPS") return static_cast<::electricsim::io::WireId>(kWireLHJB_IN_PARK_LAMPS);
   if (name == "DRIVER_ES_LOW_BEAM_SWITCH") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_LOW_BEAM_SWITCH);
   if (name == "DRIVER_ES_FLASH_TO_PASS_SWITCH") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_FLASH_TO_PASS_SWITCH);
@@ -3085,6 +3259,9 @@ inline ::electricsim::io::WireId wire_id_for(::std::string_view name) noexcept {
   if (name == "IPC_ES_AIR_BAG_TT_DRV") return static_cast<::electricsim::io::WireId>(kWireIPC_ES_AIR_BAG_TT_DRV);
   if (name == "RSA_ES_DIM_LEVEL_DRV") return static_cast<::electricsim::io::WireId>(kWireRSA_ES_DIM_LEVEL_DRV);
   if (name == "IPC_DOOR_AJAR_INPUT_1495") return static_cast<::electricsim::io::WireId>(kWireIPC_DOOR_AJAR_INPUT_1495);
+  if (name == "IPC_LR_TURN_INPUT_1334") return static_cast<::electricsim::io::WireId>(kWireIPC_LR_TURN_INPUT_1334);
+  if (name == "IPC_RR_TURN_INPUT_1335") return static_cast<::electricsim::io::WireId>(kWireIPC_RR_TURN_INPUT_1335);
+  if (name == "IPC_HIGH_BEAM_INPUT_1192") return static_cast<::electricsim::io::WireId>(kWireIPC_HIGH_BEAM_INPUT_1192);
   if (name == "SDM_RUN1_INPUT_1139") return static_cast<::electricsim::io::WireId>(kWireSDM_RUN1_INPUT_1139);
   if (name == "RSA_PARK_LAMPS_INPUT_301E") return static_cast<::electricsim::io::WireId>(kWireRSA_PARK_LAMPS_INPUT_301E);
   if (name == "IPC_DIM_LEVEL_INPUT_230") return static_cast<::electricsim::io::WireId>(kWireIPC_DIM_LEVEL_INPUT_230);
@@ -3166,9 +3343,6 @@ inline ::electricsim::io::WireId wire_id_for(::std::string_view name) noexcept {
   if (name == "AD_ES_STATE_B_RELEASED") return static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_B_RELEASED);
   if (name == "AD_ES_STATE_C_RELEASED") return static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_C_RELEASED);
   if (name == "AD_ES_POWER_SUPPLY_OUT") return static_cast<::electricsim::io::WireId>(kWireAD_ES_POWER_SUPPLY_OUT);
-  if (name == "DRIVER_RSA_MODE_SW_LOCK") return kWireDRIVER_RSA_MODE_SW_LOCK;
-  if (name == "DRIVER_RSA_MODE_SW_OFF_ACC") return kWireDRIVER_RSA_MODE_SW_OFF_ACC;
-  if (name == "DRIVER_RSA_MODE_SW_RUN") return kWireDRIVER_RSA_MODE_SW_RUN;
   if (name == "HV_ISOLATION_FAULT_LEAD") return kWireHV_ISOLATION_FAULT_LEAD;
   if (name == "HV_ISOLATION_FAULT_KOHM") return kWireHV_ISOLATION_FAULT_KOHM;
   if (name == "CHASSIS_BPM_AD_DTC_BITMAP") return kWireCHASSIS_BPM_AD_DTC_BITMAP;
@@ -3179,15 +3353,9 @@ inline ::electricsim::io::WireId wire_id_for(::std::string_view name) noexcept {
   if (name == "HV_BUS_PACK_CURRENT_MA") return kWireHV_BUS_PACK_CURRENT_MA;
   if (name == "CHASSIS_PIM_ACTIVE_DTC_BITMAP_LO") return kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO;
   if (name == "CHASSIS_PIM_ACTIVE_DTC_BITMAP_HI") return kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI;
-  if (name == "DRIVER_RSA_HVAC_HEAT") return kWireDRIVER_RSA_HVAC_HEAT;
-  if (name == "DRIVER_RSA_HVAC_VENT") return kWireDRIVER_RSA_HVAC_VENT;
-  if (name == "DRIVER_RSA_HVAC_AC") return kWireDRIVER_RSA_HVAC_AC;
-  if (name == "DRIVER_RSA_DIM_UP") return kWireDRIVER_RSA_DIM_UP;
-  if (name == "DRIVER_RSA_DIM_DOWN") return kWireDRIVER_RSA_DIM_DOWN;
   if (name == "DRIVER_ES_BATTERY_RECOVERY_SWITCH") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_BATTERY_RECOVERY_SWITCH);
   if (name == "APM_VEHICLE_WAKE_UP_IN") return static_cast<::electricsim::io::WireId>(kWireAPM_VEHICLE_WAKE_UP_IN);
   if (name == "AD_FEED_LOGIC_SUPPLY") return static_cast<::electricsim::io::WireId>(kWireAD_FEED_LOGIC_SUPPLY);
-  if (name == "DRIVER_COAST_DOWN_SWITCH") return kWireDRIVER_COAST_DOWN_SWITCH;
   if (name == "BTCM_FEED_FRONT_BRAKE_FUSE_542") return static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_FUSE_542);
   if (name == "BTCM_FEED_REAR_BRAKE_FUSE_642") return static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_FUSE_642);
   if (name == "BTCM_FEED_FRONT_BRAKE_BPLUS_1633B") return static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B);
@@ -3434,20 +3602,47 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case kWireEXT_WHEEL_SPEED_FR: return "";
     case kWireEXT_WHEEL_SPEED_RL: return "";
     case kWireEXT_WHEEL_SPEED_RR: return "";
-    case kWireDRIVER_RSA_KEYPAD_BUTTON1: return "";
-    case kWireDRIVER_RSA_KEYPAD_BUTTON2: return "";
-    case kWireDRIVER_RSA_KEYPAD_BUTTON3: return "";
-    case kWireDRIVER_RSA_KEYPAD_BUTTON4: return "";
-    case kWireDRIVER_RSA_KEYPAD_BUTTON5: return "";
-    case kWireDRIVER_POWER_WINDOW_DRIVER_UP: return "";
-    case kWireDRIVER_POWER_WINDOW_DRIVER_DOWN: return "";
-    case kWireDRIVER_POWER_WINDOW_PASSENGER_UP: return "";
-    case kWireDRIVER_POWER_WINDOW_PASSENGER_DOWN: return "";
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_1): return "none";
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_2): return "none";
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_3): return "none";
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_4): return "none";
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_5): return "none";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_1): return "none";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_2): return "none";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_3): return "none";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_4): return "none";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_5): return "none";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_WINDOW_DRIVER_UP): return "none";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_WINDOW_DRIVER_DOWN): return "none";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_WINDOW_PASSENGER_UP): return "none";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_WINDOW_PASSENGER_DOWN): return "none";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_MODE_LOCK): return "none";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_MODE_OFF_ACC): return "none";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_MODE_RUN): return "none";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_HVAC_HEAT): return "none";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_HVAC_VENT): return "none";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_HVAC_AC): return "none";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_DIM_UP): return "none";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_DIM_DOWN): return "none";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_COAST_DOWN_SWITCH): return "none";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_1_IN): return "";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_2_IN): return "";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_3_IN): return "";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_4_IN): return "";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_5_IN): return "";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_WINDOW_DRIVER_UP_IN): return "";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_WINDOW_DRIVER_DOWN_IN): return "";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_WINDOW_PASSENGER_UP_IN): return "";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_WINDOW_PASSENGER_DOWN_IN): return "";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_MODE_LOCK_IN): return "";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_MODE_OFF_ACC_IN): return "";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_MODE_RUN_IN): return "";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_HVAC_HEAT_IN): return "";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_HVAC_VENT_IN): return "";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_HVAC_AC_IN): return "";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_DIM_UP_IN): return "";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_DIM_DOWN_IN): return "";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_COAST_DOWN_IN): return "";
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_RSA_EXT_KEYPAD1_IN): return "";
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_RSA_EXT_KEYPAD2_IN): return "";
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_RSA_EXT_KEYPAD3_IN): return "";
@@ -3456,8 +3651,6 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case static_cast<::electricsim::io::WireId>(kWireRSA_ES_EKP_BACKLIGHT): return "rsa_ecu";
     case kWirePIM_CRUISE_ACTIVE: return "";
     case kWirePIM_CRUISE_SETPOINT_MPS: return "";
-    case kWireAD_PRECHARGE_RELAY: return "";
-    case kWireAD_MAIN_CONTACTOR: return "";
     case kWireAD_ISOLATION_KOHM: return "";
     case kWireAD_MAIN_CONTACTOR_FB: return "";
     case kWireAD_PRECHARGE_CONTACTOR_FB: return "";
@@ -3564,10 +3757,7 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_HEADLAMP_LOW_DRV): return "lhjb_ecu";
     case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_HEADLAMP_HIGH_DRV): return "lhjb_ecu";
     case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_TURN_LF_DRV): return "lhjb_ecu";
-    case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_TURN_RF_DRV): return "lhjb_ecu";
     case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_TURN_LR_DRV): return "lhjb_ecu";
-    case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_TURN_RR_DRV): return "lhjb_ecu";
-    case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_HORN_RELAY): return "lhjb_ecu";
     case static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_MCU_SUPPLY): return "";
     case static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_BPLUS_FUSEBLOCK): return "";
     case static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_STOP_ALWAYS_HOT): return "";
@@ -3577,6 +3767,18 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case static_cast<::electricsim::io::WireId>(kWireLHJB_IN_TURN_LEFT): return "";
     case static_cast<::electricsim::io::WireId>(kWireLHJB_IN_TURN_RIGHT): return "";
     case static_cast<::electricsim::io::WireId>(kWireLHJB_IN_HORN_CMD): return "";
+    case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_RIGHT_TURN_OUT): return "lhjb_ecu";
+    case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_HAZ_WARN_OUT): return "lhjb_ecu";
+    case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_DRL_ON_OUT): return "lhjb_ecu";
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_ES_HEADLAMP_HIGH_DRV): return "rhjb_ecu";
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_ES_HEADLAMP_LOW_DRV): return "rhjb_ecu";
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_ES_TURN_RF_DRV): return "rhjb_ecu";
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_ES_TURN_RR_DRV): return "rhjb_ecu";
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_IN_HIGH_BEAM_524A): return "";
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_IN_LOW_BEAM_525A): return "";
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_IN_RIGHT_TURN_1966A): return "";
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_IN_HAZ_WARN_1697A): return "";
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_IN_DRL_ON_838A): return "";
     case static_cast<::electricsim::io::WireId>(kWireLHJB_IN_PARK_LAMPS): return "";
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_LOW_BEAM_SWITCH): return "none";
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_FLASH_TO_PASS_SWITCH): return "none";
@@ -3617,6 +3819,9 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case static_cast<::electricsim::io::WireId>(kWireIPC_ES_AIR_BAG_TT_DRV): return "sdm_ecu";
     case static_cast<::electricsim::io::WireId>(kWireRSA_ES_DIM_LEVEL_DRV): return "rsa_ecu";
     case static_cast<::electricsim::io::WireId>(kWireIPC_DOOR_AJAR_INPUT_1495): return "";
+    case static_cast<::electricsim::io::WireId>(kWireIPC_LR_TURN_INPUT_1334): return "";
+    case static_cast<::electricsim::io::WireId>(kWireIPC_RR_TURN_INPUT_1335): return "";
+    case static_cast<::electricsim::io::WireId>(kWireIPC_HIGH_BEAM_INPUT_1192): return "";
     case static_cast<::electricsim::io::WireId>(kWireSDM_RUN1_INPUT_1139): return "";
     case static_cast<::electricsim::io::WireId>(kWireRSA_PARK_LAMPS_INPUT_301E): return "";
     case static_cast<::electricsim::io::WireId>(kWireIPC_DIM_LEVEL_INPUT_230): return "";
@@ -3698,9 +3903,6 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_B_RELEASED): return "ad_ecu";
     case static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_C_RELEASED): return "ad_ecu";
     case static_cast<::electricsim::io::WireId>(kWireAD_ES_POWER_SUPPLY_OUT): return "ad_ecu";
-    case kWireDRIVER_RSA_MODE_SW_LOCK: return "";
-    case kWireDRIVER_RSA_MODE_SW_OFF_ACC: return "";
-    case kWireDRIVER_RSA_MODE_SW_RUN: return "";
     case kWireHV_ISOLATION_FAULT_LEAD: return "";
     case kWireHV_ISOLATION_FAULT_KOHM: return "";
     case kWireCHASSIS_BPM_AD_DTC_BITMAP: return "";
@@ -3711,15 +3913,9 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case kWireHV_BUS_PACK_CURRENT_MA: return "hv_bus_host";
     case kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO: return "pim_ecu";
     case kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI: return "pim_ecu";
-    case kWireDRIVER_RSA_HVAC_HEAT: return "";
-    case kWireDRIVER_RSA_HVAC_VENT: return "";
-    case kWireDRIVER_RSA_HVAC_AC: return "";
-    case kWireDRIVER_RSA_DIM_UP: return "";
-    case kWireDRIVER_RSA_DIM_DOWN: return "";
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_BATTERY_RECOVERY_SWITCH): return "none";
     case static_cast<::electricsim::io::WireId>(kWireAPM_VEHICLE_WAKE_UP_IN): return "";
     case static_cast<::electricsim::io::WireId>(kWireAD_FEED_LOGIC_SUPPLY): return "";
-    case kWireDRIVER_COAST_DOWN_SWITCH: return "";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_FUSE_542): return "";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_FUSE_642): return "";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B): return "";
@@ -3971,20 +4167,47 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(kWireEXT_WHEEL_SPEED_FR, &gen) && gen == 0) { visitor(::std::string_view{"EXT_WHEEL_SPEED_FR"}, kWireEXT_WHEEL_SPEED_FR); ++count; }
   if (table.write_gen(kWireEXT_WHEEL_SPEED_RL, &gen) && gen == 0) { visitor(::std::string_view{"EXT_WHEEL_SPEED_RL"}, kWireEXT_WHEEL_SPEED_RL); ++count; }
   if (table.write_gen(kWireEXT_WHEEL_SPEED_RR, &gen) && gen == 0) { visitor(::std::string_view{"EXT_WHEEL_SPEED_RR"}, kWireEXT_WHEEL_SPEED_RR); ++count; }
-  if (table.write_gen(kWireDRIVER_RSA_KEYPAD_BUTTON1, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_RSA_KEYPAD_BUTTON1"}, kWireDRIVER_RSA_KEYPAD_BUTTON1); ++count; }
-  if (table.write_gen(kWireDRIVER_RSA_KEYPAD_BUTTON2, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_RSA_KEYPAD_BUTTON2"}, kWireDRIVER_RSA_KEYPAD_BUTTON2); ++count; }
-  if (table.write_gen(kWireDRIVER_RSA_KEYPAD_BUTTON3, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_RSA_KEYPAD_BUTTON3"}, kWireDRIVER_RSA_KEYPAD_BUTTON3); ++count; }
-  if (table.write_gen(kWireDRIVER_RSA_KEYPAD_BUTTON4, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_RSA_KEYPAD_BUTTON4"}, kWireDRIVER_RSA_KEYPAD_BUTTON4); ++count; }
-  if (table.write_gen(kWireDRIVER_RSA_KEYPAD_BUTTON5, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_RSA_KEYPAD_BUTTON5"}, kWireDRIVER_RSA_KEYPAD_BUTTON5); ++count; }
-  if (table.write_gen(kWireDRIVER_POWER_WINDOW_DRIVER_UP, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_POWER_WINDOW_DRIVER_UP"}, kWireDRIVER_POWER_WINDOW_DRIVER_UP); ++count; }
-  if (table.write_gen(kWireDRIVER_POWER_WINDOW_DRIVER_DOWN, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_POWER_WINDOW_DRIVER_DOWN"}, kWireDRIVER_POWER_WINDOW_DRIVER_DOWN); ++count; }
-  if (table.write_gen(kWireDRIVER_POWER_WINDOW_PASSENGER_UP, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_POWER_WINDOW_PASSENGER_UP"}, kWireDRIVER_POWER_WINDOW_PASSENGER_UP); ++count; }
-  if (table.write_gen(kWireDRIVER_POWER_WINDOW_PASSENGER_DOWN, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_POWER_WINDOW_PASSENGER_DOWN"}, kWireDRIVER_POWER_WINDOW_PASSENGER_DOWN); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_1), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_EXT_KEYPAD_1"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_1)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_2), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_EXT_KEYPAD_2"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_2)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_3), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_EXT_KEYPAD_3"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_3)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_4), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_EXT_KEYPAD_4"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_4)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_5), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_EXT_KEYPAD_5"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_5)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_1), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_RSA_KEYPAD_1"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_1)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_2), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_RSA_KEYPAD_2"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_2)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_3), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_RSA_KEYPAD_3"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_3)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_4), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_RSA_KEYPAD_4"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_4)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_5), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_RSA_KEYPAD_5"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_5)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_WINDOW_DRIVER_UP), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_WINDOW_DRIVER_UP"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_WINDOW_DRIVER_UP)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_WINDOW_DRIVER_DOWN), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_WINDOW_DRIVER_DOWN"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_WINDOW_DRIVER_DOWN)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_WINDOW_PASSENGER_UP), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_WINDOW_PASSENGER_UP"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_WINDOW_PASSENGER_UP)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_WINDOW_PASSENGER_DOWN), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_WINDOW_PASSENGER_DOWN"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_WINDOW_PASSENGER_DOWN)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_MODE_LOCK), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_RSA_MODE_LOCK"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_MODE_LOCK)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_MODE_OFF_ACC), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_RSA_MODE_OFF_ACC"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_MODE_OFF_ACC)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_MODE_RUN), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_RSA_MODE_RUN"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_MODE_RUN)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_HVAC_HEAT), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_RSA_HVAC_HEAT"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_HVAC_HEAT)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_HVAC_VENT), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_RSA_HVAC_VENT"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_HVAC_VENT)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_HVAC_AC), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_RSA_HVAC_AC"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_HVAC_AC)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_DIM_UP), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_RSA_DIM_UP"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_DIM_UP)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_DIM_DOWN), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_RSA_DIM_DOWN"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_DIM_DOWN)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_COAST_DOWN_SWITCH), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_COAST_DOWN_SWITCH"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_COAST_DOWN_SWITCH)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_1_IN), &gen) && gen == 0) { visitor(::std::string_view{"RSA_KEYPAD_1_IN"}, static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_1_IN)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_2_IN), &gen) && gen == 0) { visitor(::std::string_view{"RSA_KEYPAD_2_IN"}, static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_2_IN)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_3_IN), &gen) && gen == 0) { visitor(::std::string_view{"RSA_KEYPAD_3_IN"}, static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_3_IN)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_4_IN), &gen) && gen == 0) { visitor(::std::string_view{"RSA_KEYPAD_4_IN"}, static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_4_IN)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_5_IN), &gen) && gen == 0) { visitor(::std::string_view{"RSA_KEYPAD_5_IN"}, static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_5_IN)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRSA_WINDOW_DRIVER_UP_IN), &gen) && gen == 0) { visitor(::std::string_view{"RSA_WINDOW_DRIVER_UP_IN"}, static_cast<::electricsim::io::WireId>(kWireRSA_WINDOW_DRIVER_UP_IN)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRSA_WINDOW_DRIVER_DOWN_IN), &gen) && gen == 0) { visitor(::std::string_view{"RSA_WINDOW_DRIVER_DOWN_IN"}, static_cast<::electricsim::io::WireId>(kWireRSA_WINDOW_DRIVER_DOWN_IN)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRSA_WINDOW_PASSENGER_UP_IN), &gen) && gen == 0) { visitor(::std::string_view{"RSA_WINDOW_PASSENGER_UP_IN"}, static_cast<::electricsim::io::WireId>(kWireRSA_WINDOW_PASSENGER_UP_IN)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRSA_WINDOW_PASSENGER_DOWN_IN), &gen) && gen == 0) { visitor(::std::string_view{"RSA_WINDOW_PASSENGER_DOWN_IN"}, static_cast<::electricsim::io::WireId>(kWireRSA_WINDOW_PASSENGER_DOWN_IN)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRSA_MODE_LOCK_IN), &gen) && gen == 0) { visitor(::std::string_view{"RSA_MODE_LOCK_IN"}, static_cast<::electricsim::io::WireId>(kWireRSA_MODE_LOCK_IN)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRSA_MODE_OFF_ACC_IN), &gen) && gen == 0) { visitor(::std::string_view{"RSA_MODE_OFF_ACC_IN"}, static_cast<::electricsim::io::WireId>(kWireRSA_MODE_OFF_ACC_IN)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRSA_MODE_RUN_IN), &gen) && gen == 0) { visitor(::std::string_view{"RSA_MODE_RUN_IN"}, static_cast<::electricsim::io::WireId>(kWireRSA_MODE_RUN_IN)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRSA_HVAC_HEAT_IN), &gen) && gen == 0) { visitor(::std::string_view{"RSA_HVAC_HEAT_IN"}, static_cast<::electricsim::io::WireId>(kWireRSA_HVAC_HEAT_IN)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRSA_HVAC_VENT_IN), &gen) && gen == 0) { visitor(::std::string_view{"RSA_HVAC_VENT_IN"}, static_cast<::electricsim::io::WireId>(kWireRSA_HVAC_VENT_IN)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRSA_HVAC_AC_IN), &gen) && gen == 0) { visitor(::std::string_view{"RSA_HVAC_AC_IN"}, static_cast<::electricsim::io::WireId>(kWireRSA_HVAC_AC_IN)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRSA_DIM_UP_IN), &gen) && gen == 0) { visitor(::std::string_view{"RSA_DIM_UP_IN"}, static_cast<::electricsim::io::WireId>(kWireRSA_DIM_UP_IN)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRSA_DIM_DOWN_IN), &gen) && gen == 0) { visitor(::std::string_view{"RSA_DIM_DOWN_IN"}, static_cast<::electricsim::io::WireId>(kWireRSA_DIM_DOWN_IN)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRSA_COAST_DOWN_IN), &gen) && gen == 0) { visitor(::std::string_view{"RSA_COAST_DOWN_IN"}, static_cast<::electricsim::io::WireId>(kWireRSA_COAST_DOWN_IN)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireCHASSIS_RSA_EXT_KEYPAD1_IN), &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_RSA_EXT_KEYPAD1_IN"}, static_cast<::electricsim::io::WireId>(kWireCHASSIS_RSA_EXT_KEYPAD1_IN)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireCHASSIS_RSA_EXT_KEYPAD2_IN), &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_RSA_EXT_KEYPAD2_IN"}, static_cast<::electricsim::io::WireId>(kWireCHASSIS_RSA_EXT_KEYPAD2_IN)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireCHASSIS_RSA_EXT_KEYPAD3_IN), &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_RSA_EXT_KEYPAD3_IN"}, static_cast<::electricsim::io::WireId>(kWireCHASSIS_RSA_EXT_KEYPAD3_IN)); ++count; }
@@ -3993,8 +4216,6 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRSA_ES_EKP_BACKLIGHT), &gen) && gen == 0) { visitor(::std::string_view{"RSA_ES_EKP_BACKLIGHT"}, static_cast<::electricsim::io::WireId>(kWireRSA_ES_EKP_BACKLIGHT)); ++count; }
   if (table.write_gen(kWirePIM_CRUISE_ACTIVE, &gen) && gen == 0) { visitor(::std::string_view{"PIM_CRUISE_ACTIVE"}, kWirePIM_CRUISE_ACTIVE); ++count; }
   if (table.write_gen(kWirePIM_CRUISE_SETPOINT_MPS, &gen) && gen == 0) { visitor(::std::string_view{"PIM_CRUISE_SETPOINT_MPS"}, kWirePIM_CRUISE_SETPOINT_MPS); ++count; }
-  if (table.write_gen(kWireAD_PRECHARGE_RELAY, &gen) && gen == 0) { visitor(::std::string_view{"AD_PRECHARGE_RELAY"}, kWireAD_PRECHARGE_RELAY); ++count; }
-  if (table.write_gen(kWireAD_MAIN_CONTACTOR, &gen) && gen == 0) { visitor(::std::string_view{"AD_MAIN_CONTACTOR"}, kWireAD_MAIN_CONTACTOR); ++count; }
   if (table.write_gen(kWireAD_ISOLATION_KOHM, &gen) && gen == 0) { visitor(::std::string_view{"AD_ISOLATION_KOHM"}, kWireAD_ISOLATION_KOHM); ++count; }
   if (table.write_gen(kWireAD_MAIN_CONTACTOR_FB, &gen) && gen == 0) { visitor(::std::string_view{"AD_MAIN_CONTACTOR_FB"}, kWireAD_MAIN_CONTACTOR_FB); ++count; }
   if (table.write_gen(kWireAD_PRECHARGE_CONTACTOR_FB, &gen) && gen == 0) { visitor(::std::string_view{"AD_PRECHARGE_CONTACTOR_FB"}, kWireAD_PRECHARGE_CONTACTOR_FB); ++count; }
@@ -4101,10 +4322,7 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireLHJB_ES_HEADLAMP_LOW_DRV), &gen) && gen == 0) { visitor(::std::string_view{"LHJB_ES_HEADLAMP_LOW_DRV"}, static_cast<::electricsim::io::WireId>(kWireLHJB_ES_HEADLAMP_LOW_DRV)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireLHJB_ES_HEADLAMP_HIGH_DRV), &gen) && gen == 0) { visitor(::std::string_view{"LHJB_ES_HEADLAMP_HIGH_DRV"}, static_cast<::electricsim::io::WireId>(kWireLHJB_ES_HEADLAMP_HIGH_DRV)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireLHJB_ES_TURN_LF_DRV), &gen) && gen == 0) { visitor(::std::string_view{"LHJB_ES_TURN_LF_DRV"}, static_cast<::electricsim::io::WireId>(kWireLHJB_ES_TURN_LF_DRV)); ++count; }
-  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireLHJB_ES_TURN_RF_DRV), &gen) && gen == 0) { visitor(::std::string_view{"LHJB_ES_TURN_RF_DRV"}, static_cast<::electricsim::io::WireId>(kWireLHJB_ES_TURN_RF_DRV)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireLHJB_ES_TURN_LR_DRV), &gen) && gen == 0) { visitor(::std::string_view{"LHJB_ES_TURN_LR_DRV"}, static_cast<::electricsim::io::WireId>(kWireLHJB_ES_TURN_LR_DRV)); ++count; }
-  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireLHJB_ES_TURN_RR_DRV), &gen) && gen == 0) { visitor(::std::string_view{"LHJB_ES_TURN_RR_DRV"}, static_cast<::electricsim::io::WireId>(kWireLHJB_ES_TURN_RR_DRV)); ++count; }
-  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireLHJB_ES_HORN_RELAY), &gen) && gen == 0) { visitor(::std::string_view{"LHJB_ES_HORN_RELAY"}, static_cast<::electricsim::io::WireId>(kWireLHJB_ES_HORN_RELAY)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_MCU_SUPPLY), &gen) && gen == 0) { visitor(::std::string_view{"LHJB_FEED_MCU_SUPPLY"}, static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_MCU_SUPPLY)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_BPLUS_FUSEBLOCK), &gen) && gen == 0) { visitor(::std::string_view{"LHJB_FEED_BPLUS_FUSEBLOCK"}, static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_BPLUS_FUSEBLOCK)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_STOP_ALWAYS_HOT), &gen) && gen == 0) { visitor(::std::string_view{"LHJB_FEED_STOP_ALWAYS_HOT"}, static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_STOP_ALWAYS_HOT)); ++count; }
@@ -4114,6 +4332,18 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireLHJB_IN_TURN_LEFT), &gen) && gen == 0) { visitor(::std::string_view{"LHJB_IN_TURN_LEFT"}, static_cast<::electricsim::io::WireId>(kWireLHJB_IN_TURN_LEFT)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireLHJB_IN_TURN_RIGHT), &gen) && gen == 0) { visitor(::std::string_view{"LHJB_IN_TURN_RIGHT"}, static_cast<::electricsim::io::WireId>(kWireLHJB_IN_TURN_RIGHT)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireLHJB_IN_HORN_CMD), &gen) && gen == 0) { visitor(::std::string_view{"LHJB_IN_HORN_CMD"}, static_cast<::electricsim::io::WireId>(kWireLHJB_IN_HORN_CMD)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireLHJB_ES_RIGHT_TURN_OUT), &gen) && gen == 0) { visitor(::std::string_view{"LHJB_ES_RIGHT_TURN_OUT"}, static_cast<::electricsim::io::WireId>(kWireLHJB_ES_RIGHT_TURN_OUT)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireLHJB_ES_HAZ_WARN_OUT), &gen) && gen == 0) { visitor(::std::string_view{"LHJB_ES_HAZ_WARN_OUT"}, static_cast<::electricsim::io::WireId>(kWireLHJB_ES_HAZ_WARN_OUT)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireLHJB_ES_DRL_ON_OUT), &gen) && gen == 0) { visitor(::std::string_view{"LHJB_ES_DRL_ON_OUT"}, static_cast<::electricsim::io::WireId>(kWireLHJB_ES_DRL_ON_OUT)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRHJB_ES_HEADLAMP_HIGH_DRV), &gen) && gen == 0) { visitor(::std::string_view{"RHJB_ES_HEADLAMP_HIGH_DRV"}, static_cast<::electricsim::io::WireId>(kWireRHJB_ES_HEADLAMP_HIGH_DRV)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRHJB_ES_HEADLAMP_LOW_DRV), &gen) && gen == 0) { visitor(::std::string_view{"RHJB_ES_HEADLAMP_LOW_DRV"}, static_cast<::electricsim::io::WireId>(kWireRHJB_ES_HEADLAMP_LOW_DRV)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRHJB_ES_TURN_RF_DRV), &gen) && gen == 0) { visitor(::std::string_view{"RHJB_ES_TURN_RF_DRV"}, static_cast<::electricsim::io::WireId>(kWireRHJB_ES_TURN_RF_DRV)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRHJB_ES_TURN_RR_DRV), &gen) && gen == 0) { visitor(::std::string_view{"RHJB_ES_TURN_RR_DRV"}, static_cast<::electricsim::io::WireId>(kWireRHJB_ES_TURN_RR_DRV)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRHJB_IN_HIGH_BEAM_524A), &gen) && gen == 0) { visitor(::std::string_view{"RHJB_IN_HIGH_BEAM_524A"}, static_cast<::electricsim::io::WireId>(kWireRHJB_IN_HIGH_BEAM_524A)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRHJB_IN_LOW_BEAM_525A), &gen) && gen == 0) { visitor(::std::string_view{"RHJB_IN_LOW_BEAM_525A"}, static_cast<::electricsim::io::WireId>(kWireRHJB_IN_LOW_BEAM_525A)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRHJB_IN_RIGHT_TURN_1966A), &gen) && gen == 0) { visitor(::std::string_view{"RHJB_IN_RIGHT_TURN_1966A"}, static_cast<::electricsim::io::WireId>(kWireRHJB_IN_RIGHT_TURN_1966A)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRHJB_IN_HAZ_WARN_1697A), &gen) && gen == 0) { visitor(::std::string_view{"RHJB_IN_HAZ_WARN_1697A"}, static_cast<::electricsim::io::WireId>(kWireRHJB_IN_HAZ_WARN_1697A)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRHJB_IN_DRL_ON_838A), &gen) && gen == 0) { visitor(::std::string_view{"RHJB_IN_DRL_ON_838A"}, static_cast<::electricsim::io::WireId>(kWireRHJB_IN_DRL_ON_838A)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireLHJB_IN_PARK_LAMPS), &gen) && gen == 0) { visitor(::std::string_view{"LHJB_IN_PARK_LAMPS"}, static_cast<::electricsim::io::WireId>(kWireLHJB_IN_PARK_LAMPS)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_LOW_BEAM_SWITCH), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_LOW_BEAM_SWITCH"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_LOW_BEAM_SWITCH)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_FLASH_TO_PASS_SWITCH), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_FLASH_TO_PASS_SWITCH"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_FLASH_TO_PASS_SWITCH)); ++count; }
@@ -4154,6 +4384,9 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireIPC_ES_AIR_BAG_TT_DRV), &gen) && gen == 0) { visitor(::std::string_view{"IPC_ES_AIR_BAG_TT_DRV"}, static_cast<::electricsim::io::WireId>(kWireIPC_ES_AIR_BAG_TT_DRV)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRSA_ES_DIM_LEVEL_DRV), &gen) && gen == 0) { visitor(::std::string_view{"RSA_ES_DIM_LEVEL_DRV"}, static_cast<::electricsim::io::WireId>(kWireRSA_ES_DIM_LEVEL_DRV)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireIPC_DOOR_AJAR_INPUT_1495), &gen) && gen == 0) { visitor(::std::string_view{"IPC_DOOR_AJAR_INPUT_1495"}, static_cast<::electricsim::io::WireId>(kWireIPC_DOOR_AJAR_INPUT_1495)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireIPC_LR_TURN_INPUT_1334), &gen) && gen == 0) { visitor(::std::string_view{"IPC_LR_TURN_INPUT_1334"}, static_cast<::electricsim::io::WireId>(kWireIPC_LR_TURN_INPUT_1334)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireIPC_RR_TURN_INPUT_1335), &gen) && gen == 0) { visitor(::std::string_view{"IPC_RR_TURN_INPUT_1335"}, static_cast<::electricsim::io::WireId>(kWireIPC_RR_TURN_INPUT_1335)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireIPC_HIGH_BEAM_INPUT_1192), &gen) && gen == 0) { visitor(::std::string_view{"IPC_HIGH_BEAM_INPUT_1192"}, static_cast<::electricsim::io::WireId>(kWireIPC_HIGH_BEAM_INPUT_1192)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireSDM_RUN1_INPUT_1139), &gen) && gen == 0) { visitor(::std::string_view{"SDM_RUN1_INPUT_1139"}, static_cast<::electricsim::io::WireId>(kWireSDM_RUN1_INPUT_1139)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRSA_PARK_LAMPS_INPUT_301E), &gen) && gen == 0) { visitor(::std::string_view{"RSA_PARK_LAMPS_INPUT_301E"}, static_cast<::electricsim::io::WireId>(kWireRSA_PARK_LAMPS_INPUT_301E)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireIPC_DIM_LEVEL_INPUT_230), &gen) && gen == 0) { visitor(::std::string_view{"IPC_DIM_LEVEL_INPUT_230"}, static_cast<::electricsim::io::WireId>(kWireIPC_DIM_LEVEL_INPUT_230)); ++count; }
@@ -4235,9 +4468,6 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_B_RELEASED), &gen) && gen == 0) { visitor(::std::string_view{"AD_ES_STATE_B_RELEASED"}, static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_B_RELEASED)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_C_RELEASED), &gen) && gen == 0) { visitor(::std::string_view{"AD_ES_STATE_C_RELEASED"}, static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_C_RELEASED)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireAD_ES_POWER_SUPPLY_OUT), &gen) && gen == 0) { visitor(::std::string_view{"AD_ES_POWER_SUPPLY_OUT"}, static_cast<::electricsim::io::WireId>(kWireAD_ES_POWER_SUPPLY_OUT)); ++count; }
-  if (table.write_gen(kWireDRIVER_RSA_MODE_SW_LOCK, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_RSA_MODE_SW_LOCK"}, kWireDRIVER_RSA_MODE_SW_LOCK); ++count; }
-  if (table.write_gen(kWireDRIVER_RSA_MODE_SW_OFF_ACC, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_RSA_MODE_SW_OFF_ACC"}, kWireDRIVER_RSA_MODE_SW_OFF_ACC); ++count; }
-  if (table.write_gen(kWireDRIVER_RSA_MODE_SW_RUN, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_RSA_MODE_SW_RUN"}, kWireDRIVER_RSA_MODE_SW_RUN); ++count; }
   if (table.write_gen(kWireHV_ISOLATION_FAULT_LEAD, &gen) && gen == 0) { visitor(::std::string_view{"HV_ISOLATION_FAULT_LEAD"}, kWireHV_ISOLATION_FAULT_LEAD); ++count; }
   if (table.write_gen(kWireHV_ISOLATION_FAULT_KOHM, &gen) && gen == 0) { visitor(::std::string_view{"HV_ISOLATION_FAULT_KOHM"}, kWireHV_ISOLATION_FAULT_KOHM); ++count; }
   if (table.write_gen(kWireCHASSIS_BPM_AD_DTC_BITMAP, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_BPM_AD_DTC_BITMAP"}, kWireCHASSIS_BPM_AD_DTC_BITMAP); ++count; }
@@ -4248,15 +4478,9 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(kWireHV_BUS_PACK_CURRENT_MA, &gen) && gen == 0) { visitor(::std::string_view{"HV_BUS_PACK_CURRENT_MA"}, kWireHV_BUS_PACK_CURRENT_MA); ++count; }
   if (table.write_gen(kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_PIM_ACTIVE_DTC_BITMAP_LO"}, kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO); ++count; }
   if (table.write_gen(kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI, &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_PIM_ACTIVE_DTC_BITMAP_HI"}, kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI); ++count; }
-  if (table.write_gen(kWireDRIVER_RSA_HVAC_HEAT, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_RSA_HVAC_HEAT"}, kWireDRIVER_RSA_HVAC_HEAT); ++count; }
-  if (table.write_gen(kWireDRIVER_RSA_HVAC_VENT, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_RSA_HVAC_VENT"}, kWireDRIVER_RSA_HVAC_VENT); ++count; }
-  if (table.write_gen(kWireDRIVER_RSA_HVAC_AC, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_RSA_HVAC_AC"}, kWireDRIVER_RSA_HVAC_AC); ++count; }
-  if (table.write_gen(kWireDRIVER_RSA_DIM_UP, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_RSA_DIM_UP"}, kWireDRIVER_RSA_DIM_UP); ++count; }
-  if (table.write_gen(kWireDRIVER_RSA_DIM_DOWN, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_RSA_DIM_DOWN"}, kWireDRIVER_RSA_DIM_DOWN); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_BATTERY_RECOVERY_SWITCH), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_BATTERY_RECOVERY_SWITCH"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_BATTERY_RECOVERY_SWITCH)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireAPM_VEHICLE_WAKE_UP_IN), &gen) && gen == 0) { visitor(::std::string_view{"APM_VEHICLE_WAKE_UP_IN"}, static_cast<::electricsim::io::WireId>(kWireAPM_VEHICLE_WAKE_UP_IN)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireAD_FEED_LOGIC_SUPPLY), &gen) && gen == 0) { visitor(::std::string_view{"AD_FEED_LOGIC_SUPPLY"}, static_cast<::electricsim::io::WireId>(kWireAD_FEED_LOGIC_SUPPLY)); ++count; }
-  if (table.write_gen(kWireDRIVER_COAST_DOWN_SWITCH, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_COAST_DOWN_SWITCH"}, kWireDRIVER_COAST_DOWN_SWITCH); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_FUSE_542), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_FEED_FRONT_BRAKE_FUSE_542"}, static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_FUSE_542)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_FUSE_642), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_FEED_REAR_BRAKE_FUSE_642"}, static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_FUSE_642)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_FEED_FRONT_BRAKE_BPLUS_1633B"}, static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B)); ++count; }
@@ -4504,20 +4728,47 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case kWireEXT_WHEEL_SPEED_FR: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
     case kWireEXT_WHEEL_SPEED_RL: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
     case kWireEXT_WHEEL_SPEED_RR: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
-    case kWireDRIVER_RSA_KEYPAD_BUTTON1: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
-    case kWireDRIVER_RSA_KEYPAD_BUTTON2: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
-    case kWireDRIVER_RSA_KEYPAD_BUTTON3: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
-    case kWireDRIVER_RSA_KEYPAD_BUTTON4: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
-    case kWireDRIVER_RSA_KEYPAD_BUTTON5: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
-    case kWireDRIVER_POWER_WINDOW_DRIVER_UP: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
-    case kWireDRIVER_POWER_WINDOW_DRIVER_DOWN: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
-    case kWireDRIVER_POWER_WINDOW_PASSENGER_UP: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
-    case kWireDRIVER_POWER_WINDOW_PASSENGER_DOWN: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_1): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_2): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_3): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_4): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_5): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_1): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_2): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_3): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_4): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_KEYPAD_5): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_WINDOW_DRIVER_UP): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_WINDOW_DRIVER_DOWN): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_WINDOW_PASSENGER_UP): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_WINDOW_PASSENGER_DOWN): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_MODE_LOCK): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_MODE_OFF_ACC): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_MODE_RUN): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_HVAC_HEAT): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_HVAC_VENT): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_HVAC_AC): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_DIM_UP): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_RSA_DIM_DOWN): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_COAST_DOWN_SWITCH): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_1_IN): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_2_IN): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_3_IN): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_4_IN): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireRSA_KEYPAD_5_IN): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireRSA_WINDOW_DRIVER_UP_IN): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireRSA_WINDOW_DRIVER_DOWN_IN): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireRSA_WINDOW_PASSENGER_UP_IN): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireRSA_WINDOW_PASSENGER_DOWN_IN): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireRSA_MODE_LOCK_IN): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireRSA_MODE_OFF_ACC_IN): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireRSA_MODE_RUN_IN): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireRSA_HVAC_HEAT_IN): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireRSA_HVAC_VENT_IN): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireRSA_HVAC_AC_IN): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireRSA_DIM_UP_IN): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireRSA_DIM_DOWN_IN): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireRSA_COAST_DOWN_IN): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_RSA_EXT_KEYPAD1_IN): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_RSA_EXT_KEYPAD2_IN): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_RSA_EXT_KEYPAD3_IN): return ::electricsim::io::CellClass::kConductor;
@@ -4526,8 +4777,6 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case static_cast<::electricsim::io::WireId>(kWireRSA_ES_EKP_BACKLIGHT): return ::electricsim::io::CellClass::kElementState;
     case kWirePIM_CRUISE_ACTIVE: return ::electricsim::io::CellClass::kSemantic;
     case kWirePIM_CRUISE_SETPOINT_MPS: return ::electricsim::io::CellClass::kSemantic;
-    case kWireAD_PRECHARGE_RELAY: return ::electricsim::io::CellClass::kSemantic;
-    case kWireAD_MAIN_CONTACTOR: return ::electricsim::io::CellClass::kSemantic;
     case kWireAD_ISOLATION_KOHM: return ::electricsim::io::CellClass::kSemantic;
     case kWireAD_MAIN_CONTACTOR_FB: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
     case kWireAD_PRECHARGE_CONTACTOR_FB: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
@@ -4634,10 +4883,7 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_HEADLAMP_LOW_DRV): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_HEADLAMP_HIGH_DRV): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_TURN_LF_DRV): return ::electricsim::io::CellClass::kElementState;
-    case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_TURN_RF_DRV): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_TURN_LR_DRV): return ::electricsim::io::CellClass::kElementState;
-    case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_TURN_RR_DRV): return ::electricsim::io::CellClass::kElementState;
-    case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_HORN_RELAY): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_MCU_SUPPLY): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_BPLUS_FUSEBLOCK): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireLHJB_FEED_STOP_ALWAYS_HOT): return ::electricsim::io::CellClass::kConductor;
@@ -4647,6 +4893,18 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case static_cast<::electricsim::io::WireId>(kWireLHJB_IN_TURN_LEFT): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireLHJB_IN_TURN_RIGHT): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireLHJB_IN_HORN_CMD): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_RIGHT_TURN_OUT): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_HAZ_WARN_OUT): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireLHJB_ES_DRL_ON_OUT): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_ES_HEADLAMP_HIGH_DRV): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_ES_HEADLAMP_LOW_DRV): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_ES_TURN_RF_DRV): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_ES_TURN_RR_DRV): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_IN_HIGH_BEAM_524A): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_IN_LOW_BEAM_525A): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_IN_RIGHT_TURN_1966A): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_IN_HAZ_WARN_1697A): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_IN_DRL_ON_838A): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireLHJB_IN_PARK_LAMPS): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_LOW_BEAM_SWITCH): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_FLASH_TO_PASS_SWITCH): return ::electricsim::io::CellClass::kElementState;
@@ -4687,6 +4945,9 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case static_cast<::electricsim::io::WireId>(kWireIPC_ES_AIR_BAG_TT_DRV): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireRSA_ES_DIM_LEVEL_DRV): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireIPC_DOOR_AJAR_INPUT_1495): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireIPC_LR_TURN_INPUT_1334): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireIPC_RR_TURN_INPUT_1335): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireIPC_HIGH_BEAM_INPUT_1192): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireSDM_RUN1_INPUT_1139): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireRSA_PARK_LAMPS_INPUT_301E): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireIPC_DIM_LEVEL_INPUT_230): return ::electricsim::io::CellClass::kConductor;
@@ -4768,9 +5029,6 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_B_RELEASED): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireAD_ES_STATE_C_RELEASED): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireAD_ES_POWER_SUPPLY_OUT): return ::electricsim::io::CellClass::kElementState;
-    case kWireDRIVER_RSA_MODE_SW_LOCK: return ::electricsim::io::CellClass::kSemantic;
-    case kWireDRIVER_RSA_MODE_SW_OFF_ACC: return ::electricsim::io::CellClass::kSemantic;
-    case kWireDRIVER_RSA_MODE_SW_RUN: return ::electricsim::io::CellClass::kSemantic;
     case kWireHV_ISOLATION_FAULT_LEAD: return ::electricsim::io::CellClass::kSemantic;
     case kWireHV_ISOLATION_FAULT_KOHM: return ::electricsim::io::CellClass::kSemantic;
     case kWireCHASSIS_BPM_AD_DTC_BITMAP: return ::electricsim::io::CellClass::kSemantic;
@@ -4781,15 +5039,9 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case kWireHV_BUS_PACK_CURRENT_MA: return ::electricsim::io::CellClass::kSemantic;
     case kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_LO: return ::electricsim::io::CellClass::kSemantic;
     case kWireCHASSIS_PIM_ACTIVE_DTC_BITMAP_HI: return ::electricsim::io::CellClass::kSemantic;
-    case kWireDRIVER_RSA_HVAC_HEAT: return ::electricsim::io::CellClass::kSemantic;
-    case kWireDRIVER_RSA_HVAC_VENT: return ::electricsim::io::CellClass::kSemantic;
-    case kWireDRIVER_RSA_HVAC_AC: return ::electricsim::io::CellClass::kSemantic;
-    case kWireDRIVER_RSA_DIM_UP: return ::electricsim::io::CellClass::kSemantic;
-    case kWireDRIVER_RSA_DIM_DOWN: return ::electricsim::io::CellClass::kSemantic;
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_BATTERY_RECOVERY_SWITCH): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireAPM_VEHICLE_WAKE_UP_IN): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireAD_FEED_LOGIC_SUPPLY): return ::electricsim::io::CellClass::kConductor;
-    case kWireDRIVER_COAST_DOWN_SWITCH: return ::electricsim::io::CellClass::kSemantic;
     case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_FUSE_542): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_REAR_BRAKE_FUSE_642): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireBTCM_FEED_FRONT_BRAKE_BPLUS_1633B): return ::electricsim::io::CellClass::kConductor;

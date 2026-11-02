@@ -1,7 +1,7 @@
 {
   "//": "Cruise-control end-to-end demo on the electronics-driven path.",
   "//1": "ev1sim drives Chrono entirely from electronics output:",
-  "//2": "  scenario set_throttle → main bus 6903 → PIM → chassis bus 4073",
+  "//2": "  scenario set_throttle → pedal travel (DRIVER_ES_PEDAL_TRAVEL) → PIM → chassis bus 4073",
   "//3": "  → ev1sim ApplyElectronicsThrottle → Chrono powertrain.",
   "//4": "Cruise authority lives in PIM (pim_throttle_cmd_q8 / pim_supervisor).",
   "//5": "",

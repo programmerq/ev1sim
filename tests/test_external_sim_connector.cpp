@@ -62,7 +62,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
                                                //  (horn 6940/6941 removed — now chassis cavity 4046)
     // Driver inputs on the main harness segment, output
     // from ev1sim: brake_pedal_q8 (6900), steering_deg_q8 (6901),
-    // gear_selector (6902), throttle_q8 (6903), brake_switch (6904),
+    // brake_switch (6904),
     // (hazard/turn moved to chassis cavities kSigTurnHazSw_* 4043-4045),
     // seatbelt_switch (6964),
     // rsa_mode_sw_lock (6972), rsa_mode_sw_off_acc (6973), rsa_mode_sw_run (6974),
@@ -76,7 +76,7 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
     // rsa_exterior_keypad3 (6987), rsa_exterior_keypad4 (6988),
     // rsa_exterior_keypad5 (6989).
     // (6970 is reserved — not registered as an endpoint.)
-    constexpr int kNumDriverInputs = 23;
+    constexpr int kNumDriverInputs = 21;
     const int expected = NUM_LIGHTS + 2 + VehiclePanels::NUM_PANELS +
                          kNumCombSw + kNumChargeCplr + kNumPrnd + kNumWiperSwCavity + kNumTurnHazSwCavity + kNumCruiseSwCavity + kNumMotor +
                          kNumSimTime +
@@ -246,15 +246,14 @@ TEST_CASE("Endpoint table covers every device exactly once", "[ExternalSim]") {
             // 4168/4169 = road_grade_pct / pitch_deg (contract 1.4.0).
             CHECK_FALSE(e.input_to_sim);    // dynamics signals are outputs
             ++dynamics_count;
-        } else if ((e.signal_id >= 6900 && e.signal_id <= 6904) ||
+        } else if (e.signal_id == 6900 || e.signal_id == 6901 || e.signal_id == 6904 ||
                    e.signal_id == 6964 ||
                    (e.signal_id >= 6972 && e.signal_id <= 6974) ||
                    (e.signal_id >= 6975 && e.signal_id <= 6979) ||
                    (e.signal_id >= 6980 && e.signal_id <= 6983) ||
                    (e.signal_id >= 6985 && e.signal_id <= 6989)) {
             // Driver inputs on the main harness segment — outputs from ev1sim.
-            // 6900=brake_pedal_q8  6901=steering_deg_q8  6902=gear_selector
-            // 6903=throttle_q8     6904=brake_switch
+            // 6900=brake_pedal_q8  6901=steering_deg_q8  6904=brake_switch
             // (hazard/turn now publish on chassis cavities 4043-4045)
             // (cruise stalk now publishes on chassis cavities 4047-4049)
             // (wiper switch/wash now publish on chassis cavities 4054-4057)
@@ -691,25 +690,12 @@ TEST_CASE("SetAmbientTempC and SetAmbientHumidityPct store without crashing", "[
 
 TEST_CASE("SetDriverRsaKeypadButtons and SetDriverRsaModeSwitches store without crashing", "[ExternalSim]") {
     ExternalSimConnector c;
-    // 0=idle, 1=tap (lower digit), 2=long-press (higher digit).
-    CHECK_NOTHROW(c.SetDriverRsaKeypadButton1(1));  // tap button 1 -> digit '1'
-    CHECK_NOTHROW(c.SetDriverRsaKeypadButton2(2));  // long-press button 2 -> digit '4'
-    CHECK_NOTHROW(c.SetDriverRsaKeypadButton3(0));  // idle
-    CHECK_NOTHROW(c.SetDriverRsaKeypadButton4(0));  // idle
-    CHECK_NOTHROW(c.SetDriverRsaKeypadButton5(0));  // idle
+    CHECK_NOTHROW(c.SetDriverRsaKeypadButton1(true));
+    CHECK_NOTHROW(c.SetDriverRsaKeypadButton2(false));
     CHECK_NOTHROW(c.SetDriverRsaModeSwitches(ev1sim::RsaKeypadDriver::kModeSwRun));
+    CHECK_NOTHROW(c.SetRsaDimmerButtons(true, false));
     CHECK_NOTHROW(c.Tick(0.0));
-    CHECK_NOTHROW(c.SetDriverRsaModeSwitches(ev1sim::RsaKeypadDriver::kModeSwLock |
-                                             ev1sim::RsaKeypadDriver::kModeSwRun));  // two at once
-    CHECK_NOTHROW(c.Tick(0.0));
-}
-
-TEST_CASE("SetDriverRsaKeypadButton long-press value 2 stores without crashing", "[ExternalSim]") {
-    ExternalSimConnector c;
-    // Exercise all three values for one button.
-    CHECK_NOTHROW(c.SetDriverRsaKeypadButton1(0));  // idle
-    CHECK_NOTHROW(c.SetDriverRsaKeypadButton1(1));  // tap
-    CHECK_NOTHROW(c.SetDriverRsaKeypadButton1(2));  // long-press
+    CHECK_NOTHROW(c.SetDriverRsaModeSwitches(0u));
     CHECK_NOTHROW(c.Tick(0.0));
 }
 

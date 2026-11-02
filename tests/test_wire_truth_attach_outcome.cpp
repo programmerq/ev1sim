@@ -30,6 +30,7 @@
 
 #include "WireTruthChassis.h"
 #include "ExternalSimConnector.h"
+#include "PhysicalWorld.h"  // ev1sim::RsaKeypadDriver::kModeSw*
 
 #include "topology/topology_generated.h"
 #include "wire_table.hpp"
@@ -378,4 +379,56 @@ TEST_CASE("Outside air temperature publishes onto the wire through Tick",
     c.SetAmbientTempC(95.0f);
     c.Tick(0.3);
     CHECK(level() == 1000u);
+}
+
+// The RSA reads its faceplate buttons only as contacts through the solver, so
+// a held keypad, mode, window, dimmer or coast-down button must reach its
+// DRIVER_ES_* cell through Tick, and drop when released.
+TEST_CASE("RSA faceplate buttons publish onto the wire through Tick",
+          "[wire_truth][attach_outcome]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("rsa_face");
+    auto table = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(table != nullptr);
+
+    ScopedWiresName guard(seg.c_str());
+    ExternalSimConnector::Options opts;
+    opts.enabled = true;
+    ExternalSimConnector c(opts);
+
+    auto contact = [&](electricsim::io::ElementStateId id) {
+        electricsim::io::WireTable::Sample<bool> s{};
+        REQUIRE(table->read_bit_sample(id, &s));
+        REQUIRE(s.written());
+        return s.value;
+    };
+
+    c.SetDriverRsaKeypadButton3(true);
+    c.SetDriverRsaModeSwitches(ev1sim::RsaKeypadDriver::kModeSwOffAcc);
+    c.SetDriverPowerWindowPassengerDown(true);
+    c.SetRsaDimmerButtons(/*up=*/true, /*down=*/false);
+    c.SetCoastDownSwitch(true);
+    c.Tick(0.0);
+    REQUIRE(c.IsConnected());
+    CHECK(contact(topo::kWireDRIVER_ES_RSA_KEYPAD_3));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_RSA_KEYPAD_1));
+    CHECK(contact(topo::kWireDRIVER_ES_RSA_MODE_OFF_ACC));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_RSA_MODE_RUN));
+    CHECK(contact(topo::kWireDRIVER_ES_WINDOW_PASSENGER_DOWN));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_WINDOW_DRIVER_UP));
+    CHECK(contact(topo::kWireDRIVER_ES_RSA_DIM_UP));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_RSA_DIM_DOWN));
+    CHECK(contact(topo::kWireDRIVER_ES_COAST_DOWN_SWITCH));
+
+    c.SetDriverRsaKeypadButton3(false);
+    c.SetDriverRsaModeSwitches(0u);
+    c.SetDriverPowerWindowPassengerDown(false);
+    c.SetRsaDimmerButtons(false, false);
+    c.SetCoastDownSwitch(false);
+    c.Tick(0.1);
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_RSA_KEYPAD_3));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_RSA_MODE_OFF_ACC));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_WINDOW_PASSENGER_DOWN));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_RSA_DIM_UP));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_COAST_DOWN_SWITCH));
 }

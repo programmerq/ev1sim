@@ -391,16 +391,14 @@ TEST_CASE("WireTruthChassis::mirror_signal: unregistered signal_id returns false
 }
 
 // ---------------------------------------------------------------------------
-// RSA mode buttons: one bit cell per press area (LOCK / OFF-ACC / RUN — ESM
-// electrical ELPD 441; the RSA's LOCK/OFF-ACC/RUN MODE SW inputs, ELPD 45-46).
-// They replace the 6971 byte press-enum, which could not carry two buttons
-// pressed together. The connector case drives the REAL publish path (Tick ->
-// on-change bool deltas -> MirrorBatch) and reads the cells back as the RSA
-// would, proving a two-button press lands on the wire in ONE tick.
+// RSA faceplate buttons: one contact per button (mode LOCK / OFF-ACC / RUN,
+// interior keypad 1-5, the four window switches), each a bit the RSA reads as
+// a level. The connector case drives the REAL publish path (Tick -> on-change
+// bool deltas -> MirrorBatch) and reads the contacts back as the solver would.
 // ---------------------------------------------------------------------------
-TEST_CASE("WireTruthChassis::mirror_signal: RSA mode buttons are three bit cells",
+TEST_CASE("WireTruthChassis::mirror_signal: RSA faceplate buttons are contacts",
           "[wire_truth][mirror_signal]") {
-    const std::string seg = unique_segment("ms_rsa_mode");
+    const std::string seg = unique_segment("ms_rsa_faceplate");
     auto creator = create_fleet_table(seg, electricsim::topology::kTopologyHash);
     REQUIRE(creator != nullptr);
     auto wire = ev1sim::WireTruthChassis::Attach(seg);
@@ -408,19 +406,30 @@ TEST_CASE("WireTruthChassis::mirror_signal: RSA mode buttons are three bit cells
 
     namespace topo = electricsim::topology;
     const std::uint8_t on[] = {0x01u};
-    struct { std::uint32_t id; WireId cell; } const sws[] = {
-        {6972U, topo::kWireDRIVER_RSA_MODE_SW_LOCK},
-        {6973U, topo::kWireDRIVER_RSA_MODE_SW_OFF_ACC},
-        {6974U, topo::kWireDRIVER_RSA_MODE_SW_RUN},
+    struct { std::uint32_t id; electricsim::io::ElementStateId cell; } const sws[] = {
+        {6972U, topo::kWireDRIVER_ES_RSA_MODE_LOCK},
+        {6973U, topo::kWireDRIVER_ES_RSA_MODE_OFF_ACC},
+        {6974U, topo::kWireDRIVER_ES_RSA_MODE_RUN},
+        {6975U, topo::kWireDRIVER_ES_RSA_KEYPAD_1},
+        {6976U, topo::kWireDRIVER_ES_RSA_KEYPAD_2},
+        {6977U, topo::kWireDRIVER_ES_RSA_KEYPAD_3},
+        {6978U, topo::kWireDRIVER_ES_RSA_KEYPAD_4},
+        {6979U, topo::kWireDRIVER_ES_RSA_KEYPAD_5},
+        {6980U, topo::kWireDRIVER_ES_WINDOW_DRIVER_UP},
+        {6981U, topo::kWireDRIVER_ES_WINDOW_DRIVER_DOWN},
+        {6982U, topo::kWireDRIVER_ES_WINDOW_PASSENGER_UP},
+        {6983U, topo::kWireDRIVER_ES_WINDOW_PASSENGER_DOWN},
     };
     for (const auto& sw : sws) {
+        INFO("signal " << sw.id);
         REQUIRE(wire->mirror_signal(sw.id, on, 1u));
         bool v = false;
-        REQUIRE(creator->read_bit(sw.cell, &v));
+        REQUIRE(read_contact(*creator, sw.cell, &v));
         CHECK(v);
     }
-    // The superseded byte is no longer produced by ev1sim.
-    REQUIRE_FALSE(wire->mirror_signal(6971U, on, 1u));
+    // ev1sim produces no gear-selector or raw-throttle slot: nothing reads them.
+    CHECK_FALSE(wire->mirror_signal(6902U, on, 1u));
+    CHECK_FALSE(wire->mirror_signal(6903U, on, 1u));
 }
 
 TEST_CASE("WireTruthChassis::mirror_signal: a park-brake button push reaches the BTCM contact",
@@ -471,7 +480,7 @@ TEST_CASE("Connector publishes two RSA mode buttons pressed in one tick",
     opts.enabled = true;
     ExternalSimConnector c(opts);
 
-    auto read = [&](WireId id, bool* v, std::uint32_t* gen) {
+    auto read = [&](electricsim::io::ElementStateId id, bool* v, std::uint32_t* gen) {
         electricsim::io::WireTable::Sample<bool> s;
         const bool ok = rsa->read_bit_sample(id, &s) && s.written();
         if (ok) { *v = s.value; *gen = s.generation; }
@@ -483,9 +492,9 @@ TEST_CASE("Connector publishes two RSA mode buttons pressed in one tick",
     c.Tick(0.01);
     bool lock = false, off_acc = true, run = false;
     std::uint32_t g_lock = 0, g_off_acc = 0, g_run = 0;
-    REQUIRE(read(topo::kWireDRIVER_RSA_MODE_SW_LOCK, &lock, &g_lock));
-    REQUIRE(read(topo::kWireDRIVER_RSA_MODE_SW_OFF_ACC, &off_acc, &g_off_acc));
-    REQUIRE(read(topo::kWireDRIVER_RSA_MODE_SW_RUN, &run, &g_run));
+    REQUIRE(read(topo::kWireDRIVER_ES_RSA_MODE_LOCK, &lock, &g_lock));
+    REQUIRE(read(topo::kWireDRIVER_ES_RSA_MODE_OFF_ACC, &off_acc, &g_off_acc));
+    REQUIRE(read(topo::kWireDRIVER_ES_RSA_MODE_RUN, &run, &g_run));
     CHECK(lock);
     CHECK_FALSE(off_acc);
     CHECK(run);
@@ -494,10 +503,10 @@ TEST_CASE("Connector publishes two RSA mode buttons pressed in one tick",
     c.SetDriverRsaModeSwitches(0u);
     c.Tick(0.02);
     std::uint32_t g2 = 0;
-    REQUIRE(read(topo::kWireDRIVER_RSA_MODE_SW_LOCK, &lock, &g2));
+    REQUIRE(read(topo::kWireDRIVER_ES_RSA_MODE_LOCK, &lock, &g2));
     CHECK_FALSE(lock);
     CHECK(g2 != g_lock);
-    REQUIRE(read(topo::kWireDRIVER_RSA_MODE_SW_RUN, &run, &g2));
+    REQUIRE(read(topo::kWireDRIVER_ES_RSA_MODE_RUN, &run, &g2));
     CHECK_FALSE(run);
     CHECK(g2 != g_run);
 }
@@ -1311,7 +1320,7 @@ TEST_CASE("RefuseConductorWrite: a write via a DIFFERENT accessor on the same "
     REQUIRE(count_occurrences(capture.contents(), "REFUSED write_bit") == 1);
 }
 
-TEST_CASE("WireTruthChassis: a DIM click is one press and release; lock commands reach the console",
+TEST_CASE("WireTruthChassis: the DIM buttons are held contacts; lock commands reach the console",
           "[wire_truth]") {
     namespace topo = electricsim::topology;
     const std::string seg = unique_segment("dim");
@@ -1320,18 +1329,19 @@ TEST_CASE("WireTruthChassis: a DIM click is one press and release; lock commands
     auto wire = ev1sim::WireTruthChassis::Attach(seg);
     REQUIRE(wire != nullptr);
 
-    // The RSA counts a press as a fresh 1, or two generations past its cursor
-    // onto a 0 (ev1/rsa/rsa_dimmer_panel.hpp): one click must leave the cell
-    // at 0, two generations on.
-    WireTable::Sample<bool> s;
-    REQUIRE(wire->publish_rsa_dim_click(true));
-    REQUIRE(producer->read_bit_sample(topo::kWireDRIVER_RSA_DIM_UP, &s));
-    REQUIRE(s.written());
-    REQUIRE_FALSE(s.value);
-    REQUIRE(s.generation == 2u);
-    REQUIRE(wire->publish_rsa_dim_click(false));
-    REQUIRE(producer->read_bit_sample(topo::kWireDRIVER_RSA_DIM_DOWN, &s));
-    REQUIRE(s.generation == 2u);
+    // The RSA steps once per press it sees (ev1/rsa/rsa_dimmer_panel.hpp), so
+    // each button is a level that stays up while held.
+    bool up = false, down = true;
+    REQUIRE(wire->publish_rsa_dim_buttons(true, false));
+    REQUIRE(read_contact(*producer, topo::kWireDRIVER_ES_RSA_DIM_UP, &up));
+    REQUIRE(read_contact(*producer, topo::kWireDRIVER_ES_RSA_DIM_DOWN, &down));
+    CHECK(up);
+    CHECK_FALSE(down);
+    REQUIRE(wire->publish_rsa_dim_buttons(false, true));
+    REQUIRE(read_contact(*producer, topo::kWireDRIVER_ES_RSA_DIM_UP, &up));
+    REQUIRE(read_contact(*producer, topo::kWireDRIVER_ES_RSA_DIM_DOWN, &down));
+    CHECK_FALSE(up);
+    CHECK(down);
 
     REQUIRE(wire->rsa_console().lock_driver == std::nullopt);
     REQUIRE(producer->write_byte(topo::kWireCHASSIS_DOOR_LOCK_CMD_DRIVER, 1u));

@@ -164,20 +164,19 @@ public:
     void SetTurnHazSwOutputs(bool right_turn, bool left_turn, bool hazard, bool horn);
     void SetWiperWasherSwOutputs(bool delay, bool request, bool hi, bool washer);
 
-    /// Outgoing driver inputs — published to the main harness segment
-    /// (IDs 6900-6903).
+    /// Outgoing driver inputs. Brake (6900) and steering (6901) publish to
+    /// the main harness segment; the throttle is written as pedal travel
+    /// (DRIVER_ES_PEDAL_TRAVEL).
     /// q8 values: brake/throttle 0..255 (normalized × 256), steering signed
-    /// degrees × 256, gear enum 0=P 1=R 2=N 3=D.
+    /// degrees × 256.
     void SetDriverBrakePedalQ8(std::uint8_t q8);
     void SetDriverThrottleQ8(std::uint8_t q8);
 
     /// Fault injection (scenario action "fail_throttle_input"): while
-    /// suppressed, the driver THROTTLE
-    /// delta (6903) is omitted from the driver-input group publish —
-    /// including the 200 ms heartbeat — modeling the accelerator-pedal
-    /// acquisition feed going dead toward the consuming controller. The
-    /// other driver inputs keep publishing. Restore re-publishes on the
-    /// next heartbeat (<= 200 ms).
+    /// suppressed, the pedal-travel write
+    /// (DRIVER_ES_PEDAL_TRAVEL) is withheld, modeling the accelerator-pedal
+    /// feed going dead toward the PIM. The other driver inputs keep
+    /// publishing. Restore writes again on the next Tick.
     void SetSuppressThrottlePublish(bool suppress);
 
     /// Vehicle-plant fault injection (scenario action "hv_isolation_fault"):
@@ -190,16 +189,14 @@ public:
     void SetHvIsolationFault(std::uint8_t lead, std::uint32_t leak_kohm);
 
     /// The shifter's coast-down button position (scenario action
-    /// "coast_down_switch"; 1 = coast down). Published on DRIVER_COAST_DOWN_SWITCH
+    /// "coast_down_switch"; 1 = coast down). Published on DRIVER_ES_COAST_DOWN_SWITCH
     /// every tick once set, for the RSA to report as $31 Coast Down Request.
     void SetCoastDownSwitch(bool on);
 
-    /// Queue one click of the RSA's DIM UP (`up`) or DIM DOWN button. Each
-    /// tick publishes at most one queued click per button on
-    /// DRIVER_RSA_DIM_UP / _DOWN, so the RSA reads every click separately.
-    void PressRsaDimmer(bool up);
+    /// The RSA's DIM UP / DIM DOWN buttons, held or not. Written every tick
+    /// on DRIVER_ES_RSA_DIM_UP / _DOWN; the RSA steps once per press.
+    void SetRsaDimmerButtons(bool up_held, bool down_held);
     void SetDriverSteeringDegQ8(std::int16_t q8);
-    void SetDriverGearSelector(std::uint8_t enum_v);
 
     /// Outgoing brake-switch state (ID 6904) — derived from brake travel
     /// hysteresis in PhysicalWorld::BrakeSwitch.  Encoded as 1-byte uint8
@@ -239,30 +236,19 @@ public:
     /// SimApp calls this each tick with the PrndSelector's current pin outputs.
     void SetPrndSelector(bool a, bool b, bool c, bool d);
 
-    /// Outgoing RSA per-digit keypad button signals (IDs 6975-6979, main harness).
-    /// Encoded as 1-byte uint8 with long-press support (Option A encoding):
-    ///   0 = idle (no press this tick)
-    ///   1 = tap  (enters the lower digit: 1, 3, 5, 7, 9 respectively)
-    ///   2 = long-press (enters the higher digit: 2, 4, 6, 8, 0 respectively)
-    ///   Button1 (6975): "1/2" button
-    ///   Button2 (6976): "3/4" button
-    ///   Button3 (6977): "5/6" button
-    ///   Button4 (6978): "7/8" button
-    ///   Button5 (6979): "9/0" button
-    /// (Slot 6970 is reserved — was kSigDriverRsaKeypadCodeOk; do not reuse.)
-    void SetDriverRsaKeypadButton1(std::uint8_t value);
-    void SetDriverRsaKeypadButton2(std::uint8_t value);
-    void SetDriverRsaKeypadButton3(std::uint8_t value);
-    void SetDriverRsaKeypadButton4(std::uint8_t value);
-    void SetDriverRsaKeypadButton5(std::uint8_t value);
+    /// RSA interior keypad buttons (IDs 6975-6979 → DRIVER_ES_RSA_KEYPAD_1..5):
+    /// one held contact per button ("1/2", "3/4", "5/6", "7/8", "9/0"). The
+    /// RSA reads a short hold as the lower digit and a long one as the higher.
+    void SetDriverRsaKeypadButton1(bool held);
+    void SetDriverRsaKeypadButton2(bool held);
+    void SetDriverRsaKeypadButton3(bool held);
+    void SetDriverRsaKeypadButton4(bool held);
+    void SetDriverRsaKeypadButton5(bool held);
 
-    /// Outgoing RSA mode-selection buttons, one bool signal per console press
-    /// area (IDs 6972 LOCK, 6973 OFF/ACC, 6974 RUN; main harness segment; wire
-    /// cells DRIVER_RSA_MODE_SW_*).  `mask` is RsaKeypadDriver::kModeSw* bits
-    /// (0x01 LOCK, 0x02 OFF/ACC, 0x04 RUN); 0 = none.  Momentary: set the mask
-    /// on the press tick and 0 after; each signal publishes on change, so
-    /// two buttons in one mask reach the RSA in the same tick.  Replaces the
-    /// byte press-enum on 6971, which could not carry two buttons at once.
+    /// RSA mode buttons held this tick (IDs 6972 LOCK, 6973 OFF/ACC, 6974 RUN →
+    /// DRIVER_ES_RSA_MODE_*).  `mask` is RsaKeypadDriver::kModeSw* bits
+    /// (0x01 LOCK, 0x02 OFF/ACC, 0x04 RUN); 0 = none held.  The RSA acts once
+    /// per press, so a press must stay set across its reads.
     /// @source ESM electrical ELPD 441 (the three modes), ELPD 45-46 (the RSA's
     /// RUN / OFF/ACC / LOCK MODE SW inputs).
     void SetDriverRsaModeSwitches(std::uint8_t mask);
