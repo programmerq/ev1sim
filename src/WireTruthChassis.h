@@ -359,6 +359,11 @@ public:
     // attached.
     bool publish_pedal_travel(std::uint16_t permille);
 
+    // The accelerator pedal sensor's connector open (1) or connected (0)
+    // (DRIVER_ES_PEDAL_SENSOR_OPEN, a harness-fault boundary). ev1sim is this
+    // cell's producer. Returns false if not attached.
+    bool publish_pedal_sensor_open(bool open);
+
     // The air at the HTCM's outside-air sensor (CHASSIS_ES_OUTSIDE_AIR_TEMP),
     // written as permille of the sensor's -40..+80 C span and clamped to it.
     // ev1sim is this cell's producer. Returns false if not attached.

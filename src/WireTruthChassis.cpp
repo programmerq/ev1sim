@@ -936,6 +936,12 @@ bool WireTruthChassis::publish_outside_air_temp(float temp_c) {
         static_cast<std::uint16_t>(std::lround(frac * 1000.0f)));
 }
 
+bool WireTruthChassis::publish_pedal_sensor_open(bool open) {
+    if (!attached()) return false;
+    return impl_->table->write_element_state(
+        electricsim::topology::kWireDRIVER_ES_PEDAL_SENSOR_OPEN, open);
+}
+
 bool WireTruthChassis::publish_reverse_select_switch(bool closed) {
     if (!attached()) return false;
     return write_bit(ProducerWireId(electricsim::topology::kWireDRIVER_ES_REVERSE_SELECT_SWITCH),
@@ -1120,6 +1126,7 @@ std::optional<std::uint8_t> WireTruthChassis::window_motor_cmd(int) const {
 bool WireTruthChassis::publish_coast_down_switch(bool) { return false; }
 bool WireTruthChassis::publish_pedal_travel(std::uint16_t) { return false; }
 bool WireTruthChassis::publish_outside_air_temp(float) { return false; }
+bool WireTruthChassis::publish_pedal_sensor_open(bool) { return false; }
 bool WireTruthChassis::publish_reverse_select_switch(bool) { return false; }
 bool WireTruthChassis::publish_rsa_dim_buttons(bool, bool) { return false; }
 

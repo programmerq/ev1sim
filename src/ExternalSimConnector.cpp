@@ -1232,9 +1232,10 @@ struct ExternalSimConnector::State {
     std::uint8_t  driver_throttle_q8 = 0;
     std::uint8_t  driver_brake_pub   = 0xFF;  // force first publish
     std::int16_t  driver_steering_pub = 0x7FFF;
-    // Fault injection: withhold the pedal-travel write while set
-    // (SetSuppressThrottlePublish — VAT safety scenarios).
-    bool          suppress_throttle_publish = false;
+    // Fault injection: the pedal sensor's connector open (SetPedalSensorOpen —
+    // VAT safety scenarios). Unwritten until first armed.
+    bool          pedal_sensor_open_armed = false;
+    bool          pedal_sensor_open       = false;
     // Discrete driver inputs (ID 6904, 6964) on the main harness segment.
     bool          driver_brake_switch                = false;
     bool          driver_seatbelt_buckled            = true;   // default: always buckled
@@ -2289,8 +2290,9 @@ std::optional<std::uint8_t> ExternalSimConnector::GetWiperSweepPositionPct() con
     return m_state->wiper_sweep_position_pct;
 }
 
-void ExternalSimConnector::SetSuppressThrottlePublish(bool suppress) {
-    m_state->suppress_throttle_publish = suppress;
+void ExternalSimConnector::SetPedalSensorOpen(bool open) {
+    m_state->pedal_sensor_open_armed = true;
+    m_state->pedal_sensor_open       = open;
 }
 
 void ExternalSimConnector::SetDriverSteeringDegQ8(std::int16_t q8) {
@@ -3629,11 +3631,16 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         st.wire->publish_coast_down_switch(st.coast_down_switch_on);
     }
     // Accelerator pedal travel, level-held every tick: the PIM reads the pedal
-    // only through the solver's pps tracks. Withheld with the throttle delta
-    // during the fail_throttle_input fault window.
-    if (st.wire && !st.suppress_throttle_publish) {
+    // only through the solver's pps tracks. The foot stays on the pedal during
+    // a sensor fault, so this keeps writing.
+    if (st.wire) {
         st.wire->publish_pedal_travel(static_cast<std::uint16_t>(
             (static_cast<unsigned>(st.driver_throttle_q8) * 1000u + 127u) / 255u));
+    }
+    // Pedal sensor connector open (fail_throttle_input): unwritten until the
+    // fault is first injected, since unwritten reads connected.
+    if (st.pedal_sensor_open_armed && st.wire) {
+        st.wire->publish_pedal_sensor_open(st.pedal_sensor_open);
     }
     // Outside air at the HTCM's sensor, level-held every tick from the same
     // air temperature as the chassis-bus ambient publish.

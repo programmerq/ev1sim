@@ -172,12 +172,12 @@ public:
     void SetDriverBrakePedalQ8(std::uint8_t q8);
     void SetDriverThrottleQ8(std::uint8_t q8);
 
-    /// Fault injection (scenario action "fail_throttle_input"): while
-    /// suppressed, the pedal-travel write
-    /// (DRIVER_ES_PEDAL_TRAVEL) is withheld, modeling the accelerator-pedal
-    /// feed going dead toward the PIM. The other driver inputs keep
-    /// publishing. Restore writes again on the next Tick.
-    void SetSuppressThrottlePublish(bool suppress);
+    /// Fault injection (scenario action "fail_throttle_input"): open = the
+    /// accelerator pedal sensor's connector comes open, so all three tracks
+    /// read 0 at the PIM (DRIVER_ES_PEDAL_SENSOR_OPEN). Written every tick
+    /// once first set; never written before, since unwritten reads connected.
+    /// The pedal travel keeps publishing: the foot is still on the pedal.
+    void SetPedalSensorOpen(bool open);
 
     /// Vehicle-plant fault injection (scenario action "hv_isolation_fault"):
     /// an insulation fault from ONE HV lead to chassis. lead 1 = HV+,

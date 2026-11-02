@@ -26,15 +26,15 @@
 namespace electricsim::topology {
 
 inline constexpr std::uint32_t kFormatVersion = 2U;
-inline constexpr std::uint32_t kTopologyHash = 0xB7055C92U;
-inline constexpr std::size_t kWireCount = 572;
+inline constexpr std::uint32_t kTopologyHash = 0xA554923DU;
+inline constexpr std::size_t kWireCount = 573;
 
 // Per-class cell counts. Emitted so a
 // receipt can print the classification without re-parsing YAML,
 // and so a test can assert against them. The legacy count is held
 // by a DECREASING ratchet in the generator that fails on !=.
 inline constexpr std::size_t kConductorCellCount = 200;
-inline constexpr std::size_t kElementStateCellCount = 159;
+inline constexpr std::size_t kElementStateCellCount = 160;
 inline constexpr std::size_t kSemanticCellCount = 82;
 inline constexpr std::size_t kUnclassifiedLegacyCellCount = 131;
 
@@ -270,6 +270,7 @@ inline constexpr ::electricsim::io::WireId kWireDRIVER_BRAKE_PEDAL_Q8 = 216U;
 inline constexpr ::electricsim::io::WireId kWireDRIVER_STEERING_DEG_Q8 = 217U;
 inline constexpr ::electricsim::io::WireId kWireDRIVER_GEAR_SELECTOR = 218U;
 inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_PEDAL_TRAVEL{1219U};
+inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_PEDAL_SENSOR_OPEN{1600U};
 inline constexpr ::electricsim::io::WireId kWireDRIVER_THROTTLE_Q8 = 219U;
 inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_SEATBELT_SWITCH{1117U};
 inline constexpr ::electricsim::io::WireId kWireEXT_WHEEL_SPEED_FL = 223U;
@@ -1070,6 +1071,8 @@ inline constexpr auto kWireDRIVER_GEAR_SELECTOR_Default = static_cast<std::uint8
 inline constexpr InitPolicy kWireDRIVER_GEAR_SELECTOR_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireDRIVER_ES_PEDAL_TRAVEL_Default = static_cast<std::uint16_t>(0x0U);
 inline constexpr InitPolicy kWireDRIVER_ES_PEDAL_TRAVEL_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireDRIVER_ES_PEDAL_SENSOR_OPEN_Default = false;
+inline constexpr InitPolicy kWireDRIVER_ES_PEDAL_SENSOR_OPEN_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireDRIVER_THROTTLE_Q8_Default = static_cast<std::uint8_t>(0x0U);
 inline constexpr InitPolicy kWireDRIVER_THROTTLE_Q8_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireDRIVER_ES_SEATBELT_SWITCH_Default = false;
@@ -1997,6 +2000,7 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(kWireDRIVER_STEERING_DEG_Q8, ::electricsim::io::WireType::kUint16) && ok;
   ok = table.declare(kWireDRIVER_GEAR_SELECTOR, ::electricsim::io::WireType::kByte) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_PEDAL_TRAVEL), ::electricsim::io::WireType::kUint16) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_PEDAL_SENSOR_OPEN), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(kWireDRIVER_THROTTLE_Q8, ::electricsim::io::WireType::kByte) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_SEATBELT_SWITCH), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(kWireEXT_WHEEL_SPEED_FL, ::electricsim::io::WireType::kFloat32) && ok;
@@ -2577,6 +2581,7 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case kWireDRIVER_STEERING_DEG_Q8: return "DRIVER_STEERING_DEG_Q8";
     case kWireDRIVER_GEAR_SELECTOR: return "DRIVER_GEAR_SELECTOR";
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_PEDAL_TRAVEL): return "DRIVER_ES_PEDAL_TRAVEL";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_PEDAL_SENSOR_OPEN): return "DRIVER_ES_PEDAL_SENSOR_OPEN";
     case kWireDRIVER_THROTTLE_Q8: return "DRIVER_THROTTLE_Q8";
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_SEATBELT_SWITCH): return "DRIVER_ES_SEATBELT_SWITCH";
     case kWireEXT_WHEEL_SPEED_FL: return "EXT_WHEEL_SPEED_FL";
@@ -3156,6 +3161,7 @@ inline ::electricsim::io::WireId wire_id_for(::std::string_view name) noexcept {
   if (name == "DRIVER_STEERING_DEG_Q8") return kWireDRIVER_STEERING_DEG_Q8;
   if (name == "DRIVER_GEAR_SELECTOR") return kWireDRIVER_GEAR_SELECTOR;
   if (name == "DRIVER_ES_PEDAL_TRAVEL") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_PEDAL_TRAVEL);
+  if (name == "DRIVER_ES_PEDAL_SENSOR_OPEN") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_PEDAL_SENSOR_OPEN);
   if (name == "DRIVER_THROTTLE_Q8") return kWireDRIVER_THROTTLE_Q8;
   if (name == "DRIVER_ES_SEATBELT_SWITCH") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_SEATBELT_SWITCH);
   if (name == "EXT_WHEEL_SPEED_FL") return kWireEXT_WHEEL_SPEED_FL;
@@ -3740,6 +3746,7 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case kWireDRIVER_STEERING_DEG_Q8: return "";
     case kWireDRIVER_GEAR_SELECTOR: return "";
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_PEDAL_TRAVEL): return "none";
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_PEDAL_SENSOR_OPEN): return "none";
     case kWireDRIVER_THROTTLE_Q8: return "";
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_SEATBELT_SWITCH): return "none";
     case kWireEXT_WHEEL_SPEED_FL: return "";
@@ -4329,6 +4336,7 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(kWireDRIVER_STEERING_DEG_Q8, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_STEERING_DEG_Q8"}, kWireDRIVER_STEERING_DEG_Q8); ++count; }
   if (table.write_gen(kWireDRIVER_GEAR_SELECTOR, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_GEAR_SELECTOR"}, kWireDRIVER_GEAR_SELECTOR); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_PEDAL_TRAVEL), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_PEDAL_TRAVEL"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_PEDAL_TRAVEL)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_PEDAL_SENSOR_OPEN), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_PEDAL_SENSOR_OPEN"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_PEDAL_SENSOR_OPEN)); ++count; }
   if (table.write_gen(kWireDRIVER_THROTTLE_Q8, &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_THROTTLE_Q8"}, kWireDRIVER_THROTTLE_Q8); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_SEATBELT_SWITCH), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_SEATBELT_SWITCH"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_SEATBELT_SWITCH)); ++count; }
   if (table.write_gen(kWireEXT_WHEEL_SPEED_FL, &gen) && gen == 0) { visitor(::std::string_view{"EXT_WHEEL_SPEED_FL"}, kWireEXT_WHEEL_SPEED_FL); ++count; }
@@ -4914,6 +4922,7 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case kWireDRIVER_STEERING_DEG_Q8: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
     case kWireDRIVER_GEAR_SELECTOR: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_PEDAL_TRAVEL): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_PEDAL_SENSOR_OPEN): return ::electricsim::io::CellClass::kElementState;
     case kWireDRIVER_THROTTLE_Q8: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_SEATBELT_SWITCH): return ::electricsim::io::CellClass::kElementState;
     case kWireEXT_WHEEL_SPEED_FL: return ::electricsim::io::CellClass::kUnclassifiedLegacy;

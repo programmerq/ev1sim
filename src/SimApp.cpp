@@ -2801,9 +2801,9 @@ void SimApp::FlashToPass(bool held) {
 }
 
 void SimApp::FailThrottleInput(bool fail) {
-    if (m_external_sim) m_external_sim->SetSuppressThrottlePublish(fail);
+    if (m_external_sim) m_external_sim->SetPedalSensorOpen(fail);
     std::cout << "[Scenario] fail_throttle_input -> "
-              << (fail ? "SUPPRESSED" : "restored") << "\n";
+              << (fail ? "pedal sensor OPEN" : "pedal sensor connected") << "\n";
 }
 
 void SimApp::SetChargeCoupler(bool mated) {
