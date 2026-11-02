@@ -2003,7 +2003,7 @@ int SimApp::RunWithVisualization() {
             }
         }
 
-        // --- Power window motor log (chassis bus 4086/4087) — no visual yet ---
+        // --- Power window motor log (motor legs at the junction blocks) — no visual yet ---
         {
             static const char* kPwNames[] = {"STOP", "UP", "DOWN"};
             static const char* kSideNames[] = {"driver", "passenger"};
@@ -2558,7 +2558,7 @@ int SimApp::RunHeadless() {
             }
         }
 
-        // --- Power window motor log (chassis bus 4086/4087) — no visual yet ---
+        // --- Power window motor log (motor legs at the junction blocks) — no visual yet ---
         {
             static const char* kPwNames[] = {"STOP", "UP", "DOWN"};
             static const char* kSideNames[] = {"driver", "passenger"};

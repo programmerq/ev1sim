@@ -970,8 +970,10 @@ TEST_CASE("Connector dash snapshot: bus frames via BusSnoop plus the IPC lamp ce
     REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_IPC_ANTILOCK_TELLTALE, true));
     REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_IPC_WAIT_TELLTALE, true));
     REQUIRE(fleet->write_float32(topo::kWireCHASSIS_IPC_TRIP_DISTANCE_M, 2500.0f));
-    // The RSA's console outputs: ACC on, RUN off, the PARK selector LED lit.
-    REQUIRE(fleet->write_bit(topo::kWireCHASSIS_RSA_ACC_OUT, true));
+    // The RSA's console outputs: ACC on, RUN off, the PARK selector LED lit,
+    // the SECURITY telltale lit.
+    REQUIRE(fleet->write_element_state(topo::kWireRSA_ES_WSW_ENABLE_OUT, true));
+    REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_SECURITY_TELLTALE, true));
     REQUIRE(fleet->write_bit(topo::kWireRSA_RUN1_OUT,
                              topo::kWireRSA_RUN1_OUT_Default));  // rest = not RUN
     REQUIRE(fleet->write_bit(topo::kWireCHASSIS_RSA_SELECTOR_LED_PARK, true));
@@ -1003,6 +1005,7 @@ TEST_CASE("Connector dash snapshot: bus frames via BusSnoop plus the IPC lamp ce
     CHECK(snap.rsa->acc == std::optional<bool>(true));
     CHECK(snap.rsa->run == std::optional<bool>(false));
     CHECK(snap.rsa->led_park == std::optional<bool>(true));
+    CHECK(snap.rsa->security == std::optional<bool>(true));
     CHECK_FALSE(snap.rsa->led_drive.has_value());
     CHECK_FALSE(snap.rsa->dim_level_permille.has_value());
 
@@ -1398,4 +1401,51 @@ TEST_CASE("WireTruthChassis: brake motor leads read as fractions of full drive",
     REQUIRE(lf.has_value());
     CHECK(lf->drive == 0.0f);
     CHECK(lf->release == 1.0f);
+}
+
+TEST_CASE("WireTruthChassis: a window motor's command comes from its two legs",
+          "[wire_truth]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("window_legs");
+    auto fleet = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(fleet != nullptr);
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+
+    CHECK_FALSE(wire->window_motor_cmd(0).has_value());   // legs never solved
+    REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_LH_WINDOW_UP_DRIVE, true));
+    REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_LH_WINDOW_DOWN_DRIVE, false));
+    CHECK(wire->window_motor_cmd(0) == std::optional<std::uint8_t>(1u));   // up
+    REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_LH_WINDOW_UP_DRIVE, false));
+    REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_LH_WINDOW_DOWN_DRIVE, true));
+    CHECK(wire->window_motor_cmd(0) == std::optional<std::uint8_t>(2u));   // down
+    REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_LH_WINDOW_UP_DRIVE, true));
+    CHECK(wire->window_motor_cmd(0) == std::optional<std::uint8_t>(0u));   // both: stop
+
+    REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_RH_WINDOW_UP_DRIVE, false));
+    REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_RH_WINDOW_DOWN_DRIVE, true));
+    CHECK(wire->window_motor_cmd(1) == std::optional<std::uint8_t>(2u));
+}
+
+TEST_CASE("Connector reads the window motor commands off the motor legs through Tick",
+          "[wire_truth][e2e]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("e2e_window_legs");
+    auto fleet = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(fleet != nullptr);
+    ScopedEnv env("ELECTRICSIM_WIRES_NAME", seg.c_str());
+
+    ExternalSimConnector::Options opts;
+    opts.enabled = true;
+    ExternalSimConnector c(opts);
+    c.Tick(0.0);
+    REQUIRE(c.IsConnected());
+    CHECK_FALSE(c.HasReceivedPowerWindowMotor(1));
+
+    REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_RH_WINDOW_UP_DRIVE, true));
+    REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_RH_WINDOW_DOWN_DRIVE, false));
+    c.Tick(0.1);
+    REQUIRE(c.HasReceivedPowerWindowMotor(1));
+    CHECK(c.GetPowerWindowMotor(1) == 1u);
+    CHECK_FALSE(c.HasReceivedPowerWindowMotor(0));
 }

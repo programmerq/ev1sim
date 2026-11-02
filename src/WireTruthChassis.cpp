@@ -547,9 +547,6 @@ static const std::unordered_map<std::uint32_t, ConsumerCell>& ConsumerRegistry()
         // Door lock commands (byte)
         {4084U, {kWireCHASSIS_DOOR_LOCK_CMD_DRIVER,     WireType::kByte}},
         {4085U, {kWireCHASSIS_DOOR_LOCK_CMD_PASSENGER,  WireType::kByte}},
-        // Power window motor commands (byte)
-        {4086U, {kWireCHASSIS_POWER_WINDOW_MOTOR_DRIVER,    WireType::kByte}},
-        {4087U, {kWireCHASSIS_POWER_WINDOW_MOTOR_PASSENGER, WireType::kByte}},
         // RSA shift-blocked cue (bit)
         {4088U, {kWireCHASSIS_RSA_SHIFT_BLOCKED,        WireType::kBit}},
         // IPC seatbelt telltale (bit)
@@ -782,9 +779,15 @@ ev1sim::DashRsaConsole WireTruthChassis::rsa_console() const {
     using namespace electricsim::topology;
     ev1sim::DashRsaConsole c;
     c.run           = rsa_run_active();
-    c.acc           = read_bit(kWireCHASSIS_RSA_ACC_OUT);
+    // ACC: the RSA's ACC command out (grounding 1399, in ACC/RUN/START).
+    {
+        electricsim::io::WireTable::Sample<bool> acc;
+        if (attached() && impl_->table->read_bit_sample(kWireRSA_ES_WSW_ENABLE_OUT, &acc) &&
+            acc.written())
+            c.acc = acc.value;
+    }
     c.valid_code    = read_bit(kWireCHASSIS_RSA_VALID_CODE);
-    c.security      = read_bit(kWireCHASSIS_RSA_SECURITY_INDICATOR);
+    c.security      = read_bit(ReadOnlyWireId(kWireCHASSIS_SECURITY_TELLTALE));
     c.shift_blocked = read_bit(kWireCHASSIS_RSA_SHIFT_BLOCKED);
     c.btsi_solenoid = read_bit(ReadOnlyWireId(kWireCHASSIS_RSA_BTSI_ENERGISED));
     c.led_park      = read_bit(kWireCHASSIS_RSA_SELECTOR_LED_PARK);
@@ -897,6 +900,17 @@ std::optional<std::uint16_t> WireTruthChassis::pim_retard_request_permille() con
 
 std::optional<std::uint8_t> WireTruthChassis::wiper_sweep_position_pct() const {
     return read_byte(electricsim::topology::kWireCHASSIS_WIPER_SWEEP_POSITION);
+}
+
+std::optional<std::uint8_t> WireTruthChassis::window_motor_cmd(int side) const {
+    using namespace electricsim::topology;
+    const auto up = read_bit(ReadOnlyWireId(side == 0 ? kWireCHASSIS_LH_WINDOW_UP_DRIVE
+                                                       : kWireCHASSIS_RH_WINDOW_UP_DRIVE));
+    const auto down = read_bit(ReadOnlyWireId(side == 0 ? kWireCHASSIS_LH_WINDOW_DOWN_DRIVE
+                                                         : kWireCHASSIS_RH_WINDOW_DOWN_DRIVE));
+    if (!up || !down) return std::nullopt;
+    if (*up == *down) return std::uint8_t{0u};
+    return std::uint8_t{*up ? 1u : 2u};
 }
 
 bool WireTruthChassis::publish_coast_down_switch(bool on) {
@@ -1098,6 +1112,9 @@ std::optional<std::uint16_t> WireTruthChassis::pim_retard_request_permille() con
     return std::nullopt;
 }
 std::optional<std::uint8_t> WireTruthChassis::wiper_sweep_position_pct() const {
+    return std::nullopt;
+}
+std::optional<std::uint8_t> WireTruthChassis::window_motor_cmd(int) const {
     return std::nullopt;
 }
 bool WireTruthChassis::publish_coast_down_switch(bool) { return false; }

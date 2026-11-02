@@ -359,11 +359,11 @@ constexpr int           kNumIpcExtraTelltaleSignals   = 6;
 constexpr std::uint32_t kSigDoorLockCmdDriver    = 4084U;
 constexpr std::uint32_t kSigDoorLockCmdPassenger = 4085U;
 
-// Power window motor commands (the external RSA → ev1sim, chassis segment).
+// Power window motor commands (ev1sim's endpoints, chassis segment), decoded
+// from each motor's UP / DOWN legs at the junction blocks
+// (WireTruthChassis::window_motor_cmd).
 //   4086  vehicle.body.power_window_motor.driver    uint8: 0=stop, 1=up, 2=down
 //   4087  vehicle.body.power_window_motor.passenger uint8: 0=stop, 1=up, 2=down
-// Locked in lockstep with the external sim's chassis-signal header
-// kSigChassisPowerWindowMotorDriver = 4086, kSigChassisPowerWindowMotorPassenger = 4087.
 constexpr std::uint32_t kSigPowerWindowMotorDriver    = 4086U;
 constexpr std::uint32_t kSigPowerWindowMotorPassenger = 4087U;
 constexpr int           kNumDoorLockPwSignals         = 4;  // 4084+4085+4086+4087
@@ -2967,8 +2967,6 @@ EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockStatePassenger,    kSigChassisDoorLockStat
 EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockStateTrunk,        kSigChassisDoorLockStateTrunk);
 EV1SIM_CHASSIS_ID_MATCHES(kDynamicsBase + 68U,           kSigChassisRoadGradePct);
 EV1SIM_CHASSIS_ID_MATCHES(kDynamicsBase + 69U,           kSigChassisPitchDeg);
-EV1SIM_CHASSIS_ID_MATCHES(kSigPowerWindowMotorDriver,    kSigChassisPowerWindowMotorDriver);
-EV1SIM_CHASSIS_ID_MATCHES(kSigPowerWindowMotorPassenger, kSigChassisPowerWindowMotorPassenger);
 EV1SIM_CHASSIS_ID_MATCHES(kSigRsaShiftBlocked,           kSigChassisRsaShiftBlocked);
 EV1SIM_CHASSIS_ID_MATCHES(kSigAmbientTempC,              kSigChassisAmbientTempC);
 EV1SIM_CHASSIS_ID_MATCHES(kSigAmbientHumidityPct,        kSigChassisAmbientHumidityPct);
@@ -3401,6 +3399,13 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             for (const auto& [wire_motor, motor] : kMotors) {
                 if (auto leads = st.wire->btcm_motor_leads(wire_motor))
                     st.apply_btcm_motor_leads(motor, leads->drive, leads->release);
+            }
+        }
+        // Window motor commands from the motor legs at the junction blocks.
+        for (int side = 0; side < 2; ++side) {
+            if (auto cmd = st.wire->window_motor_cmd(side)) {
+                st.pw_motor_cmd[side]     = *cmd;
+                st.has_pw_motor_cmd[side] = true;
             }
         }
         // Retard request at the PIM, permille duty; 0 while the line is dark.

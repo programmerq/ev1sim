@@ -266,9 +266,10 @@ public:
     std::optional<bool>          ipc_service_soon_telltale() const;
     std::optional<bool>          ipc_wait_telltale() const;  // CHASSIS_IPC_WAIT_TELLTALE
 
-    // The RSA console's output cells in one read (RSA_RUN1_OUT, CHASSIS_RSA_ACC_OUT,
-    // _VALID_CODE, _SECURITY_INDICATOR, _SHIFT_BLOCKED, _BTSI_ENERGISED, the four
-    // _SELECTOR_LED_* and RSA_ES_DIM_LEVEL_DRV). Unwritten cells stay nullopt.
+    // The RSA console's output cells in one read (RSA_RUN1_OUT, RSA_ES_WSW_ENABLE_OUT,
+    // CHASSIS_RSA_VALID_CODE, CHASSIS_SECURITY_TELLTALE, CHASSIS_RSA_SHIFT_BLOCKED,
+    // _BTSI_ENERGISED, the four _SELECTOR_LED_* and RSA_ES_DIM_LEVEL_DRV).
+    // Unwritten cells stay nullopt.
     ev1sim::DashRsaConsole rsa_console() const;
     // The IPC's COMMAND to ground circuit 2029 (IPC_ES_WAIT_TT_DRV, an
     // element_state cause the IPC writes). Read-only here, as every cell ev1sim
@@ -336,6 +337,12 @@ public:
     // request duty in permille while the line is live, 0 while dark. nullopt
     // until the solver writes it.
     std::optional<std::uint16_t> pim_retard_request_permille() const;
+
+    // A window motor's command from its two legs at the junction block
+    // (CHASSIS_{LH,RH}_WINDOW_{UP,DOWN}_DRIVE): 0 = stop, 1 = up, 2 = down
+    // (both legs live, or both dark, is stop). side 0 = driver (LH),
+    // 1 = passenger (RH). nullopt until the solver writes both legs.
+    std::optional<std::uint8_t> window_motor_cmd(int side) const;
 
     // The wiper blades' position, percent of one full sweep cycle (0 = park,
     // 50 = end of sweep), from the RHJB's wiper-motor plant. nullopt until the

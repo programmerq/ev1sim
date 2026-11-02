@@ -120,9 +120,9 @@ struct DashLamps {
 // nullopt until its cell has been written.
 struct DashRsaConsole {
     std::optional<bool> run;            // RSA_RUN1_OUT
-    std::optional<bool> acc;            // CHASSIS_RSA_ACC_OUT
+    std::optional<bool> acc;            // RSA_ES_WSW_ENABLE_OUT (ACC command out)
     std::optional<bool> valid_code;     // CHASSIS_RSA_VALID_CODE
-    std::optional<bool> security;       // CHASSIS_RSA_SECURITY_INDICATOR
+    std::optional<bool> security;       // CHASSIS_SECURITY_TELLTALE
     std::optional<bool> shift_blocked;  // CHASSIS_RSA_SHIFT_BLOCKED
     std::optional<bool> btsi_solenoid;  // CHASSIS_RSA_BTSI_ENERGISED
     std::optional<bool> led_park;       // CHASSIS_RSA_SELECTOR_LED_PARK
