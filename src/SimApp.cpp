@@ -138,6 +138,12 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
     //     floating-UI panel lambdas can safely dereference m_physical during
     //     their initial label evaluation in AddButton().
     m_physical = std::make_unique<ev1sim::PhysicalWorld>();
+    if (const auto lever = ev1sim::PrndSelector::Parse(m_config.spawn.prnd)) {
+        m_physical->prnd_selector().set_position(*lever);
+    } else {
+        std::cerr << "[SimApp] spawn.prnd \"" << m_config.spawn.prnd
+                  << "\" is not P, R, N or D; the lever starts in P\n";
+    }
     {
         const auto& w = m_config.environment.weather;
         m_physical->ambient_temp_sensor().set_config(

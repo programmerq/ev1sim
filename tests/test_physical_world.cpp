@@ -312,6 +312,17 @@ TEST_CASE("TurnSignalStalk: consume_auto_cancel_event clears on first read",
     CHECK_FALSE(stalk.consume_auto_cancel_event());
 }
 
+TEST_CASE("PrndSelector::Parse names the four positions and nothing else", "[PhysicalWorld]") {
+    using P = PrndSelector::Position;
+    CHECK(PrndSelector::Parse("P") == P::P);
+    CHECK(PrndSelector::Parse("R") == P::R);
+    CHECK(PrndSelector::Parse("N") == P::N);
+    CHECK(PrndSelector::Parse("D") == P::D);
+    CHECK_FALSE(PrndSelector::Parse("d").has_value());
+    CHECK_FALSE(PrndSelector::Parse("").has_value());
+    CHECK_FALSE(PrndSelector::Parse("Drive").has_value());
+}
+
 // ---------------------------------------------------------------------------
 // IpcTripResetButton
 // ---------------------------------------------------------------------------
