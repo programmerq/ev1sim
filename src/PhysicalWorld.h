@@ -658,8 +658,8 @@ public:
     //   pin C, DK GRN 113 "REQUEST OUT"        INT, LOW or HIGH     (chassis ID 4055)
     //   pin D, PPL 92    "HI OUT"             HIGH only            (chassis ID 4056)
     //   pin E, PNK 228C  "WASHER-SWITCH OUT"  wash pressed         (chassis ID 4057)
-    // INT also reads a delay-ladder rung on the RHJB; ev1sim has no delay
-    // collar, so it leaves that rung unwritten and the RHJB uses its default.
+    // INT also routes cavity F to B through the delay collar's ladder rung
+    // (DRIVER_ES_WIPER_PULSE_LADDER_KOHM, pulse_ladder_kohm()).
     bool pin_delay_out() const {
         return m_position == Position::LOW || m_position == Position::HIGH;
     }
@@ -667,9 +667,31 @@ public:
     bool pin_hi_out()            const { return m_position == Position::HIGH; }
     bool pin_washer_switch_out() const { return m_wash; }
 
+    // The delay collar: nine ladder rungs, 660K (longest dwell) to 45K
+    // (shortest), in the order ELPD 511 prints them.
+    // @source:manual elec-511 (ELPD 511, the wiper/washer switch ladder)
+    static constexpr int kDelayRungs = 9;
+    static constexpr std::uint16_t kDelayRungKohm[kDelayRungs] = {
+        660, 580, 500, 420, 330, 290, 205, 125, 45};
+    /// The rung a fresh car's collar sits on: the RHJB's own no-producer rung
+    /// (electricsim wsw_int_dwell.h EV1_WSW_DEFAULT_LADDER_TAP), so turning
+    /// the collar on is not itself a change in wipe rate.
+    static constexpr int kDefaultDelayRung = 4;
+
+    int  delay_rung() const { return m_delay_rung; }
+    /// Turn the collar one rung toward a longer / shorter dwell; stops at the ends.
+    void delay_longer()  { if (m_delay_rung > 0) --m_delay_rung; }
+    void delay_shorter() { if (m_delay_rung < kDelayRungs - 1) ++m_delay_rung; }
+    /// The selected rung in kOhm while the stalk is at INT, 0 (no rung) at
+    /// any other position.
+    std::uint16_t pulse_ladder_kohm() const {
+        return m_position == Position::INT ? kDelayRungKohm[m_delay_rung] : 0u;
+    }
+
 private:
-    Position m_position = Position::OFF;
-    bool     m_wash     = false;
+    Position m_position   = Position::OFF;
+    bool     m_wash       = false;
+    int      m_delay_rung = kDefaultDelayRung;
 };
 
 /// Power window switches (driver + passenger × up + down).
@@ -917,7 +939,8 @@ public:
 
 /// The RSA's own faceplate buttons that ev1sim presses: the interior keypad
 /// (DRIVER_ES_RSA_KEYPAD_1..5), the LOCK / OFF-ACC / RUN mode buttons
-/// (DRIVER_ES_RSA_MODE_*) and DIM UP / DIM DOWN (DRIVER_ES_RSA_DIM_*).  One
+/// (DRIVER_ES_RSA_MODE_*), DIM UP / DIM DOWN (DRIVER_ES_RSA_DIM_*) and the
+/// HVAC head's HEAT / VENT / A/C buttons (DRIVER_ES_RSA_HVAC_*).  One
 /// driver's hand, so one press at a time, in the order queued.  The keypad
 /// shares the exterior keypad's tap / long-press timing; a mode or dimmer
 /// press is a tap.
@@ -930,6 +953,9 @@ public:
         kModeRun = 7,
         kDimDown = 8,
         kDimUp = 9,
+        kHvacHeat = 10,
+        kHvacVent = 11,
+        kHvacAc = 12,
     };
 
     /// Queue an interior keypad press (idx 0..4); a long press for the higher digit.
@@ -938,6 +964,21 @@ public:
     void press_mode(std::uint8_t mode_switches);
     /// Queue one DIM UP or DIM DOWN click.
     void press_dim(bool up) { press(up ? kDimUp : kDimDown, kTapHoldS); }
+    /// Queue one tap of an HVAC head button (kHvacHeat, kHvacVent or kHvacAc).
+    void press_hvac(Button b) { press(b, kTapHoldS); }
+};
+
+/// A switch that stays where the hand leaves it: closed until toggled open.
+/// Stands in for a momentary switch the driver holds (the battery recovery
+/// switch) or a connector a technician unplugs (the SDM connector).
+class HeldContact {
+public:
+    bool closed() const { return m_closed; }
+    void set(bool closed) { m_closed = closed; }
+    void toggle() { m_closed = !m_closed; }
+
+private:
+    bool m_closed = false;
 };
 
 /// Door handle pull attempts (driver door + passenger door).
@@ -1476,6 +1517,13 @@ public:
 
     RsaConsoleButtons&       rsa_console_buttons()       { return m_rsa_console_buttons; }
     const RsaConsoleButtons& rsa_console_buttons() const { return m_rsa_console_buttons; }
+
+    /// The battery recovery switch (DRIVER_ES_BATTERY_RECOVERY_SWITCH), held or not.
+    HeldContact&       battery_recovery_switch()       { return m_battery_recovery; }
+    const HeldContact& battery_recovery_switch() const { return m_battery_recovery; }
+    /// The SDM connector unplugged (DRIVER_ES_SDM_CONNECTOR_UNPLUGGED) or seated.
+    HeldContact&       sdm_connector_unplugged()       { return m_sdm_unplugged; }
+    const HeldContact& sdm_connector_unplugged() const { return m_sdm_unplugged; }
     RsaExteriorKeypad&       rsa_exterior_keypad()       { return m_rsa_ext_keypad; }
     const RsaExteriorKeypad& rsa_exterior_keypad() const { return m_rsa_ext_keypad; }
 
@@ -1598,6 +1646,8 @@ private:
     PowerWindows       m_power_windows;
     RsaExteriorKeypad  m_rsa_ext_keypad;
     RsaConsoleButtons  m_rsa_console_buttons;
+    HeldContact        m_battery_recovery;
+    HeldContact        m_sdm_unplugged;
     DoorHandles        m_door_handles;
     // Actuator/plant peripherals driven by the external electrical sim.
     DoorLockMotor          m_door_lock_motor_lh;   // driver door

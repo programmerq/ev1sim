@@ -957,6 +957,33 @@ bool WireTruthChassis::publish_rsa_dim_buttons(bool up_held, bool down_held) {
     return up && down;
 }
 
+bool WireTruthChassis::publish_rsa_hvac_buttons(bool heat, bool vent, bool ac) {
+    if (!attached()) return false;
+    namespace topo = electricsim::topology;
+    const bool h = write_bit(ProducerWireId(topo::kWireDRIVER_ES_RSA_HVAC_HEAT), heat);
+    const bool v = write_bit(ProducerWireId(topo::kWireDRIVER_ES_RSA_HVAC_VENT), vent);
+    const bool a = write_bit(ProducerWireId(topo::kWireDRIVER_ES_RSA_HVAC_AC), ac);
+    return h && v && a;
+}
+
+bool WireTruthChassis::publish_wiper_pulse_ladder_kohm(std::uint16_t kohm) {
+    if (!attached()) return false;
+    return impl_->table->write_element_state_level(
+        electricsim::topology::kWireDRIVER_ES_WIPER_PULSE_LADDER_KOHM, kohm);
+}
+
+bool WireTruthChassis::publish_battery_recovery_switch(bool held) {
+    if (!attached()) return false;
+    return impl_->table->write_element_state(
+        electricsim::topology::kWireDRIVER_ES_BATTERY_RECOVERY_SWITCH, held);
+}
+
+bool WireTruthChassis::publish_sdm_connector_unplugged(bool unplugged) {
+    if (!attached()) return false;
+    return impl_->table->write_element_state(
+        electricsim::topology::kWireDRIVER_ES_SDM_CONNECTOR_UNPLUGGED, unplugged);
+}
+
 }  // namespace ev1sim
 
 #else  // !EV1SIM_HAVE_WIRE_TRUTH
@@ -1129,6 +1156,10 @@ bool WireTruthChassis::publish_outside_air_temp(float) { return false; }
 bool WireTruthChassis::publish_pedal_sensor_open(bool) { return false; }
 bool WireTruthChassis::publish_reverse_select_switch(bool) { return false; }
 bool WireTruthChassis::publish_rsa_dim_buttons(bool, bool) { return false; }
+bool WireTruthChassis::publish_rsa_hvac_buttons(bool, bool, bool) { return false; }
+bool WireTruthChassis::publish_wiper_pulse_ladder_kohm(std::uint16_t) { return false; }
+bool WireTruthChassis::publish_battery_recovery_switch(bool) { return false; }
+bool WireTruthChassis::publish_sdm_connector_unplugged(bool) { return false; }
 
 }  // namespace ev1sim
 

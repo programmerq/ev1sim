@@ -1413,6 +1413,10 @@ struct ExternalSimConnector::State {
     bool          coast_down_switch_on            = false;
     // RSA DIM DOWN / DIM UP buttons held ([0] down, [1] up).
     bool          rsa_dim_held[2]                 = {false, false};
+    bool          rsa_hvac_held[3]                = {false, false, false};  // heat, vent, a/c
+    std::uint16_t wiper_pulse_ladder_kohm         = 0u;
+    bool          battery_recovery_held           = false;
+    bool          sdm_connector_unplugged         = false;
     // PIM coast-down drag (CHASSIS_PIM_COAST_DRAG_NM), Nm at the shaft.
     float         pim_coast_drag_nm               = 0.0f;
     bool          has_pim_coast_drag_nm           = false;
@@ -2278,6 +2282,24 @@ void ExternalSimConnector::SetCoastDownSwitch(bool on) {
 void ExternalSimConnector::SetRsaDimmerButtons(bool up_held, bool down_held) {
     m_state->rsa_dim_held[1] = up_held;
     m_state->rsa_dim_held[0] = down_held;
+}
+
+void ExternalSimConnector::SetRsaHvacButtons(bool heat, bool vent, bool ac) {
+    m_state->rsa_hvac_held[0] = heat;
+    m_state->rsa_hvac_held[1] = vent;
+    m_state->rsa_hvac_held[2] = ac;
+}
+
+void ExternalSimConnector::SetWiperPulseLadderKohm(std::uint16_t kohm) {
+    m_state->wiper_pulse_ladder_kohm = kohm;
+}
+
+void ExternalSimConnector::SetBatteryRecoverySwitch(bool held) {
+    m_state->battery_recovery_held = held;
+}
+
+void ExternalSimConnector::SetSdmConnectorUnplugged(bool unplugged) {
+    m_state->sdm_connector_unplugged = unplugged;
 }
 
 std::optional<float> ExternalSimConnector::GetPimCoastDragNm() const {
@@ -3656,6 +3678,16 @@ void ExternalSimConnector::Tick(double sim_time_s) {
     // RSA DIM UP / DIM DOWN contacts, level-held every tick.
     if (st.wire) {
         st.wire->publish_rsa_dim_buttons(st.rsa_dim_held[1], st.rsa_dim_held[0]);
+    }
+    // The rest of the driver's contacts, level-held every tick: the RSA HVAC
+    // head buttons, the wiper delay collar's rung, the battery recovery switch
+    // and the SDM connector.
+    if (st.wire) {
+        st.wire->publish_rsa_hvac_buttons(st.rsa_hvac_held[0], st.rsa_hvac_held[1],
+                                          st.rsa_hvac_held[2]);
+        st.wire->publish_wiper_pulse_ladder_kohm(st.wiper_pulse_ladder_kohm);
+        st.wire->publish_battery_recovery_switch(st.battery_recovery_held);
+        st.wire->publish_sdm_connector_unplugged(st.sdm_connector_unplugged);
     }
 #endif
 

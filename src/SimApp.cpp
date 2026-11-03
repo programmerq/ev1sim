@@ -398,6 +398,21 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
                     std::cout << "[UI] Wiper wash\n";
                 });
 
+            // --- Wiper delay collar (the INT dwell): longer / shorter ---
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    const auto& ws = m_physical->wiper_stalk();
+                    return FormatWiperDelayLabel(
+                        ev1sim::WiperStalk::kDelayRungKohm[ws.delay_rung()]);
+                },
+                []() {});   // display-only row (the selected rung)
+            m_floating_ui->AddButton(
+                []() -> std::wstring { return L"Wiper delay longer"; },
+                [this]() { m_physical->wiper_stalk().delay_longer(); });
+            m_floating_ui->AddButton(
+                []() -> std::wstring { return L"Wiper delay shorter"; },
+                [this]() { m_physical->wiper_stalk().delay_shorter(); });
+
             // --- Cruise stalk: SET, RESUME, CANCEL, +, - ---
             m_floating_ui->AddButton(
                 []() -> std::wstring { return FormatCruiseLabel(L"SET"); },
@@ -452,6 +467,22 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
                                       ? "BUCKLED" : "UNBUCKLED") << "\n";
                 });
 
+            // --- Battery recovery switch (held until clicked again) ---
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatBatteryRecoveryLabel(
+                        m_physical->battery_recovery_switch().closed());
+                },
+                [this]() { m_physical->battery_recovery_switch().toggle(); });
+
+            // --- SDM connector (a technician unplugging it) ---
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatSdmConnectorLabel(
+                        m_physical->sdm_connector_unplugged().closed());
+                },
+                [this]() { m_physical->sdm_connector_unplugged().toggle(); });
+
             // --- HVAC status (display-only; no click action) ---
             // Subscribes to HTCM chassis-bus signals 4082 (blower level) and
             // 4083 (defrost grid).  Labels update each frame via UpdateLabels().
@@ -471,8 +502,9 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
                 },
                 []() {});   // no-op: display-only row
 
-            // --- HVAC driver controls (drive ev1sim::HvacControls; the
-            //     requests are published to HTCM on chassis 4124-4128 each tick).
+            // --- HVAC driver controls (drive ev1sim::HvacControls, published on
+            //     chassis 4124-4128, which no electricsim module reads; the car's
+            //     HEAT / VENT / A/C buttons are on the RSA console panel).
             //     Display row for the setpoint + buttons to adjust/cycle/toggle. ---
             m_floating_ui->AddButton(
                 [this]() -> std::wstring {
@@ -1184,6 +1216,8 @@ void SimApp::PublishRsaConsoleButtons(double dt_s) {
     if (buttons.held(B::kModeRun))    mode |= ev1sim::RsaKeypadDriver::kModeSwRun;
     m_external_sim->SetDriverRsaModeSwitches(mode);
     m_external_sim->SetRsaDimmerButtons(buttons.held(B::kDimUp), buttons.held(B::kDimDown));
+    m_external_sim->SetRsaHvacButtons(buttons.held(B::kHvacHeat), buttons.held(B::kHvacVent),
+                                      buttons.held(B::kHvacAc));
 }
 
 // ---------------------------------------------------------------------------
@@ -1795,6 +1829,11 @@ int SimApp::RunWithVisualization() {
             m_external_sim->SetWiperWasherSwOutputs(
                 ws.pin_delay_out(), ws.pin_request_out(),
                 ws.pin_hi_out(), ws.pin_washer_switch_out());
+            m_external_sim->SetWiperPulseLadderKohm(ws.pulse_ladder_kohm());
+            m_external_sim->SetBatteryRecoverySwitch(
+                m_physical->battery_recovery_switch().closed());
+            m_external_sim->SetSdmConnectorUnplugged(
+                m_physical->sdm_connector_unplugged().closed());
         }
         // Charge coupler presence (chassis bus, ID 4060).  Stubbed false until
         // a floating-UI panel or charge-door animation sets it.
@@ -2399,6 +2438,11 @@ int SimApp::RunHeadless() {
             m_external_sim->SetWiperWasherSwOutputs(
                 ws.pin_delay_out(), ws.pin_request_out(),
                 ws.pin_hi_out(), ws.pin_washer_switch_out());
+            m_external_sim->SetWiperPulseLadderKohm(ws.pulse_ladder_kohm());
+            m_external_sim->SetBatteryRecoverySwitch(
+                m_physical->battery_recovery_switch().closed());
+            m_external_sim->SetSdmConnectorUnplugged(
+                m_physical->sdm_connector_unplugged().closed());
         }
         // Charge coupler presence (chassis bus, ID 4060).  Stubbed false until
         // a floating-UI panel or charge-door animation sets it.
@@ -2842,6 +2886,24 @@ void SimApp::DispatchAction(ev1sim::InputAction action) {
             break;
         case A::WiperWash:
             if (m_physical) m_physical->wiper_stalk().press_wash();
+            break;
+        case A::WiperDelayLonger:
+            if (m_physical) m_physical->wiper_stalk().delay_longer();
+            break;
+        case A::WiperDelayShorter:
+            if (m_physical) m_physical->wiper_stalk().delay_shorter();
+            break;
+        case A::HvacHeat:
+            if (m_physical)
+                m_physical->rsa_console_buttons().press_hvac(ev1sim::RsaConsoleButtons::kHvacHeat);
+            break;
+        case A::HvacVent:
+            if (m_physical)
+                m_physical->rsa_console_buttons().press_hvac(ev1sim::RsaConsoleButtons::kHvacVent);
+            break;
+        case A::HvacAc:
+            if (m_physical)
+                m_physical->rsa_console_buttons().press_hvac(ev1sim::RsaConsoleButtons::kHvacAc);
             break;
         case A::CruiseSet:       CruiseSet();         break;
         case A::CruiseResume:    CruiseResume();      break;
