@@ -5,7 +5,6 @@
 #include "EV1TMeasyTire.h"
 
 #include "chrono/physics/ChShaft.h"
-#include "chrono/physics/ChShaftsClutch.h"
 #include "chrono_vehicle/ChDriver.h"
 #include "chrono_vehicle/ChPowertrainAssembly.h"
 #include "chrono_vehicle/ChTransmission.h"
@@ -161,25 +160,18 @@ std::unique_ptr<WheeledVehicle> BuildEV1Vehicle(const ChCoordsys<>& pose,
     return ev1;
 }
 
-std::shared_ptr<ChShaftsClutch> AddParkPawl(WheeledVehicle& ev1) {
-    const DrivelineShafts d =
-        FindDrivelineShafts(ev1, GetDataFile("ev1/driveline/EV1_Driveline2WD.json"));
-    auto ground = chrono_types::make_shared<ChShaft>();
-    ground->SetFixed(true);
-    ev1.GetSystem()->AddShaft(ground);
-    auto pawl = chrono_types::make_shared<ChShaftsClutch>();
-    pawl->Initialize(d.differential_box, ground);
-    pawl->SetTorqueLimit(kParkPawlHoldNm);
-    SetParkPawlEngaged(*pawl, false);
-    ev1.GetSystem()->Add(pawl);
-    return pawl;
+std::shared_ptr<ChShaft> ParkPawlCarrier(WheeledVehicle& ev1) {
+    return FindDrivelineShafts(ev1, GetDataFile("ev1/driveline/EV1_Driveline2WD.json"))
+        .differential_box;
 }
 
-// A released pawl is disabled outright, so the solver sees no constraint row
-// for it, rather than a zero-torque box that still takes part in iteration.
-void SetParkPawlEngaged(ChShaftsClutch& pawl, bool engaged) {
-    pawl.SetModulation(engaged ? 1.0 : 0.0);
-    pawl.SetDisabled(!engaged);
+void SetParkPawlEngaged(ChShaft& carrier, bool engaged) {
+    if (engaged == carrier.IsFixed()) return;
+    if (engaged) {
+        carrier.SetPosDt(0.0);
+        carrier.SetPosDt2(0.0);
+    }
+    carrier.SetFixed(engaged);
 }
 
 void SetMotorDirection(ChWheeledVehicle& vehicle, MotorDirection dir) {

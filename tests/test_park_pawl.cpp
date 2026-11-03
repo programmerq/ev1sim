@@ -26,8 +26,7 @@ std::pair<double, double> Roll(bool pawl_engaged) {
     vehicle::SetDataPath(EV1SIM_VEHICLE_DATA_DIR);
 
     auto ev1 = ev1sim::BuildEV1Vehicle(ChCoordsys<>(ChVector3d(0, 0, 0.5), QUNIT), kStep, 1.0);
-    auto pawl = ev1sim::AddParkPawl(*ev1);
-    ev1sim::SetParkPawlEngaged(*pawl, pawl_engaged);
+    ev1sim::SetParkPawlEngaged(*ev1sim::ParkPawlCarrier(*ev1), pawl_engaged);
 
     RigidTerrain terrain(ev1->GetSystem());
     auto mat = chrono_types::make_shared<ChContactMaterialSMC>();

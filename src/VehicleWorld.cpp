@@ -119,7 +119,7 @@ void VehicleWorld::CreateEV1(const Config& cfg) {
 
     m_vehicle = m_ev1.get();
     m_system  = m_ev1->GetSystem();
-    m_park_pawl = ev1sim::AddParkPawl(*m_ev1);
+    m_park_pawl = ev1sim::ParkPawlCarrier(*m_ev1);
 
     m_vehicle->SetChassisVisualizationType(VisualizationType::MESH);
     m_vehicle->SetSuspensionVisualizationType(VisualizationType::PRIMITIVES);

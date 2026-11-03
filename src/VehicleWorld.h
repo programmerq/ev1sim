@@ -5,7 +5,7 @@
 #include "VehiclePose.h"
 #include "VehicleState.h"
 
-#include "chrono/physics/ChShaftsClutch.h"
+#include "chrono/physics/ChShaft.h"
 #include "chrono/physics/ChSystemSMC.h"
 #include "chrono_vehicle/terrain/RigidTerrain.h"
 #include "chrono_vehicle/wheeled_vehicle/ChWheeledVehicle.h"
@@ -88,8 +88,9 @@ private:
     chrono::vehicle::ChWheeledVehicle* m_vehicle = nullptr;
     chrono::ChSystem*                  m_system  = nullptr;
 
-    // The EV1's park pawl (EV1Vehicle.h AddParkPawl); null on other models.
-    std::shared_ptr<chrono::ChShaftsClutch> m_park_pawl;
+    // The differential carrier the EV1's park pawl holds (EV1Vehicle.h
+    // ParkPawlCarrier); null on other models.
+    std::shared_ptr<chrono::ChShaft> m_park_pawl;
 
     std::unique_ptr<CommandDriver>                m_driver;
     std::unique_ptr<chrono::vehicle::RigidTerrain> m_terrain;
