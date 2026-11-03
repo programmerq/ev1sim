@@ -266,9 +266,10 @@ public:
     std::optional<bool>          ipc_service_soon_telltale() const;
     std::optional<bool>          ipc_wait_telltale() const;  // CHASSIS_IPC_WAIT_TELLTALE
 
-    // The RSA console's output cells in one read (RSA_RUN1_OUT, CHASSIS_RSA_ACC_OUT,
-    // _VALID_CODE, _SECURITY_INDICATOR, _SHIFT_BLOCKED, _BTSI_ENERGISED, the four
-    // _SELECTOR_LED_* and RSA_ES_DIM_LEVEL_DRV). Unwritten cells stay nullopt.
+    // The RSA console's output cells in one read (RSA_RUN1_OUT, RSA_ES_WSW_ENABLE_OUT,
+    // CHASSIS_RSA_VALID_CODE, CHASSIS_SECURITY_TELLTALE, CHASSIS_RSA_SHIFT_BLOCKED,
+    // _BTSI_ENERGISED, the four _SELECTOR_LED_* and RSA_ES_DIM_LEVEL_DRV).
+    // Unwritten cells stay nullopt.
     ev1sim::DashRsaConsole rsa_console() const;
     // The IPC's COMMAND to ground circuit 2029 (IPC_ES_WAIT_TT_DRV, an
     // element_state cause the IPC writes). Read-only here, as every cell ev1sim
@@ -337,6 +338,12 @@ public:
     // until the solver writes it.
     std::optional<std::uint16_t> pim_retard_request_permille() const;
 
+    // A window motor's command from its two legs at the junction block
+    // (CHASSIS_{LH,RH}_WINDOW_{UP,DOWN}_DRIVE): 0 = stop, 1 = up, 2 = down
+    // (both legs live, or both dark, is stop). side 0 = driver (LH),
+    // 1 = passenger (RH). nullopt until the solver writes both legs.
+    std::optional<std::uint8_t> window_motor_cmd(int side) const;
+
     // The wiper blades' position, percent of one full sweep cycle (0 = park,
     // 50 = end of sweep), from the RHJB's wiper-motor plant. nullopt until the
     // RHJB writes CHASSIS_WIPER_SWEEP_POSITION.
@@ -344,13 +351,18 @@ public:
 
     // The shifter's coast-down button position (1 = coast down), read by the
     // RSA. ev1sim is this cell's producer. Returns false if not attached.
-    bool publish_coast_down_switch(bool on);               // DRIVER_COAST_DOWN_SWITCH
+    bool publish_coast_down_switch(bool on);               // DRIVER_ES_COAST_DOWN_SWITCH
 
     // Accelerator pedal travel, permille of full travel
     // (DRIVER_ES_PEDAL_TRAVEL); the solver turns it into the PIM's pedal
     // position tracks. ev1sim is this cell's producer. Returns false if not
     // attached.
     bool publish_pedal_travel(std::uint16_t permille);
+
+    // The accelerator pedal sensor's connector open (1) or connected (0)
+    // (DRIVER_ES_PEDAL_SENSOR_OPEN, a harness-fault boundary). ev1sim is this
+    // cell's producer. Returns false if not attached.
+    bool publish_pedal_sensor_open(bool open);
 
     // The air at the HTCM's outside-air sensor (CHASSIS_ES_OUTSIDE_AIR_TEMP),
     // written as permille of the sensor's -40..+80 C span and clamped to it.
@@ -362,10 +374,9 @@ public:
     // this cell's producer. Returns false if not attached.
     bool publish_reverse_select_switch(bool closed);
 
-    // One click (press then release) of the RSA's DIM UP or DIM DOWN button;
-    // the RSA moves its dimmer step one level per click. Returns false if not
-    // attached.
-    bool publish_rsa_dim_click(bool up);                   // DRIVER_RSA_DIM_UP / _DOWN
+    // The RSA's DIM UP / DIM DOWN buttons as held contacts; the RSA moves its
+    // dimmer step one level per press. Returns false if not attached.
+    bool publish_rsa_dim_buttons(bool up_held, bool down_held);  // DRIVER_ES_RSA_DIM_UP / _DOWN
 
 private:
     WireTruthChassis();

@@ -691,13 +691,43 @@ const char* RsaKeypadDriver::expected_state_name() const {
 }
 
 // ---------------------------------------------------------------------------
+// HeldPressTimeline
+// ---------------------------------------------------------------------------
+
+void HeldPressTimeline::press(int button_idx, double hold_s) {
+    if (button_idx < 0 || button_idx >= kMaxButtons || m_count >= kQueueLen) return;
+    m_queue[(m_head + m_count) % kQueueLen] = {static_cast<std::uint8_t>(button_idx), hold_s};
+    ++m_count;
+}
+
+void HeldPressTimeline::update(double dt_s) {
+    constexpr double kTimeEpsS = 1e-9;   // sim time is a sum of float steps
+    if (m_phase != Phase::Idle) m_timer -= dt_s;
+    if (m_phase == Phase::Held && m_timer <= kTimeEpsS) {
+        m_phase = Phase::Gap;
+        m_timer = kGapS;
+    }
+    if (m_phase == Phase::Gap && m_timer <= kTimeEpsS) {
+        m_phase  = Phase::Idle;
+        m_button = -1;
+    }
+    if (m_phase == Phase::Idle && m_count > 0) {
+        const Press p = m_queue[m_head];
+        m_head = (m_head + 1) % kQueueLen;
+        --m_count;
+        m_phase  = Phase::Held;
+        m_button = p.button_idx;
+        m_timer  = p.hold_s;
+    }
+}
+
+// ---------------------------------------------------------------------------
 // RsaExteriorKeypad
 // ---------------------------------------------------------------------------
 
 void RsaExteriorKeypad::press_button(int button_idx, bool long_press) {
-    if (button_idx < 0 || button_idx >= 5 || m_count >= kQueueLen) return;
-    m_queue[(m_head + m_count) % kQueueLen] = {static_cast<std::uint8_t>(button_idx), long_press};
-    ++m_count;
+    if (button_idx < 0 || button_idx >= 5) return;
+    press(button_idx, long_press ? kLongHoldS : kTapHoldS);
 }
 
 // Digit-to-button+long_press mapping (same as interior keypad notation):
@@ -733,25 +763,19 @@ void RsaExteriorKeypad::enter_code_sequence(const char* code_str) {
     }
 }
 
-void RsaExteriorKeypad::update(double dt_s) {
-    constexpr double kTimeEpsS = 1e-9;   // sim time is a sum of float steps
-    if (m_phase != Phase::Idle) m_timer -= dt_s;
-    if (m_phase == Phase::Held && m_timer <= kTimeEpsS) {
-        m_phase = Phase::Gap;
-        m_timer = kGapS;
-    }
-    if (m_phase == Phase::Gap && m_timer <= kTimeEpsS) {
-        m_phase  = Phase::Idle;
-        m_button = -1;
-    }
-    if (m_phase == Phase::Idle && m_count > 0) {
-        const Press p = m_queue[m_head];
-        m_head = (m_head + 1) % kQueueLen;
-        --m_count;
-        m_phase  = Phase::Held;
-        m_button = p.button_idx;
-        m_timer  = p.long_press ? kLongHoldS : kTapHoldS;
-    }
+// ---------------------------------------------------------------------------
+// RsaConsoleButtons
+// ---------------------------------------------------------------------------
+
+void RsaConsoleButtons::press_digit(int idx, bool long_press) {
+    if (idx < 0 || idx >= 5) return;
+    press(kKeypad1 + idx, long_press ? kLongHoldS : kTapHoldS);
+}
+
+void RsaConsoleButtons::press_mode(std::uint8_t mode_switches) {
+    if (mode_switches & RsaKeypadDriver::kModeSwLock)   press(kModeLock, kTapHoldS);
+    if (mode_switches & RsaKeypadDriver::kModeSwOffAcc) press(kModeOffAcc, kTapHoldS);
+    if (mode_switches & RsaKeypadDriver::kModeSwRun)    press(kModeRun, kTapHoldS);
 }
 
 // ---------------------------------------------------------------------------

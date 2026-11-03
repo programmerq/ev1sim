@@ -30,6 +30,7 @@
 
 #include "WireTruthChassis.h"
 #include "ExternalSimConnector.h"
+#include "PhysicalWorld.h"  // ev1sim::RsaKeypadDriver::kModeSw*
 
 #include "topology/topology_generated.h"
 #include "wire_table.hpp"
@@ -301,7 +302,7 @@ TEST_CASE("Seat-belt, reverse and park contacts publish onto the wire through Ti
 
 // The accelerator pedal reaches the PIM only through the solver, so the
 // connector must write its travel (permille) on the pedal element every Tick,
-// and withhold it during the fail_throttle_input fault window.
+// and keep writing it while the pedal sensor's connector is open.
 TEST_CASE("Accelerator pedal travel publishes onto the wire through Tick",
           "[wire_truth][attach_outcome]") {
     namespace topo = electricsim::topology;
@@ -334,10 +335,45 @@ TEST_CASE("Accelerator pedal travel publishes onto the wire through Tick",
     c.Tick(0.2);
     CHECK(travel() == 1000u);
 
-    c.SetSuppressThrottlePublish(true);
+    c.SetPedalSensorOpen(true);
     c.SetDriverThrottleQ8(0);
     c.Tick(0.3);
-    CHECK(travel() == 1000u);    // withheld during the fault window
+    CHECK(travel() == 0u);       // the foot still moves during a sensor fault
+}
+
+// fail_throttle_input opens the pedal sensor's connector. The cell stays
+// unwritten until the fault is first injected (unwritten reads connected),
+// then holds the injected state every Tick.
+TEST_CASE("The pedal-sensor-open fault publishes onto the wire through Tick",
+          "[wire_truth][attach_outcome]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("pps_open");
+    auto table = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(table != nullptr);
+
+    ScopedWiresName guard(seg.c_str());
+    ExternalSimConnector::Options opts;
+    opts.enabled = true;
+    ExternalSimConnector c(opts);
+
+    auto sample = [&]() {
+        electricsim::io::WireTable::Sample<bool> s{};
+        REQUIRE(table->read_bit_sample(topo::kWireDRIVER_ES_PEDAL_SENSOR_OPEN, &s));
+        return s;
+    };
+
+    c.Tick(0.0);
+    REQUIRE(c.IsConnected());
+    CHECK_FALSE(sample().written());
+
+    c.SetPedalSensorOpen(true);
+    c.Tick(0.1);
+    REQUIRE(sample().written());
+    CHECK(sample().value);
+
+    c.SetPedalSensorOpen(false);
+    c.Tick(0.2);
+    CHECK_FALSE(sample().value);
 }
 
 // The HTCM reads outside air only through its sensor element, so the
@@ -378,4 +414,56 @@ TEST_CASE("Outside air temperature publishes onto the wire through Tick",
     c.SetAmbientTempC(95.0f);
     c.Tick(0.3);
     CHECK(level() == 1000u);
+}
+
+// The RSA reads its faceplate buttons only as contacts through the solver, so
+// a held keypad, mode, window, dimmer or coast-down button must reach its
+// DRIVER_ES_* cell through Tick, and drop when released.
+TEST_CASE("RSA faceplate buttons publish onto the wire through Tick",
+          "[wire_truth][attach_outcome]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("rsa_face");
+    auto table = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(table != nullptr);
+
+    ScopedWiresName guard(seg.c_str());
+    ExternalSimConnector::Options opts;
+    opts.enabled = true;
+    ExternalSimConnector c(opts);
+
+    auto contact = [&](electricsim::io::ElementStateId id) {
+        electricsim::io::WireTable::Sample<bool> s{};
+        REQUIRE(table->read_bit_sample(id, &s));
+        REQUIRE(s.written());
+        return s.value;
+    };
+
+    c.SetDriverRsaKeypadButton3(true);
+    c.SetDriverRsaModeSwitches(ev1sim::RsaKeypadDriver::kModeSwOffAcc);
+    c.SetDriverPowerWindowPassengerDown(true);
+    c.SetRsaDimmerButtons(/*up=*/true, /*down=*/false);
+    c.SetCoastDownSwitch(true);
+    c.Tick(0.0);
+    REQUIRE(c.IsConnected());
+    CHECK(contact(topo::kWireDRIVER_ES_RSA_KEYPAD_3));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_RSA_KEYPAD_1));
+    CHECK(contact(topo::kWireDRIVER_ES_RSA_MODE_OFF_ACC));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_RSA_MODE_RUN));
+    CHECK(contact(topo::kWireDRIVER_ES_WINDOW_PASSENGER_DOWN));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_WINDOW_DRIVER_UP));
+    CHECK(contact(topo::kWireDRIVER_ES_RSA_DIM_UP));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_RSA_DIM_DOWN));
+    CHECK(contact(topo::kWireDRIVER_ES_COAST_DOWN_SWITCH));
+
+    c.SetDriverRsaKeypadButton3(false);
+    c.SetDriverRsaModeSwitches(0u);
+    c.SetDriverPowerWindowPassengerDown(false);
+    c.SetRsaDimmerButtons(false, false);
+    c.SetCoastDownSwitch(false);
+    c.Tick(0.1);
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_RSA_KEYPAD_3));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_RSA_MODE_OFF_ACC));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_WINDOW_PASSENGER_DOWN));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_RSA_DIM_UP));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_COAST_DOWN_SWITCH));
 }

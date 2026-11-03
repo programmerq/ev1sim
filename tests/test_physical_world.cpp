@@ -10,6 +10,7 @@
 #include <initializer_list>
 #include <limits>
 #include <string>
+#include <utility>
 #include <vector>
 
 using namespace ev1sim;
@@ -1091,6 +1092,95 @@ TEST_CASE("RsaExteriorKeypad: enter_code_sequence holds each digit's button in t
                                                                : RsaExteriorKeypad::kTapHoldS,
                                                      dt * 1.5));
     }
+}
+
+// ---------------------------------------------------------------------------
+// RsaConsoleButtons
+// ---------------------------------------------------------------------------
+
+namespace {
+// Plays a RsaConsoleButtons queue to the end at 10 ms steps and returns each
+// press as (button, seconds held), in order.
+std::vector<std::pair<int, double>> play_console(RsaConsoleButtons& b) {
+    const double dt = 0.01;
+    std::vector<std::pair<int, double>> holds;
+    int cur = -1;
+    double since = 0.0, t = 0.0;
+    for (int step = 0; step < 2000 && b.sequence_in_progress(); ++step) {
+        b.update(dt);
+        t += dt;
+        int now = -1;
+        for (int i = 0; i < HeldPressTimeline::kMaxButtons; ++i)
+            if (b.held(i)) { CHECK(now == -1); now = i; }
+        if (now != cur) {
+            if (cur >= 0) holds.emplace_back(cur, t - since);
+            cur = now;
+            since = t;
+        }
+    }
+    CHECK_FALSE(b.sequence_in_progress());
+    return holds;
+}
+}  // namespace
+
+TEST_CASE("RsaConsoleButtons: keypad, mode and dimmer presses play out one at a time",
+          "[PhysicalWorld][RsaConsoleButtons]") {
+    using B = RsaConsoleButtons;
+    B b;
+    b.press_digit(0, /*long_press=*/false);
+    b.press_digit(4, /*long_press=*/true);
+    b.press_mode(RsaKeypadDriver::kModeSwRun | RsaKeypadDriver::kModeSwLock);  // LOCK first
+    b.press_dim(/*up=*/true);
+    b.press_dim(/*up=*/false);
+
+    const auto holds = play_console(b);
+    REQUIRE(holds.size() == 6);
+    const int buttons[6] = {B::kKeypad1 + 0, B::kKeypad1 + 4, B::kModeLock, B::kModeRun,
+                            B::kDimUp, B::kDimDown};
+    const double secs[6] = {B::kTapHoldS, B::kLongHoldS, B::kTapHoldS, B::kTapHoldS,
+                            B::kTapHoldS, B::kTapHoldS};
+    for (int i = 0; i < 6; ++i) {
+        INFO("press " << i);
+        CHECK(holds[i].first == buttons[i]);
+        CHECK_THAT(holds[i].second, Catch::Matchers::WithinAbs(secs[i], 0.015));
+    }
+}
+
+TEST_CASE("RsaConsoleButtons: a K-key cycle's code and ACC press become held contacts in order",
+          "[PhysicalWorld][RsaConsoleButtons]") {
+    RsaKeypadDriver keypad;
+    keypad.set_code_string("12345");
+    keypad.cycle_k();   // OFF -> ACC: the code, then OFF/ACC
+    RsaConsoleButtons b;
+    // Feed the scheduler's events in as SimApp does, then let the presses play.
+    for (int step = 0; step < 200; ++step) {
+        keypad.update(0.01);
+        const auto fires = keypad.consume_fires_now();
+        for (int bi = 0; bi < 5; ++bi)
+            if (fires.button_value[bi] != 0u) b.press_digit(bi, fires.button_value[bi] == 2u);
+        b.press_mode(fires.mode_switches);
+    }
+    const auto holds = play_console(b);
+    using B = RsaConsoleButtons;
+    REQUIRE(holds.size() == 6);
+    const int buttons[6] = {B::kKeypad1 + 0, B::kKeypad1 + 0, B::kKeypad1 + 1,
+                            B::kKeypad1 + 1, B::kKeypad1 + 2, B::kModeOffAcc};
+    const bool longs[6] = {false, true, false, true, false, false};
+    for (int i = 0; i < 6; ++i) {
+        INFO("press " << i);
+        CHECK(holds[i].first == buttons[i]);
+        CHECK_THAT(holds[i].second,
+                   Catch::Matchers::WithinAbs(longs[i] ? B::kLongHoldS : B::kTapHoldS, 0.015));
+    }
+}
+
+TEST_CASE("RsaConsoleButtons: out-of-range digits and an empty mode mask queue nothing",
+          "[PhysicalWorld][RsaConsoleButtons]") {
+    RsaConsoleButtons b;
+    b.press_digit(-1, false);
+    b.press_digit(5, true);
+    b.press_mode(0u);
+    CHECK_FALSE(b.sequence_in_progress());
 }
 
 TEST_CASE("RsaExteriorKeypad: out-of-range buttons and bad codes queue nothing",

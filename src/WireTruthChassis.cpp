@@ -167,8 +167,6 @@ static const std::unordered_map<std::uint32_t, ProducerCell>& ProducerRegistry()
         // Driver inputs — main segment (byte / uint16 / bit / float32)
         {6900U, {kWireDRIVER_BRAKE_PEDAL_Q8,            WireType::kByte}},
         {6901U, {kWireDRIVER_STEERING_DEG_Q8,           WireType::kUint16}},
-        {6902U, {kWireDRIVER_GEAR_SELECTOR,             WireType::kByte}},
-        {6903U, {kWireDRIVER_THROTTLE_Q8,               WireType::kByte}},
         // Brake pedal switch, 1 = pedal pressed
         {6904U, {kWireDRIVER_ES_BRAKE_SWITCH,           WireType::kBit}},
         // External wheel speed (float32)
@@ -182,33 +180,20 @@ static const std::unordered_map<std::uint32_t, ProducerCell>& ProducerRegistry()
         {6946U, {kWireDRIVER_ES_PARK_BRAKE_SWITCH,       WireType::kBit}},
         // Driver's buckle switch, closed while UNBUCKLED (elec-265).
         {6964U, {kWireDRIVER_ES_SEATBELT_SWITCH,         WireType::kBit}},
-        // RSA mode buttons: one bit cell per press area (LOCK / OFF-ACC / RUN,
-        // ESM ELPD 441; the RSA's LOCK/OFF-ACC/RUN MODE SW inputs, ELPD 45-46).
-        // Replace the 6971 byte press-enum, which ev1sim no longer publishes.
-        {6972U, {kWireDRIVER_RSA_MODE_SW_LOCK,           WireType::kBit}},
-        {6973U, {kWireDRIVER_RSA_MODE_SW_OFF_ACC,        WireType::kBit}},
-        {6974U, {kWireDRIVER_RSA_MODE_SW_RUN,            WireType::kBit}},
-        // Interior keypad buttons are BYTE, not bit: the cell carries the
-        // tap-vs-long-press digit encoding (0=idle, 1=tap/lower, 2=long/higher),
-        // matching the external sim's topology (the external sim's topology declaration
-        // DRIVER_RSA_KEYPAD_BUTTON{1..5}: type byte, since the 2026-06-19
-        // rsa-keypad-window-wire-type change) and the byte read in RSA's
-        // rsa_apply_driver_input_wires(). Declaring them kBit here silently sent
-        // every digit to a bit cell RSA never reads as a byte, so RSA never
-        // authenticated and the co-sim vehicle never left PARK. The mode button
-        // (then the 6971 byte) and exterior keypad (6985-6989) were already byte, which is why
-        // ACC was received but no interior code ever was.
-        // @design 2026-06-25 claude — cross-repo wire-type sync fix.
-        {6975U, {kWireDRIVER_RSA_KEYPAD_BUTTON1,         WireType::kByte}},
-        {6976U, {kWireDRIVER_RSA_KEYPAD_BUTTON2,         WireType::kByte}},
-        {6977U, {kWireDRIVER_RSA_KEYPAD_BUTTON3,         WireType::kByte}},
-        {6978U, {kWireDRIVER_RSA_KEYPAD_BUTTON4,         WireType::kByte}},
-        {6979U, {kWireDRIVER_RSA_KEYPAD_BUTTON5,         WireType::kByte}},
-        // Power window switches (bit)
-        {6980U, {kWireDRIVER_POWER_WINDOW_DRIVER_UP,      WireType::kBit}},
-        {6981U, {kWireDRIVER_POWER_WINDOW_DRIVER_DOWN,    WireType::kBit}},
-        {6982U, {kWireDRIVER_POWER_WINDOW_PASSENGER_UP,   WireType::kBit}},
-        {6983U, {kWireDRIVER_POWER_WINDOW_PASSENGER_DOWN, WireType::kBit}},
+        // RSA faceplate buttons: one held contact each, read by the RSA.
+        // @source ESM electrical ELPD 440-443 (buttons on the RSA itself).
+        {6972U, {kWireDRIVER_ES_RSA_MODE_LOCK,         WireType::kBit}},
+        {6973U, {kWireDRIVER_ES_RSA_MODE_OFF_ACC,      WireType::kBit}},
+        {6974U, {kWireDRIVER_ES_RSA_MODE_RUN,          WireType::kBit}},
+        {6975U, {kWireDRIVER_ES_RSA_KEYPAD_1,          WireType::kBit}},
+        {6976U, {kWireDRIVER_ES_RSA_KEYPAD_2,          WireType::kBit}},
+        {6977U, {kWireDRIVER_ES_RSA_KEYPAD_3,          WireType::kBit}},
+        {6978U, {kWireDRIVER_ES_RSA_KEYPAD_4,          WireType::kBit}},
+        {6979U, {kWireDRIVER_ES_RSA_KEYPAD_5,          WireType::kBit}},
+        {6980U, {kWireDRIVER_ES_WINDOW_DRIVER_UP,      WireType::kBit}},
+        {6981U, {kWireDRIVER_ES_WINDOW_DRIVER_DOWN,    WireType::kBit}},
+        {6982U, {kWireDRIVER_ES_WINDOW_PASSENGER_UP,   WireType::kBit}},
+        {6983U, {kWireDRIVER_ES_WINDOW_PASSENGER_DOWN, WireType::kBit}},
         // RSA exterior keypad buttons, 1 while held; the RSA times tap
         // against long press from the line.
         {6985U, {kWireDRIVER_ES_EXT_KEYPAD_1, WireType::kBit}},
@@ -562,9 +547,6 @@ static const std::unordered_map<std::uint32_t, ConsumerCell>& ConsumerRegistry()
         // Door lock commands (byte)
         {4084U, {kWireCHASSIS_DOOR_LOCK_CMD_DRIVER,     WireType::kByte}},
         {4085U, {kWireCHASSIS_DOOR_LOCK_CMD_PASSENGER,  WireType::kByte}},
-        // Power window motor commands (byte)
-        {4086U, {kWireCHASSIS_POWER_WINDOW_MOTOR_DRIVER,    WireType::kByte}},
-        {4087U, {kWireCHASSIS_POWER_WINDOW_MOTOR_PASSENGER, WireType::kByte}},
         // RSA shift-blocked cue (bit)
         {4088U, {kWireCHASSIS_RSA_SHIFT_BLOCKED,        WireType::kBit}},
         // IPC seatbelt telltale (bit)
@@ -797,9 +779,15 @@ ev1sim::DashRsaConsole WireTruthChassis::rsa_console() const {
     using namespace electricsim::topology;
     ev1sim::DashRsaConsole c;
     c.run           = rsa_run_active();
-    c.acc           = read_bit(kWireCHASSIS_RSA_ACC_OUT);
+    // ACC: the RSA's ACC command out (grounding 1399, in ACC/RUN/START).
+    {
+        electricsim::io::WireTable::Sample<bool> acc;
+        if (attached() && impl_->table->read_bit_sample(kWireRSA_ES_WSW_ENABLE_OUT, &acc) &&
+            acc.written())
+            c.acc = acc.value;
+    }
     c.valid_code    = read_bit(kWireCHASSIS_RSA_VALID_CODE);
-    c.security      = read_bit(kWireCHASSIS_RSA_SECURITY_INDICATOR);
+    c.security      = read_bit(ReadOnlyWireId(kWireCHASSIS_SECURITY_TELLTALE));
     c.shift_blocked = read_bit(kWireCHASSIS_RSA_SHIFT_BLOCKED);
     c.btsi_solenoid = read_bit(ReadOnlyWireId(kWireCHASSIS_RSA_BTSI_ENERGISED));
     c.led_park      = read_bit(kWireCHASSIS_RSA_SELECTOR_LED_PARK);
@@ -914,9 +902,20 @@ std::optional<std::uint8_t> WireTruthChassis::wiper_sweep_position_pct() const {
     return read_byte(electricsim::topology::kWireCHASSIS_WIPER_SWEEP_POSITION);
 }
 
+std::optional<std::uint8_t> WireTruthChassis::window_motor_cmd(int side) const {
+    using namespace electricsim::topology;
+    const auto up = read_bit(ReadOnlyWireId(side == 0 ? kWireCHASSIS_LH_WINDOW_UP_DRIVE
+                                                       : kWireCHASSIS_RH_WINDOW_UP_DRIVE));
+    const auto down = read_bit(ReadOnlyWireId(side == 0 ? kWireCHASSIS_LH_WINDOW_DOWN_DRIVE
+                                                         : kWireCHASSIS_RH_WINDOW_DOWN_DRIVE));
+    if (!up || !down) return std::nullopt;
+    if (*up == *down) return std::uint8_t{0u};
+    return std::uint8_t{*up ? 1u : 2u};
+}
+
 bool WireTruthChassis::publish_coast_down_switch(bool on) {
     if (!attached()) return false;
-    return write_bit(ProducerWireId(electricsim::topology::kWireDRIVER_COAST_DOWN_SWITCH), on);
+    return write_bit(ProducerWireId(electricsim::topology::kWireDRIVER_ES_COAST_DOWN_SWITCH), on);
 }
 
 bool WireTruthChassis::publish_pedal_travel(std::uint16_t permille) {
@@ -937,17 +936,25 @@ bool WireTruthChassis::publish_outside_air_temp(float temp_c) {
         static_cast<std::uint16_t>(std::lround(frac * 1000.0f)));
 }
 
+bool WireTruthChassis::publish_pedal_sensor_open(bool open) {
+    if (!attached()) return false;
+    return impl_->table->write_element_state(
+        electricsim::topology::kWireDRIVER_ES_PEDAL_SENSOR_OPEN, open);
+}
+
 bool WireTruthChassis::publish_reverse_select_switch(bool closed) {
     if (!attached()) return false;
     return write_bit(ProducerWireId(electricsim::topology::kWireDRIVER_ES_REVERSE_SELECT_SWITCH),
                      closed);
 }
 
-bool WireTruthChassis::publish_rsa_dim_click(bool up) {
+bool WireTruthChassis::publish_rsa_dim_buttons(bool up_held, bool down_held) {
     if (!attached()) return false;
-    const WireId cell = up ? ProducerWireId(electricsim::topology::kWireDRIVER_RSA_DIM_UP)
-                           : ProducerWireId(electricsim::topology::kWireDRIVER_RSA_DIM_DOWN);
-    return write_bit(cell, true) && write_bit(cell, false);
+    const bool up = write_bit(ProducerWireId(electricsim::topology::kWireDRIVER_ES_RSA_DIM_UP),
+                              up_held);
+    const bool down = write_bit(ProducerWireId(electricsim::topology::kWireDRIVER_ES_RSA_DIM_DOWN),
+                                down_held);
+    return up && down;
 }
 
 }  // namespace ev1sim
@@ -1113,11 +1120,15 @@ std::optional<std::uint16_t> WireTruthChassis::pim_retard_request_permille() con
 std::optional<std::uint8_t> WireTruthChassis::wiper_sweep_position_pct() const {
     return std::nullopt;
 }
+std::optional<std::uint8_t> WireTruthChassis::window_motor_cmd(int) const {
+    return std::nullopt;
+}
 bool WireTruthChassis::publish_coast_down_switch(bool) { return false; }
 bool WireTruthChassis::publish_pedal_travel(std::uint16_t) { return false; }
 bool WireTruthChassis::publish_outside_air_temp(float) { return false; }
+bool WireTruthChassis::publish_pedal_sensor_open(bool) { return false; }
 bool WireTruthChassis::publish_reverse_select_switch(bool) { return false; }
-bool WireTruthChassis::publish_rsa_dim_click(bool) { return false; }
+bool WireTruthChassis::publish_rsa_dim_buttons(bool, bool) { return false; }
 
 }  // namespace ev1sim
 

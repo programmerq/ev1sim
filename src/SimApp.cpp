@@ -1155,6 +1155,38 @@ void SimApp::PublishAmbient(double sim_time_s) {
 }
 
 // ---------------------------------------------------------------------------
+// RSA faceplate buttons (interior keypad, mode, dimmer), for both run loops.
+void SimApp::PublishRsaConsoleButtons(double dt_s) {
+    auto& keypad  = m_physical->rsa_keypad();
+    auto& buttons = m_physical->rsa_console_buttons();
+    keypad.update(dt_s);
+    const auto fires = keypad.consume_fires_now();
+    for (int bi = 0; bi < 5; ++bi) {
+        if (fires.button_value[bi] != 0u)
+            buttons.press_digit(bi, fires.button_value[bi] == 2u);
+    }
+    buttons.press_mode(fires.mode_switches);
+    for (const bool up : {false, true}) {
+        for (int n = m_physical->rsa_dimmer().take(up); n > 0; --n)
+            buttons.press_dim(up);
+    }
+    buttons.update(dt_s);
+    if (!m_external_sim) return;
+    using B = ev1sim::RsaConsoleButtons;
+    m_external_sim->SetDriverRsaKeypadButton1(buttons.held(B::kKeypad1 + 0));
+    m_external_sim->SetDriverRsaKeypadButton2(buttons.held(B::kKeypad1 + 1));
+    m_external_sim->SetDriverRsaKeypadButton3(buttons.held(B::kKeypad1 + 2));
+    m_external_sim->SetDriverRsaKeypadButton4(buttons.held(B::kKeypad1 + 3));
+    m_external_sim->SetDriverRsaKeypadButton5(buttons.held(B::kKeypad1 + 4));
+    std::uint8_t mode = 0u;
+    if (buttons.held(B::kModeLock))   mode |= ev1sim::RsaKeypadDriver::kModeSwLock;
+    if (buttons.held(B::kModeOffAcc)) mode |= ev1sim::RsaKeypadDriver::kModeSwOffAcc;
+    if (buttons.held(B::kModeRun))    mode |= ev1sim::RsaKeypadDriver::kModeSwRun;
+    m_external_sim->SetDriverRsaModeSwitches(mode);
+    m_external_sim->SetRsaDimmerButtons(buttons.held(B::kDimUp), buttons.held(B::kDimDown));
+}
+
+// ---------------------------------------------------------------------------
 void SimApp::ApplyRearEmbBrake(double time, double /*local_rear_brake*/) {
     // BTCM-failure model: real EV1 rear brakes are PURELY electromechanical.
     // There's no hydraulic backup line from the master cylinder, unlike the
@@ -1522,7 +1554,7 @@ int SimApp::RunWithVisualization() {
         // --- Bus-mediated throttle override (electronics drive mode) ---
         // No-op in "local" mode.  Must run before the propulsion gate so
         // a stale-fallback to the local pedal still respects KEY OFF.
-        // Raw-pedal capture: 6903 publishes the driver's pedal, not the
+        // Raw-pedal capture: the pedal travel is the driver's pedal, not the
         // post-override command — see the headless twin of this site for
         // the feedback-collapse this prevents. @design 2026-07-04.
         const double driver_pedal_raw = cmd.throttle;
@@ -1778,7 +1810,7 @@ int SimApp::RunWithVisualization() {
             m_external_sim->SetPrndSelector(prnd.pin_a(), prnd.pin_b(),
                                             prnd.pin_c(), prnd.pin_d());
         }
-        // Driver inputs (main harness segment, IDs 6900-6903).
+        // Driver inputs (brake 6900, steering 6901, pedal travel).
         {
             auto clamp01_q8 = [](double v) -> std::uint8_t {
                 if (v < 0.0) v = 0.0;
@@ -1796,13 +1828,10 @@ int SimApp::RunWithVisualization() {
                 return static_cast<std::int16_t>(deg_q8);
             };
             m_external_sim->SetDriverBrakePedalQ8(clamp01_q8(driver_brake_raw));
-            // Raw pedal, not the electronics-override result — 6903 is the
-            // APA pedal sensor (PIM's input); see the capture site above.
+            // Raw pedal, not the electronics-override result — the pedal
+            // travel is the APA pedal (PIM's input); see the capture site above.
             m_external_sim->SetDriverThrottleQ8(clamp01_q8(driver_pedal_raw));
             m_external_sim->SetDriverSteeringDegQ8(steer_deg_q8(cmd.steering));
-            // Gear selector: map PrndSelector::Position to enum (P=0, R=1, N=2, D=3).
-            m_external_sim->SetDriverGearSelector(
-                static_cast<std::uint8_t>(m_physical->prnd_selector().position()));
             // Brake switch (6904): derive from brake travel with hysteresis.
             bool brake_sw = m_physical->brake_switch().update(driver_brake_raw);
             m_external_sim->SetDriverBrakeSwitch(brake_sw);
@@ -1823,26 +1852,10 @@ int SimApp::RunWithVisualization() {
                 m_physical->turn_signal_stalk().active_right());
             m_external_sim->SetDriverHazardRequest(
                 m_physical->hazard_switch().on());
-            // RSA keypad buttons (6975-6979) and mode buttons (6972-6974) — tick the
-            // scheduler and consume whatever it has ready for this frame.
-            // button_value encoding: 0=idle, 1=tap, 2=long-press.
-            m_physical->rsa_keypad().update(render_dt);
-            {
-                auto fires = m_physical->rsa_keypad().consume_fires_now();
-                m_external_sim->SetDriverRsaKeypadButton1(fires.button_value[0]);
-                m_external_sim->SetDriverRsaKeypadButton2(fires.button_value[1]);
-                m_external_sim->SetDriverRsaKeypadButton3(fires.button_value[2]);
-                m_external_sim->SetDriverRsaKeypadButton4(fires.button_value[3]);
-                m_external_sim->SetDriverRsaKeypadButton5(fires.button_value[4]);
-                m_external_sim->SetDriverRsaModeSwitches(fires.mode_switches);
-            }
+            // RSA keypad, mode and dimmer buttons as held contacts.
+            PublishRsaConsoleButtons(render_dt);
             // The trip-reset button has no car input wire yet; drop the press.
             m_physical->ipc_trip_reset().consume_press_event();
-            // RSA DIM UP / DIM DOWN clicks from the console.
-            for (const bool up : {false, true}) {
-                for (int n = m_physical->rsa_dimmer().take(up); n > 0; --n)
-                    m_external_sim->PressRsaDimmer(up);
-            }
             // Cruise stalk: evolve the faithful 3-contact model from the keyboard
             // held contacts (UI presses + N cancel already folded in via press_*),
             // then publish the raw chassis cavities kSigCruiseSw_* (4047-4049).
@@ -1990,7 +2003,7 @@ int SimApp::RunWithVisualization() {
             }
         }
 
-        // --- Power window motor log (chassis bus 4086/4087) — no visual yet ---
+        // --- Power window motor log (motor legs at the junction blocks) — no visual yet ---
         {
             static const char* kPwNames[] = {"STOP", "UP", "DOWN"};
             static const char* kSideNames[] = {"driver", "passenger"};
@@ -2300,14 +2313,14 @@ int SimApp::RunHeadless() {
         // fallback is the scripted driver (or zero throttle).  When the
         // bus is fresh, PIM's commanded throttle replaces the local value.
         //
-        // Capture the DRIVER's raw pedal BEFORE the override: 6903
-        // (DRIVER_THROTTLE_Q8) models the APA pedal sensor — a physical
+        // Capture the DRIVER's raw pedal BEFORE the override: the pedal
+        // travel (DRIVER_ES_PEDAL_TRAVEL) models the APA pedal — a physical
         // human input — and it is PIM's input for computing the very
         // command the override applies. Publishing the post-override
         // value fed PIM its own output back (pedal -> PIM cmd -> plant
         // cmd -> "pedal"), which collapses to zero the moment the bus
         // goes live: PIM boots commanding 0 (PARK), the override zeroes
-        // cmd.throttle, 6903 publishes 0, PIM reads foot-off, commands 0
+        // cmd.throttle, the pedal reads 0, PIM reads foot-off, commands 0
         // — forever. Latent until 2026-07-04 because ev1sim never
         // actually ingested 4073 after the wire-truth migration (the consumer-registry gap);
         // the moment that was fixed, cruise_hold's car stopped launching.
@@ -2402,9 +2415,9 @@ int SimApp::RunHeadless() {
             m_external_sim->SetPrndSelector(prnd.pin_a(), prnd.pin_b(),
                                             prnd.pin_c(), prnd.pin_d());
         }
-        // Driver inputs (IDs 6900-6903). The throttle publishes the RAW
-        // driver pedal captured before the electronics-mode bus override —
-        // 6903 is the APA pedal sensor (PIM's input), not the vehicle's
+        // Driver inputs (brake 6900, steering 6901, pedal travel). The throttle
+        // publishes the RAW driver pedal captured before the electronics-mode
+        // bus override — the pedal travel is the APA pedal (PIM's input), not the vehicle's
         // actuation (that is 4104); publishing the override-adjusted value
         // fed PIM its own command back and collapsed the loop to zero (see
         // the capture-site comment above ApplyElectronicsThrottle).
@@ -2417,9 +2430,6 @@ int SimApp::RunHeadless() {
             m_external_sim->SetDriverBrakePedalQ8(clamp01_q8(driver_brake_raw));
             m_external_sim->SetDriverThrottleQ8(clamp01_q8(driver_pedal_raw));
             m_external_sim->SetDriverSteeringDegQ8(0);  // no keyboard in headless
-            // Gear selector: map PrndSelector::Position to enum (P=0, R=1, N=2, D=3).
-            m_external_sim->SetDriverGearSelector(
-                static_cast<std::uint8_t>(m_physical->prnd_selector().position()));
             // Brake switch (6904): derive from brake travel with hysteresis.
             bool brake_sw = m_physical->brake_switch().update(driver_brake_raw);
             m_external_sim->SetDriverBrakeSwitch(brake_sw);
@@ -2442,29 +2452,14 @@ int SimApp::RunHeadless() {
                 m_physical->turn_signal_stalk().active_right());
             m_external_sim->SetDriverHazardRequest(
                 m_physical->hazard_switch().on());
-            // RSA keypad signals — headless: no key presses; tick scheduler
-            // and publish whatever it has (likely idle zeros).
-            // button_value encoding: 0=idle, 1=tap, 2=long-press.
-            m_physical->rsa_keypad().update(tick_dt);
-            {
-                auto fires = m_physical->rsa_keypad().consume_fires_now();
-                m_external_sim->SetDriverRsaKeypadButton1(fires.button_value[0]);
-                m_external_sim->SetDriverRsaKeypadButton2(fires.button_value[1]);
-                m_external_sim->SetDriverRsaKeypadButton3(fires.button_value[2]);
-                m_external_sim->SetDriverRsaKeypadButton4(fires.button_value[3]);
-                m_external_sim->SetDriverRsaKeypadButton5(fires.button_value[4]);
-                m_external_sim->SetDriverRsaModeSwitches(fires.mode_switches);
-            }
+            // RSA keypad, mode and dimmer buttons as held contacts (scenario
+            // key cycles and console presses).
+            PublishRsaConsoleButtons(tick_dt);
             // Cruise stalk cavities (4047-4049), wiper.
             // Headless: no keyboard/UI input; evolve the cruise model with both
             // contacts open so the ON/OFF latch stays disarmed and the bus sees
             // stable zeros.
             m_physical->ipc_trip_reset().consume_press_event();   // no car input wire
-            // RSA DIM UP / DIM DOWN clicks from the console.
-            for (const bool up : {false, true}) {
-                for (int n = m_physical->rsa_dimmer().take(up); n > 0; --n)
-                    m_external_sim->PressRsaDimmer(up);
-            }
             m_physical->cruise_stalk().update(tick_dt, false, false);
             m_external_sim->SetCruiseSetCoastContact(
                 m_physical->cruise_stalk().set_coast_contact());
@@ -2563,7 +2558,7 @@ int SimApp::RunHeadless() {
             }
         }
 
-        // --- Power window motor log (chassis bus 4086/4087) — no visual yet ---
+        // --- Power window motor log (motor legs at the junction blocks) — no visual yet ---
         {
             static const char* kPwNames[] = {"STOP", "UP", "DOWN"};
             static const char* kSideNames[] = {"driver", "passenger"};
@@ -2806,9 +2801,9 @@ void SimApp::FlashToPass(bool held) {
 }
 
 void SimApp::FailThrottleInput(bool fail) {
-    if (m_external_sim) m_external_sim->SetSuppressThrottlePublish(fail);
+    if (m_external_sim) m_external_sim->SetPedalSensorOpen(fail);
     std::cout << "[Scenario] fail_throttle_input -> "
-              << (fail ? "SUPPRESSED" : "restored") << "\n";
+              << (fail ? "pedal sensor OPEN" : "pedal sensor connected") << "\n";
 }
 
 void SimApp::SetChargeCoupler(bool mated) {

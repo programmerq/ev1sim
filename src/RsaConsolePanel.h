@@ -16,11 +16,11 @@
 // panel (examples/ev1_rsa_panel/wire_panel_sink.cpp):
 //
 //   RUN LED      = RSA_RUN1_OUT
-//   OFF/ACC LED  = CHASSIS_RSA_ACC_OUT and not RUN
+//   OFF/ACC LED  = RSA_ES_WSW_ENABLE_OUT (the ACC command out) and not RUN
 //   VALID CODE   = CHASSIS_RSA_VALID_CODE (also lights the exterior KEYPAD lamp)
 //   P R N D      = the four CHASSIS_RSA_SELECTOR_LED_* cells
 //   COAST DOWN   = the PCM's $41 Coast Down LED Request (DashPcmStatus)
-//   Security     = CHASSIS_RSA_SECURITY_INDICATOR: solid after 25 key entries
+//   Security     = CHASSIS_SECURITY_TELLTALE: solid after 25 key entries
 //                  without a valid code, the car's only "entry denied" sign
 //   Door locks   = the RSA's lock commands (CHASSIS_DOOR_LOCK_CMD_*); the
 //                  console has no lock lamp

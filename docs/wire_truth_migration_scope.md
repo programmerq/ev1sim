@@ -365,26 +365,26 @@ never hardcodes it — code resolves the `kWire…` symbol). `dir` is ev1sim's r
 
 | sig | WireId `kWire…` | # | type | dir |
 |--|--|--|--|--|
-| 6900 | DRIVER_BRAKE_PEDAL_Q8 | 206 | byte | ev1sim->ECU (produce) |
-| 6901 | DRIVER_STEERING_DEG_Q8 | 207 | uint16 | ev1sim->ECU (produce) |
-| 6902 | DRIVER_GEAR_SELECTOR | 208 | byte | ev1sim->ECU (produce) |
-| 6903 | DRIVER_THROTTLE_Q8 | 209 | byte | ev1sim->ECU (produce) |
+| 6900 | DRIVER_BRAKE_PEDAL_Q8 | 216 | byte | ev1sim->ECU (produce) |
+| 6901 | DRIVER_STEERING_DEG_Q8 | 217 | uint16 | ev1sim->ECU (produce) |
 | 6904 | DRIVER_ES_BRAKE_SWITCH | 1307 | bit (element_state) | ev1sim->ECU (produce) |
-| 6910 | EXT_WHEEL_SPEED_FL | 213 | float32 | ev1sim->ECU (produce) |
-| 6911 | EXT_WHEEL_SPEED_FR | 214 | float32 | ev1sim->ECU (produce) |
-| 6912 | EXT_WHEEL_SPEED_RL | 215 | float32 | ev1sim->ECU (produce) |
-| 6913 | EXT_WHEEL_SPEED_RR | 216 | float32 | ev1sim->ECU (produce) |
+| 6910 | EXT_WHEEL_SPEED_FL | 223 | float32 | ev1sim->ECU (produce) |
+| 6911 | EXT_WHEEL_SPEED_FR | 224 | float32 | ev1sim->ECU (produce) |
+| 6912 | EXT_WHEEL_SPEED_RL | 225 | float32 | ev1sim->ECU (produce) |
+| 6913 | EXT_WHEEL_SPEED_RR | 226 | float32 | ev1sim->ECU (produce) |
 | 6964 | DRIVER_ES_SEATBELT_SWITCH | 1117 | bit (element_state) | ev1sim->ECU (produce) |
-| 6971 | DRIVER_RSA_MODE_BUTTON | 218 | byte | ev1sim->ECU (produce) |
-| 6975 | DRIVER_RSA_KEYPAD_BUTTON1 | 219 | bit | ev1sim->ECU (produce) |
-| 6976 | DRIVER_RSA_KEYPAD_BUTTON2 | 220 | bit | ev1sim->ECU (produce) |
-| 6977 | DRIVER_RSA_KEYPAD_BUTTON3 | 221 | bit | ev1sim->ECU (produce) |
-| 6978 | DRIVER_RSA_KEYPAD_BUTTON4 | 222 | bit | ev1sim->ECU (produce) |
-| 6979 | DRIVER_RSA_KEYPAD_BUTTON5 | 223 | bit | ev1sim->ECU (produce) |
-| 6980 | DRIVER_POWER_WINDOW_DRIVER_UP | 224 | bit | ev1sim->ECU (produce) |
-| 6981 | DRIVER_POWER_WINDOW_DRIVER_DOWN | 225 | bit | ev1sim->ECU (produce) |
-| 6982 | DRIVER_POWER_WINDOW_PASSENGER_UP | 226 | bit | ev1sim->ECU (produce) |
-| 6983 | DRIVER_POWER_WINDOW_PASSENGER_DOWN | 227 | bit | ev1sim->ECU (produce) |
+| 6972 | DRIVER_ES_RSA_MODE_LOCK | 1247 | bit (element_state) | ev1sim->ECU (produce) |
+| 6973 | DRIVER_ES_RSA_MODE_OFF_ACC | 1248 | bit (element_state) | ev1sim->ECU (produce) |
+| 6974 | DRIVER_ES_RSA_MODE_RUN | 1249 | bit (element_state) | ev1sim->ECU (produce) |
+| 6975 | DRIVER_ES_RSA_KEYPAD_1 | 1238 | bit (element_state) | ev1sim->ECU (produce) |
+| 6976 | DRIVER_ES_RSA_KEYPAD_2 | 1239 | bit (element_state) | ev1sim->ECU (produce) |
+| 6977 | DRIVER_ES_RSA_KEYPAD_3 | 1240 | bit (element_state) | ev1sim->ECU (produce) |
+| 6978 | DRIVER_ES_RSA_KEYPAD_4 | 1241 | bit (element_state) | ev1sim->ECU (produce) |
+| 6979 | DRIVER_ES_RSA_KEYPAD_5 | 1242 | bit (element_state) | ev1sim->ECU (produce) |
+| 6980 | DRIVER_ES_WINDOW_DRIVER_UP | 1243 | bit (element_state) | ev1sim->ECU (produce) |
+| 6981 | DRIVER_ES_WINDOW_DRIVER_DOWN | 1244 | bit (element_state) | ev1sim->ECU (produce) |
+| 6982 | DRIVER_ES_WINDOW_PASSENGER_UP | 1245 | bit (element_state) | ev1sim->ECU (produce) |
+| 6983 | DRIVER_ES_WINDOW_PASSENGER_DOWN | 1246 | bit (element_state) | ev1sim->ECU (produce) |
 | 6985 | DRIVER_ES_EXT_KEYPAD_1 | 1210 | bit (element_state) | ev1sim->ECU (produce) |
 | 6986 | DRIVER_ES_EXT_KEYPAD_2 | 1211 | bit (element_state) | ev1sim->ECU (produce) |
 | 6987 | DRIVER_ES_EXT_KEYPAD_3 | 1212 | bit (element_state) | ev1sim->ECU (produce) |
@@ -607,7 +607,7 @@ pure redundancy); **22** are pure ev1sim output with no in-tree reader
 FRONT_BRAKE_PRESSURE/REAR_BRAKE_POSITION (4107/08), STEERING_TORQUE (4109),
 SLIP_RATIO_{FL,FR,RL,RR} (4120-23), DOOR_LOCK_STATE_{DRIVER,PASSENGER,TRUNK}
 (4165-67), ROAD_GRADE_PCT (4168), PITCH_DEG (4169), DRIVER_STEERING_DEG_Q8
-(6901), DRIVER_GEAR_SELECTOR (6902).
+(6901).
 
 **Status — DONE (2026-06-16): ev1sim is off the chassis ring.**
 1. **Coupler 4060 — DONE.** Mirrored to the wire (last-writer-wins). Every

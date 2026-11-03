@@ -347,10 +347,11 @@ private:
 ///
 /// The EV1 RSA (Remote Security Access) module controls the vehicle's run
 /// mode.  To start the vehicle the user must:
-///   1. Enter the correct 5-digit interior code on the RSA keypad by
-///      pressing the per-digit button signals (6975-6979).  This opens the
+///   1. Enter the correct 5-digit interior code on the RSA keypad
+///      (DRIVER_ES_RSA_KEYPAD_1..5).  This opens the
 ///      RSA's authentication window (~5 s on the external sim side).
-///   2. Press the ACC or RUN mode button on the RSA HMI (6972 LOCK / 6973 OFF/ACC / 6974 RUN).
+///   2. Press the ACC or RUN mode button on the RSA HMI (DRIVER_ES_RSA_MODE_LOCK /
+///      _OFF_ACC / _RUN).
 ///
 /// The K key in ev1sim cycles a local "expected key state" through the
 /// faithful EV1 detent order — OFF → ACC → RUN → OFF — so a cold start that
@@ -378,23 +379,20 @@ private:
 /// to ONE transition, least-energised first, so ACC+RUN together would land in
 /// ACC, not RUN.
 ///
-/// Long-press encoding (Option A):
-///   Each button signal (6975-6979) carries a uint8 payload:
-///     0 = idle (no press)
-///     1 = tap  (lower digit: 1, 3, 5, 7, 9)
-///     2 = long-press (higher digit: 2, 4, 6, 8, 0)
+/// Each fire is one press event per button: 1 = tap (lower digit: 1, 3, 5,
+/// 7, 9), 2 = long press (higher digit: 2, 4, 6, 8, 0).  SimApp hands the
+/// events to RsaConsoleButtons, which holds each contact long enough for the
+/// RSA to time it.
 ///
 /// The digit sequence runs through a tick-driven scheduler.  Call update()
-/// once per render frame; consume_fires_now() to get the resulting signals.
-///
-/// TODO: hold-time threshold for distinguishing tap vs long in real UI (≥500 ms).
+/// once per render frame; consume_fires_now() to get the resulting events.
 class RsaKeypadDriver {
 public:
     enum class ExpectedState { OFF, RUN, ACC };
 
     /// Aggregate of signals to fire on this tick.
     struct KeypadFireSet {
-        /// Per-button value (index 0..4, signals 6975-6979).
+        /// Per-button press event (index 0..4).
         /// 0 = idle, 1 = tap (lower digit), 2 = long-press (higher digit).
         std::uint8_t button_value[5] = {};
         /// Mode buttons pressed this tick, one bit per console press area:
@@ -494,7 +492,7 @@ private:
 /// The shifter's coast-down button.  p.48 reads it as a position ("COAST DOWN
 /// SW: Displays the position of the coast down button on the shifter. YES =
 /// coast down"), so it is modelled as push-on / push-off and published as a
-/// held level on DRIVER_COAST_DOWN_SWITCH (@inferred 2026-10-20 claude: the
+/// held level on DRIVER_ES_COAST_DOWN_SWITCH (@inferred 2026-10-20 claude: the
 /// print names a position, not a pulse).  Whether coast-down is accepted is the
 /// PCM's: the console lamp shows the $41 Coast Down LED Request, not this.
 class CoastDownButton {
@@ -508,9 +506,9 @@ private:
 };
 
 /// The RSA's DIM UP / DIM DOWN buttons (ESM ELPD 440), momentary.  Each
-/// press queues one click; SimApp hands the clicks to the external sim, which
-/// publishes each as a press and release on DRIVER_RSA_DIM_UP / _DOWN.  The
-/// RSA owns the dimmer step; ev1sim only presses its buttons.
+/// press queues one click; SimApp plays the clicks out as held presses on
+/// RsaConsoleButtons (DRIVER_ES_RSA_DIM_UP / _DOWN).  The RSA owns the dimmer
+/// step; ev1sim only presses its buttons.
 class RsaDimmerButtons {
 public:
     void press(bool up) { ++(up ? m_up : m_down); }
@@ -677,15 +675,12 @@ private:
 /// Power window switches (driver + passenger × up + down).
 ///
 /// EV1 is a 2-seater: driver window and passenger window, each with an up and
-/// a down momentary switch.  Each switch publishes a boolean on the main
-/// harness segment while held (true = held, false = released):
-///   kSigDriverPowerWindowDriverUp    (6980)
-///   kSigDriverPowerWindowDriverDown  (6981)
-///   kSigDriverPowerWindowPassengerUp   (6982)
-///   kSigDriverPowerWindowPassengerDown (6983)
+/// a down momentary switch on the RSA faceplate.  Each switch is a contact
+/// closed while held (DRIVER_ES_WINDOW_{DRIVER,PASSENGER}_{UP,DOWN}); the RSA
+/// reads it as a level.
 ///
 /// No keyboard binding — the floating UI panel will call press()/release()
-/// when its widget set expands.  consumer = RSA (future round).
+/// when its widget set expands.
 class PowerWindows {
 public:
     enum class Window    { DRIVER, PASSENGER };
@@ -863,27 +858,19 @@ private:
     bool m_driver = true;
 };
 
-/// RSA exterior pillar keypad (5 buttons: 1/2, 3/4, 5/6, 7/8, 9/0).
-///
-/// Each button is one contact the RSA reads as a level while it is held
-/// (DRIVER_ES_EXT_KEYPAD_1..5).  The RSA tells the lower digit from the higher
-/// one by how long the button stays down, so a queued press becomes a hold of
-/// kTapHoldS (lower digit) or kLongHoldS (higher digit), and queued presses are
-/// separated by a kGapS release.  Both holds sit well clear of the RSA's
-/// long-press time (electricsim rsa_ext_keypad_lines.hpp kKeypadLongPressMs).
-class RsaExteriorKeypad {
+/// A queue of button presses played out as held contacts, one press at a
+/// time: each press closes its button's contact for its hold time, then a
+/// kGapS release separates it from the next.  The RSA reads each faceplate
+/// button as a level and does its own timing (tap vs long press, one action
+/// per press), so a press must stay down across the RSA's reads.
+class HeldPressTimeline {
 public:
     static constexpr double kTapHoldS  = 0.2;   // @inferred — a deliberate tap
     static constexpr double kLongHoldS = 0.8;   // @inferred — a held button
     static constexpr double kGapS      = 0.2;   // @inferred — release between presses
 
-    /// Queue a press of button idx (0..4): a tap, or a long press.
-    void press_button(int button_idx, bool long_press);
-
-    /// Queue the full 5-digit code (manual p.442), one press per digit:
-    /// 1→btn0 tap, 2→btn0 long, 3→btn1 tap, … 9→btn4 tap, 0→btn4 long.
-    /// code_str must be exactly 5 digit characters (0-9).
-    void enter_code_sequence(const char* code_str);
+    /// Queue a press of button idx (0..kMaxButtons-1) held for hold_s.
+    void press(int button_idx, double hold_s);
 
     /// Advance the press timeline by dt_s; held() then reports this tick's contacts.
     void update(double dt_s);
@@ -894,9 +881,11 @@ public:
     /// True while a press is held, releasing, or queued.
     bool sequence_in_progress() const { return m_phase != Phase::Idle || m_count > 0; }
 
+    static constexpr int kMaxButtons = 16;
+
 private:
     enum class Phase { Idle, Held, Gap };
-    struct Press { std::uint8_t button_idx; bool long_press; };
+    struct Press { std::uint8_t button_idx; double hold_s; };
     static constexpr int kQueueLen = 16;
 
     Press  m_queue[kQueueLen] = {};
@@ -905,6 +894,50 @@ private:
     Phase  m_phase  = Phase::Idle;
     int    m_button = -1;
     double m_timer  = 0.0;   // seconds left in the current hold or gap
+};
+
+/// RSA exterior pillar keypad (5 buttons: 1/2, 3/4, 5/6, 7/8, 9/0).
+///
+/// Each button is one contact the RSA reads as a level while it is held
+/// (DRIVER_ES_EXT_KEYPAD_1..5).  The RSA tells the lower digit from the higher
+/// one by how long the button stays down, so a press is a kTapHoldS hold
+/// (lower digit) or a kLongHoldS hold (higher digit).  Both holds sit well
+/// clear of the RSA's long-press time (electricsim rsa_ext_keypad_lines.hpp
+/// kKeypadLongPressMs).
+class RsaExteriorKeypad : public HeldPressTimeline {
+public:
+    /// Queue a press of button idx (0..4): a tap, or a long press.
+    void press_button(int button_idx, bool long_press);
+
+    /// Queue the full 5-digit code (manual p.442), one press per digit:
+    /// 1→btn0 tap, 2→btn0 long, 3→btn1 tap, … 9→btn4 tap, 0→btn4 long.
+    /// code_str must be exactly 5 digit characters (0-9).
+    void enter_code_sequence(const char* code_str);
+};
+
+/// The RSA's own faceplate buttons that ev1sim presses: the interior keypad
+/// (DRIVER_ES_RSA_KEYPAD_1..5), the LOCK / OFF-ACC / RUN mode buttons
+/// (DRIVER_ES_RSA_MODE_*) and DIM UP / DIM DOWN (DRIVER_ES_RSA_DIM_*).  One
+/// driver's hand, so one press at a time, in the order queued.  The keypad
+/// shares the exterior keypad's tap / long-press timing; a mode or dimmer
+/// press is a tap.
+class RsaConsoleButtons : public HeldPressTimeline {
+public:
+    enum Button : int {
+        kKeypad1 = 0,   // kKeypad1 + i for keypad button i (0..4)
+        kModeLock = 5,
+        kModeOffAcc = 6,
+        kModeRun = 7,
+        kDimDown = 8,
+        kDimUp = 9,
+    };
+
+    /// Queue an interior keypad press (idx 0..4); a long press for the higher digit.
+    void press_digit(int idx, bool long_press);
+    /// Queue the presses for an RsaKeypadDriver kModeSw* mask, LOCK first.
+    void press_mode(std::uint8_t mode_switches);
+    /// Queue one DIM UP or DIM DOWN click.
+    void press_dim(bool up) { press(up ? kDimUp : kDimDown, kTapHoldS); }
 };
 
 /// Door handle pull attempts (driver door + passenger door).
@@ -1441,6 +1474,8 @@ public:
     PowerWindows&       power_windows()       { return m_power_windows; }
     const PowerWindows& power_windows() const { return m_power_windows; }
 
+    RsaConsoleButtons&       rsa_console_buttons()       { return m_rsa_console_buttons; }
+    const RsaConsoleButtons& rsa_console_buttons() const { return m_rsa_console_buttons; }
     RsaExteriorKeypad&       rsa_exterior_keypad()       { return m_rsa_ext_keypad; }
     const RsaExteriorKeypad& rsa_exterior_keypad() const { return m_rsa_ext_keypad; }
 
@@ -1562,6 +1597,7 @@ private:
     AmbientTempSensor  m_ambient_temp;
     PowerWindows       m_power_windows;
     RsaExteriorKeypad  m_rsa_ext_keypad;
+    RsaConsoleButtons  m_rsa_console_buttons;
     DoorHandles        m_door_handles;
     // Actuator/plant peripherals driven by the external electrical sim.
     DoorLockMotor          m_door_lock_motor_lh;   // driver door

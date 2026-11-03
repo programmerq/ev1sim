@@ -159,8 +159,6 @@ constexpr std::uint32_t kDynamicsBase   = 4100;
 // Encoding per the external sim's driver-input header.
 constexpr std::uint32_t kSigDriverBrakePedalQ8    = 6900U;
 constexpr std::uint32_t kSigDriverSteeringDegQ8   = 6901U;
-constexpr std::uint32_t kSigDriverGearSelector    = 6902U;
-constexpr std::uint32_t kSigDriverThrottleQ8      = 6903U;
 // Brake switch (discrete bool, 0/1) — locked in lockstep with external sim
 // ev1_driver_inputs.hpp kSigDriverBrakeSwitch = 6904.
 constexpr std::uint32_t kSigDriverBrakeSwitch     = 6904U;
@@ -175,19 +173,15 @@ constexpr std::uint32_t kSigTurnHazSw_RightTurnOut = 4043U;
 constexpr std::uint32_t kSigTurnHazSw_LeftTurnOut  = 4044U;
 constexpr std::uint32_t kSigTurnHazSw_HazardOut    = 4045U;
 constexpr std::uint32_t kSigTurnHazSw_HornOut      = 4046U;  // single horn cmd (ckt 28)
-// RSA per-digit keypad button signals (momentary 1-tick bool, 0=idle, 1=pressed).
-// Locked in lockstep with external sim kSigDriverRsaKeypadButton[1..5] = 6975-6979.
-// (Slot 6970 was kSigDriverRsaKeypadCodeOk — now reserved, not published here.)
+// RSA interior keypad buttons (IDs 6975-6979 → DRIVER_ES_RSA_KEYPAD_1..5):
+// one held contact per button; the RSA times tap against long press.
 constexpr std::uint32_t kSigDriverRsaKeypadButton1 = 6975U;  // "1/2" button (tap=1)
 constexpr std::uint32_t kSigDriverRsaKeypadButton2 = 6976U;  // "3/4" button (tap=3)
 constexpr std::uint32_t kSigDriverRsaKeypadButton3 = 6977U;  // "5/6" button (tap=5)
 constexpr std::uint32_t kSigDriverRsaKeypadButton4 = 6978U;  // "7/8" button (tap=7)
 constexpr std::uint32_t kSigDriverRsaKeypadButton5 = 6979U;  // "9/0" button (tap=9)
-// RSA mode-selection buttons — one momentary uint8 bool per press area.
-// Locked in lockstep with the external sim's kSigDriverRsaModeSw{Lock,OffAcc,Run}
-// = 6972/6973/6974 (wire cells DRIVER_RSA_MODE_SW_*).  These replace the byte
-// press-enum 6971 (0=NONE,1=OFF,2=ACC,3=RUN,4=START), which ev1sim no longer
-// publishes: one value cannot carry two buttons pressed together.
+// RSA mode buttons (IDs 6972-6974 → DRIVER_ES_RSA_MODE_LOCK / _OFF_ACC / _RUN):
+// one held contact per button; the RSA acts once per press.
 // @source ESM electrical ELPD 441 (LOCK, OFF/ACC, RUN), ELPD 45-46 (the RSA's
 // RUN / OFF/ACC / LOCK MODE SW inputs).
 constexpr std::uint32_t kSigDriverRsaModeSwLock    = 6972U;
@@ -204,9 +198,8 @@ constexpr std::uint32_t kSigDriverRsaModeSwRun     = 6974U;
 constexpr std::uint32_t kSigCruiseSw_SetCoastOut    = 4047U;  // ckt 84,  PIM J1 pin 9
 constexpr std::uint32_t kSigCruiseSw_ResumeAccelOut = 4048U;  // ckt 87,  PIM J1 pin 25
 constexpr std::uint32_t kSigCruiseSw_OnOffOut       = 4049U;  // ckt 397, PIM J1 pin 10
-// Power window switch signals (momentary bool, held while pressed).
-// Locked in lockstep with external sim kSigDriverPowerWindow* = 6980-6983.
-// consumer = RSA (window-motor logic), future round.
+// Power window switches (IDs 6980-6983 → DRIVER_ES_WINDOW_*): held contacts
+// on the RSA faceplate.
 constexpr std::uint32_t kSigDriverPowerWindowDriverUp      = 6980U;
 constexpr std::uint32_t kSigDriverPowerWindowDriverDown    = 6981U;
 constexpr std::uint32_t kSigDriverPowerWindowPassengerUp   = 6982U;
@@ -223,8 +216,8 @@ constexpr std::uint32_t kSigDriverRsaExteriorKeypad5 = 6989U;
 constexpr int           kNumExteriorKeypadInputs     = 5;
 
 // Number of driver-input endpoints on the main harness segment:
-// 6900-6904, 6964, 6972-6979 (14 base), 6980-6983, 6985-6989 = 23 total.
-constexpr int kNumDriverInputs = 14 + kNumPowerWindowInputs + kNumExteriorKeypadInputs;
+// 6900, 6901, 6904, 6964, 6972-6979 (12 base), 6980-6983, 6985-6989 = 21 total.
+constexpr int kNumDriverInputs = 12 + kNumPowerWindowInputs + kNumExteriorKeypadInputs;
 
 // Motor state signals on the chassis segment (ev1sim → external sim, float32 LE).
 //   4070  vehicle.dynamics.motor_rpm          motor shaft RPM
@@ -366,11 +359,11 @@ constexpr int           kNumIpcExtraTelltaleSignals   = 6;
 constexpr std::uint32_t kSigDoorLockCmdDriver    = 4084U;
 constexpr std::uint32_t kSigDoorLockCmdPassenger = 4085U;
 
-// Power window motor commands (the external RSA → ev1sim, chassis segment).
+// Power window motor commands (ev1sim's endpoints, chassis segment), decoded
+// from each motor's UP / DOWN legs at the junction blocks
+// (WireTruthChassis::window_motor_cmd).
 //   4086  vehicle.body.power_window_motor.driver    uint8: 0=stop, 1=up, 2=down
 //   4087  vehicle.body.power_window_motor.passenger uint8: 0=stop, 1=up, 2=down
-// Locked in lockstep with the external sim's chassis-signal header
-// kSigChassisPowerWindowMotorDriver = 4086, kSigChassisPowerWindowMotorPassenger = 4087.
 constexpr std::uint32_t kSigPowerWindowMotorDriver    = 4086U;
 constexpr std::uint32_t kSigPowerWindowMotorPassenger = 4087U;
 constexpr int           kNumDoorLockPwSignals         = 4;  // 4084+4085+4086+4087
@@ -723,12 +716,10 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // ---------------------------------------------------------------------------
 // kNumDriverInputs covers all driver inputs on the main harness segment,
 // all output from ev1sim:
-//   6900 brake_pedal_q8, 6901 steering_deg_q8, 6902 gear_selector,
-//   6903 throttle_q8, 6904 brake_switch,
+//   6900 brake_pedal_q8, 6901 steering_deg_q8, 6904 brake_switch,
 //   6964 seatbelt_switch, 6972-6974 rsa_mode_sw_{lock,off_acc,run},
-//   6975 rsa_keypad_button1, 6976..6979 (buttons 2-5).
-//   + 4 new: 6980-6983 power window switches (driver up/down, passenger up/down).
-// (Slot 6970 is reserved; not registered.)
+//   6975 rsa_keypad_button1, 6976..6979 (buttons 2-5),
+//   6980-6983 power window switches (driver up/down, passenger up/down).
 // +1 for the charge coupler presence (ID 4060, chassis segment).
 // +kNumPrndSelector for the 4 PRND selector lines (IDs 4050-4053, chassis segment).
 // +kNumMotorSignals for motor RPM + torque (IDs 4070-4071, chassis segment). DC pack
@@ -1007,10 +998,6 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
                 "vehicle.driver.brake_pedal_q8", "driver_brake_pedal_q8", false};
     out[i++] = {kSigDriverSteeringDegQ8,
                 "vehicle.driver.steering_deg_q8", "driver_steering_deg_q8", false};
-    out[i++] = {kSigDriverGearSelector,
-                "vehicle.driver.gear_selector", "driver_gear_selector", false};
-    out[i++] = {kSigDriverThrottleQ8,
-                "vehicle.driver.throttle_q8", "driver_throttle_q8", false};
     out[i++] = {kSigDriverBrakeSwitch,
                 "vehicle.driver.brake_switch", "driver_brake_switch", false};
     out[i++] = {kSigDriverSeatbeltSwitch,
@@ -1242,15 +1229,13 @@ struct ExternalSimConnector::State {
     // published to the main harness segment in Tick().
     std::uint8_t  driver_brake_q8    = 0;
     std::int16_t  driver_steering_q8 = 0;
-    std::uint8_t  driver_gear        = 3;  // default D
     std::uint8_t  driver_throttle_q8 = 0;
     std::uint8_t  driver_brake_pub   = 0xFF;  // force first publish
     std::int16_t  driver_steering_pub = 0x7FFF;
-    std::uint8_t  driver_gear_pub    = 0xFF;
-    std::uint8_t  driver_throttle_pub = 0xFF;
-    // Fault injection: omit the throttle delta from the driver-input group
-    // while set (SetSuppressThrottlePublish — VAT safety scenarios).
-    bool          suppress_throttle_publish = false;
+    // Fault injection: the pedal sensor's connector open (SetPedalSensorOpen —
+    // VAT safety scenarios). Unwritten until first armed.
+    bool          pedal_sensor_open_armed = false;
+    bool          pedal_sensor_open       = false;
     // Discrete driver inputs (ID 6904, 6964) on the main harness segment.
     bool          driver_brake_switch                = false;
     bool          driver_seatbelt_buckled            = true;   // default: always buckled
@@ -1267,11 +1252,10 @@ struct ExternalSimConnector::State {
     std::int8_t   driver_hazard_pub       = -1;
     std::int8_t   driver_horn_out_pub     = -1;   // kSigTurnHazSw_HornOut (4046)
 
-    // RSA per-digit keypad buttons (IDs 6975-6979) and mode buttons (6972-6974).
-    // driver_rsa_buttons[0..4] encode Option A: 0=idle, 1=tap, 2=long-press.
-    // Corresponds to kSigDriverRsaKeypadButton[1..5].
-    std::uint8_t  driver_rsa_buttons[5]   = {};
-    std::uint8_t  driver_rsa_mode_switches = 0;  // kModeSw* mask
+    // RSA interior keypad (IDs 6975-6979) and mode buttons (6972-6974): held
+    // contacts.
+    bool          driver_rsa_keypad[5]    = {};
+    std::uint8_t  driver_rsa_mode_switches = 0;  // kModeSw* mask of held buttons
     // Published sentinels: use -1 to force first publish.
     std::int8_t   driver_rsa_btn_pub[5]   = {-1,-1,-1,-1,-1};
     std::int8_t   driver_rsa_mode_sw_pub[3] = {-1,-1,-1};  // LOCK, OFF/ACC, RUN
@@ -1427,8 +1411,8 @@ struct ExternalSimConnector::State {
     // Shifter coast-down button (scenario action coast_down_switch).
     bool          coast_down_switch_armed         = false;
     bool          coast_down_switch_on            = false;
-    // RSA DIM DOWN / DIM UP clicks not yet published ([0] down, [1] up).
-    int           rsa_dim_clicks[2]               = {0, 0};
+    // RSA DIM DOWN / DIM UP buttons held ([0] down, [1] up).
+    bool          rsa_dim_held[2]                 = {false, false};
     // PIM coast-down drag (CHASSIS_PIM_COAST_DRAG_NM), Nm at the shaft.
     float         pim_coast_drag_nm               = 0.0f;
     bool          has_pim_coast_drag_nm           = false;
@@ -2291,8 +2275,9 @@ void ExternalSimConnector::SetCoastDownSwitch(bool on) {
     m_state->coast_down_switch_on    = on;
 }
 
-void ExternalSimConnector::PressRsaDimmer(bool up) {
-    ++m_state->rsa_dim_clicks[up ? 1 : 0];
+void ExternalSimConnector::SetRsaDimmerButtons(bool up_held, bool down_held) {
+    m_state->rsa_dim_held[1] = up_held;
+    m_state->rsa_dim_held[0] = down_held;
 }
 
 std::optional<float> ExternalSimConnector::GetPimCoastDragNm() const {
@@ -2305,16 +2290,13 @@ std::optional<std::uint8_t> ExternalSimConnector::GetWiperSweepPositionPct() con
     return m_state->wiper_sweep_position_pct;
 }
 
-void ExternalSimConnector::SetSuppressThrottlePublish(bool suppress) {
-    m_state->suppress_throttle_publish = suppress;
+void ExternalSimConnector::SetPedalSensorOpen(bool open) {
+    m_state->pedal_sensor_open_armed = true;
+    m_state->pedal_sensor_open       = open;
 }
 
 void ExternalSimConnector::SetDriverSteeringDegQ8(std::int16_t q8) {
     m_state->driver_steering_q8 = q8;
-}
-
-void ExternalSimConnector::SetDriverGearSelector(std::uint8_t enum_v) {
-    m_state->driver_gear = enum_v;
 }
 
 void ExternalSimConnector::SetDriverBrakeSwitch(bool pressed) {
@@ -2348,24 +2330,24 @@ void ExternalSimConnector::SetPrndSelector(bool a, bool b, bool c, bool d) {
     m_state->prnd_d = d;
 }
 
-void ExternalSimConnector::SetDriverRsaKeypadButton1(std::uint8_t value) {
-    m_state->driver_rsa_buttons[0] = value;
+void ExternalSimConnector::SetDriverRsaKeypadButton1(bool held) {
+    m_state->driver_rsa_keypad[0] = held;
 }
 
-void ExternalSimConnector::SetDriverRsaKeypadButton2(std::uint8_t value) {
-    m_state->driver_rsa_buttons[1] = value;
+void ExternalSimConnector::SetDriverRsaKeypadButton2(bool held) {
+    m_state->driver_rsa_keypad[1] = held;
 }
 
-void ExternalSimConnector::SetDriverRsaKeypadButton3(std::uint8_t value) {
-    m_state->driver_rsa_buttons[2] = value;
+void ExternalSimConnector::SetDriverRsaKeypadButton3(bool held) {
+    m_state->driver_rsa_keypad[2] = held;
 }
 
-void ExternalSimConnector::SetDriverRsaKeypadButton4(std::uint8_t value) {
-    m_state->driver_rsa_buttons[3] = value;
+void ExternalSimConnector::SetDriverRsaKeypadButton4(bool held) {
+    m_state->driver_rsa_keypad[3] = held;
 }
 
-void ExternalSimConnector::SetDriverRsaKeypadButton5(std::uint8_t value) {
-    m_state->driver_rsa_buttons[4] = value;
+void ExternalSimConnector::SetDriverRsaKeypadButton5(bool held) {
+    m_state->driver_rsa_keypad[4] = held;
 }
 
 void ExternalSimConnector::SetDriverRsaModeSwitches(std::uint8_t mask) {
@@ -2987,8 +2969,6 @@ EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockStatePassenger,    kSigChassisDoorLockStat
 EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockStateTrunk,        kSigChassisDoorLockStateTrunk);
 EV1SIM_CHASSIS_ID_MATCHES(kDynamicsBase + 68U,           kSigChassisRoadGradePct);
 EV1SIM_CHASSIS_ID_MATCHES(kDynamicsBase + 69U,           kSigChassisPitchDeg);
-EV1SIM_CHASSIS_ID_MATCHES(kSigPowerWindowMotorDriver,    kSigChassisPowerWindowMotorDriver);
-EV1SIM_CHASSIS_ID_MATCHES(kSigPowerWindowMotorPassenger, kSigChassisPowerWindowMotorPassenger);
 EV1SIM_CHASSIS_ID_MATCHES(kSigRsaShiftBlocked,           kSigChassisRsaShiftBlocked);
 EV1SIM_CHASSIS_ID_MATCHES(kSigAmbientTempC,              kSigChassisAmbientTempC);
 EV1SIM_CHASSIS_ID_MATCHES(kSigAmbientHumidityPct,        kSigChassisAmbientHumidityPct);
@@ -3217,8 +3197,6 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             st.status = Status::Connected;
             st.driver_brake_pub            = 0xFF;
             st.driver_steering_pub         = 0x7FFF;
-            st.driver_gear_pub             = 0xFF;
-            st.driver_throttle_pub         = 0xFF;
             st.driver_brake_switch_pub     = -1;
             st.driver_seatbelt_buckled_pub = -1;
             st.driver_turn_left_pub        = -1;
@@ -3423,6 +3401,13 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             for (const auto& [wire_motor, motor] : kMotors) {
                 if (auto leads = st.wire->btcm_motor_leads(wire_motor))
                     st.apply_btcm_motor_leads(motor, leads->drive, leads->release);
+            }
+        }
+        // Window motor commands from the motor legs at the junction blocks.
+        for (int side = 0; side < 2; ++side) {
+            if (auto cmd = st.wire->window_motor_cmd(side)) {
+                st.pw_motor_cmd[side]     = *cmd;
+                st.has_pw_motor_cmd[side] = true;
             }
         }
         // Retard request at the PIM, permille duty; 0 while the line is dark.
@@ -3646,11 +3631,16 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         st.wire->publish_coast_down_switch(st.coast_down_switch_on);
     }
     // Accelerator pedal travel, level-held every tick: the PIM reads the pedal
-    // only through the solver's pps tracks. Withheld with the throttle delta
-    // during the fail_throttle_input fault window.
-    if (st.wire && !st.suppress_throttle_publish) {
+    // only through the solver's pps tracks. The foot stays on the pedal during
+    // a sensor fault, so this keeps writing.
+    if (st.wire) {
         st.wire->publish_pedal_travel(static_cast<std::uint16_t>(
             (static_cast<unsigned>(st.driver_throttle_q8) * 1000u + 127u) / 255u));
+    }
+    // Pedal sensor connector open (fail_throttle_input): unwritten until the
+    // fault is first injected, since unwritten reads connected.
+    if (st.pedal_sensor_open_armed && st.wire) {
+        st.wire->publish_pedal_sensor_open(st.pedal_sensor_open);
     }
     // Outside air at the HTCM's sensor, level-held every tick from the same
     // air temperature as the chassis-bus ambient publish.
@@ -3663,12 +3653,9 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         st.wire->publish_reverse_select_switch(!st.prnd_a && !st.prnd_b &&
                                                st.prnd_c && st.prnd_d);
     }
-    // RSA dimmer: one queued click per button per tick, so two clicks never
-    // land between the same two RSA reads.
-    for (int up = 0; up < 2; ++up) {
-        if (st.rsa_dim_clicks[up] > 0 && st.wire &&
-            st.wire->publish_rsa_dim_click(up == 1))
-            --st.rsa_dim_clicks[up];
+    // RSA DIM UP / DIM DOWN contacts, level-held every tick.
+    if (st.wire) {
+        st.wire->publish_rsa_dim_buttons(st.rsa_dim_held[1], st.rsa_dim_held[0]);
     }
 #endif
 
@@ -3740,33 +3727,11 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         // even though the change-detection thresholds wouldn't fire.
         if (brake_heartbeat_due ||
             st.driver_brake_q8    != st.driver_brake_pub ||
-            st.driver_steering_q8 != st.driver_steering_pub ||
-            st.driver_gear        != st.driver_gear_pub ||
-            // While the throttle delta is suppressed its _pub cache is
-            // frozen, so a changing pedal would hold this mismatch true
-            // and re-publish the OTHER group members every tick. Gate the
-            // term on suppression: during a fault window the group reverts
-            // to heartbeat + real brake/steer/gear changes only, and the
-            // restore re-publish happens via this same term on the first
-            // un-suppressed Tick (or the heartbeat, whichever is sooner).
-            (!st.suppress_throttle_publish &&
-             st.driver_throttle_q8 != st.driver_throttle_pub)) {
+            st.driver_steering_q8 != st.driver_steering_pub) {
             drv.push_back(MakeU8Delta(kSigDriverBrakePedalQ8,  st.driver_brake_q8));
             drv.push_back(MakeI16Delta(kSigDriverSteeringDegQ8, st.driver_steering_q8));
-            drv.push_back(MakeU8Delta(kSigDriverGearSelector,   st.driver_gear));
-            if (!st.suppress_throttle_publish) {
-                // Fault injection (scenario "fail_throttle_input"): while
-                // suppressed the throttle delta is withheld — heartbeats
-                // included — so a consumer-side freshness window genuinely
-                // expires. The _pub cache is left untouched so restoring
-                // re-publishes on the next heartbeat at the latest.
-                drv.push_back(MakeU8Delta(kSigDriverThrottleQ8,
-                                          st.driver_throttle_q8));
-                st.driver_throttle_pub = st.driver_throttle_q8;
-            }
             st.driver_brake_pub    = st.driver_brake_q8;
             st.driver_steering_pub = st.driver_steering_q8;
-            st.driver_gear_pub     = st.driver_gear;
         }
         // Brake switch and seatbelt — publish on change (separate booleans so
         // they don't force-publish the Q8 group and vice-versa).
@@ -3808,24 +3773,8 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             drv.push_back(MakeBoolDelta(kSigTurnHazSw_HornOut, horn_out));
             st.driver_horn_out_pub = horn_out_val;
         }
-        // RSA per-digit keypad buttons (IDs 6975-6979) — one-shot: publish on
-        // change.  Payload: 0=idle, 1=tap (lower digit), 2=long-press (higher digit).
-        {
-            constexpr std::uint32_t kBtnIds[5] = {
-                kSigDriverRsaKeypadButton1, kSigDriverRsaKeypadButton2,
-                kSigDriverRsaKeypadButton3, kSigDriverRsaKeypadButton4,
-                kSigDriverRsaKeypadButton5,
-            };
-            for (int bi = 0; bi < 5; ++bi) {
-                const std::int8_t bval = static_cast<std::int8_t>(st.driver_rsa_buttons[bi]);
-                if (st.driver_rsa_btn_pub[bi] < 0 || bval != st.driver_rsa_btn_pub[bi]) {
-                    drv.push_back(MakeU8Delta(kBtnIds[bi], st.driver_rsa_buttons[bi]));
-                    st.driver_rsa_btn_pub[bi] = bval;
-                }
-            }
-        }
         // RSA buttons, power windows, exterior keypad, contract buttons.
-        // Momentary/level bools: publish on change only (sentinel -1 forces first publish).
+        // Held contacts: publish on change only (sentinel -1 forces first publish).
         auto publish_bool_change = [&](std::uint32_t sig_id, bool cur_val, std::int8_t& pub) {
             const std::int8_t v = cur_val ? 1 : 0;
             if (pub < 0 || v != pub) {
@@ -3833,9 +3782,19 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                 pub = v;
             }
         };
-        // RSA mode buttons (6972-6974) — one bool per press area, published on
-        // change.  All three are evaluated in the same pass, so a mask with two
-        // bits set lands on the wire in one tick.
+        // RSA interior keypad (6975-6979) — held contacts.
+        {
+            constexpr std::uint32_t kBtnIds[5] = {
+                kSigDriverRsaKeypadButton1, kSigDriverRsaKeypadButton2,
+                kSigDriverRsaKeypadButton3, kSigDriverRsaKeypadButton4,
+                kSigDriverRsaKeypadButton5,
+            };
+            for (int bi = 0; bi < 5; ++bi) {
+                publish_bool_change(kBtnIds[bi], st.driver_rsa_keypad[bi],
+                                    st.driver_rsa_btn_pub[bi]);
+            }
+        }
+        // RSA mode buttons (6972-6974) — held contacts, one per button.
         publish_bool_change(kSigDriverRsaModeSwLock,
                             (st.driver_rsa_mode_switches & 0x01u) != 0u,
                             st.driver_rsa_mode_sw_pub[0]);
@@ -3845,8 +3804,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         publish_bool_change(kSigDriverRsaModeSwRun,
                             (st.driver_rsa_mode_switches & 0x04u) != 0u,
                             st.driver_rsa_mode_sw_pub[2]);
-        // Power window switches (6980-6983) — momentary bool, held while pressed.
-        // Default false (no UI source yet); floating UI will set press()/release().
+        // Power window switches (6980-6983) — held contacts.
         publish_bool_change(kSigDriverPowerWindowDriverUp,
                             st.driver_pw_driver_up,     st.driver_pw_driver_up_pub);
         publish_bool_change(kSigDriverPowerWindowDriverDown,
