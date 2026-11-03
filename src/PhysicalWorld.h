@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdint>
 #include <optional>
+#include <string_view>
 
 // Forward declaration — avoid pulling Irrlicht into every translation unit
 // that includes PhysicalWorld.h.
@@ -160,6 +161,15 @@ private:
 class PrndSelector {
 public:
     enum class Position { P, R, N, D };
+
+    /// "P", "R", "N" or "D" to its position; anything else is nullopt.
+    static std::optional<Position> Parse(std::string_view s) {
+        if (s == "P") return Position::P;
+        if (s == "R") return Position::R;
+        if (s == "N") return Position::N;
+        if (s == "D") return Position::D;
+        return std::nullopt;
+    }
 
     /// Advance one step toward D (P→R→N→D; stays at D if already at D).
     void cycle_up();

@@ -240,6 +240,7 @@ Config Config::LoadFromFile(const std::string& path) {
         read_if(sp, "yaw_deg", cfg.spawn.yaw_deg);
         read_if(sp, "speed_mps", cfg.spawn.speed_mps);
         read_if(sp, "settle",    cfg.spawn.settle);
+        read_if(sp, "prnd",      cfg.spawn.prnd);
         cfg.spawn.has_x   = sp.contains("x");
         cfg.spawn.has_y   = sp.contains("y");
         cfg.spawn.has_z   = sp.contains("z");

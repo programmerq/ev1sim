@@ -49,6 +49,13 @@ TEST_CASE("Config built-in defaults are sane", "[Config]") {
     CHECK(cfg.input.steer_rate == 1.8);
     CHECK(cfg.telemetry.show_hud == true);
     CHECK(cfg.spawn.speed_mps == 0.0);  // at rest unless a config asks to roll
+    CHECK(cfg.spawn.prnd == "P");
+}
+
+TEST_CASE("Config reads the spawn lever position", "[Config]") {
+    auto path = WriteTempJson(R"({ "spawn": { "speed_mps": 25.0, "prnd": "D" } })");
+    Config cfg = Config::LoadFromFile(path);
+    CHECK(cfg.spawn.prnd == "D");
 }
 
 // -----------------------------------------------------------------------

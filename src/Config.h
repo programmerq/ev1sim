@@ -61,6 +61,9 @@ struct Config {
         // (ev1sim::SettleAtRest).  false keeps the raw drop, for a run that
         // measures the landing itself (config/bounce_test.json).
         bool settle = true;
+        // The PRND lever at spawn: "P", "R", "N" or "D" (PrndSelector::Parse).
+        // A rolling start can begin in D instead of shifting through R at speed.
+        std::string prnd = "P";
         // Which of x/y/z/yaw_deg the config file set itself.  A level file
         // supplies a default spawn; a key the case config sets explicitly
         // wins over it, so a rolling-start case can place the car where its
