@@ -116,6 +116,22 @@ TEST_CASE("Console DIM - / DIM + queue one click each", "[rsa_console_input]") {
     REQUIRE(w.rsa_dimmer().take(true) == 0);  // taken once
 }
 
+TEST_CASE("Console HEAT / VENT / A/C queue one faceplate tap each", "[rsa_console_input]") {
+    PhysicalWorld w;
+    REQUIRE_FALSE(ApplyRsaConsoleAction(w, {C::kVent, false}));
+    REQUIRE(w.rsa_console_buttons().sequence_in_progress());
+    auto& b = w.rsa_console_buttons();
+    b.update(0.01);
+    REQUIRE(b.held(RsaConsoleButtons::kHvacVent));
+    REQUIRE_FALSE(b.held(RsaConsoleButtons::kHvacHeat));
+    REQUIRE_FALSE(ApplyRsaConsoleAction(w, {C::kHeat, false}));
+    REQUIRE_FALSE(ApplyRsaConsoleAction(w, {C::kAc, false}));
+    for (int i = 0; i < 100 && !b.held(RsaConsoleButtons::kHvacHeat); ++i) b.update(0.01);
+    REQUIRE(b.held(RsaConsoleButtons::kHvacHeat));
+    for (int i = 0; i < 100 && !b.held(RsaConsoleButtons::kHvacAc); ++i) b.update(0.01);
+    REQUIRE(b.held(RsaConsoleButtons::kHvacAc));
+}
+
 namespace {
 irr::SEvent Mouse(irr::EMOUSE_INPUT_EVENT e, int x, int y) {
     irr::SEvent ev{};
@@ -143,9 +159,9 @@ TEST_CASE("Console mouse: clicks on the real panel layout become actions", "[rsa
     REQUIRE(mouse.OnEvent(centre(1, irr::EMIE_LMOUSE_PRESSED_DOWN)));
     REQUIRE_FALSE(mouse.OnEvent(centre(1, irr::EMIE_LMOUSE_LEFT_UP)));
     // A keypad key held 0.6 s: the higher digit, on release.
-    REQUIRE(mouse.OnEvent(centre(12, irr::EMIE_LMOUSE_PRESSED_DOWN)));
+    REQUIRE(mouse.OnEvent(centre(15, irr::EMIE_LMOUSE_PRESSED_DOWN)));
     now = 0.6;
-    REQUIRE(mouse.OnEvent(centre(12, irr::EMIE_LMOUSE_LEFT_UP)));
+    REQUIRE(mouse.OnEvent(centre(15, irr::EMIE_LMOUSE_LEFT_UP)));
     // A click on the VALID CODE lamp or off the panel is not the console's.
     REQUIRE_FALSE(mouse.OnEvent(centre(6, irr::EMIE_LMOUSE_PRESSED_DOWN)));
     REQUIRE_FALSE(mouse.OnEvent(Mouse(irr::EMIE_LMOUSE_PRESSED_DOWN, 5, 5)));

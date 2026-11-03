@@ -467,3 +467,63 @@ TEST_CASE("RSA faceplate buttons publish onto the wire through Tick",
     CHECK_FALSE(contact(topo::kWireDRIVER_ES_RSA_DIM_UP));
     CHECK_FALSE(contact(topo::kWireDRIVER_ES_COAST_DOWN_SWITCH));
 }
+
+// The driver's remaining contacts (RSA HVAC head, wiper delay collar, battery
+// recovery switch, SDM connector) reach their DRIVER_ES_* cells through Tick.
+TEST_CASE("HVAC head, wiper delay rung, battery recovery and SDM connector publish through Tick",
+          "[wire_truth][attach_outcome]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("drv_rest");
+    auto table = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(table != nullptr);
+
+    ScopedWiresName guard(seg.c_str());
+    ExternalSimConnector::Options opts;
+    opts.enabled = true;
+    ExternalSimConnector c(opts);
+
+    auto contact = [&](electricsim::io::ElementStateId id) {
+        electricsim::io::WireTable::Sample<bool> s{};
+        REQUIRE(table->read_bit_sample(id, &s));
+        REQUIRE(s.written());
+        return s.value;
+    };
+    auto rung = [&]() {
+        electricsim::io::WireTable::Sample<std::uint16_t> s{};
+        REQUIRE(table->read_uint16_sample(topo::kWireDRIVER_ES_WIPER_PULSE_LADDER_KOHM, &s));
+        REQUIRE(s.written());
+        return s.value;
+    };
+
+    // Released and seated: every cell written, every contact open, no rung.
+    c.Tick(0.0);
+    REQUIRE(c.IsConnected());
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_RSA_HVAC_HEAT));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_RSA_HVAC_VENT));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_RSA_HVAC_AC));
+    CHECK(rung() == 0u);
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_BATTERY_RECOVERY_SWITCH));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_SDM_CONNECTOR_UNPLUGGED));
+
+    c.SetRsaHvacButtons(/*heat=*/false, /*vent=*/false, /*ac=*/true);
+    c.SetWiperPulseLadderKohm(205u);
+    c.SetBatteryRecoverySwitch(true);
+    c.SetSdmConnectorUnplugged(true);
+    c.Tick(0.1);
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_RSA_HVAC_HEAT));
+    CHECK(contact(topo::kWireDRIVER_ES_RSA_HVAC_AC));
+    CHECK(rung() == 205u);
+    CHECK(contact(topo::kWireDRIVER_ES_BATTERY_RECOVERY_SWITCH));
+    CHECK(contact(topo::kWireDRIVER_ES_SDM_CONNECTOR_UNPLUGGED));
+
+    c.SetRsaHvacButtons(true, false, false);
+    c.SetWiperPulseLadderKohm(0u);
+    c.SetBatteryRecoverySwitch(false);
+    c.SetSdmConnectorUnplugged(false);
+    c.Tick(0.2);
+    CHECK(contact(topo::kWireDRIVER_ES_RSA_HVAC_HEAT));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_RSA_HVAC_AC));
+    CHECK(rung() == 0u);
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_BATTERY_RECOVERY_SWITCH));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_SDM_CONNECTOR_UNPLUGGED));
+}

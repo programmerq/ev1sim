@@ -439,6 +439,23 @@ TEST_CASE("WiperStalk: default position is OFF", "[PhysicalWorld]") {
     CHECK_FALSE(ws.consume_wash());
 }
 
+TEST_CASE("WiperStalk: the delay collar's rung reaches the line only at INT", "[PhysicalWorld]") {
+    WiperStalk ws;
+    CHECK(ws.delay_rung() == WiperStalk::kDefaultDelayRung);
+    CHECK(ws.pulse_ladder_kohm() == 0u);           // OFF: no rung
+    ws.cycle_position();                           // INT
+    CHECK(ws.pulse_ladder_kohm() == 330u);
+    ws.delay_shorter();
+    CHECK(ws.pulse_ladder_kohm() == 290u);
+    for (int i = 0; i < 20; ++i) ws.delay_shorter();
+    CHECK(ws.pulse_ladder_kohm() == 45u);          // stops at the shortest rung
+    for (int i = 0; i < 20; ++i) ws.delay_longer();
+    CHECK(ws.pulse_ladder_kohm() == 660u);         // and at the longest
+    ws.cycle_position();                           // LOW
+    CHECK(ws.pulse_ladder_kohm() == 0u);
+    CHECK(ws.delay_rung() == 0);                   // the collar keeps its place
+}
+
 TEST_CASE("WiperStalk: contacts per position match the RHJB's reading", "[PhysicalWorld]") {
     using P = WiperStalk::Position;
     struct Row { P pos; bool delay, request, hi; };
@@ -1172,6 +1189,36 @@ TEST_CASE("RsaConsoleButtons: a K-key cycle's code and ACC press become held con
         CHECK_THAT(holds[i].second,
                    Catch::Matchers::WithinAbs(longs[i] ? B::kLongHoldS : B::kTapHoldS, 0.015));
     }
+}
+
+TEST_CASE("RsaConsoleButtons: HVAC head presses are taps, one at a time",
+          "[PhysicalWorld][RsaConsoleButtons]") {
+    using B = RsaConsoleButtons;
+    B b;
+    b.press_hvac(B::kHvacHeat);
+    b.press_hvac(B::kHvacAc);
+    b.press_hvac(B::kHvacVent);
+    const auto holds = play_console(b);
+    REQUIRE(holds.size() == 3);
+    const int buttons[3] = {B::kHvacHeat, B::kHvacAc, B::kHvacVent};
+    for (int i = 0; i < 3; ++i) {
+        INFO("press " << i);
+        CHECK(holds[i].first == buttons[i]);
+        CHECK_THAT(holds[i].second, Catch::Matchers::WithinAbs(B::kTapHoldS, 0.015));
+    }
+}
+
+TEST_CASE("HeldContact: open until toggled; the world's battery recovery and SDM start open",
+          "[PhysicalWorld]") {
+    HeldContact c;
+    CHECK_FALSE(c.closed());
+    c.toggle();
+    CHECK(c.closed());
+    c.set(false);
+    CHECK_FALSE(c.closed());
+    PhysicalWorld w;
+    CHECK_FALSE(w.battery_recovery_switch().closed());
+    CHECK_FALSE(w.sdm_connector_unplugged().closed());
 }
 
 TEST_CASE("RsaConsoleButtons: out-of-range digits and an empty mode mask queue nothing",

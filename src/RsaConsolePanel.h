@@ -26,9 +26,10 @@
 //                  console has no lock lamp
 //
 // Phase 4 makes the console's buttons clickable: OFF/ACC, RUN, LOCK, P R N D,
-// COAST DOWN, DIM - / DIM + and the five interior keypad keys.  Each LED row entry names the
-// control it sits on; HitTest() maps a point to it with the same layout Draw()
-// uses.  LOCK, the dimmer and the keypad keys have no lamp.
+// COAST DOWN, DIM - / DIM +, the HVAC head's HEAT / VENT / A/C and the five
+// interior keypad keys.  Each LED row entry names the control it sits on;
+// HitTest() maps a point to it with the same layout Draw() uses.  LOCK, the
+// dimmer, the HVAC buttons and the keypad keys have no lamp.
 //
 // The HVAC, fan, clock and trip LEDs in rsa_panel_catalog.yaml are marked
 // "stub" there (no RSA behaviour modelled), so the panel leaves them out rather
@@ -71,6 +72,7 @@ enum class RsaConsoleControl : std::uint8_t {
     kPark, kReverse, kNeutral, kDrive,
     kCoastDown,
     kDimDown, kDimUp,
+    kHeat, kVent, kAc,                  // HVAC head
     kKey1, kKey2, kKey3, kKey4, kKey5,  // interior keypad [1/2] .. [9/0]
 };
 
@@ -89,6 +91,7 @@ struct RsaConsoleView {
     std::vector<RsaLed> keypad;    // VALID CODE, KEYPAD (exterior)
     std::vector<RsaLed> buttons;   // LOCK, COAST DOWN
     std::vector<RsaLed> dimmer;    // DIM -, DIM +
+    std::vector<RsaLed> climate;   // HEAT, VENT, A/C
     std::vector<RsaLed> digits;    // interior keypad [1/2] .. [9/0]
     std::wstring security;
     std::wstring shift_lock;
@@ -104,7 +107,7 @@ RsaConsoleView BuildRsaConsoleView(const std::optional<DashRsaConsole>& rsa,
 
 /// Where each LED/button of `view` sits for a panel at (x, y), `w` wide: the
 /// one layout Draw() paints and HitTest() reads.  Rows top to bottom: mode,
-/// selector, keypad lamps, buttons, dimmer, digits.  Pure.
+/// selector, keypad lamps, buttons, dimmer, climate, digits.  Pure.
 struct RsaConsoleCell {
     const RsaLed* led;
     int x0, y0, x1, y1;

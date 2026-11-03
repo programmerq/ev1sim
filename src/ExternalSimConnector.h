@@ -196,6 +196,22 @@ public:
     /// The RSA's DIM UP / DIM DOWN buttons, held or not. Written every tick
     /// on DRIVER_ES_RSA_DIM_UP / _DOWN; the RSA steps once per press.
     void SetRsaDimmerButtons(bool up_held, bool down_held);
+
+    /// The RSA HVAC head's HEAT / VENT / A/C buttons, held or not. Written
+    /// every tick on DRIVER_ES_RSA_HVAC_*; the RSA latches the last press.
+    void SetRsaHvacButtons(bool heat, bool vent, bool ac);
+
+    /// The wiper stalk's PULSE delay rung in kOhm (0 = no rung). Written every
+    /// tick on DRIVER_ES_WIPER_PULSE_LADDER_KOHM.
+    void SetWiperPulseLadderKohm(std::uint16_t kohm);
+
+    /// The battery recovery switch held. Written every tick on
+    /// DRIVER_ES_BATTERY_RECOVERY_SWITCH.
+    void SetBatteryRecoverySwitch(bool held);
+
+    /// The SDM connector unplugged. Written every tick on
+    /// DRIVER_ES_SDM_CONNECTOR_UNPLUGGED.
+    void SetSdmConnectorUnplugged(bool unplugged);
     void SetDriverSteeringDegQ8(std::int16_t q8);
 
     /// Outgoing brake-switch state (ID 6904) — derived from brake travel

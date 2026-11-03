@@ -96,6 +96,11 @@ RsaConsoleView BuildRsaConsoleView(const std::optional<DashRsaConsole>& rsa,
         Button(L"DIM -", RsaConsoleControl::kDimDown),
         Button(L"DIM +", RsaConsoleControl::kDimUp),
     };
+    v.climate = {
+        Button(L"HEAT", RsaConsoleControl::kHeat),
+        Button(L"VENT", RsaConsoleControl::kVent),
+        Button(L"A/C", RsaConsoleControl::kAc),
+    };
     // Keycaps as on the console keypad; a long press enters the higher digit.
     v.digits = {
         Button(L"1/2", RsaConsoleControl::kKey1), Button(L"3/4", RsaConsoleControl::kKey2),
@@ -117,7 +122,7 @@ constexpr int kPad = 8;
 constexpr int kRowH = 16;
 constexpr int kLedH = 16;
 constexpr int kLedGap = 3;
-constexpr int kLedRows = 6;   // mode, selector, keypad lamps, buttons, dimmer, digits
+constexpr int kLedRows = 7;   // mode, selector, keypad lamps, buttons, dimmer, climate, digits
 constexpr int kTextRows = 6;  // title, security, shift lock, BTSI, backlight, door locks
 
 // Same palette family as the cluster panel; LEDs lit green or amber.
@@ -155,6 +160,7 @@ std::vector<RsaConsoleCell> LayoutRsaConsole(const RsaConsoleView& view, int x, 
     row(view.keypad);
     row(view.buttons);
     row(view.dimmer);
+    row(view.climate);
     row(view.digits);
     return cells;
 }
