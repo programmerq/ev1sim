@@ -353,9 +353,6 @@ private:
     // Read by the floating-UI throttle/brake display rows each frame.
     DriverCommand m_last_cmd;
 
-    // Last-seen door lock cmd from RSA — used to suppress repeated log lines.
-    // 0xFF = never received.
-
     // Last-seen power window motor cmd — used to suppress repeated log lines.
     // 0xFF = never received.
     std::uint8_t m_last_pw_motor_cmd[2]  = {0xFFu, 0xFFu};  // [0]=driver,[1]=passenger
