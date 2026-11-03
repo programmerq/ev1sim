@@ -1347,9 +1347,13 @@ void SimApp::ApplyMotorDirection() {
     ev1sim::SetMotorDirection(m_world->GetVehicle(),
                               reverse ? ev1sim::MotorDirection::kReverse
                                       : ev1sim::MotorDirection::kForward);
-    // The lever's cable also works the park pawl (ParkPawlLatch).
-    m_world->SetParkPawl(m_park_pawl.update(lever == ev1sim::PrndSelector::Position::P,
-                                            m_world->GetState().speed_mps));
+    // The lever's cable also works the park pawl (ParkPawlLatch). Without an
+    // electrical sim nothing shifts the lever out of its default P and no PIM
+    // withholds torque there, so the car drives as before with the pawl up.
+    const bool electrical = m_external_sim && m_external_sim->GetOptions().enabled;
+    m_world->SetParkPawl(m_park_pawl.update(
+        electrical && lever == ev1sim::PrndSelector::Position::P,
+        m_world->GetState().speed_mps));
 }
 
 // ---------------------------------------------------------------------------
