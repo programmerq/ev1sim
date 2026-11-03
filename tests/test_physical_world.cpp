@@ -439,6 +439,19 @@ TEST_CASE("WiperStalk: default position is OFF", "[PhysicalWorld]") {
     CHECK_FALSE(ws.consume_wash());
 }
 
+TEST_CASE("ParkPawlLatch: drops in at rest in P, ratchets at speed, lifts out of P",
+          "[PhysicalWorld]") {
+    ParkPawlLatch pawl;
+    CHECK_FALSE(pawl.update(/*lever_in_park=*/false, 0.0));
+    CHECK(pawl.update(true, 0.1));             // P at rest: in
+    CHECK(pawl.update(true, 3.0));             // stays in, whatever the speed reads
+    CHECK_FALSE(pawl.update(false, 0.0));      // lever out of P: out
+    CHECK_FALSE(pawl.update(true, -2.0));      // P while rolling back: ratchets
+    CHECK_FALSE(pawl.update(true, ParkPawlLatch::kEngageMaxSpeedMps + 0.01));
+    CHECK(pawl.update(true, -ParkPawlLatch::kEngageMaxSpeedMps));  // slowed: in
+    CHECK(pawl.engaged());
+}
+
 TEST_CASE("PrndSelector: the BTSI lock holds the lever in P and only in P", "[PhysicalWorld]") {
     using P = PrndSelector::Position;
     PrndSelector s;

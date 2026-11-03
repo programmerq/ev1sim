@@ -119,6 +119,7 @@ void VehicleWorld::CreateEV1(const Config& cfg) {
 
     m_vehicle = m_ev1.get();
     m_system  = m_ev1->GetSystem();
+    m_park_pawl = ev1sim::AddParkPawl(*m_ev1);
 
     m_vehicle->SetChassisVisualizationType(VisualizationType::MESH);
     m_vehicle->SetSuspensionVisualizationType(VisualizationType::PRIMITIVES);
@@ -370,6 +371,10 @@ void VehicleWorld::Synchronize(double time) {
     // Must run after the vehicle Synchronize so we win over Chrono's
     // unified-m_braking pass (which we zeroed in driver Synchronize).
     m_driver->ApplyBrakes(time);
+}
+
+void VehicleWorld::SetParkPawl(bool engaged) {
+    if (m_park_pawl) ev1sim::SetParkPawlEngaged(*m_park_pawl, engaged);
 }
 
 void VehicleWorld::ApplyFrontBrakePerWheel(double time, double brake_fl, double brake_fr) {

@@ -596,6 +596,7 @@ if(BUILD_TESTS)
             tests/test_reverse_drive.cpp
             tests/test_ride_frequency.cpp
             tests/test_coast_drag.cpp
+            tests/test_park_pawl.cpp
             src/EV1Vehicle.cpp
             src/EV1DriveMotor.cpp
             src/EV1TMeasyTire.cpp

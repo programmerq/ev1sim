@@ -201,6 +201,31 @@ private:
     bool     m_park_locked = false;          // free until the solenoid is seen
 };
 
+/// The drive unit's park pawl: "As the lever is moved into park the pawl is
+/// rotated into the lock position preventing the vehicle from moving"
+/// (@source:manual propulsion p.345, PARK PAWL).  It is cable-driven from the
+/// lever, so it follows the lever, with one mechanical limit: above a walking
+/// pace the pawl ratchets over the parking gear instead of dropping in.  Once
+/// in, it stays in until the lever leaves P.
+class ParkPawlLatch {
+public:
+    /// Above this car speed the pawl cannot drop into the gear.
+    /// @inferred — a pawl ratchets at speed; the manual prints no figure.
+    static constexpr double kEngageMaxSpeedMps = 0.5;
+
+    /// Advance one step: the lever position and the car's speed (either sign).
+    /// Returns whether the pawl holds the gear.
+    bool update(bool lever_in_park, double speed_mps) {
+        if (!lever_in_park) m_engaged = false;
+        else if (!m_engaged && std::abs(speed_mps) <= kEngageMaxSpeedMps) m_engaged = true;
+        return m_engaged;
+    }
+    bool engaged() const { return m_engaged; }
+
+private:
+    bool m_engaged = false;
+};
+
 /// Charge coupler presence: the paddle mated in the charge port.  Toggled from
 /// the floating UI or a rig switch; published as chassis ID 4060
 /// (DRIVER_ES_CHARGE_COUPLER_MATED).
