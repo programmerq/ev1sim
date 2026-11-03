@@ -805,36 +805,23 @@ TEST_CASE("Coupler 4060 mirrors to the wire (Phase 5 prep)", "[wire_truth][mirro
 // @design 2026-06-17 — Phase 4 ECU-bus migration.
 // ---------------------------------------------------------------------------
 
-TEST_CASE("WireTruthChassis::rsa_run_active follows RSA_RUN1_OUT", "[wire_truth][ecu]") {
+TEST_CASE("WireTruthChassis::rsa_run_active follows the PMM's RUN 1 input", "[wire_truth][ecu]") {
     namespace topo = electricsim::topology;
     const std::string seg = unique_segment("ecu_rsa");
-    auto rsa = create_fleet_table(seg, topo::kTopologyHash);
-    REQUIRE(rsa != nullptr);
+    auto fleet = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(fleet != nullptr);
 
     auto wire = ev1sim::WireTruthChassis::Attach(seg);
     REQUIRE(wire != nullptr);
 
-    // Unwritten -> nullopt (consumer keeps its "no run-mode" default).
+    // Unpublished -> nullopt (consumer keeps its "no run-mode" default).
     REQUIRE(wire->rsa_run_active() == std::nullopt);
 
-    // The line's rest level is the cell's declared default; RUN is the other
-    // level. Written in those terms so the test holds at either modelled
-    // polarity, and asserted on the active-low car level directly below.
-    constexpr bool kRest = topo::kWireRSA_RUN1_OUT_Default;
-    REQUIRE(rsa->write_bit(topo::kWireRSA_RUN1_OUT, !kRest));
+    // Energised = the RSA is grounding 819, RUN commanded.
+    REQUIRE(publish_conductor(*fleet, topo::kWireRHJB_PMM_RUN1_CMD_IN, true));
     REQUIRE(wire->rsa_run_active() == std::optional<bool>(true));
-    REQUIRE(rsa->write_bit(topo::kWireRSA_RUN1_OUT, kRest));
+    REQUIRE(publish_conductor(*fleet, topo::kWireRHJB_PMM_RUN1_CMD_IN, false));
     REQUIRE(wire->rsa_run_active() == std::optional<bool>(false));
-}
-
-TEST_CASE("RSA run command reads relative to its rest level", "[wire_truth][ecu]") {
-    // ev1sim does not pick the polarity; the declared default does. With an
-    // active-low line (rest high) a low level is RUN; with the logical
-    // convention (rest low) a high level is RUN.
-    namespace topo = electricsim::topology;
-    constexpr bool kRest = topo::kWireRSA_RUN1_OUT_Default;
-    CHECK(ev1sim::WireTruthChassis::rsa_run_commanded_level(!kRest));
-    CHECK_FALSE(ev1sim::WireTruthChassis::rsa_run_commanded_level(kRest));
 }
 
 TEST_CASE("WireTruthChassis::ad_main_contactor_closed follows the AD's HV_ES_MAIN_CONTACTOR",
@@ -972,8 +959,7 @@ TEST_CASE("Connector dash snapshot: bus frames via BusSnoop plus the IPC lamp ce
     // the SECURITY telltale lit.
     REQUIRE(fleet->write_element_state(topo::kWireRSA_ES_WSW_ENABLE_OUT, true));
     REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_SECURITY_TELLTALE, true));
-    REQUIRE(fleet->write_bit(topo::kWireRSA_RUN1_OUT,
-                             topo::kWireRSA_RUN1_OUT_Default));  // rest = not RUN
+    REQUIRE(publish_conductor(*fleet, topo::kWireRHJB_PMM_RUN1_CMD_IN, false));  // not RUN
     REQUIRE(fleet->write_bit(topo::kWireCHASSIS_RSA_SELECTOR_LED_PARK, true));
 
     // Pump the transmitters and the connector's tick in lockstep.

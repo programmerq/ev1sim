@@ -205,18 +205,11 @@ public:
     // written() contract: nullopt until the producing ECU has written the cell.
     // @design 2026-06-17 — Phase 4 ECU-bus migration off SharedMemoryTransport.
 
-    // RSA power-mode "run active" (RSA_RUN1_OUT). The RSA controller asserts
-    // RUN1_OUT == RUN2_OUT == (run_mode is RUN or START); see the external sim's RSA controller. true => RUN/START, false => OFF/ACC. The old
-    // kSigRunModeBroadcast (5711) carried the full 4-value enum, but only the
-    // run-active bit survives on the wire (the ACC output has no cell yet —
-    // external-sim gap), so OFF-vs-ACC and RUN-vs-START are not
-    // distinguishable here. Reads RSA_RUN1_OUT (RUN2 is identical) relative
-    // to its declared rest level (rsa_run_commanded_level), never as a raw
-    // bit: the line is active-low on the car.
-    std::optional<bool> rsa_run_active() const;    // RSA_RUN1_OUT (rsa_ecu)
-    // Whether a written RSA_RUN1_OUT level means RUN is commanded: any level
-    // other than the cell's declared default (the line's rest level).
-    static bool rsa_run_commanded_level(bool level);
+    // RSA power-mode "run active": the power moding module's RUN 1 input
+    // (RHJB_PMM_RUN1_CMD_IN) is energised, so the RSA is commanding RUN or
+    // START. OFF and ACC both read false (the ACC output has no cell), and RUN
+    // and START are not distinguishable here.
+    std::optional<bool> rsa_run_active() const;    // RHJB_PMM_RUN1_CMD_IN
 
     // Auto-Disconnect main HV contactor closed: the AD's own contactor
     // command, the contact the HV bus plant reads. nullopt until the AD writes it.
@@ -266,7 +259,7 @@ public:
     std::optional<bool>          ipc_service_soon_telltale() const;
     std::optional<bool>          ipc_wait_telltale() const;  // CHASSIS_IPC_WAIT_TELLTALE
 
-    // The RSA console's output cells in one read (RSA_RUN1_OUT, RSA_ES_WSW_ENABLE_OUT,
+    // The RSA console's output cells in one read (RHJB_PMM_RUN1_CMD_IN, RSA_ES_WSW_ENABLE_OUT,
     // CHASSIS_RSA_VALID_CODE, CHASSIS_SECURITY_TELLTALE, CHASSIS_RSA_SHIFT_BLOCKED,
     // _BTSI_ENERGISED, the four _SELECTOR_LED_* and RSA_ES_DIM_LEVEL_DRV).
     // Unwritten cells stay nullopt.

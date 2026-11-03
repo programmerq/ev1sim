@@ -3270,7 +3270,7 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         //     leaves the corresponding has_* flag false and the getter at its
         //     "no data" default — exactly the pre-attach behaviour.
 
-        // RSA power mode (was kSigRunModeBroadcast 5711). RSA_RUN1_OUT only
+        // RSA power mode. RHJB_PMM_RUN1_CMD_IN only
         // encodes run_active (RUN/START); the OFF/ACC distinction is lost (the
         // ACC output has no wire cell yet — external-sim gap). Map
         // run_active -> RUN(2), else OFF(0). ev1sim's only consumer is the KEY
