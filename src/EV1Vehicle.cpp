@@ -170,13 +170,16 @@ std::shared_ptr<ChShaftsClutch> AddParkPawl(WheeledVehicle& ev1) {
     auto pawl = chrono_types::make_shared<ChShaftsClutch>();
     pawl->Initialize(d.differential_box, ground);
     pawl->SetTorqueLimit(kParkPawlHoldNm);
-    pawl->SetModulation(0.0);
+    SetParkPawlEngaged(*pawl, false);
     ev1.GetSystem()->Add(pawl);
     return pawl;
 }
 
+// A released pawl is disabled outright, so the solver sees no constraint row
+// for it, rather than a zero-torque box that still takes part in iteration.
 void SetParkPawlEngaged(ChShaftsClutch& pawl, bool engaged) {
     pawl.SetModulation(engaged ? 1.0 : 0.0);
+    pawl.SetDisabled(!engaged);
 }
 
 void SetMotorDirection(ChWheeledVehicle& vehicle, MotorDirection dir) {
