@@ -493,7 +493,8 @@ public:
     std::uint8_t GetDoorLockCmd(int side) const;
     bool         HasReceivedDoorLockCmd(int side) const;
 
-    /// Incoming power window motor commands from RSA (IDs 4086/4087, chassis segment).
+    /// Each window motor's command, decoded every tick from its UP / DOWN legs
+    /// at the junction blocks (WireTruthChassis::window_motor_cmd).
     /// uint8: 0=stop, 1=up, 2=down.  Returns 0xFF if never received.
     /// side: 0=driver, 1=passenger.
     std::uint8_t GetPowerWindowMotor(int side) const;

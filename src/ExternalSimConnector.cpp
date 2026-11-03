@@ -359,14 +359,7 @@ constexpr int           kNumIpcExtraTelltaleSignals   = 6;
 constexpr std::uint32_t kSigDoorLockCmdDriver    = 4084U;
 constexpr std::uint32_t kSigDoorLockCmdPassenger = 4085U;
 
-// Power window motor commands (ev1sim's endpoints, chassis segment), decoded
-// from each motor's UP / DOWN legs at the junction blocks
-// (WireTruthChassis::window_motor_cmd).
-//   4086  vehicle.body.power_window_motor.driver    uint8: 0=stop, 1=up, 2=down
-//   4087  vehicle.body.power_window_motor.passenger uint8: 0=stop, 1=up, 2=down
-constexpr std::uint32_t kSigPowerWindowMotorDriver    = 4086U;
-constexpr std::uint32_t kSigPowerWindowMotorPassenger = 4087U;
-constexpr int           kNumDoorLockPwSignals         = 4;  // 4084+4085+4086+4087
+constexpr int           kNumDoorLockPwSignals         = 2;  // 4084+4085
 
 // Door lock STATE feedback (ev1sim → external sim, chassis segment).
 // The resulting per-door latched state of ev1sim::DoorLocks, after the
@@ -727,7 +720,7 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // +kNumWiperSignals for wiper motor command (4080) + washer pump command (4081).
 // +kNumHvacSignals for hvac_blower_level (4082) + defrost_grid_active (4083).
 // +kNumAmbientSignals for ambient temp (4090) + ambient humidity (4091).
-// +kNumDoorLockPwSignals for door lock cmds (4084/4085) + power window motor cmds (4086/4087).
+// +kNumDoorLockPwSignals for door lock cmds (4084/4085).
 // +kNumRsaShiftBlockedSignals for RSA shift-blocked cue (4088) — RSA → ev1sim.
 // +kNumIpcTelltaleSignals for the IPC seatbelt telltale (4130) — IPC → ev1sim.
 // +kNumIpcTripDistSignals for IPC trip distance (4132) — IPC → ev1sim.
@@ -901,13 +894,6 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     out[i++] = {kSigDoorLockCmdPassenger,
                 "vehicle.body.door_lock_cmd.passenger",
                 "door_lock_cmd_passenger", true};
-    // Power window motor commands (RSA → ev1sim, chassis segment, input_to_sim=true).
-    out[i++] = {kSigPowerWindowMotorDriver,
-                "vehicle.body.power_window_motor.driver",
-                "power_window_motor_driver", true};
-    out[i++] = {kSigPowerWindowMotorPassenger,
-                "vehicle.body.power_window_motor.passenger",
-                "power_window_motor_passenger", true};
     // RSA shift-blocked cue (RSA → ev1sim, chassis segment, input_to_sim=true).
     // Level signal: 1 while a P→non-P shift is refused (brake not pressed); 0 otherwise.
     out[i++] = {kSigRsaShiftBlocked,
@@ -1447,7 +1433,7 @@ struct ExternalSimConnector::State {
     std::uint8_t  door_lock_cmd[2]        = {0xFFu, 0xFFu};  // [0]=driver, [1]=passenger
     bool          has_door_lock_cmd[2]    = {false, false};
 
-    // Power window motor commands (IDs 4086/4087, chassis segment) — received from RSA.
+    // Power window motor commands, decoded each tick from the junction-block legs.
     // 0=stop, 1=up, 2=down.  0xFF = never received.
     std::uint8_t  pw_motor_cmd[2]         = {0xFFu, 0xFFu};  // [0]=driver, [1]=passenger
     bool          has_pw_motor_cmd[2]     = {false, false};
@@ -2803,12 +2789,6 @@ void ExternalSimConnector::DebugInjectU8(std::uint32_t signal_id,
     } else if (signal_id == kSigDoorLockCmdPassenger) {
         m_state->door_lock_cmd[1]  = value;
         m_state->has_door_lock_cmd[1] = true;
-    } else if (signal_id == kSigPowerWindowMotorDriver) {
-        m_state->pw_motor_cmd[0]    = value;
-        m_state->has_pw_motor_cmd[0] = true;
-    } else if (signal_id == kSigPowerWindowMotorPassenger) {
-        m_state->pw_motor_cmd[1]    = value;
-        m_state->has_pw_motor_cmd[1] = true;
     } else if (signal_id == kSigHvacBlowerLevel) {
         m_state->hvac_blower_level     = value;
         m_state->has_hvac_blower_level = true;
