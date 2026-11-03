@@ -10,7 +10,7 @@
 # an opaque identifier, recorded so a reader can tell WHICH upstream state
 # this copy reflects — without it the manifest says the copy is consistent
 # but not what it is consistent with.
-provenance a263aa9c7269524411bf6aa9886fb6ff6b75a463
+provenance 22bc4753991e4d17bdb40861d936198c2d1aec3f
 count 17
 261dff836d93146090d462dfac4980df492f6f0d375dc192e724d133efe66b6e  src/io/ev1_chassis_signals.hpp
 43f11cacc108aba17425ce315b20200755871045bcc92a98aecf19106fce498c  src/io/gm8192/gm8192_frame.c
