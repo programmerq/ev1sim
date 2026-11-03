@@ -302,7 +302,9 @@ jobs:
 
       - name: Smoke — headless_smoke.json must exit 0
         timeout-minutes: 3
-        run: ./build/ev1sim --config config/headless_smoke.json
+        run: |
+          sudo apt-get install -y -qq gdb
+          MALLOC_CHECK_=3 stdbuf -oL gdb -q -batch -ex run -ex bt -ex 'thread apply all bt 8' --args ./build/ev1sim --config config/headless_smoke.json 2>&1 | tail -n 120
 
       - name: Smoke — accel_brake.json must exit 0 (scripted accel/hold/brake)
         timeout-minutes: 3
