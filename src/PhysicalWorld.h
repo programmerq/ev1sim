@@ -803,8 +803,8 @@ public:
         m_trunk = (m_trunk == State::LOCKED) ? State::UNLOCKED : State::LOCKED;
     }
 
-    /// Set the lock state for a specific door directly.
-    /// Used by the RSA mirror path (kSigChassisDoorLockCmd* 4084/4085).
+    /// Set the lock state for a specific door directly (the door-lock plant at
+    /// end of travel, and the config's locked-at-start).
     void set_driver(State s)    { m_driver    = s; }
     void set_passenger(State s) { m_passenger = s; }
     void set_trunk(State s)     { m_trunk     = s; }

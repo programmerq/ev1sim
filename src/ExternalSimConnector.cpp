@@ -351,20 +351,10 @@ constexpr std::uint32_t kSigIpcReducedPerfTelltale    = 4144U;
 constexpr std::uint32_t kSigIpcCheckTirePressTelltale = 4145U;
 constexpr int           kNumIpcExtraTelltaleSignals   = 6;
 
-// Door lock commands (the external RSA → ev1sim, chassis segment).
-//   4084  vehicle.body.door_lock_cmd.driver    uint8: 0=unlocked, 1=locked
-//   4085  vehicle.body.door_lock_cmd.passenger uint8: 0=unlocked, 1=locked
-// Locked in lockstep with the external sim's chassis-signal header
-// kSigChassisDoorLockCmdDriver = 4084, kSigChassisDoorLockCmdPassenger = 4085.
-constexpr std::uint32_t kSigDoorLockCmdDriver    = 4084U;
-constexpr std::uint32_t kSigDoorLockCmdPassenger = 4085U;
-
-constexpr int           kNumDoorLockPwSignals         = 2;  // 4084+4085
 
 // Door lock STATE feedback (ev1sim → external sim, chassis segment).
 // The resulting per-door latched state of ev1sim::DoorLocks, after the
-// door_lock_motor (4182-4185) reaches end-of-travel or the RSA cmd (4084/4085)
-// mirror is applied.  Closes the central-locking loop so RSA/IPC can confirm
+// door_lock_motor (4182-4185) reaches end-of-travel.  Closes the central-locking loop so RSA/IPC can confirm
 // the actuated state.
 // MOVED 4155-4157 → 4165-4167: the old block had been allocated ev1sim-side
 // only and collided with the HV bus rail IDs in the canonical chassis-signal
@@ -720,7 +710,6 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // +kNumWiperSignals for wiper motor command (4080) + washer pump command (4081).
 // +kNumHvacSignals for hvac_blower_level (4082) + defrost_grid_active (4083).
 // +kNumAmbientSignals for ambient temp (4090) + ambient humidity (4091).
-// +kNumDoorLockPwSignals for door lock cmds (4084/4085).
 // +kNumRsaShiftBlockedSignals for RSA shift-blocked cue (4088) — RSA → ev1sim.
 // +kNumIpcTelltaleSignals for the IPC seatbelt telltale (4130) — IPC → ev1sim.
 // +kNumIpcTripDistSignals for IPC trip distance (4132) — IPC → ev1sim.
@@ -749,7 +738,7 @@ constexpr int kNumEndpoints =
     kNumMotorSignals + kNumSimTimeSignals + kNumThrottleCmdSignals +
     kNumSteeringCmdSignals +
     kNumBrakeSignals + kNumWiperSignals + kNumHvacSignals +
-    kNumAmbientSignals + kNumDoorLockPwSignals + kNumRsaShiftBlockedSignals +
+    kNumAmbientSignals + kNumRsaShiftBlockedSignals +
     kNumDoorLockMotorSignals + kNumDoorLockSwitchSignals +
     kNumSounderSignals + kNumSteeringPumpSignals +
     kNumHvacControlSignals + kNumDoorLockStateSignals +
@@ -887,13 +876,6 @@ std::array<ExternalSimConnector::Endpoint, kNumEndpoints> BuildEndpoints() {
     out[i++] = {kSigIpcCheckTirePressTelltale,
                 "vehicle.ipc.check_tire_press_telltale",
                 "ipc_check_tire_press_telltale", true};
-    // Door lock commands (RSA → ev1sim, chassis segment, input_to_sim=true).
-    out[i++] = {kSigDoorLockCmdDriver,
-                "vehicle.body.door_lock_cmd.driver",
-                "door_lock_cmd_driver", true};
-    out[i++] = {kSigDoorLockCmdPassenger,
-                "vehicle.body.door_lock_cmd.passenger",
-                "door_lock_cmd_passenger", true};
     // RSA shift-blocked cue (RSA → ev1sim, chassis segment, input_to_sim=true).
     // Level signal: 1 while a P→non-P shift is refused (brake not pressed); 0 otherwise.
     out[i++] = {kSigRsaShiftBlocked,
@@ -1428,8 +1410,8 @@ struct ExternalSimConnector::State {
     bool          ipc_check_tire_press_telltale       = false;
     bool          has_ipc_check_tire_press_telltale   = false;
 
-    // Door lock commands (IDs 4084/4085, chassis segment) — received from RSA.
-    // 0=unlocked, 1=locked.  0xFF = never received.
+    // Door lock commands: the RSA no longer publishes them, so these hold the
+    // never-received sentinel (0xFF) for the VAT CSV writer's columns.
     std::uint8_t  door_lock_cmd[2]        = {0xFFu, 0xFFu};  // [0]=driver, [1]=passenger
     bool          has_door_lock_cmd[2]    = {false, false};
 
@@ -2783,12 +2765,6 @@ void ExternalSimConnector::DebugInjectU8(std::uint32_t signal_id,
     } else if (signal_id == kSigWasherPumpCommand) {
         m_state->washer_pump_cmd     = (value != 0u);
         m_state->has_washer_pump_cmd = true;
-    } else if (signal_id == kSigDoorLockCmdDriver) {
-        m_state->door_lock_cmd[0]  = value;
-        m_state->has_door_lock_cmd[0] = true;
-    } else if (signal_id == kSigDoorLockCmdPassenger) {
-        m_state->door_lock_cmd[1]  = value;
-        m_state->has_door_lock_cmd[1] = true;
     } else if (signal_id == kSigHvacBlowerLevel) {
         m_state->hvac_blower_level     = value;
         m_state->has_hvac_blower_level = true;
@@ -2971,8 +2947,6 @@ EV1SIM_CHASSIS_ID_MATCHES(kSigWiperMotorCommand,         kSigChassisWiperMotorCo
 EV1SIM_CHASSIS_ID_MATCHES(kSigWasherPumpCommand,         kSigChassisWasherPumpCommand);
 EV1SIM_CHASSIS_ID_MATCHES(kSigHvacBlowerLevel,           kSigChassisHvacBlowerLevel);
 EV1SIM_CHASSIS_ID_MATCHES(kSigDefrostGridActive,         kSigChassisDefrostGridActive);
-EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockCmdDriver,         kSigChassisDoorLockCmdDriver);
-EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockCmdPassenger,      kSigChassisDoorLockCmdPassenger);
 EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockStateDriver,       kSigChassisDoorLockStateDriver);
 EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockStatePassenger,    kSigChassisDoorLockStatePassenger);
 EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockStateTrunk,        kSigChassisDoorLockStateTrunk);

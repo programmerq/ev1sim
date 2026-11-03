@@ -487,8 +487,9 @@ public:
     bool GetWasherPumpCommand() const;
     bool HasReceivedWasherPumpCommand() const;
 
-    /// Incoming door lock commands from RSA (IDs 4084/4085, chassis segment).
-    /// uint8: 0=unlocked, 1=locked.  Returns 0xFF if never received.
+    /// Door lock commands. The RSA no longer publishes them (the latches follow
+    /// the lock-motor legs), so these return 0xFF / false; kept for the VAT
+    /// CSV writer's door_lock_cmd_* columns.
     /// side: 0=driver, 1=passenger.
     std::uint8_t GetDoorLockCmd(int side) const;
     bool         HasReceivedDoorLockCmd(int side) const;

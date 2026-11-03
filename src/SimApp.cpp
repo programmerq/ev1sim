@@ -1447,8 +1447,7 @@ void SimApp::ConsumeBodyActuatorPeripherals(double dt, double steering) {
     // --- Door-lock motors LH/RH (chassis 4182-4185 in) ---
     // The RHJB dual-H-bridge motor-leg drives: advance each motor and mirror its
     // end-of-travel stroke into DoorLocks.  Until the RHJB has published a leg
-    // the motors never move and the high-level 4084/4085 RSA mirror remains
-    // authoritative.  The plant step itself lives in PhysicalWorld so a unit
+    // the motors never move.  The plant step itself lives in PhysicalWorld so a unit
     // test can drive it — this file is not in the Chrono-free test target.
     {
         const bool have_legs =
@@ -2028,23 +2027,6 @@ int SimApp::RunWithVisualization() {
                 m_vis->GetDevice(), GetDataFile("ev1/ev1_trunk_lid.obj"));
         m_trunk_lid3d->Update(m_world->GetPose(), m_panels->IsOpen(PanelID::TRUNK), render_dt);
 
-        // --- Door lock mirror from RSA (chassis bus 4084/4085) ---
-        // RSA publishes desired lock state; ev1sim mirrors it to DoorLocks.
-        {
-            using S = ev1sim::DoorLocks::State;
-            for (int side = 0; side < 2; ++side) {
-                if (!m_external_sim->HasReceivedDoorLockCmd(side)) continue;
-                const std::uint8_t cmd = m_external_sim->GetDoorLockCmd(side);
-                if (cmd == m_last_door_lock_cmd[side]) continue;
-                m_last_door_lock_cmd[side] = cmd;
-                const S new_state = (cmd == 1u) ? S::LOCKED : S::UNLOCKED;
-                if (side == 0) m_physical->door_locks().set_driver(new_state);
-                else           m_physical->door_locks().set_passenger(new_state);
-                std::cout << "[SimApp] Door lock " << (side == 0 ? "driver" : "passenger")
-                          << ": " << (new_state == S::LOCKED ? "LOCKED" : "UNLOCKED") << "\n";
-            }
-        }
-
         // --- Power window motor log (motor legs at the junction blocks) — no visual yet ---
         {
             static const char* kPwNames[] = {"STOP", "UP", "DOWN"};
@@ -2590,22 +2572,6 @@ int SimApp::RunHeadless() {
                     ? m_external_sim->GetWiperMotorCommand()
                     : 0u;
             m_wiper->Tick(tick_dt, wiper_cmd);
-        }
-
-        // --- Door lock mirror from RSA (chassis bus 4084/4085) ---
-        {
-            using S = ev1sim::DoorLocks::State;
-            for (int side = 0; side < 2; ++side) {
-                if (!m_external_sim->HasReceivedDoorLockCmd(side)) continue;
-                const std::uint8_t cmd = m_external_sim->GetDoorLockCmd(side);
-                if (cmd == m_last_door_lock_cmd[side]) continue;
-                m_last_door_lock_cmd[side] = cmd;
-                const S new_state = (cmd == 1u) ? S::LOCKED : S::UNLOCKED;
-                if (side == 0) m_physical->door_locks().set_driver(new_state);
-                else           m_physical->door_locks().set_passenger(new_state);
-                std::cout << "[SimApp] Door lock " << (side == 0 ? "driver" : "passenger")
-                          << ": " << (new_state == S::LOCKED ? "LOCKED" : "UNLOCKED") << "\n";
-            }
         }
 
         // --- Power window motor log (motor legs at the junction blocks) — no visual yet ---
