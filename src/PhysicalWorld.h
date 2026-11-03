@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <optional>
 
 // Forward declaration — avoid pulling Irrlicht into every translation unit
 // that includes PhysicalWorld.h.
@@ -166,12 +167,27 @@ public:
     /// Advance one step toward P (D→N→R→P; stays at P if already at P).
     void cycle_down();
 
-    /// Go straight to `p`: the EV1's selector is four console push buttons, so
-    /// a press selects its position directly (the RSA still decides whether to
-    /// accept it, e.g. brake-to-shift out of P).
-    void set_position(Position p) { m_position = p; }
+    /// Go straight to `p` (a console click on P, R, N or D). Refused, like
+    /// cycle_up(), when it would leave P while the lever is locked.
+    void set_position(Position p) {
+        if (m_park_locked && m_position == Position::P && p != Position::P) return;
+        m_position = p;
+    }
 
     Position position() const { return m_position; }
+
+    /// The BTSI solenoid's lever block: while locked, the lever cannot leave
+    /// P (cycle_up() and set_position() are refused there); a lever already
+    /// out of P is not moved.
+    void set_park_lock(bool locked) { m_park_locked = locked; }
+    bool park_locked() const { return m_park_locked; }
+
+    /// Lock from the solenoid as the wire carries it: locked while it is seen
+    /// de-energised, free while energised or not yet seen (no electrical sim).
+    /// @design electricsim config/topology.yaml CHASSIS_RSA_BTSI_ENERGISED
+    void set_btsi_energised(std::optional<bool> energised) {
+        m_park_locked = energised.has_value() && !*energised;
+    }
 
     /// Wire-level pin outputs per propulsion manual p. 343.
     /// Published as 1-bit booleans on the chassis bus (IDs 4050-4053).
@@ -181,7 +197,8 @@ public:
     bool pin_d() const;
 
 private:
-    Position m_position = Position::P;   // default: Park
+    Position m_position    = Position::P;   // default: Park
+    bool     m_park_locked = false;          // free until the solenoid is seen
 };
 
 /// Charge coupler presence: the paddle mated in the charge port.  Toggled from

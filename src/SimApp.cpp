@@ -1843,8 +1843,11 @@ int SimApp::RunWithVisualization() {
         // The pump motor body closes molex.D/E while present; PSCM senses it.
         m_external_sim->SetSteeringPumpInterlockClosed(
             m_physical->power_steering_pump().interlock_closed());
-        // PRND selector wire-level pins (chassis bus, IDs 4050-4053).
+        // PRND selector wire-level pins (chassis bus, IDs 4050-4053); the
+        // lever stays in P while the RSA's BTSI solenoid is off.
         {
+            m_physical->prnd_selector().set_btsi_energised(
+                m_external_sim->GetRsaBtsiEnergised());
             const auto& prnd = m_physical->prnd_selector();
             m_external_sim->SetPrndSelector(prnd.pin_a(), prnd.pin_b(),
                                             prnd.pin_c(), prnd.pin_d());
@@ -2452,9 +2455,12 @@ int SimApp::RunHeadless() {
         // The pump motor body closes molex.D/E while present; PSCM senses it.
         m_external_sim->SetSteeringPumpInterlockClosed(
             m_physical->power_steering_pump().interlock_closed());
-        // PRND selector wire-level pins (chassis bus, IDs 4050-4053).
-        // In headless mode stays at default Park; no keyboard cycling.
+        // PRND selector wire-level pins (chassis bus, IDs 4050-4053), moved
+        // by scenario prnd actions; the lever stays in P while the RSA's BTSI
+        // solenoid is off.
         {
+            m_physical->prnd_selector().set_btsi_energised(
+                m_external_sim->GetRsaBtsiEnergised());
             const auto& prnd = m_physical->prnd_selector();
             m_external_sim->SetPrndSelector(prnd.pin_a(), prnd.pin_b(),
                                             prnd.pin_c(), prnd.pin_d());

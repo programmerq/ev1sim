@@ -84,7 +84,7 @@ double BrakePedal::update(double travel) {
 
 void PrndSelector::cycle_up() {
     switch (m_position) {
-        case Position::P: m_position = Position::R; break;
+        case Position::P: if (!m_park_locked) m_position = Position::R; break;
         case Position::R: m_position = Position::N; break;
         case Position::N: m_position = Position::D; break;
         case Position::D: break;  // clamp at D
