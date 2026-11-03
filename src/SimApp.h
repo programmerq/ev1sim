@@ -176,7 +176,8 @@ private:
     void PublishMotorState();
 
     // Point the plant motor's torque the way the PRND lever says (R =
-    // backward).  Both loops call it once per tick.
+    // backward), and drop the park pawl in or lift it out with the lever.
+    // Both loops call it once per tick.
     void ApplyMotorDirection();
 
     Config m_config;
@@ -356,6 +357,7 @@ private:
     // Last-seen power window motor cmd — used to suppress repeated log lines.
     // 0xFF = never received.
     std::uint8_t m_last_pw_motor_cmd[2]  = {0xFFu, 0xFFu};  // [0]=driver,[1]=passenger
+    ev1sim::ParkPawlLatch m_park_pawl;   // the drive unit's park pawl, worked by the lever
 
     // (Door-lock stroke edge-tracking moved into PhysicalWorld::StepDoorLockPlant
     //  so the leg → stroke → latch chain is reachable from a unit test.)

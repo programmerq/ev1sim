@@ -1342,11 +1342,14 @@ void SimApp::ApplyElectronicsSteering(DriverCommand& cmd) {
 // PIM commands no torque, and the motor stays coupled to the wheels).  Both
 // loops call this once per tick, before the physics substeps.
 void SimApp::ApplyMotorDirection() {
-    const bool reverse = m_physical->prnd_selector().position() ==
-                         ev1sim::PrndSelector::Position::R;
+    const auto lever = m_physical->prnd_selector().position();
+    const bool reverse = lever == ev1sim::PrndSelector::Position::R;
     ev1sim::SetMotorDirection(m_world->GetVehicle(),
                               reverse ? ev1sim::MotorDirection::kReverse
                                       : ev1sim::MotorDirection::kForward);
+    // The lever's cable also works the park pawl (ParkPawlLatch).
+    m_world->SetParkPawl(m_park_pawl.update(lever == ev1sim::PrndSelector::Position::P,
+                                            m_world->GetState().speed_mps));
 }
 
 // ---------------------------------------------------------------------------
