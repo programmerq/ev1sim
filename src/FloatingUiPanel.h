@@ -51,6 +51,12 @@ std::wstring FormatDoorHandleLabel(const wchar_t* door_name);
 std::wstring FormatWiperLabel(int pos);
 /// Format wiper wash button label (always static "Wash").
 std::wstring FormatWashLabel();
+/// Format the wiper delay collar's rung: "Wiper delay: 330K".
+std::wstring FormatWiperDelayLabel(std::uint16_t rung_kohm);
+/// Format the battery recovery switch: "Batt recovery: HELD" / "released".
+std::wstring FormatBatteryRecoveryLabel(bool held);
+/// Format the SDM connector: "SDM conn: UNPLUGGED" / "plugged in".
+std::wstring FormatSdmConnectorLabel(bool unplugged);
 /// Format cruise stalk button labels.
 std::wstring FormatCruiseLabel(const wchar_t* action);
 /// Format IPC trip-reset button label (always static "Trip Reset").

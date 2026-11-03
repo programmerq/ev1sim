@@ -4,6 +4,7 @@
 #include "EV1DriveMotor.h"
 #include "EV1TMeasyTire.h"
 
+#include "chrono/physics/ChShaft.h"
 #include "chrono_vehicle/ChDriver.h"
 #include "chrono_vehicle/ChPowertrainAssembly.h"
 #include "chrono_vehicle/ChTransmission.h"
@@ -44,6 +45,50 @@ namespace {
 // The two driveline shafts are private to ChShaftsDriveline2WD, so they are
 // found among the system's shafts by the inertias the driveline JSON gives
 // them; a JSON that made them indistinguishable fails loudly.
+struct DrivelineShafts {
+    std::shared_ptr<ChShaft> driveshaft;
+    std::shared_ptr<ChShaft> differential_box;
+    double conical_ratio;
+};
+
+// The two shafts private to ChShaftsDriveline2WD, found among the system's
+// shafts (the suspensions' axle shafts excluded) by the inertias the driveline
+// JSON gives them; a JSON that made them indistinguishable fails loudly.
+DrivelineShafts FindDrivelineShafts(WheeledVehicle& ev1, const std::string& driveline_json) {
+    std::vector<ChShaft*> axle_shafts;
+    for (auto& axle : ev1.GetAxles())
+        for (auto side : {LEFT, RIGHT})
+            axle_shafts.push_back(axle->m_suspension->GetAxle(side).get());
+
+    std::ifstream f(driveline_json);
+    const auto j = nlohmann::json::parse(f, nullptr, true, true);
+    const double j_drive = j.at("Shaft Inertia").at("Driveshaft").get<double>();
+    const double j_diff  = j.at("Shaft Inertia").at("Differential Box").get<double>();
+    DrivelineShafts d{nullptr, nullptr, j.at("Gear Ratio").at("Conical Gear").get<double>()};
+    if (j_drive == j_diff)
+        throw std::runtime_error("driveline: driveshaft and differential box share an "
+                                 "inertia in " + driveline_json +
+                                 "; cannot tell them apart");
+
+    int found = 0;
+    for (auto& shaft : ev1.GetSystem()->GetShafts()) {
+        if (std::find(axle_shafts.begin(), axle_shafts.end(), shaft.get()) != axle_shafts.end())
+            continue;
+        if (shaft->GetInertia() == j_drive) {
+            d.driveshaft = shaft;
+            ++found;
+        } else if (shaft->GetInertia() == j_diff) {
+            d.differential_box = shaft;
+            ++found;
+        }
+    }
+    if (found != 2)
+        throw std::runtime_error("driveline: expected the driveshaft and differential box "
+                                 "among the system's shafts, matched " +
+                                 std::to_string(found));
+    return d;
+}
+
 void SpinUpRotatingParts(WheeledVehicle& ev1, double fwd_speed_mps,
                          double wheel_radius_m, const std::string& driveline_json) {
     const double w = fwd_speed_mps / wheel_radius_m;
@@ -53,41 +98,15 @@ void SpinUpRotatingParts(WheeledVehicle& ev1, double fwd_speed_mps,
         if (!body->IsFixed())
             body->SetPosDt(fwd);
 
-    std::vector<ChShaft*> axle_shafts;
     for (auto& axle : ev1.GetAxles())
         for (auto side : {LEFT, RIGHT}) {
             axle->m_suspension->GetSpindle(side)->SetAngVelLocal(ChVector3d(0, w, 0));
-            auto shaft = axle->m_suspension->GetAxle(side);
-            shaft->SetPosDt(-w);
-            axle_shafts.push_back(shaft.get());
+            axle->m_suspension->GetAxle(side)->SetPosDt(-w);
         }
 
-    std::ifstream f(driveline_json);
-    const auto j = nlohmann::json::parse(f, nullptr, true, true);
-    const double j_drive = j.at("Shaft Inertia").at("Driveshaft").get<double>();
-    const double j_diff  = j.at("Shaft Inertia").at("Differential Box").get<double>();
-    const double conical = j.at("Gear Ratio").at("Conical Gear").get<double>();
-    if (j_drive == j_diff)
-        throw std::runtime_error(
-            "rolling spawn: driveshaft and differential box share an inertia in " +
-            driveline_json + "; cannot tell them apart to spin them up");
-
-    int found = 0;
-    for (auto& shaft : ev1.GetSystem()->GetShafts()) {
-        if (std::find(axle_shafts.begin(), axle_shafts.end(), shaft.get()) != axle_shafts.end())
-            continue;
-        if (shaft->GetInertia() == j_drive) {
-            shaft->SetPosDt(w / conical);
-            ++found;
-        } else if (shaft->GetInertia() == j_diff) {
-            shaft->SetPosDt(-w);
-            ++found;
-        }
-    }
-    if (found != 2)
-        throw std::runtime_error("rolling spawn: expected the driveshaft and differential "
-                                 "box among the system's shafts, matched " +
-                                 std::to_string(found));
+    const DrivelineShafts d = FindDrivelineShafts(ev1, driveline_json);
+    d.driveshaft->SetPosDt(w / d.conical_ratio);
+    d.differential_box->SetPosDt(-w);
 }
 
 }  // namespace
@@ -139,6 +158,20 @@ std::unique_ptr<WheeledVehicle> BuildEV1Vehicle(const ChCoordsys<>& pose,
         SpinUpRotatingParts(*ev1, fwd_speed_mps, radius, driveline_json);
     }
     return ev1;
+}
+
+std::shared_ptr<ChShaft> ParkPawlCarrier(WheeledVehicle& ev1) {
+    return FindDrivelineShafts(ev1, GetDataFile("ev1/driveline/EV1_Driveline2WD.json"))
+        .differential_box;
+}
+
+void SetParkPawlEngaged(ChShaft& carrier, bool engaged) {
+    if (engaged == carrier.IsFixed()) return;
+    if (engaged) {
+        carrier.SetPosDt(0.0);
+        carrier.SetPosDt2(0.0);
+    }
+    carrier.SetFixed(engaged);
 }
 
 void SetMotorDirection(ChWheeledVehicle& vehicle, MotorDirection dir) {

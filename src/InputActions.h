@@ -29,6 +29,8 @@ enum class InputAction {
     HazardToggle,
     WiperCycle,
     WiperWash,
+    WiperDelayLonger,     // the delay collar, one rung toward a longer INT dwell
+    WiperDelayShorter,
 
     // Cruise stalk.
     CruiseSet,
@@ -36,6 +38,11 @@ enum class InputAction {
     CruiseCancel,
     CruiseSpeedUp,
     CruiseSpeedDown,
+
+    // RSA HVAC head buttons.
+    HvacHeat,
+    HvacVent,
+    HvacAc,
 
     // Transmission selector.
     PrndUp,
@@ -78,11 +85,16 @@ inline constexpr ActionName kInputActionNames[] = {
     {InputAction::HazardToggle,       "hazard_toggle"},
     {InputAction::WiperCycle,         "wiper_cycle"},
     {InputAction::WiperWash,          "wiper_wash"},
+    {InputAction::WiperDelayLonger,   "wiper_delay_longer"},
+    {InputAction::WiperDelayShorter,  "wiper_delay_shorter"},
     {InputAction::CruiseSet,          "cruise_set"},
     {InputAction::CruiseResume,       "cruise_resume"},
     {InputAction::CruiseCancel,       "cruise_cancel"},
     {InputAction::CruiseSpeedUp,      "cruise_speed_up"},
     {InputAction::CruiseSpeedDown,    "cruise_speed_down"},
+    {InputAction::HvacHeat,           "rsa_hvac_heat"},
+    {InputAction::HvacVent,           "rsa_hvac_vent"},
+    {InputAction::HvacAc,             "rsa_hvac_ac"},
     {InputAction::PrndUp,             "prnd_up"},
     {InputAction::PrndDown,           "prnd_down"},
     {InputAction::KeyOnCycle,         "key_on_cycle"},

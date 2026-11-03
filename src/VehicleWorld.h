@@ -5,6 +5,7 @@
 #include "VehiclePose.h"
 #include "VehicleState.h"
 
+#include "chrono/physics/ChShaft.h"
 #include "chrono/physics/ChSystemSMC.h"
 #include "chrono_vehicle/terrain/RigidTerrain.h"
 #include "chrono_vehicle/wheeled_vehicle/ChWheeledVehicle.h"
@@ -42,6 +43,10 @@ public:
     /// them in as ratios of the BrakeSimple max torque.
     ///   brake_rl, brake_rr — brake ratio [0..1] for left/right rear wheels.
     void ApplyRearBrakePerWheel(double time, double brake_rl, double brake_rr);
+
+    /// Drop the drive unit's park pawl in or lift it out (EV1 model only;
+    /// a no-op on the stock vehicles).
+    void SetParkPawl(bool engaged);
 
     // Teleport vehicle back to spawn.  Resets velocities.
     void ResetVehicle();
@@ -82,6 +87,10 @@ private:
     // Non-owning convenience pointers into the active model.
     chrono::vehicle::ChWheeledVehicle* m_vehicle = nullptr;
     chrono::ChSystem*                  m_system  = nullptr;
+
+    // The differential carrier the EV1's park pawl holds (EV1Vehicle.h
+    // ParkPawlCarrier); null on other models.
+    std::shared_ptr<chrono::ChShaft> m_park_pawl;
 
     std::unique_ptr<CommandDriver>                m_driver;
     std::unique_ptr<chrono::vehicle::RigidTerrain> m_terrain;

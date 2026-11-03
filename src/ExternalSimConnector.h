@@ -196,6 +196,22 @@ public:
     /// The RSA's DIM UP / DIM DOWN buttons, held or not. Written every tick
     /// on DRIVER_ES_RSA_DIM_UP / _DOWN; the RSA steps once per press.
     void SetRsaDimmerButtons(bool up_held, bool down_held);
+
+    /// The RSA HVAC head's HEAT / VENT / A/C buttons, held or not. Written
+    /// every tick on DRIVER_ES_RSA_HVAC_*; the RSA latches the last press.
+    void SetRsaHvacButtons(bool heat, bool vent, bool ac);
+
+    /// The wiper stalk's PULSE delay rung in kOhm (0 = no rung). Written every
+    /// tick on DRIVER_ES_WIPER_PULSE_LADDER_KOHM.
+    void SetWiperPulseLadderKohm(std::uint16_t kohm);
+
+    /// The battery recovery switch held. Written every tick on
+    /// DRIVER_ES_BATTERY_RECOVERY_SWITCH.
+    void SetBatteryRecoverySwitch(bool held);
+
+    /// The SDM connector unplugged. Written every tick on
+    /// DRIVER_ES_SDM_CONNECTOR_UNPLUGGED.
+    void SetSdmConnectorUnplugged(bool unplugged);
     void SetDriverSteeringDegQ8(std::int16_t q8);
 
     /// Outgoing brake-switch state (ID 6904) — derived from brake travel
@@ -471,13 +487,15 @@ public:
     bool GetWasherPumpCommand() const;
     bool HasReceivedWasherPumpCommand() const;
 
-    /// Incoming door lock commands from RSA (IDs 4084/4085, chassis segment).
-    /// uint8: 0=unlocked, 1=locked.  Returns 0xFF if never received.
+    /// Door lock commands. The RSA no longer publishes them (the latches follow
+    /// the lock-motor legs), so these return 0xFF / false; kept for the VAT
+    /// CSV writer's door_lock_cmd_* columns.
     /// side: 0=driver, 1=passenger.
     std::uint8_t GetDoorLockCmd(int side) const;
     bool         HasReceivedDoorLockCmd(int side) const;
 
-    /// Incoming power window motor commands from RSA (IDs 4086/4087, chassis segment).
+    /// Each window motor's command, decoded every tick from its UP / DOWN legs
+    /// at the junction blocks (WireTruthChassis::window_motor_cmd).
     /// uint8: 0=stop, 1=up, 2=down.  Returns 0xFF if never received.
     /// side: 0=driver, 1=passenger.
     std::uint8_t GetPowerWindowMotor(int side) const;
@@ -684,6 +702,10 @@ public:
     /// was never written stays nullopt; frame groups are empty without the
     /// substrate or before their first frame.
     ev1sim::DashSnapshot GetDashSnapshot() const;
+
+    /// The RSA's BTSI solenoid energised (the shift lever free to leave P),
+    /// read off CHASSIS_RSA_BTSI_ENERGISED; nullopt until the wire carries it.
+    std::optional<bool> GetRsaBtsiEnergised() const;
 
     /// Incoming Auto Disconnect main HV contactor state (ID 5224, main
     /// harness segment).  Published by the AD controller on change.

@@ -118,6 +118,18 @@ std::wstring FormatHvacModeLabel(std::uint8_t mode) {
     }
 }
 
+std::wstring FormatWiperDelayLabel(std::uint16_t rung_kohm) {
+    return L"Wiper delay: " + std::to_wstring(rung_kohm) + L"K";
+}
+
+std::wstring FormatBatteryRecoveryLabel(bool held) {
+    return held ? L"Batt recovery: HELD" : L"Batt recovery: released";
+}
+
+std::wstring FormatSdmConnectorLabel(bool unplugged) {
+    return unplugged ? L"SDM conn: UNPLUGGED" : L"SDM conn: plugged in";
+}
+
 std::wstring FormatHvacAcLabel(bool on) {
     return on ? L"HVAC A/C: ON" : L"HVAC A/C: OFF";
 }

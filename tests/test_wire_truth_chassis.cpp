@@ -709,7 +709,6 @@ TEST_CASE("Batches A/J/K/L render through the connector overlay (wire -> getter)
     REQUIRE(prod->write_bit (topo::kWireCHASSIS_WASHER_PUMP_COMMAND,  true)); // J bit
     REQUIRE(prod->write_byte(topo::kWireCHASSIS_HVAC_BLOWER_LEVEL,    4u));   // K byte
     REQUIRE(prod->write_bit (topo::kWireCHASSIS_DEFROST_GRID_ACTIVE,  true)); // K bit (U8-served)
-    REQUIRE(prod->write_byte(topo::kWireCHASSIS_DOOR_LOCK_CMD_DRIVER, 1u));   // L byte
     REQUIRE(prod->write_bit (topo::kWireCHASSIS_RSA_SHIFT_BLOCKED,    true)); // L bit (U8-served)
 
     ExternalSimConnector c;
@@ -723,14 +722,13 @@ TEST_CASE("Batches A/J/K/L render through the connector overlay (wire -> getter)
     sinks.on_byte   = [&c](std::uint32_t id, std::uint8_t v)  { c.DebugInjectU8(id, v); };
     sinks.on_float  = [&c](std::uint32_t id, float v)         { c.DebugInjectFloat(id, v); };
     sinks.on_uint32 = [&c](std::uint32_t id, std::uint32_t v) { c.DebugInjectU32(id, v); };
-    REQUIRE(wire->apply_consumer_overlay(sinks) >= 7);
+    REQUIRE(wire->apply_consumer_overlay(sinks) >= 6);
 
     CHECK(c.GetBulbCmd(LightID::LBL));        // Batch A
     CHECK(c.GetWiperMotorCommand() == 3u);    // Batch J
     CHECK(c.GetWasherPumpCommand());          // Batch J
     CHECK(c.GetHvacBlowerLevel() == 4u);      // Batch K
     CHECK(c.GetDefrostGridActive());          // Batch K  (regresses without the on_bit fix)
-    CHECK(c.GetDoorLockCmd(0) == 1u);         // Batch L
     CHECK(c.GetRsaShiftBlocked());            // Batch L  (regresses without the on_bit fix)
 }
 
@@ -1323,7 +1321,7 @@ TEST_CASE("RefuseConductorWrite: a write via a DIFFERENT accessor on the same "
     REQUIRE(count_occurrences(capture.contents(), "REFUSED write_bit") == 1);
 }
 
-TEST_CASE("WireTruthChassis: the DIM buttons are held contacts; lock commands reach the console",
+TEST_CASE("WireTruthChassis: the DIM buttons are held contacts",
           "[wire_truth]") {
     namespace topo = electricsim::topology;
     const std::string seg = unique_segment("dim");
@@ -1345,12 +1343,6 @@ TEST_CASE("WireTruthChassis: the DIM buttons are held contacts; lock commands re
     REQUIRE(read_contact(*producer, topo::kWireDRIVER_ES_RSA_DIM_DOWN, &down));
     CHECK_FALSE(up);
     CHECK(down);
-
-    REQUIRE(wire->rsa_console().lock_driver == std::nullopt);
-    REQUIRE(producer->write_byte(topo::kWireCHASSIS_DOOR_LOCK_CMD_DRIVER, 1u));
-    REQUIRE(producer->write_byte(topo::kWireCHASSIS_DOOR_LOCK_CMD_PASSENGER, 0u));
-    REQUIRE(wire->rsa_console().lock_driver == std::optional<std::uint8_t>(1u));
-    REQUIRE(wire->rsa_console().lock_passenger == std::optional<std::uint8_t>(0u));
 }
 
 TEST_CASE("WireTruthChassis: a switch contact written by its producer id reads as an element state",

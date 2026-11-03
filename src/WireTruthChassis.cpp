@@ -544,9 +544,6 @@ static const std::unordered_map<std::uint32_t, ConsumerCell>& ConsumerRegistry()
         // HVAC blower level + defrost grid (byte / bit)
         {4082U, {kWireCHASSIS_HVAC_BLOWER_LEVEL,        WireType::kByte}},
         {4083U, {kWireCHASSIS_DEFROST_GRID_ACTIVE,      WireType::kBit}},
-        // Door lock commands (byte)
-        {4084U, {kWireCHASSIS_DOOR_LOCK_CMD_DRIVER,     WireType::kByte}},
-        {4085U, {kWireCHASSIS_DOOR_LOCK_CMD_PASSENGER,  WireType::kByte}},
         // RSA shift-blocked cue (bit)
         {4088U, {kWireCHASSIS_RSA_SHIFT_BLOCKED,        WireType::kBit}},
         // IPC seatbelt telltale (bit)
@@ -789,7 +786,7 @@ ev1sim::DashRsaConsole WireTruthChassis::rsa_console() const {
     c.valid_code    = read_bit(kWireCHASSIS_RSA_VALID_CODE);
     c.security      = read_bit(ReadOnlyWireId(kWireCHASSIS_SECURITY_TELLTALE));
     c.shift_blocked = read_bit(kWireCHASSIS_RSA_SHIFT_BLOCKED);
-    c.btsi_solenoid = read_bit(ReadOnlyWireId(kWireCHASSIS_RSA_BTSI_ENERGISED));
+    c.btsi_solenoid = rsa_btsi_energised();
     c.led_park      = read_bit(kWireCHASSIS_RSA_SELECTOR_LED_PARK);
     c.led_reverse   = read_bit(kWireCHASSIS_RSA_SELECTOR_LED_REVERSE);
     c.led_neutral   = read_bit(kWireCHASSIS_RSA_SELECTOR_LED_NEUTRAL);
@@ -800,8 +797,6 @@ ev1sim::DashRsaConsole WireTruthChassis::rsa_console() const {
             dim.written())
             c.dim_level_permille = dim.value;
     }
-    c.lock_driver   = read_byte(kWireCHASSIS_DOOR_LOCK_CMD_DRIVER);
-    c.lock_passenger = read_byte(kWireCHASSIS_DOOR_LOCK_CMD_PASSENGER);
     return c;
 }
 std::optional<bool> WireTruthChassis::ipc_wait_drive() const {
@@ -955,6 +950,37 @@ bool WireTruthChassis::publish_rsa_dim_buttons(bool up_held, bool down_held) {
     const bool down = write_bit(ProducerWireId(electricsim::topology::kWireDRIVER_ES_RSA_DIM_DOWN),
                                 down_held);
     return up && down;
+}
+
+bool WireTruthChassis::publish_rsa_hvac_buttons(bool heat, bool vent, bool ac) {
+    if (!attached()) return false;
+    namespace topo = electricsim::topology;
+    const bool h = write_bit(ProducerWireId(topo::kWireDRIVER_ES_RSA_HVAC_HEAT), heat);
+    const bool v = write_bit(ProducerWireId(topo::kWireDRIVER_ES_RSA_HVAC_VENT), vent);
+    const bool a = write_bit(ProducerWireId(topo::kWireDRIVER_ES_RSA_HVAC_AC), ac);
+    return h && v && a;
+}
+
+bool WireTruthChassis::publish_wiper_pulse_ladder_kohm(std::uint16_t kohm) {
+    if (!attached()) return false;
+    return impl_->table->write_element_state_level(
+        electricsim::topology::kWireDRIVER_ES_WIPER_PULSE_LADDER_KOHM, kohm);
+}
+
+bool WireTruthChassis::publish_battery_recovery_switch(bool held) {
+    if (!attached()) return false;
+    return impl_->table->write_element_state(
+        electricsim::topology::kWireDRIVER_ES_BATTERY_RECOVERY_SWITCH, held);
+}
+
+bool WireTruthChassis::publish_sdm_connector_unplugged(bool unplugged) {
+    if (!attached()) return false;
+    return impl_->table->write_element_state(
+        electricsim::topology::kWireDRIVER_ES_SDM_CONNECTOR_UNPLUGGED, unplugged);
+}
+
+std::optional<bool> WireTruthChassis::rsa_btsi_energised() const {
+    return read_bit(ReadOnlyWireId(kWireCHASSIS_RSA_BTSI_ENERGISED));
 }
 
 }  // namespace ev1sim
@@ -1129,6 +1155,11 @@ bool WireTruthChassis::publish_outside_air_temp(float) { return false; }
 bool WireTruthChassis::publish_pedal_sensor_open(bool) { return false; }
 bool WireTruthChassis::publish_reverse_select_switch(bool) { return false; }
 bool WireTruthChassis::publish_rsa_dim_buttons(bool, bool) { return false; }
+bool WireTruthChassis::publish_rsa_hvac_buttons(bool, bool, bool) { return false; }
+bool WireTruthChassis::publish_wiper_pulse_ladder_kohm(std::uint16_t) { return false; }
+bool WireTruthChassis::publish_battery_recovery_switch(bool) { return false; }
+bool WireTruthChassis::publish_sdm_connector_unplugged(bool) { return false; }
+std::optional<bool> WireTruthChassis::rsa_btsi_energised() const { return std::nullopt; }
 
 }  // namespace ev1sim
 

@@ -378,6 +378,28 @@ public:
     // dimmer step one level per press. Returns false if not attached.
     bool publish_rsa_dim_buttons(bool up_held, bool down_held);  // DRIVER_ES_RSA_DIM_UP / _DOWN
 
+    // The RSA HVAC head's HEAT / VENT / A/C buttons as held contacts; the RSA
+    // latches the last one pressed. Returns false if not attached.
+    bool publish_rsa_hvac_buttons(bool heat, bool vent, bool ac);  // DRIVER_ES_RSA_HVAC_*
+
+    // The wiper stalk's PULSE path through the delay collar's ladder rung, in
+    // kOhm (DRIVER_ES_WIPER_PULSE_LADDER_KOHM; 0 = no rung). Returns false if
+    // not attached.
+    bool publish_wiper_pulse_ladder_kohm(std::uint16_t kohm);
+
+    // The battery recovery switch held (DRIVER_ES_BATTERY_RECOVERY_SWITCH).
+    // Returns false if not attached.
+    bool publish_battery_recovery_switch(bool held);
+
+    // The SDM connector unplugged (DRIVER_ES_SDM_CONNECTOR_UNPLUGGED), which
+    // grounds the AIR BAG lamp line through its shorting bar. Returns false if
+    // not attached.
+    bool publish_sdm_connector_unplugged(bool unplugged);
+
+    // The RSA's BTSI solenoid energised (CHASSIS_RSA_BTSI_ENERGISED), which
+    // frees the shift lever to leave PARK. nullopt if not attached or unwritten.
+    std::optional<bool> rsa_btsi_energised() const;
+
 private:
     WireTruthChassis();
     struct Impl;

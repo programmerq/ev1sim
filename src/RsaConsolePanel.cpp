@@ -50,19 +50,6 @@ std::wstring FormatRsaBacklight(const std::optional<std::uint16_t>& dim_level_pe
     return buf;
 }
 
-std::wstring FormatRsaDoorLocks(const std::optional<std::uint8_t>& driver,
-                                const std::optional<std::uint8_t>& passenger) {
-    if (!driver || !passenger) return L"Door locks: ---";
-    const bool d = *driver != 0u;
-    const bool p = *passenger != 0u;
-    if (d == p) return d ? L"Door locks: LOCKED" : L"Door locks: unlocked";
-    std::wstring s = L"Door locks: DRV ";
-    s += d ? L"locked" : L"unlocked";
-    s += L", PAS ";
-    s += p ? L"locked" : L"unlocked";
-    return s;
-}
-
 RsaConsoleView BuildRsaConsoleView(const std::optional<DashRsaConsole>& rsa,
                                    const std::optional<bool>& coast_down_led) {
     const DashRsaConsole none;
@@ -96,6 +83,11 @@ RsaConsoleView BuildRsaConsoleView(const std::optional<DashRsaConsole>& rsa,
         Button(L"DIM -", RsaConsoleControl::kDimDown),
         Button(L"DIM +", RsaConsoleControl::kDimUp),
     };
+    v.climate = {
+        Button(L"HEAT", RsaConsoleControl::kHeat),
+        Button(L"VENT", RsaConsoleControl::kVent),
+        Button(L"A/C", RsaConsoleControl::kAc),
+    };
     // Keycaps as on the console keypad; a long press enters the higher digit.
     v.digits = {
         Button(L"1/2", RsaConsoleControl::kKey1), Button(L"3/4", RsaConsoleControl::kKey2),
@@ -106,7 +98,6 @@ RsaConsoleView BuildRsaConsoleView(const std::optional<DashRsaConsole>& rsa,
     v.shift_lock = FormatRsaShiftLock(c.shift_blocked);
     v.btsi       = FormatRsaBtsi(c.btsi_solenoid);
     v.backlight  = FormatRsaBacklight(c.dim_level_permille);
-    v.door_locks = FormatRsaDoorLocks(c.lock_driver, c.lock_passenger);
     return v;
 }
 
@@ -117,8 +108,8 @@ constexpr int kPad = 8;
 constexpr int kRowH = 16;
 constexpr int kLedH = 16;
 constexpr int kLedGap = 3;
-constexpr int kLedRows = 6;   // mode, selector, keypad lamps, buttons, dimmer, digits
-constexpr int kTextRows = 6;  // title, security, shift lock, BTSI, backlight, door locks
+constexpr int kLedRows = 7;   // mode, selector, keypad lamps, buttons, dimmer, climate, digits
+constexpr int kTextRows = 5;  // title, security, shift lock, BTSI, backlight
 
 // Same palette family as the cluster panel; LEDs lit green or amber.
 const irr::video::SColor kBg(200, 12, 20, 24);
@@ -155,6 +146,7 @@ std::vector<RsaConsoleCell> LayoutRsaConsole(const RsaConsoleView& view, int x, 
     row(view.keypad);
     row(view.buttons);
     row(view.dimmer);
+    row(view.climate);
     row(view.digits);
     return cells;
 }
@@ -221,8 +213,6 @@ void RsaConsolePanel::Draw(irr::video::IVideoDriver* driver,
     text(view_.btsi, x_ + kPad, y, inner, kRowH, kText);
     y += kRowH;
     text(view_.backlight, x_ + kPad, y, inner, kRowH, kText);
-    y += kRowH;
-    text(view_.door_locks, x_ + kPad, y, inner, kRowH, kText);
 }
 
 }  // namespace ev1sim

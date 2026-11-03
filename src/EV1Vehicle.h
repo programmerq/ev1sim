@@ -1,6 +1,7 @@
 #pragma once
 
 #include "chrono/core/ChCoordsys.h"
+#include "chrono/physics/ChShaft.h"
 #include "chrono_vehicle/ChTerrain.h"
 #include "chrono_vehicle/wheeled_vehicle/vehicle/WheeledVehicle.h"
 
@@ -18,6 +19,16 @@ namespace ev1sim {
 std::unique_ptr<chrono::vehicle::WheeledVehicle> BuildEV1Vehicle(
     const chrono::ChCoordsys<>& pose, double step_size_s,
     double fwd_speed_mps = 0.0);
+
+/// The drive unit's park pawl locks the final-drive gear (the differential
+/// carrier) to the case.  This returns the carrier's shaft, which the pawl
+/// fixes while engaged.  @design — a rigid pawl; the manual prints no rating.
+std::shared_ptr<chrono::ChShaft> ParkPawlCarrier(chrono::vehicle::WheeledVehicle& ev1);
+
+/// Drop the pawl in (engaged: the carrier stops and is held fixed) or lift it
+/// out.  ParkPawlLatch (PhysicalWorld.h) decides which from the lever and the
+/// car's speed.
+void SetParkPawlEngaged(chrono::ChShaft& carrier, bool engaged);
 
 /// Which way the drive motor turns its torque.  @source:manual propulsion
 /// p250: "When shifted to reverse the motor torque direction is, counter

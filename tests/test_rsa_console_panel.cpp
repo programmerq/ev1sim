@@ -24,14 +24,6 @@ TEST_CASE("RSA console labels: written cells read ON/off, unwritten read ---", "
     REQUIRE(FormatRsaBtsi(std::nullopt) == L"BTSI solenoid: ---");
 }
 
-TEST_CASE("RSA console door locks: the RSA's two lock commands", "[rsa_console]") {
-    using U = std::uint8_t;
-    REQUIRE(FormatRsaDoorLocks(std::nullopt, U{1}) == L"Door locks: ---");
-    REQUIRE(FormatRsaDoorLocks(U{1}, U{1}) == L"Door locks: LOCKED");
-    REQUIRE(FormatRsaDoorLocks(U{0}, U{0}) == L"Door locks: unlocked");
-    REQUIRE(FormatRsaDoorLocks(U{0}, U{1}) == L"Door locks: DRV unlocked, PAS locked");
-}
-
 TEST_CASE("RSA console backlight: drive level in permille as a percentage", "[rsa_console]") {
     REQUIRE(FormatRsaBacklight(std::nullopt) == L"Backlight ---");
     REQUIRE(FormatRsaBacklight(std::uint16_t{0}) == L"Backlight 0%");
@@ -54,10 +46,11 @@ TEST_CASE("RSA console view: every LED unknown before the RSA writes", "[rsa_con
     REQUIRE_FALSE(v.buttons[1].known);
     REQUIRE(v.dimmer.size() == 2u);
     for (const RsaLed& key : v.dimmer) REQUIRE_FALSE(key.lamp);
+    REQUIRE(v.climate.size() == 3u);
+    for (const RsaLed& key : v.climate) REQUIRE_FALSE(key.lamp);
     REQUIRE(v.digits.size() == 5u);
     for (const RsaLed& key : v.digits) REQUIRE_FALSE(key.lamp);
     REQUIRE(v.backlight == L"Backlight ---");
-    REQUIRE(v.door_locks == L"Door locks: ---");
 }
 
 TEST_CASE("RSA console COAST DOWN lamp is the PCM's $41 LED request", "[rsa_console]") {
@@ -77,7 +70,7 @@ TEST_CASE("RSA console COAST DOWN lamp is the PCM's $41 LED request", "[rsa_cons
 TEST_CASE("RSA console hit test finds each control where it is drawn", "[rsa_console]") {
     RsaConsolePanel panel(100, 50, 220);
     const auto cells = LayoutRsaConsole(panel.view(), 100, 50, 220);
-    REQUIRE(cells.size() == 2u + 4u + 2u + 2u + 2u + 5u);
+    REQUIRE(cells.size() == 2u + 4u + 2u + 2u + 2u + 3u + 5u);
     for (const RsaConsoleCell& c : cells) {
         const int cx = (c.x0 + c.x1) / 2;
         const int cy = (c.y0 + c.y1) / 2;
@@ -87,14 +80,18 @@ TEST_CASE("RSA console hit test finds each control where it is drawn", "[rsa_con
         REQUIRE(c.x1 <= 100 + 220);
         REQUIRE(c.y1 <= 50 + panel.Height());
     }
-    // Spot checks by name: the rows run mode, selector, lamps, buttons, dimmer, keys.
+    // Spot checks by name: the rows run mode, selector, lamps, buttons, dimmer,
+    // climate, keys.
     REQUIRE(cells[1].led->control == RsaConsoleControl::kRun);
     REQUIRE(cells[5].led->control == RsaConsoleControl::kDrive);
     REQUIRE(cells[6].led->control == RsaConsoleControl::kNone);  // VALID CODE lamp
     REQUIRE(cells[9].led->control == RsaConsoleControl::kCoastDown);
     REQUIRE(cells[10].led->control == RsaConsoleControl::kDimDown);
     REQUIRE(cells[11].led->control == RsaConsoleControl::kDimUp);
-    REQUIRE(cells[16].led->control == RsaConsoleControl::kKey5);
+    REQUIRE(cells[12].led->control == RsaConsoleControl::kHeat);
+    REQUIRE(cells[13].led->control == RsaConsoleControl::kVent);
+    REQUIRE(cells[14].led->control == RsaConsoleControl::kAc);
+    REQUIRE(cells[19].led->control == RsaConsoleControl::kKey5);
 
     // Outside, in a gap, or hidden: nothing.
     REQUIRE(panel.HitTest(99, cells[0].y0 + 2) == RsaConsoleControl::kNone);
@@ -144,18 +141,15 @@ TEST_CASE("RSA console selector and keypad LEDs follow their cells", "[rsa_conso
 
 TEST_CASE("RSA console panel: updates from a snapshot; draws on a null driver", "[rsa_console]") {
     RsaConsolePanel panel(10, 10, 220);
-    // Box ends one pad below the last text row: 3 pads, 6 text rows, 6 LED rows
-    // with the gap between them (8*3 + 16*6 + 16*6 + 3*5).
-    REQUIRE(panel.Height() == 231);
+    // Box ends one pad below the last text row: 3 pads, 5 text rows, 7 LED rows
+    // with the gap between them (8*3 + 16*5 + 16*7 + 3*6).
+    REQUIRE(panel.Height() == 234);
 
     DashSnapshot snap;
     snap.rsa = DashRsaConsole{};
     snap.rsa->shift_blocked = true;
     snap.rsa->dim_level_permille = std::uint16_t{500};
-    snap.rsa->lock_driver = std::uint8_t{1};
-    snap.rsa->lock_passenger = std::uint8_t{1};
     panel.Update(snap);
-    REQUIRE(panel.view().door_locks == L"Door locks: LOCKED");
     REQUIRE(panel.view().shift_lock == L"Shift lock: BLOCKED");
     REQUIRE(panel.view().backlight == L"Backlight 50%");
 

@@ -13,10 +13,10 @@
 // RsaConsoleInput — clicks on the RSA console (docs/ipc_rsa_display_plan.md
 // Phase 4) become the same driver inputs the keyboard produces.
 //
-// Every control goes through a PhysicalWorld component ev1sim already
-// publishes from (the K-key keypad driver, the PRND selector), plus the new
-// coast-down button, so the console adds no new writer to the RSA's input
-// cells.
+// Every control goes through a PhysicalWorld component ev1sim publishes from
+// (the K-key keypad driver, the PRND selector, the coast-down button, the
+// dimmer and the RSA's faceplate buttons), so the console adds no writer of
+// its own to the RSA's input cells.
 //
 // Split for testing: RsaConsolePointer turns press/release times into actions
 // (pure), ApplyRsaConsoleAction() applies one to a PhysicalWorld, and

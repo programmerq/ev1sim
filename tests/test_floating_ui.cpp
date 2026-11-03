@@ -157,6 +157,14 @@ TEST_CASE("FormatWiperLabel: out-of-range returns fallback", "[FloatingUI]") {
     CHECK(FormatWiperLabel(4)  == L"Wiper: ?");
 }
 
+TEST_CASE("Wiper delay, battery recovery and SDM connector labels", "[FloatingUI]") {
+    CHECK(FormatWiperDelayLabel(330) == L"Wiper delay: 330K");
+    CHECK(FormatBatteryRecoveryLabel(true) == L"Batt recovery: HELD");
+    CHECK(FormatBatteryRecoveryLabel(false) == L"Batt recovery: released");
+    CHECK(FormatSdmConnectorLabel(true) == L"SDM conn: UNPLUGGED");
+    CHECK(FormatSdmConnectorLabel(false) == L"SDM conn: plugged in");
+}
+
 TEST_CASE("FormatWashLabel: static label", "[FloatingUI]") {
     CHECK(FormatWashLabel() == L"Wash");
 }

@@ -398,6 +398,21 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
                     std::cout << "[UI] Wiper wash\n";
                 });
 
+            // --- Wiper delay collar (the INT dwell): longer / shorter ---
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    const auto& ws = m_physical->wiper_stalk();
+                    return FormatWiperDelayLabel(
+                        ev1sim::WiperStalk::kDelayRungKohm[ws.delay_rung()]);
+                },
+                []() {});   // display-only row (the selected rung)
+            m_floating_ui->AddButton(
+                []() -> std::wstring { return L"Wiper delay longer"; },
+                [this]() { m_physical->wiper_stalk().delay_longer(); });
+            m_floating_ui->AddButton(
+                []() -> std::wstring { return L"Wiper delay shorter"; },
+                [this]() { m_physical->wiper_stalk().delay_shorter(); });
+
             // --- Cruise stalk: SET, RESUME, CANCEL, +, - ---
             m_floating_ui->AddButton(
                 []() -> std::wstring { return FormatCruiseLabel(L"SET"); },
@@ -452,6 +467,22 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
                                       ? "BUCKLED" : "UNBUCKLED") << "\n";
                 });
 
+            // --- Battery recovery switch (held until clicked again) ---
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatBatteryRecoveryLabel(
+                        m_physical->battery_recovery_switch().closed());
+                },
+                [this]() { m_physical->battery_recovery_switch().toggle(); });
+
+            // --- SDM connector (a technician unplugging it) ---
+            m_floating_ui->AddButton(
+                [this]() -> std::wstring {
+                    return FormatSdmConnectorLabel(
+                        m_physical->sdm_connector_unplugged().closed());
+                },
+                [this]() { m_physical->sdm_connector_unplugged().toggle(); });
+
             // --- HVAC status (display-only; no click action) ---
             // Subscribes to HTCM chassis-bus signals 4082 (blower level) and
             // 4083 (defrost grid).  Labels update each frame via UpdateLabels().
@@ -471,8 +502,9 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
                 },
                 []() {});   // no-op: display-only row
 
-            // --- HVAC driver controls (drive ev1sim::HvacControls; the
-            //     requests are published to HTCM on chassis 4124-4128 each tick).
+            // --- HVAC driver controls (drive ev1sim::HvacControls, published on
+            //     chassis 4124-4128, which no electricsim module reads; the car's
+            //     HEAT / VENT / A/C buttons are on the RSA console panel).
             //     Display row for the setpoint + buttons to adjust/cycle/toggle. ---
             m_floating_ui->AddButton(
                 [this]() -> std::wstring {
@@ -1184,6 +1216,8 @@ void SimApp::PublishRsaConsoleButtons(double dt_s) {
     if (buttons.held(B::kModeRun))    mode |= ev1sim::RsaKeypadDriver::kModeSwRun;
     m_external_sim->SetDriverRsaModeSwitches(mode);
     m_external_sim->SetRsaDimmerButtons(buttons.held(B::kDimUp), buttons.held(B::kDimDown));
+    m_external_sim->SetRsaHvacButtons(buttons.held(B::kHvacHeat), buttons.held(B::kHvacVent),
+                                      buttons.held(B::kHvacAc));
 }
 
 // ---------------------------------------------------------------------------
@@ -1308,11 +1342,18 @@ void SimApp::ApplyElectronicsSteering(DriverCommand& cmd) {
 // PIM commands no torque, and the motor stays coupled to the wheels).  Both
 // loops call this once per tick, before the physics substeps.
 void SimApp::ApplyMotorDirection() {
-    const bool reverse = m_physical->prnd_selector().position() ==
-                         ev1sim::PrndSelector::Position::R;
+    const auto lever = m_physical->prnd_selector().position();
+    const bool reverse = lever == ev1sim::PrndSelector::Position::R;
     ev1sim::SetMotorDirection(m_world->GetVehicle(),
                               reverse ? ev1sim::MotorDirection::kReverse
                                       : ev1sim::MotorDirection::kForward);
+    // The lever's cable also works the park pawl (ParkPawlLatch). Without an
+    // electrical sim nothing shifts the lever out of its default P and no PIM
+    // withholds torque there, so the car drives as before with the pawl up.
+    const bool electrical = m_external_sim && m_external_sim->GetOptions().enabled;
+    m_world->SetParkPawl(m_park_pawl.update(
+        electrical && lever == ev1sim::PrndSelector::Position::P,
+        m_world->GetState().speed_mps));
 }
 
 // ---------------------------------------------------------------------------
@@ -1413,8 +1454,7 @@ void SimApp::ConsumeBodyActuatorPeripherals(double dt, double steering) {
     // --- Door-lock motors LH/RH (chassis 4182-4185 in) ---
     // The RHJB dual-H-bridge motor-leg drives: advance each motor and mirror its
     // end-of-travel stroke into DoorLocks.  Until the RHJB has published a leg
-    // the motors never move and the high-level 4084/4085 RSA mirror remains
-    // authoritative.  The plant step itself lives in PhysicalWorld so a unit
+    // the motors never move.  The plant step itself lives in PhysicalWorld so a unit
     // test can drive it — this file is not in the Chrono-free test target.
     {
         const bool have_legs =
@@ -1795,6 +1835,11 @@ int SimApp::RunWithVisualization() {
             m_external_sim->SetWiperWasherSwOutputs(
                 ws.pin_delay_out(), ws.pin_request_out(),
                 ws.pin_hi_out(), ws.pin_washer_switch_out());
+            m_external_sim->SetWiperPulseLadderKohm(ws.pulse_ladder_kohm());
+            m_external_sim->SetBatteryRecoverySwitch(
+                m_physical->battery_recovery_switch().closed());
+            m_external_sim->SetSdmConnectorUnplugged(
+                m_physical->sdm_connector_unplugged().closed());
         }
         // Charge coupler presence (chassis bus, ID 4060).  Stubbed false until
         // a floating-UI panel or charge-door animation sets it.
@@ -1804,8 +1849,11 @@ int SimApp::RunWithVisualization() {
         // The pump motor body closes molex.D/E while present; PSCM senses it.
         m_external_sim->SetSteeringPumpInterlockClosed(
             m_physical->power_steering_pump().interlock_closed());
-        // PRND selector wire-level pins (chassis bus, IDs 4050-4053).
+        // PRND selector wire-level pins (chassis bus, IDs 4050-4053); the
+        // lever stays in P while the RSA's BTSI solenoid is off.
         {
+            m_physical->prnd_selector().set_btsi_energised(
+                m_external_sim->GetRsaBtsiEnergised());
             const auto& prnd = m_physical->prnd_selector();
             m_external_sim->SetPrndSelector(prnd.pin_a(), prnd.pin_b(),
                                             prnd.pin_c(), prnd.pin_d());
@@ -1985,23 +2033,6 @@ int SimApp::RunWithVisualization() {
             m_trunk_lid3d = std::make_unique<ev1sim::TrunkLid3D>(
                 m_vis->GetDevice(), GetDataFile("ev1/ev1_trunk_lid.obj"));
         m_trunk_lid3d->Update(m_world->GetPose(), m_panels->IsOpen(PanelID::TRUNK), render_dt);
-
-        // --- Door lock mirror from RSA (chassis bus 4084/4085) ---
-        // RSA publishes desired lock state; ev1sim mirrors it to DoorLocks.
-        {
-            using S = ev1sim::DoorLocks::State;
-            for (int side = 0; side < 2; ++side) {
-                if (!m_external_sim->HasReceivedDoorLockCmd(side)) continue;
-                const std::uint8_t cmd = m_external_sim->GetDoorLockCmd(side);
-                if (cmd == m_last_door_lock_cmd[side]) continue;
-                m_last_door_lock_cmd[side] = cmd;
-                const S new_state = (cmd == 1u) ? S::LOCKED : S::UNLOCKED;
-                if (side == 0) m_physical->door_locks().set_driver(new_state);
-                else           m_physical->door_locks().set_passenger(new_state);
-                std::cout << "[SimApp] Door lock " << (side == 0 ? "driver" : "passenger")
-                          << ": " << (new_state == S::LOCKED ? "LOCKED" : "UNLOCKED") << "\n";
-            }
-        }
 
         // --- Power window motor log (motor legs at the junction blocks) — no visual yet ---
         {
@@ -2399,6 +2430,11 @@ int SimApp::RunHeadless() {
             m_external_sim->SetWiperWasherSwOutputs(
                 ws.pin_delay_out(), ws.pin_request_out(),
                 ws.pin_hi_out(), ws.pin_washer_switch_out());
+            m_external_sim->SetWiperPulseLadderKohm(ws.pulse_ladder_kohm());
+            m_external_sim->SetBatteryRecoverySwitch(
+                m_physical->battery_recovery_switch().closed());
+            m_external_sim->SetSdmConnectorUnplugged(
+                m_physical->sdm_connector_unplugged().closed());
         }
         // Charge coupler presence (chassis bus, ID 4060).  Stubbed false until
         // a floating-UI panel or charge-door animation sets it.
@@ -2408,9 +2444,12 @@ int SimApp::RunHeadless() {
         // The pump motor body closes molex.D/E while present; PSCM senses it.
         m_external_sim->SetSteeringPumpInterlockClosed(
             m_physical->power_steering_pump().interlock_closed());
-        // PRND selector wire-level pins (chassis bus, IDs 4050-4053).
-        // In headless mode stays at default Park; no keyboard cycling.
+        // PRND selector wire-level pins (chassis bus, IDs 4050-4053), moved
+        // by scenario prnd actions; the lever stays in P while the RSA's BTSI
+        // solenoid is off.
         {
+            m_physical->prnd_selector().set_btsi_energised(
+                m_external_sim->GetRsaBtsiEnergised());
             const auto& prnd = m_physical->prnd_selector();
             m_external_sim->SetPrndSelector(prnd.pin_a(), prnd.pin_b(),
                                             prnd.pin_c(), prnd.pin_d());
@@ -2540,22 +2579,6 @@ int SimApp::RunHeadless() {
                     ? m_external_sim->GetWiperMotorCommand()
                     : 0u;
             m_wiper->Tick(tick_dt, wiper_cmd);
-        }
-
-        // --- Door lock mirror from RSA (chassis bus 4084/4085) ---
-        {
-            using S = ev1sim::DoorLocks::State;
-            for (int side = 0; side < 2; ++side) {
-                if (!m_external_sim->HasReceivedDoorLockCmd(side)) continue;
-                const std::uint8_t cmd = m_external_sim->GetDoorLockCmd(side);
-                if (cmd == m_last_door_lock_cmd[side]) continue;
-                m_last_door_lock_cmd[side] = cmd;
-                const S new_state = (cmd == 1u) ? S::LOCKED : S::UNLOCKED;
-                if (side == 0) m_physical->door_locks().set_driver(new_state);
-                else           m_physical->door_locks().set_passenger(new_state);
-                std::cout << "[SimApp] Door lock " << (side == 0 ? "driver" : "passenger")
-                          << ": " << (new_state == S::LOCKED ? "LOCKED" : "UNLOCKED") << "\n";
-            }
         }
 
         // --- Power window motor log (motor legs at the junction blocks) — no visual yet ---
@@ -2842,6 +2865,24 @@ void SimApp::DispatchAction(ev1sim::InputAction action) {
             break;
         case A::WiperWash:
             if (m_physical) m_physical->wiper_stalk().press_wash();
+            break;
+        case A::WiperDelayLonger:
+            if (m_physical) m_physical->wiper_stalk().delay_longer();
+            break;
+        case A::WiperDelayShorter:
+            if (m_physical) m_physical->wiper_stalk().delay_shorter();
+            break;
+        case A::HvacHeat:
+            if (m_physical)
+                m_physical->rsa_console_buttons().press_hvac(ev1sim::RsaConsoleButtons::kHvacHeat);
+            break;
+        case A::HvacVent:
+            if (m_physical)
+                m_physical->rsa_console_buttons().press_hvac(ev1sim::RsaConsoleButtons::kHvacVent);
+            break;
+        case A::HvacAc:
+            if (m_physical)
+                m_physical->rsa_console_buttons().press_hvac(ev1sim::RsaConsoleButtons::kHvacAc);
             break;
         case A::CruiseSet:       CruiseSet();         break;
         case A::CruiseResume:    CruiseResume();      break;
