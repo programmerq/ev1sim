@@ -789,7 +789,7 @@ ev1sim::DashRsaConsole WireTruthChassis::rsa_console() const {
     c.valid_code    = read_bit(kWireCHASSIS_RSA_VALID_CODE);
     c.security      = read_bit(ReadOnlyWireId(kWireCHASSIS_SECURITY_TELLTALE));
     c.shift_blocked = read_bit(kWireCHASSIS_RSA_SHIFT_BLOCKED);
-    c.btsi_solenoid = read_bit(ReadOnlyWireId(kWireCHASSIS_RSA_BTSI_ENERGISED));
+    c.btsi_solenoid = rsa_btsi_energised();
     c.led_park      = read_bit(kWireCHASSIS_RSA_SELECTOR_LED_PARK);
     c.led_reverse   = read_bit(kWireCHASSIS_RSA_SELECTOR_LED_REVERSE);
     c.led_neutral   = read_bit(kWireCHASSIS_RSA_SELECTOR_LED_NEUTRAL);
@@ -984,6 +984,10 @@ bool WireTruthChassis::publish_sdm_connector_unplugged(bool unplugged) {
         electricsim::topology::kWireDRIVER_ES_SDM_CONNECTOR_UNPLUGGED, unplugged);
 }
 
+std::optional<bool> WireTruthChassis::rsa_btsi_energised() const {
+    return read_bit(ReadOnlyWireId(kWireCHASSIS_RSA_BTSI_ENERGISED));
+}
+
 }  // namespace ev1sim
 
 #else  // !EV1SIM_HAVE_WIRE_TRUTH
@@ -1160,6 +1164,7 @@ bool WireTruthChassis::publish_rsa_hvac_buttons(bool, bool, bool) { return false
 bool WireTruthChassis::publish_wiper_pulse_ladder_kohm(std::uint16_t) { return false; }
 bool WireTruthChassis::publish_battery_recovery_switch(bool) { return false; }
 bool WireTruthChassis::publish_sdm_connector_unplugged(bool) { return false; }
+std::optional<bool> WireTruthChassis::rsa_btsi_energised() const { return std::nullopt; }
 
 }  // namespace ev1sim
 

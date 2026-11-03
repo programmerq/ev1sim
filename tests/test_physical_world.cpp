@@ -439,6 +439,30 @@ TEST_CASE("WiperStalk: default position is OFF", "[PhysicalWorld]") {
     CHECK_FALSE(ws.consume_wash());
 }
 
+TEST_CASE("PrndSelector: the BTSI lock holds the lever in P and only in P", "[PhysicalWorld]") {
+    using P = PrndSelector::Position;
+    PrndSelector s;
+    s.set_btsi_energised(std::nullopt);   // no electrical sim: free
+    CHECK_FALSE(s.park_locked());
+    s.set_btsi_energised(false);          // solenoid seen off: locked
+    REQUIRE(s.park_locked());
+    s.cycle_up();
+    CHECK(s.position() == P::P);
+    s.set_position(P::D);
+    CHECK(s.position() == P::P);
+    CHECK(s.pin_b());                     // still publishing Park
+    s.set_btsi_energised(true);           // energised: the lever moves
+    s.cycle_up();
+    CHECK(s.position() == P::R);
+    s.set_btsi_energised(false);          // out of P: the lock moves nothing
+    s.cycle_up();
+    CHECK(s.position() == P::N);
+    s.set_position(P::P);                 // and back into P is always allowed
+    CHECK(s.position() == P::P);
+    s.set_position(P::R);
+    CHECK(s.position() == P::P);
+}
+
 TEST_CASE("WiperStalk: the delay collar's rung reaches the line only at INT", "[PhysicalWorld]") {
     WiperStalk ws;
     CHECK(ws.delay_rung() == WiperStalk::kDefaultDelayRung);

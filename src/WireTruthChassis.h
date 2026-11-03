@@ -396,6 +396,10 @@ public:
     // not attached.
     bool publish_sdm_connector_unplugged(bool unplugged);
 
+    // The RSA's BTSI solenoid energised (CHASSIS_RSA_BTSI_ENERGISED), which
+    // frees the shift lever to leave PARK. nullopt if not attached or unwritten.
+    std::optional<bool> rsa_btsi_energised() const;
+
 private:
     WireTruthChassis();
     struct Impl;

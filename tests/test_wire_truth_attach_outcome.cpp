@@ -34,6 +34,7 @@
 
 #include "topology/topology_generated.h"
 #include "wire_table.hpp"
+#include "net_host/conductor_publisher.hpp"
 
 namespace {
 
@@ -526,4 +527,34 @@ TEST_CASE("HVAC head, wiper delay rung, battery recovery and SDM connector publi
     CHECK(rung() == 0u);
     CHECK_FALSE(contact(topo::kWireDRIVER_ES_BATTERY_RECOVERY_SWITCH));
     CHECK_FALSE(contact(topo::kWireDRIVER_ES_SDM_CONNECTOR_UNPLUGGED));
+}
+
+// The RSA's BTSI solenoid reaches the connector, which locks the lever in P.
+TEST_CASE("GetRsaBtsiEnergised reads the BTSI solenoid off the wire",
+          "[wire_truth][attach_outcome]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("btsi");
+    auto table = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(table != nullptr);
+
+    ScopedWiresName guard(seg.c_str());
+    ExternalSimConnector::Options opts;
+    opts.enabled = true;
+    ExternalSimConnector c(opts);
+    c.Tick(0.0);
+    REQUIRE(c.IsConnected());
+    CHECK(c.GetRsaBtsiEnergised() == std::nullopt);   // unwritten
+
+    ev1sim::PrndSelector lever;
+    // The test stands in for the solver, the conductor's producer.
+    electricsim::net_host::ConductorPublisher solver(*table);
+    REQUIRE(solver.publish(topo::kWireCHASSIS_RSA_BTSI_ENERGISED, false));
+    lever.set_btsi_energised(c.GetRsaBtsiEnergised());
+    lever.cycle_up();
+    CHECK(lever.position() == ev1sim::PrndSelector::Position::P);
+
+    REQUIRE(solver.publish(topo::kWireCHASSIS_RSA_BTSI_ENERGISED, true));
+    lever.set_btsi_energised(c.GetRsaBtsiEnergised());
+    lever.cycle_up();
+    CHECK(lever.position() == ev1sim::PrndSelector::Position::R);
 }

@@ -701,6 +701,10 @@ public:
     /// substrate or before their first frame.
     ev1sim::DashSnapshot GetDashSnapshot() const;
 
+    /// The RSA's BTSI solenoid energised (the shift lever free to leave P),
+    /// read off CHASSIS_RSA_BTSI_ENERGISED; nullopt until the wire carries it.
+    std::optional<bool> GetRsaBtsiEnergised() const;
+
     /// Incoming Auto Disconnect main HV contactor state (ID 5224, main
     /// harness segment).  Published by the AD controller on change.
     /// bool: true = main contactor commanded closed (HV bus energized from

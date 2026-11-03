@@ -2125,6 +2125,13 @@ ev1sim::DashSnapshot ExternalSimConnector::GetDashSnapshot() const {
     return snap;
 }
 
+std::optional<bool> ExternalSimConnector::GetRsaBtsiEnergised() const {
+#if EV1SIM_HAVE_WIRE_TRUTH
+    if (m_state->wire) return m_state->wire->rsa_btsi_energised();
+#endif
+    return std::nullopt;
+}
+
 bool ExternalSimConnector::GetAdMainContactorClosed() const {
     return m_state->ad_main_contactor;
 }
