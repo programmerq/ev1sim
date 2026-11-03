@@ -188,6 +188,11 @@ public:
     /// imbalance detector (batt-685, 30..70 % of pack voltage) does the rest.
     void SetHvIsolationFault(std::uint8_t lead, std::uint32_t leak_kohm);
 
+    /// Vehicle-plant fault injection (scenario action "bpm_memory_fault"): the
+    /// BPM's failed internal memories as a bitmask, written every tick on
+    /// BPM_INTERNAL_MEMORY_FAULT once set.
+    void SetBpmMemoryFault(std::uint8_t mask);
+
     /// The shifter's coast-down button position (scenario action
     /// "coast_down_switch"; 1 = coast down). Published on DRIVER_ES_COAST_DOWN_SWITCH
     /// every tick once set, for the RSA to report as $31 Coast Down Request.
@@ -208,6 +213,10 @@ public:
     /// The battery recovery switch held. Written every tick on
     /// DRIVER_ES_BATTERY_RECOVERY_SWITCH.
     void SetBatteryRecoverySwitch(bool held);
+
+    /// The RSA's RESET button held. Written every tick on
+    /// DRIVER_ES_RSA_TRIP_RESET.
+    void SetRsaTripReset(bool held);
 
     /// The SDM connector unplugged. Written every tick on
     /// DRIVER_ES_SDM_CONNECTOR_UNPLUGGED.

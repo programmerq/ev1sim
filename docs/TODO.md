@@ -54,13 +54,11 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   at startup only and stays on sim time (`AmbientTempSensor::hour_of_day`);
   without a file, or when the script cannot reach the service, the almanac
   keeps its defaults.
-- [ ] **Trip-reset button presses nothing on the car.**  The I key, the Trip
-  Reset UI button and Scenario's `ipc_trip_reset` hook change ev1sim state
-  only.  electricsim #851 adds the RSA's RESET button as
-  `DRIVER_ES_RSA_TRIP_RESET`; re-vendor and hold that contact per press once it
-  lands.  (The door handles are mechanical rods to the latch with no switch;
-  opening a door reaches the car through the jamb switches ev1sim already
-  writes.)
+- [x] **Trip-reset button reaches the car.**  The I key, the Trip Reset UI
+  button and Scenario's `ipc_trip_reset` hook each close the RSA's RESET button
+  (`DRIVER_ES_RSA_TRIP_RESET`) for one timed push (`TimedPushButton`).  (The
+  door handles are mechanical rods to the latch with no switch; opening a door
+  reaches the car through the jamb switches ev1sim already writes.)
 
 ## ABS scenarios
 

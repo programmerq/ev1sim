@@ -505,28 +505,82 @@ TEST_CASE("HVAC head, wiper delay rung, battery recovery and SDM connector publi
     CHECK(rung() == 0u);
     CHECK_FALSE(contact(topo::kWireDRIVER_ES_BATTERY_RECOVERY_SWITCH));
     CHECK_FALSE(contact(topo::kWireDRIVER_ES_SDM_CONNECTOR_UNPLUGGED));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_RSA_TRIP_RESET));
 
     c.SetRsaHvacButtons(/*heat=*/false, /*vent=*/false, /*ac=*/true);
     c.SetWiperPulseLadderKohm(205u);
     c.SetBatteryRecoverySwitch(true);
     c.SetSdmConnectorUnplugged(true);
+    c.SetRsaTripReset(true);
     c.Tick(0.1);
     CHECK_FALSE(contact(topo::kWireDRIVER_ES_RSA_HVAC_HEAT));
     CHECK(contact(topo::kWireDRIVER_ES_RSA_HVAC_AC));
     CHECK(rung() == 205u);
     CHECK(contact(topo::kWireDRIVER_ES_BATTERY_RECOVERY_SWITCH));
     CHECK(contact(topo::kWireDRIVER_ES_SDM_CONNECTOR_UNPLUGGED));
+    CHECK(contact(topo::kWireDRIVER_ES_RSA_TRIP_RESET));
 
     c.SetRsaHvacButtons(true, false, false);
     c.SetWiperPulseLadderKohm(0u);
     c.SetBatteryRecoverySwitch(false);
     c.SetSdmConnectorUnplugged(false);
+    c.SetRsaTripReset(false);
     c.Tick(0.2);
     CHECK(contact(topo::kWireDRIVER_ES_RSA_HVAC_HEAT));
     CHECK_FALSE(contact(topo::kWireDRIVER_ES_RSA_HVAC_AC));
     CHECK(rung() == 0u);
     CHECK_FALSE(contact(topo::kWireDRIVER_ES_BATTERY_RECOVERY_SWITCH));
     CHECK_FALSE(contact(topo::kWireDRIVER_ES_SDM_CONNECTOR_UNPLUGGED));
+    CHECK_FALSE(contact(topo::kWireDRIVER_ES_RSA_TRIP_RESET));
+}
+
+// The brake master-cylinder pressure reaches CHASSIS_ES_MASTER_CYL_PRESSURE as
+// permille of sensor full scale, and an armed BPM memory fault reaches
+// BPM_INTERNAL_MEMORY_FAULT, through Tick.
+TEST_CASE("Master-cylinder pressure and BPM memory fault publish through Tick",
+          "[wire_truth][attach_outcome]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("mc_bpm");
+    auto table = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(table != nullptr);
+
+    ScopedWiresName guard(seg.c_str());
+    ExternalSimConnector::Options opts;
+    opts.enabled = true;
+    ExternalSimConnector c(opts);
+
+    auto permille = [&]() {
+        electricsim::io::WireTable::Sample<std::uint16_t> s{};
+        REQUIRE(table->read_uint16_sample(topo::kWireCHASSIS_ES_MASTER_CYL_PRESSURE, &s));
+        REQUIRE(s.written());
+        return s.value;
+    };
+    auto fault_written = [&]() {
+        electricsim::io::WireTable::Sample<std::uint8_t> s{};
+        REQUIRE(table->read_byte_sample(topo::kWireBPM_INTERNAL_MEMORY_FAULT, &s));
+        return s.written();
+    };
+    auto fault = [&]() {
+        electricsim::io::WireTable::Sample<std::uint8_t> s{};
+        REQUIRE(table->read_byte_sample(topo::kWireBPM_INTERNAL_MEMORY_FAULT, &s));
+        REQUIRE(s.written());
+        return s.value;
+    };
+
+    c.Tick(0.0);
+    REQUIRE(c.IsConnected());
+    CHECK(permille() == 0u);
+    CHECK_FALSE(fault_written());
+
+    c.SetBrakeMasterPressureKpa(1724.0f);
+    c.SetBpmMemoryFault(0x04u);
+    c.Tick(0.1);
+    CHECK(permille() == 500u);
+    CHECK(fault() == 0x04u);
+
+    c.SetBrakeMasterPressureKpa(9000.0f);
+    c.Tick(0.2);
+    CHECK(permille() == 1000u);
 }
 
 // The RSA's BTSI solenoid reaches the connector, which locks the lever in P.

@@ -281,6 +281,8 @@ public:
     // 1 HV+, 2 HV-) and HV_ISOLATION_FAULT_KOHM. ev1sim is these cells'
     // producer (the vehicle plant). Returns false if not attached.
     bool publish_hv_isolation_fault(std::uint8_t lead, std::uint32_t kohm);
+    // The BPM's failed internal memories (BPM_INTERNAL_MEMORY_FAULT bitmask).
+    bool publish_bpm_memory_fault(std::uint8_t mask);
 
     // The steering pump motor's case temperature, uint16 Q8 °C
     // (CHASSIS_PS_MOTOR_CASE_TEMP_Q8, read by the PSCM's 150 °C switch). ev1sim
@@ -390,6 +392,11 @@ public:
     // The battery recovery switch held (DRIVER_ES_BATTERY_RECOVERY_SWITCH).
     // Returns false if not attached.
     bool publish_battery_recovery_switch(bool held);
+    // The RSA's RESET button held (DRIVER_ES_RSA_TRIP_RESET).
+    bool publish_rsa_trip_reset(bool held);
+    // Master-cylinder pressure on both upstream sensors
+    // (CHASSIS_ES_MASTER_CYL_PRESSURE), in permille of their 0-3448 kPa range.
+    bool publish_master_cyl_pressure_permille(std::uint16_t permille);
 
     // The SDM connector unplugged (DRIVER_ES_SDM_CONNECTOR_UNPLUGGED), which
     // grounds the AIR BAG lamp line through its shorting bar. Returns false if

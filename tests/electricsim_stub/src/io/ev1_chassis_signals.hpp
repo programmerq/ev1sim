@@ -421,23 +421,16 @@ inline constexpr std::uint32_t kSigChassisHvacBlowerLevel    = 4082U;
 // ---------------------------------------------------------------------------
 inline constexpr std::uint32_t kSigChassisDefrostGridActive  = 4083U;
 
-// ---------------------------------------------------------------------------
-// Door lock commands (electricsim/RSA → ev1sim chassis bus)
-// Signal IDs 4084-4085.  RSA publishes these when it decides to lock or
-// unlock a door (a valid exterior keypad code unlocks both).
-// Encoding: uint8 — 0=unlocked, 1=locked.
-// ---------------------------------------------------------------------------
-inline constexpr std::uint32_t kSigChassisDoorLockCmdDriver    = 4084U;  // driver door
-inline constexpr std::uint32_t kSigChassisDoorLockCmdPassenger = 4085U;  // passenger door
-
-// ---------------------------------------------------------------------------
-// Power window motor commands (electricsim/RSA → ev1sim chassis bus)
-// Signal IDs 4086-4087.  RSA publishes the motor direction while the user
-// holds the corresponding switch.  Gated on run_mode != OFF.
-// Encoding: uint8 — 0=stop, 1=up, 2=down.
-// ---------------------------------------------------------------------------
-inline constexpr std::uint32_t kSigChassisPowerWindowMotorDriver    = 4086U;  // driver window
-inline constexpr std::uint32_t kSigChassisPowerWindowMotorPassenger = 4087U;  // passenger window
+// 4084-4087 are retired: the RSA grounds the junction blocks' door-unlock and
+// window lines, and the RHJB's door-lock motor legs (CHASSIS_RHJB_DLM_*) and
+// the window motor legs (CHASSIS_{LH,RH}_WINDOW_{UP,DOWN}_DRIVE) are what
+// ev1sim reads (docs/3d_sim_contract.md). Nothing publishes them. The constants
+// stay while ev1sim's drift guard names them (scripts/audit_cross_repo_contract.py);
+// do not reuse the slots.
+inline constexpr std::uint32_t kSigChassisDoorLockCmdDriver         = 4084U;
+inline constexpr std::uint32_t kSigChassisDoorLockCmdPassenger      = 4085U;
+inline constexpr std::uint32_t kSigChassisPowerWindowMotorDriver    = 4086U;
+inline constexpr std::uint32_t kSigChassisPowerWindowMotorPassenger = 4087U;
 
 // ---------------------------------------------------------------------------
 // RSA shift-blocked cue (electricsim/RSA → ev1sim chassis bus)
@@ -486,7 +479,7 @@ inline constexpr std::uint32_t kSigChassisIpcSeatbeltTelltaleDriver    = 4130U;
 // (epsilon ~0.5 m) after each supervisor tick so the 3D sim and floating
 // UI can display trip mileage independent of the full IPC LCD summary.
 // Encoding: IEEE 754 float32, little-endian, 4 bytes.  Units: metres.
-// Value resets to 0.0 on a trip-reset pulse (kSigDriverIpcTripResetButton).
+// Value resets to 0.0 on a trip-reset pulse (the RSA RESET press, $31 Trip Reset Request).
 // ---------------------------------------------------------------------------
 inline constexpr std::uint32_t kSigChassisIpcTripDistanceM = 4132U;
 
@@ -679,8 +672,7 @@ inline constexpr std::uint32_t kSigChassisIpcDimDutyPct         = 4163U;
 // linkage actually ended up): uint8 bool, 0 = unlocked, 1 = locked,
 // published on change (plus an initial publish so consumers latch the
 // startup state).  No electricsim consumer is wired yet; the natural one is
-// RSA correlating commanded lock state (kSigChassisDoorLockCmd*, 4084/4085)
-// against achieved state.
+// RSA correlating the RHJB's lock-motor drive with the achieved state.
 //
 // HISTORY (@design 2026-06-11): ev1sim had been publishing this trio on
 // 4155–4157 — IDs this contract allocates to the HV bus rail — because the

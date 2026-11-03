@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <cstdint>
 #include <fstream>
 #include <functional>
 #include <optional>
@@ -187,6 +188,11 @@ public:
     // short). The EV1's Auto Disconnect detects it as an imbalance of the
     // chassis-to-lead voltages (batt-685 ISOLATION DETECTION).
     virtual void HvIsolationFault(int lead, double leak_kohm) = 0;
+    // Vehicle-plant fault injection (scenario action "bpm_memory_fault"): which
+    // of the BPM's internal memories has failed, as the bitmask
+    // BPM_INTERNAL_MEMORY_FAULT carries (0x01 RAM, 0x02 ROM, 0x04 EEPROM,
+    // 0x08 EEPROM checksum; 0 = none). Held until the next action.
+    virtual void BpmMemoryFault(std::uint8_t mask) = 0;
     // The shifter's coast-down button position (scenario action
     // "coast_down_switch"), held until the next action. The RSA reports it to
     // the PIM, which then commands coast-down drag (propulsion p57).
