@@ -130,8 +130,6 @@ struct DashRsaConsole {
     std::optional<bool> led_neutral;    // CHASSIS_RSA_SELECTOR_LED_NEUTRAL
     std::optional<bool> led_drive;      // CHASSIS_RSA_SELECTOR_LED_DRIVE
     std::optional<std::uint16_t> dim_level_permille;  // RSA_ES_DIM_LEVEL_DRV, permille of 12 V
-    std::optional<std::uint8_t> lock_driver;     // CHASSIS_DOOR_LOCK_CMD_DRIVER, 0 unlocked, 1 locked
-    std::optional<std::uint8_t> lock_passenger;  // CHASSIS_DOOR_LOCK_CMD_PASSENGER
 };
 
 struct DashSnapshot {

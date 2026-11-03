@@ -22,8 +22,6 @@
 //   COAST DOWN   = the PCM's $41 Coast Down LED Request (DashPcmStatus)
 //   Security     = CHASSIS_SECURITY_TELLTALE: solid after 25 key entries
 //                  without a valid code, the car's only "entry denied" sign
-//   Door locks   = the RSA's lock commands (CHASSIS_DOOR_LOCK_CMD_*); the
-//                  console has no lock lamp
 //
 // Phase 4 makes the console's buttons clickable: OFF/ACC, RUN, LOCK, P R N D,
 // COAST DOWN, DIM - / DIM +, the HVAC head's HEAT / VENT / A/C and the five
@@ -56,10 +54,6 @@ std::wstring FormatRsaShiftLock(const std::optional<bool>& shift_blocked);
 std::wstring FormatRsaBtsi(const std::optional<bool>& btsi_solenoid);
 /// "Backlight 70%" from the DIM LEVEL OUT in permille (clamped), or "Backlight ---".
 std::wstring FormatRsaBacklight(const std::optional<std::uint16_t>& dim_level_permille);
-/// "Door locks: LOCKED" / "unlocked" when both doors agree, "Door locks: DRV
-/// locked, PAS unlocked" when not, "Door locks: ---" until both are written.
-std::wstring FormatRsaDoorLocks(const std::optional<std::uint8_t>& driver,
-                                const std::optional<std::uint8_t>& passenger);
 
 // --- View model ------------------------------------------------------------
 
@@ -97,7 +91,6 @@ struct RsaConsoleView {
     std::wstring shift_lock;
     std::wstring btsi;
     std::wstring backlight;
-    std::wstring door_locks;
 };
 
 /// Everything the panel shows, derived from the snapshot's RSA group and the

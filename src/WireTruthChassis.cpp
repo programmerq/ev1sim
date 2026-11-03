@@ -544,9 +544,6 @@ static const std::unordered_map<std::uint32_t, ConsumerCell>& ConsumerRegistry()
         // HVAC blower level + defrost grid (byte / bit)
         {4082U, {kWireCHASSIS_HVAC_BLOWER_LEVEL,        WireType::kByte}},
         {4083U, {kWireCHASSIS_DEFROST_GRID_ACTIVE,      WireType::kBit}},
-        // Door lock commands (byte)
-        {4084U, {kWireCHASSIS_DOOR_LOCK_CMD_DRIVER,     WireType::kByte}},
-        {4085U, {kWireCHASSIS_DOOR_LOCK_CMD_PASSENGER,  WireType::kByte}},
         // RSA shift-blocked cue (bit)
         {4088U, {kWireCHASSIS_RSA_SHIFT_BLOCKED,        WireType::kBit}},
         // IPC seatbelt telltale (bit)
@@ -800,8 +797,6 @@ ev1sim::DashRsaConsole WireTruthChassis::rsa_console() const {
             dim.written())
             c.dim_level_permille = dim.value;
     }
-    c.lock_driver   = read_byte(kWireCHASSIS_DOOR_LOCK_CMD_DRIVER);
-    c.lock_passenger = read_byte(kWireCHASSIS_DOOR_LOCK_CMD_PASSENGER);
     return c;
 }
 std::optional<bool> WireTruthChassis::ipc_wait_drive() const {
