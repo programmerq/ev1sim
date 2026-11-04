@@ -14,13 +14,10 @@
   "events": [
     {"at_time_s": 0.30, "action": "key_on_cycle"},
     {"at_time_s": 0.60, "action": "key_on_cycle"},
-    {"at_time_s": 0.90, "action": "prnd_up"},
-    {"at_time_s": 1.10, "action": "prnd_up"},
-    {"at_time_s": 1.30, "action": "prnd_up"},
 
     {"//": "No launch. config/abs_high_mu.json spawns the car rolling at",
-     "//1": "27.7 m/s (spawn.speed_mps), and it coasts through the key-on and",
-     "//2": "shift above; the KEY OFF brake clamp is skipped for a rolling",
+     "//1": "27.7 m/s (spawn.speed_mps), and it coasts in Drive (spawn.prnd) through the",
+     "//2": "key-on above; the KEY OFF brake clamp is skipped for a rolling",
      "//3": "start, so nothing drags it before the RSA reports RUN.  It used to",
      "//4": "ramp the throttle from rest, wait_for_speed 30 m/s (released at",
      "//5": "15.03 s), then coast to an 18.00 s brake: 18 s of sim time to set",
