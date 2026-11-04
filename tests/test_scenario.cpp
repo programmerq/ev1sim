@@ -681,14 +681,15 @@ TEST_CASE("Scenario: shipped scenario JSON files parse cleanly",
         {"config/scenarios/cruise_demo_electronics.json", "electronics", 9},
         {"config/scenarios/coastdown.json",               "local",       7},
         {"config/scenarios/abs_hard_brake.json",          "local",       9},
-        // The six VAT ABS stops start rolling (spawn.speed_mps), so they
-        // carry no launch: key on, shift, brake, release (+ lane hold/steer).
-        {"config/scenarios/abs_high_mu_stop.json",        "local",       7},
-        {"config/scenarios/abs_low_mu_stop.json",         "local",       7},
-        {"config/scenarios/abs_mu_jump.json",             "local",       7},
-        {"config/scenarios/abs_split_mu.json",            "local",       9},
-        {"config/scenarios/abs_brake_and_steer.json",     "local",       8},
-        {"config/scenarios/abs_diagonal_mu.json",         "local",       8},
+        // The six VAT ABS stops start rolling in Drive (spawn.speed_mps,
+        // spawn.prnd), so they carry no launch and no shift: key on, brake,
+        // release (+ lane hold/steer).
+        {"config/scenarios/abs_high_mu_stop.json",        "local",       4},
+        {"config/scenarios/abs_low_mu_stop.json",         "local",       4},
+        {"config/scenarios/abs_mu_jump.json",             "local",       4},
+        {"config/scenarios/abs_split_mu.json",            "local",       6},
+        {"config/scenarios/abs_brake_and_steer.json",     "local",       5},
+        {"config/scenarios/abs_diagonal_mu.json",         "local",       5},
     };
 
     for (const auto& exp : shipped) {
@@ -1645,12 +1646,10 @@ TEST_CASE("Scenario: every shipped ABS scenario with a barrier is covered by "
 
 // A rolling-start ABS scenario (no wait_for_speed barrier: its config sets
 // spawn.speed_mps) has a different settle to respect: the electronics boot.
-// The car spawns key-off and coasts while the scenario keys on and shifts to
-// D; the BTCM's phase columns first read live (not the -1 no-data sentinel)
-// at t=1.38 s in abs_high_mu (2026-10-08, electricsim f6d09099), 0.08 s after
-// the last prnd_up at 1.30 s.  A brake before that point is braked by
-// nothing but passthrough.  So every such scenario must shift, and must brake
-// at least 1.5 s after its last shift: 18x the measured boot lag.
+// The car spawns key-off in Drive (spawn.prnd) and coasts while the scenario
+// keys on; the RSA reports RUN about 2.2 s after the last key_on_cycle, and a
+// brake before RUN is braked by nothing but passthrough.  So every such
+// scenario must key on, and must brake at least 2.4 s after its last key-on.
 TEST_CASE("Scenario: every rolling-start ABS scenario brakes after the "
           "electronics boot", "[Scenario][Runway]") {
     const std::filesystem::path source_root(EV1SIM_SOURCE_DIR);
@@ -1665,19 +1664,19 @@ TEST_CASE("Scenario: every rolling-start ABS scenario brakes after the "
         REQUIRE(loaded.has_value());
 
         bool has_barrier = false;
-        double brake_at = -1.0, last_shift = -1.0;
+        double brake_at = -1.0, last_key_on = -1.0;
         for (const auto& e : loaded->events()) {
             if (e.action == "wait_for_speed") has_barrier = true;
             if (e.action == "set_brake" && e.value > 0.0 && brake_at < 0.0)
                 brake_at = e.at_time_s;
-            if (e.action == "prnd_up") last_shift = std::max(last_shift, e.at_time_s);
+            if (e.action == "key_on_cycle") last_key_on = std::max(last_key_on, e.at_time_s);
         }
         if (has_barrier || brake_at < 0.0) continue;
 
         ++rolling;
         INFO("scenario " << name);
-        REQUIRE(last_shift >= 0.0);
-        CHECK(brake_at >= last_shift + 1.5);
+        REQUIRE(last_key_on >= 0.0);
+        CHECK(brake_at >= last_key_on + 2.4);
     }
     // At least one, so the case cannot pass vacuously; not an exact count.
     CHECK(rolling >= 1);
