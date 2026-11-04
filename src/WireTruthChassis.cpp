@@ -816,6 +816,10 @@ bool WireTruthChassis::publish_hv_isolation_fault(std::uint8_t lead,
     const bool b = write_uint32(ProducerWireId(electricsim::topology::kWireHV_ISOLATION_FAULT_KOHM), kohm);
     return a && b;
 }
+bool WireTruthChassis::publish_bpm_memory_fault(std::uint8_t mask) {
+    if (!attached()) return false;
+    return write_byte(ProducerWireId(electricsim::topology::kWireBPM_INTERNAL_MEMORY_FAULT), mask);
+}
 bool WireTruthChassis::publish_ps_motor_case_temp_q8(std::uint16_t q8) {
     if (!attached()) return false;
     return write_uint16(ProducerWireId(electricsim::topology::kWireCHASSIS_PS_MOTOR_CASE_TEMP_Q8), q8);
@@ -973,6 +977,18 @@ bool WireTruthChassis::publish_battery_recovery_switch(bool held) {
         electricsim::topology::kWireDRIVER_ES_BATTERY_RECOVERY_SWITCH, held);
 }
 
+bool WireTruthChassis::publish_rsa_trip_reset(bool held) {
+    if (!attached()) return false;
+    return impl_->table->write_element_state(
+        electricsim::topology::kWireDRIVER_ES_RSA_TRIP_RESET, held);
+}
+
+bool WireTruthChassis::publish_master_cyl_pressure_permille(std::uint16_t permille) {
+    if (!attached()) return false;
+    return impl_->table->write_element_state_level(
+        electricsim::topology::kWireCHASSIS_ES_MASTER_CYL_PRESSURE, permille);
+}
+
 bool WireTruthChassis::publish_sdm_connector_unplugged(bool unplugged) {
     if (!attached()) return false;
     return impl_->table->write_element_state(
@@ -1116,6 +1132,7 @@ ev1sim::DashRsaConsole WireTruthChassis::rsa_console() const { return {}; }
 std::optional<bool> WireTruthChassis::ipc_wait_drive() const {
     return std::nullopt;
 }
+bool WireTruthChassis::publish_bpm_memory_fault(std::uint8_t) { return false; }
 bool WireTruthChassis::publish_hv_isolation_fault(std::uint8_t, std::uint32_t) {
     return false;
 }
@@ -1158,6 +1175,8 @@ bool WireTruthChassis::publish_rsa_dim_buttons(bool, bool) { return false; }
 bool WireTruthChassis::publish_rsa_hvac_buttons(bool, bool, bool) { return false; }
 bool WireTruthChassis::publish_wiper_pulse_ladder_kohm(std::uint16_t) { return false; }
 bool WireTruthChassis::publish_battery_recovery_switch(bool) { return false; }
+bool WireTruthChassis::publish_rsa_trip_reset(bool) { return false; }
+bool WireTruthChassis::publish_master_cyl_pressure_permille(std::uint16_t) { return false; }
 bool WireTruthChassis::publish_sdm_connector_unplugged(bool) { return false; }
 std::optional<bool> WireTruthChassis::rsa_btsi_energised() const { return std::nullopt; }
 

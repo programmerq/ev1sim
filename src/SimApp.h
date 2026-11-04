@@ -61,6 +61,7 @@ public:
     void FlashToPass(bool held) override;
     void FailThrottleInput(bool fail) override;
     void HvIsolationFault(int lead, double leak_kohm) override;
+    void BpmMemoryFault(std::uint8_t mask) override;
     void CoastDownSwitch(bool on) override;
     void SetChargeCoupler(bool mated) override;
 

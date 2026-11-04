@@ -324,27 +324,46 @@ TEST_CASE("PrndSelector::Parse names the four positions and nothing else", "[Phy
 }
 
 // ---------------------------------------------------------------------------
-// IpcTripResetButton
+// TimedPushButton (the RSA RESET button, and inside ParkBrakeButton)
 // ---------------------------------------------------------------------------
 
-TEST_CASE("IpcTripResetButton: consume returns false at construction", "[PhysicalWorld]") {
-    IpcTripResetButton btn;
-    CHECK_FALSE(btn.consume_press_event());
+TEST_CASE("TimedPushButton: open until pressed", "[PhysicalWorld]") {
+    TimedPushButton btn;
+    btn.update(0.0);
+    btn.update(1.0);
+    CHECK_FALSE(btn.pushed());
 }
 
-TEST_CASE("IpcTripResetButton: press then consume returns true once then false", "[PhysicalWorld]") {
-    IpcTripResetButton btn;
-    btn.press();
-    CHECK(btn.consume_press_event());   // first consume: event was pending
-    CHECK_FALSE(btn.consume_press_event()); // second: flag was cleared
+TEST_CASE("TimedPushButton: a press closes the contact for kPushS", "[PhysicalWorld]") {
+    const double p = TimedPushButton::kPushS;
+    TimedPushButton btn;
+    btn.queue_press();
+    btn.update(1.0);
+    CHECK(btn.pushed());
+    btn.update(1.0 + p * 0.5);
+    CHECK(btn.pushed());
+    btn.update(1.0 + p);
+    CHECK_FALSE(btn.pushed());
 }
 
-TEST_CASE("IpcTripResetButton: multiple press calls accumulate into a single event", "[PhysicalWorld]") {
-    IpcTripResetButton btn;
-    btn.press();
-    btn.press();
-    CHECK(btn.consume_press_event());
-    CHECK_FALSE(btn.consume_press_event());
+TEST_CASE("TimedPushButton: two quick presses are two closures with a release between",
+          "[PhysicalWorld]") {
+    const double p = TimedPushButton::kPushS, g = TimedPushButton::kGapS;
+    TimedPushButton btn;
+    btn.queue_press();
+    btn.queue_press();
+    btn.update(0.0);
+    CHECK(btn.pushed());
+    btn.update(p);
+    CHECK_FALSE(btn.pushed());
+    btn.update(p + g * 0.5);
+    CHECK_FALSE(btn.pushed());
+    btn.update(p + g);
+    CHECK(btn.pushed());
+    btn.update(p + g + p);
+    CHECK_FALSE(btn.pushed());
+    btn.update(10.0);
+    CHECK_FALSE(btn.pushed());
 }
 
 // ---------------------------------------------------------------------------
@@ -2029,4 +2048,13 @@ TEST_CASE("ParkBrakeButton: changes faster than a press each become a push, with
     CHECK(b.pushed());
     b.update(false, 1.0 + 2 * p + g);
     CHECK_FALSE(b.pushed());
+}
+
+TEST_CASE("BrakePedal::sensor_permille scales to the 3448 kPa sensor and clamps",
+          "[physical_world]") {
+    CHECK(ev1sim::BrakePedal::sensor_permille(0.0) == 0u);
+    CHECK(ev1sim::BrakePedal::sensor_permille(1724.0) == 500u);
+    CHECK(ev1sim::BrakePedal::sensor_permille(3448.0) == 1000u);
+    CHECK(ev1sim::BrakePedal::sensor_permille(15000.0) == 1000u);
+    CHECK(ev1sim::BrakePedal::sensor_permille(-50.0) == 0u);
 }

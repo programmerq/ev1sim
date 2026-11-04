@@ -690,6 +690,7 @@ TEST_CASE("SetDriverRsaKeypadButtons and SetDriverRsaModeSwitches store without 
     CHECK_NOTHROW(c.SetWiperPulseLadderKohm(330u));
     CHECK_NOTHROW(c.SetBatteryRecoverySwitch(true));
     CHECK_NOTHROW(c.SetSdmConnectorUnplugged(true));
+    CHECK_NOTHROW(c.SetRsaTripReset(true));
     CHECK_NOTHROW(c.Tick(0.0));
     CHECK_NOTHROW(c.SetDriverRsaModeSwitches(0u));
     CHECK_NOTHROW(c.Tick(0.0));

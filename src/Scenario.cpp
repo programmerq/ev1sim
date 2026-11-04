@@ -197,6 +197,10 @@ void Scenario::Tick(double sim_time, const VehicleState& state,
             // A negative value also clears. BL-2026-07-18-hv-isolation-loss-vat.
             const int lead = (e.value < 0.0) ? 0 : static_cast<int>(e.value2);
             hooks.HvIsolationFault(lead, e.value < 0.0 ? 0.0 : e.value);
+        } else if (e.action == "bpm_memory_fault") {
+            // value = the failed-memory bitmask (Scenario.h BpmMemoryFault).
+            hooks.BpmMemoryFault(static_cast<std::uint8_t>(
+                std::clamp(e.value, 0.0, 255.0)));
         } else if (e.action == "lane_hold") {
             m_lane_hold_y = e.value;
             m_lane_profile = (e.value2 == 1.0) ? 1 : 0;

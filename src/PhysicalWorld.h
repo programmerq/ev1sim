@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <optional>
@@ -130,6 +131,17 @@ public:
 
     /// Most-recently-computed master cylinder pressure (kPa).
     double pressure_kpa() const { return m_pressure_kpa; }
+
+    /// Full scale of the two master-cylinder pressure sensors the BTCM reads.
+    /// @design electricsim config/topology.yaml CHASSIS_ES_MASTER_CYL_PRESSURE
+    static constexpr double kSensorFullScaleKpa = 3448.0;
+
+    /// A pressure as those sensors read it: permille of full scale, rounded,
+    /// clamped to 0..1000 (they saturate above full scale).
+    static std::uint16_t sensor_permille(double kpa) {
+        const double p = std::clamp(kpa / kSensorFullScaleKpa * 1000.0, 0.0, 1000.0);
+        return static_cast<std::uint16_t>(std::lround(p));
+    }
 
     /// Stateless conversion — exposed for unit tests and other callers
     /// that want to compute a pressure without owning a BrakePedal.
@@ -353,25 +365,19 @@ private:
     bool m_held = false;
 };
 
-/// Park-brake push button: one momentary contact (DRIVER_ES_PARK_BRAKE_SWITCH)
-/// the BTCM reads, each push toggling apply/release.  The driver's request is
-/// a level (DriverCommand::parking_brake); every change of it becomes one
-/// push held for kPushS, with a kGapS release before any further push, so
-/// changes that arrive faster than a hand can press still each become a push.
-class ParkBrakeButton {
+/// A driver's momentary button as a contact: each queued press closes it for
+/// kPushS, with a kGapS release before the next, so presses that arrive faster
+/// than a hand can press still each reach the wire as their own closure.
+class TimedPushButton {
 public:
     static constexpr double kPushS = 0.2;   // @inferred — a deliberate press, not a tap
     static constexpr double kGapS  = 0.2;   // @inferred — release between two presses
 
-    /// Call once per tick with the requested level and the sim time.
-    void update(bool requested, double sim_time_s) {
-        if (!m_seen) {
-            m_seen = true;
-            m_requested = requested;   // the car starts where the driver does
-        } else if (requested != m_requested) {
-            m_requested = requested;
-            ++m_pushes_owed;
-        }
+    /// Queue one press.
+    void queue_press() { ++m_pushes_owed; }
+
+    /// Call once per tick with the sim time.
+    void update(double sim_time_s) {
         if (m_pushed && sim_time_s - m_since_s >= kPushS - kTimeEpsS) {
             m_pushed = false;
             m_since_s = sim_time_s;
@@ -388,11 +394,37 @@ public:
 private:
     static constexpr double kTimeEpsS = 1e-9;   // sim time is a sum of float steps
 
-    bool   m_seen        = false;
-    bool   m_requested   = false;   // latest driver request
     bool   m_pushed      = false;
     int    m_pushes_owed = 0;
     double m_since_s     = -1.0;   // start of the current push or gap; < 0 = never pushed
+};
+
+/// Park-brake push button: one momentary contact (DRIVER_ES_PARK_BRAKE_SWITCH)
+/// the BTCM reads, each push toggling apply/release.  The driver's request is
+/// a level (DriverCommand::parking_brake); every change of it becomes one
+/// TimedPushButton press.
+class ParkBrakeButton {
+public:
+    static constexpr double kPushS = TimedPushButton::kPushS;
+    static constexpr double kGapS  = TimedPushButton::kGapS;
+
+    /// Call once per tick with the requested level and the sim time.
+    void update(bool requested, double sim_time_s) {
+        if (!m_seen) {
+            m_seen = true;
+            m_requested = requested;   // the car starts where the driver does
+        } else if (requested != m_requested) {
+            m_requested = requested;
+            m_button.queue_press();
+        }
+        m_button.update(sim_time_s);
+    }
+    bool pushed() const { return m_button.pushed(); }
+
+private:
+    bool            m_seen      = false;
+    bool            m_requested = false;   // latest driver request
+    TimedPushButton m_button;
 };
 
 /// RSA interior keypad + mode-button simulator.
@@ -577,26 +609,10 @@ private:
     int m_down = 0;
 };
 
-/// IPC cluster trip-reset button (momentary dash button).
-///
-/// Single-shot press: press() marks a pending event; consume_press_event()
-/// returns true once and clears the flag.  The car has no trip-reset input
-/// wire yet, so SimApp consumes the press without publishing it.
-class IpcTripResetButton {
-public:
-    /// Signal a button press (user tapped the I key in ev1sim).
-    void press() { m_pending = true; }
-
-    /// Consume the pending press event — returns true once then clears.
-    bool consume_press_event() {
-        bool v = m_pending;
-        m_pending = false;
-        return v;
-    }
-
-private:
-    bool m_pending = false;
-};
+/// The RSA's RESET button (elec-440 TRIP / RESET), DRIVER_ES_RSA_TRIP_RESET.
+/// The RSA turns a press into the IPC's trip reset. Each press (the I key, the
+/// UI button, the ipc_trip_reset action) is one TimedPushButton closure.
+using IpcTripResetButton = TimedPushButton;
 
 /// Cruise-control stalk — faithful three-contact model of the raw chassis
 /// cavities kSigCruiseSw_{SetCoast,ResumeAccel,OnOff}Out (4047/4048/4049,

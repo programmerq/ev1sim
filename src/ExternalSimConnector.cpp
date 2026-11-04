@@ -1,6 +1,7 @@
 #include "ExternalSimConnector.h"
 #include "WireTruthChassis.h"  // wire-truth substrate seam (chassis migration)
 #include "BusSnoop.h"          // GM-8192 frame snoop for the instrument cluster
+#include "PhysicalWorld.h"     // BrakePedal::sensor_permille
 
 #include <array>
 #include <cmath>
@@ -1376,6 +1377,9 @@ struct ExternalSimConnector::State {
     bool          hv_iso_fault_armed              = false;
     std::uint8_t  hv_iso_fault_lead               = 0u;
     std::uint32_t hv_iso_fault_kohm               = 0u;
+    // Injected BPM memory failure (scenario action bpm_memory_fault).
+    bool          bpm_memory_fault_armed          = false;
+    std::uint8_t  bpm_memory_fault_mask           = 0u;
     // Shifter coast-down button (scenario action coast_down_switch).
     bool          coast_down_switch_armed         = false;
     bool          coast_down_switch_on            = false;
@@ -1384,6 +1388,7 @@ struct ExternalSimConnector::State {
     bool          rsa_hvac_held[3]                = {false, false, false};  // heat, vent, a/c
     std::uint16_t wiper_pulse_ladder_kohm         = 0u;
     bool          battery_recovery_held           = false;
+    bool          rsa_trip_reset_held             = false;
     bool          sdm_connector_unplugged         = false;
     // PIM coast-down drag (CHASSIS_PIM_COAST_DRAG_NM), Nm at the shaft.
     float         pim_coast_drag_nm               = 0.0f;
@@ -2249,6 +2254,11 @@ void ExternalSimConnector::SetHvIsolationFault(std::uint8_t lead,
     m_state->hv_iso_fault_kohm  = leak_kohm;
 }
 
+void ExternalSimConnector::SetBpmMemoryFault(std::uint8_t mask) {
+    m_state->bpm_memory_fault_armed = true;
+    m_state->bpm_memory_fault_mask  = mask;
+}
+
 void ExternalSimConnector::SetCoastDownSwitch(bool on) {
     m_state->coast_down_switch_armed = true;
     m_state->coast_down_switch_on    = on;
@@ -2271,6 +2281,10 @@ void ExternalSimConnector::SetWiperPulseLadderKohm(std::uint16_t kohm) {
 
 void ExternalSimConnector::SetBatteryRecoverySwitch(bool held) {
     m_state->battery_recovery_held = held;
+}
+
+void ExternalSimConnector::SetRsaTripReset(bool held) {
+    m_state->rsa_trip_reset_held = held;
 }
 
 void ExternalSimConnector::SetSdmConnectorUnplugged(bool unplugged) {
@@ -3603,6 +3617,11 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         st.wire->publish_hv_isolation_fault(st.hv_iso_fault_lead,
                                             st.hv_iso_fault_kohm);
     }
+    // Injected BPM memory failure: unwritten (no fault) until a scenario sets
+    // it, then level-held every tick.
+    if (st.bpm_memory_fault_armed && st.wire) {
+        st.wire->publish_bpm_memory_fault(st.bpm_memory_fault_mask);
+    }
     // Steering pump case temperature: unwritten until the pump is driven,
     // then level-held every tick.
     if (st.steering_pump_case_temp_armed && st.wire) {
@@ -3648,6 +3667,9 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                                           st.rsa_hvac_held[2]);
         st.wire->publish_wiper_pulse_ladder_kohm(st.wiper_pulse_ladder_kohm);
         st.wire->publish_battery_recovery_switch(st.battery_recovery_held);
+        st.wire->publish_rsa_trip_reset(st.rsa_trip_reset_held);
+        st.wire->publish_master_cyl_pressure_permille(
+            ev1sim::BrakePedal::sensor_permille(st.brake_master_pressure_kpa));
         st.wire->publish_sdm_connector_unplugged(st.sdm_connector_unplugged);
     }
 #endif

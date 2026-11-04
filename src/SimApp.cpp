@@ -455,7 +455,7 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
             m_floating_ui->AddButton(
                 []() -> std::wstring { return FormatTripResetLabel(); },
                 [this]() {
-                    m_physical->ipc_trip_reset().press();
+                    m_physical->ipc_trip_reset().queue_press();
                     ++m_trip_reset_count;
                     std::cout << "[UI] IPC trip-reset pressed\n";
                 });
@@ -1698,7 +1698,7 @@ int SimApp::RunWithVisualization() {
 
         // I = IPC trip-reset (momentary).
         if (m_keyboard->ConsumeIpcTripReset()) {
-            m_physical->ipc_trip_reset().press();
+            m_physical->ipc_trip_reset().queue_press();
             ++m_trip_reset_count;
             std::cout << "[SimApp] IPC trip-reset pressed\n";
         }
@@ -1908,8 +1908,6 @@ int SimApp::RunWithVisualization() {
                 m_physical->hazard_switch().on());
             // RSA keypad, mode and dimmer buttons as held contacts.
             PublishRsaConsoleButtons(render_dt);
-            // The trip-reset button has no car input wire yet; drop the press.
-            m_physical->ipc_trip_reset().consume_press_event();
             // Cruise stalk: evolve the faithful 3-contact model from the keyboard
             // held contacts (UI presses + N cancel already folded in via press_*),
             // then publish the raw chassis cavities kSigCruiseSw_* (4047-4049).
@@ -2504,7 +2502,6 @@ int SimApp::RunHeadless() {
             // Headless: no keyboard/UI input; evolve the cruise model with both
             // contacts open so the ON/OFF latch stays disarmed and the bus sees
             // stable zeros.
-            m_physical->ipc_trip_reset().consume_press_event();   // no car input wire
             m_physical->cruise_stalk().update(tick_dt, false, false);
             m_external_sim->SetCruiseSetCoastContact(
                 m_physical->cruise_stalk().set_coast_contact());
@@ -2712,6 +2709,9 @@ void SimApp::PushExtContractDriverInputs(const DriverCommand& cmd, double sim_ti
         auto& pb = m_physical->park_brake_button();
         pb.update(cmd.parking_brake, sim_time_s);
         m_external_sim->SetDriverParkBrakeSwitch(pb.pushed());
+        auto& reset = m_physical->ipc_trip_reset();
+        reset.update(sim_time_s);
+        m_external_sim->SetRsaTripReset(reset.pushed());
     }
     // Key position (6966) — ev1sim does not model a key-cycle state
     // machine; the simulator runs as if the vehicle is always RUN (2).
@@ -2773,7 +2773,7 @@ void SimApp::HazardToggle() {
     if (m_physical) m_physical->hazard_switch().toggle();
 }
 void SimApp::IpcTripResetPress() {
-    if (m_physical) m_physical->ipc_trip_reset().press();
+    if (m_physical) m_physical->ipc_trip_reset().queue_press();
 }
 void SimApp::CruiseSet() {
     if (m_physical) m_physical->cruise_stalk().press_set();
@@ -2850,6 +2850,12 @@ void SimApp::HvIsolationFault(int lead, double leak_kohm) {
     std::cout << "[Scenario] hv_isolation_fault -> "
               << (lead_u8 == 1 ? "HV+" : lead_u8 == 2 ? "HV-" : "cleared")
               << " " << kohm << " kOhm to chassis\n";
+}
+
+void SimApp::BpmMemoryFault(std::uint8_t mask) {
+    if (m_external_sim) m_external_sim->SetBpmMemoryFault(mask);
+    std::cout << "[Scenario] bpm_memory_fault -> mask 0x" << std::hex
+              << static_cast<int>(mask) << std::dec << "\n";
 }
 
 void SimApp::CoastDownSwitch(bool on) {
