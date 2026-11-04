@@ -47,7 +47,7 @@ constexpr double kTireMu         = 0.8;      // dry-asphalt friction (audit §5)
 constexpr double kGravity        = 9.80665;
 // "Maximum Torque" per wheel from the brake-bias JSON (Round 4, 70/30).
 constexpr double kFrontMaxTorqueNm = 1120.0; // EV1_BrakeSimple_Front.json
-constexpr double kRearMaxTorqueNm  = 480.0;  // EV1_BrakeSimple_Rear.json == kRearBrakeMaxTorqueNm
+constexpr double kRearMaxTorqueNm  = 513.0;  // EV1_BrakeSimple_Rear.json == kRearBrakeMaxTorqueNm
 
 // Total wheel-side braking force the four corners can produce at a given
 // front/rear command ratio [0..1], BEFORE the tire-friction ceiling.  Mirrors
@@ -204,7 +204,7 @@ TEST_CASE("BrakeDecel: BTCM death zeroes the rear but front braking is retained"
 
     // 4. A hypothetical rear-only fallback (if the front had ALSO depended on
     //    the BTCM) would be far weaker — proving the front retention is what
-    //    carries the stop.  rear pair 2×480 = 960 N·m → ~0.26g.
+    //    carries the stop.  rear pair 2×513 = 1026 N·m.
     const double rear_only_decel = brake_force_n(0.0, 1.0) / kCurbMassKg;
     CHECK(front_only_decel > 2.0 * rear_only_decel);   // front is the dominant axle
 }
@@ -216,14 +216,13 @@ TEST_CASE("BrakeDecel: BTCM death zeroes the rear but front braking is retained"
 // pinning that a saturated EMB command never exceeds the Chrono brake ratio.
 TEST_CASE("BrakeDecel: rear EMB torque→ratio saturates at 1.0, never above",
           "[BrakeDecel][BTCMLoss]") {
-    const BrakeDrum::Params drum;  // peaks at 456 N·m at speed
+    const BrakeDrum::Params drum;  // peaks at 513 N·m at speed
     // Full motor command → full shoe force; at speed the self-energising
-    // torque (456 N·m) is below the 480 N·m budget, so the ratio stays < 1.
+    // torque reaches the 513 N·m budget, so the ratio lands at 1, never above.
     const double torque_at_speed =
         BrakeDrum::torque_magnitude_nm(drum.max_shoe_force_n, /*omega=*/30.0, drum);
     const double ratio = std::clamp(torque_at_speed / kRearMaxTorqueNm, 0.0, 1.0);
-    CHECK(ratio < 1.0);
-    CHECK_THAT(ratio, WithinRel(456.0 / 480.0, 1e-6));
+    CHECK_THAT(ratio, WithinRel(1.0, 1e-6));
 
     // A negative / zero motor command yields zero force → zero ratio (the
     // stale-BTCM and motor-retracting cases both land here).

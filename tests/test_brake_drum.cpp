@@ -17,8 +17,21 @@
 using Catch::Matchers::WithinAbs;
 using ev1sim::BrakeDrum;
 
-TEST_CASE("BrakeDrum: zero shoe force → zero torque", "[BrakeDrum]") {
+namespace {
+// Fixture parameters the expected values below are computed from.
+BrakeDrum::Params fixture() {
     BrakeDrum::Params p;
+    p.mu = 0.38;
+    p.drum_radius_m = 0.10;
+    p.alpha = 2.0;
+    p.max_shoe_force_n = 4000.0;
+    p.omega_threshold_rad_s = 0.5;
+    return p;
+}
+}  // namespace
+
+TEST_CASE("BrakeDrum: zero shoe force → zero torque", "[BrakeDrum]") {
+    BrakeDrum::Params p = fixture();
     CHECK(BrakeDrum::torque_magnitude_nm(0.0, 10.0, p) == 0.0);
     CHECK(BrakeDrum::torque_magnitude_nm(0.0, 0.0,  p) == 0.0);
     CHECK(BrakeDrum::torque_magnitude_nm(0.0, -50.0, p) == 0.0);
@@ -26,7 +39,7 @@ TEST_CASE("BrakeDrum: zero shoe force → zero torque", "[BrakeDrum]") {
 
 TEST_CASE("BrakeDrum: at speed, self-energizing factor is full (1+alpha)",
           "[BrakeDrum]") {
-    BrakeDrum::Params p;  // mu=0.38, R=0.10, alpha=2.0, ω_thr=0.5
+    BrakeDrum::Params p = fixture();  // mu=0.38, R=0.10, alpha=2.0, ω_thr=0.5
 
     // Above threshold ω=10 rad/s (well past the 0.5 ramp end).
     // T = 0.38 × 1000 × 0.10 × (1 + 2.0 × 1) = 0.38 × 100 × 3 = 114 N·m
@@ -41,7 +54,7 @@ TEST_CASE("BrakeDrum: at speed, self-energizing factor is full (1+alpha)",
 
 TEST_CASE("BrakeDrum: at standstill, no self-energizing assist",
           "[BrakeDrum]") {
-    BrakeDrum::Params p;
+    BrakeDrum::Params p = fixture();
     // ω = 0 → sign_factor = 0 → T = mu × F × R × 1 = 0.38 × 1000 × 0.10 = 38 N·m
     const double t = BrakeDrum::torque_magnitude_nm(1000.0, 0.0, p);
     CHECK_THAT(t, WithinAbs(38.0, 1e-9));
@@ -54,7 +67,7 @@ TEST_CASE("BrakeDrum: at standstill, no self-energizing assist",
 
 TEST_CASE("BrakeDrum: smooth_sign ramps linearly through zero",
           "[BrakeDrum]") {
-    BrakeDrum::Params p;  // ω_threshold = 0.5
+    BrakeDrum::Params p = fixture();  // ω_threshold = 0.5
 
     // Half-threshold: sign_factor = 0.25/0.5 = 0.5 → assist = 0.5 × 2 = 1.0
     // T = 0.38 × 1000 × 0.10 × (1 + 1.0) = 76 N·m
@@ -73,7 +86,7 @@ TEST_CASE("BrakeDrum: smooth_sign ramps linearly through zero",
 
 TEST_CASE("BrakeDrum: shoe force is clamped to [0, max_shoe_force_n]",
           "[BrakeDrum]") {
-    BrakeDrum::Params p;  // max 4000 N
+    BrakeDrum::Params p = fixture();  // max 4000 N
 
     // Exceed max — should be clamped.
     // T_at_speed_max = 0.38 × 4000 × 0.10 × 3 = 456 N·m
@@ -86,7 +99,7 @@ TEST_CASE("BrakeDrum: shoe force is clamped to [0, max_shoe_force_n]",
 
 TEST_CASE("BrakeDrum: required_shoe_force_n inverts torque_magnitude_nm",
           "[BrakeDrum]") {
-    BrakeDrum::Params p;
+    BrakeDrum::Params p = fixture();
 
     // At speed, alpha=2, so to hold 100 N·m we need
     // F = 100 / (mu × R × 3) = 100 / (0.38 × 0.10 × 3) = 877.2 N
@@ -108,7 +121,7 @@ TEST_CASE("BrakeDrum: required_shoe_force_n inverts torque_magnitude_nm",
 }
 
 TEST_CASE("BrakeDrum: custom params are honored", "[BrakeDrum]") {
-    BrakeDrum::Params p;
+    BrakeDrum::Params p = fixture();
     p.mu = 0.30;
     p.drum_radius_m = 0.12;
     p.alpha = 1.5;
