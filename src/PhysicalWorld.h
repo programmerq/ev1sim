@@ -89,23 +89,19 @@ private:
 /// Brake pedal master-cylinder pressure model.
 ///
 /// Converts pedal travel (normalized 0..1) into a master-cylinder pressure
-/// in kPa using a two-stage linear curve that approximates the feel of a
-/// physical brake pedal with a two-stage hardware spring:
+/// in kPa using a two-stage linear curve.  The two stages follow the pedal
+/// feel emulator's two spring rates, soft to 4.5 kg and firm to 22.7 kg over
+/// about 51 mm of travel (@source:manual brakes-310 BRAKE PEDAL FEEL
+/// EMULATOR):
 ///
 ///   travel < dead_band                -> 0 kPa             (free play, no fluid takeup)
 ///   travel < transition               -> k1 × (t - dead_band)
 ///   travel ≥ transition               -> k1×(transition - dead_band) + k2×(t - transition)
 ///
-/// The simulator-side model is intentionally simple: no fluid compressibility,
-/// no caliper-vs-master volume tracking, no temperature effects.  The two-
-/// segment shape captures the dominant feel: an initially soft segment as
-/// the master cylinder cup engages, then a much firmer segment once the
-/// fluid has nowhere to go.
+/// No fluid compressibility, volume tracking or temperature effects.
 ///
-/// Default values are educated guesses tuned to land at ~12 MPa near full
-/// travel — typical for a passenger-car master cylinder under hard braking.
-/// Real EV1 manual data would refine these; tune to match the user's sim-rig
-/// pedal feel until then.
+/// The calibration values are @inferred: the manual prints spring forces and
+/// travel but no pressure-versus-travel figure or pedal ratio.
 ///
 /// Published on the chassis bus as kSigChassisBrakeMasterPressureKpa (4074)
 /// every tick on change.  BTCM consumes it as the primary brake-effort
