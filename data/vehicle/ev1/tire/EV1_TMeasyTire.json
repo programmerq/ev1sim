@@ -84,6 +84,24 @@
     "Damping [Ns/m]":  664.0
   },
 
+  "Longitudinal Grip Peak": {
+    "//": "Longitudinal slip at peak grip against peak road friction, read by",
+    "//1": "src/EV1TMeasyTire.cpp (src/TireGripPeak.h): the Longitudinal block's",
+    "//2": "peak and sliding-onset slips move by Peak Slip(road) / Peak Slip(0.8)",
+    "//3": "instead of by road friction / 0.8, which is TMeasy's own scaling.",
+    "//4": "@source: Burckhardt, Fahrwerktechnik: Radschlupf-Regelsysteme (Vogel,",
+    "//5": "1993), surface parameters c1 c2 c3 for mu(s) = c1(1-exp(-c2 s)) - c3 s;",
+    "//6": "each point is that curve's maximum, s* = ln(c1 c2 / c3) / c2:",
+    "//7": "ice 0.05/306.39/0.001, snow 0.1946/94.129/0.0646, wet asphalt",
+    "//8": "0.857/33.822/0.347, dry cement 1.1973/25.168/0.5373, dry asphalt",
+    "//9": "1.2801/23.99/0.52.  Ice's c3 is printed 0 (no maximum) in most tables;",
+    "//10": "0.001 is the value tables that give an ice optimum use.",
+    "//11": "@inferred: that a generic passenger tire's curve stands for the EV1's",
+    "//12": "Michelin Proxima RR; no published slip curve exists for that tire.",
+    "Friction":  [0.05,   0.19,  0.80,  1.09,  1.17],
+    "Peak Slip": [0.0315, 0.060, 0.131, 0.160, 0.170]
+  },
+
   "Visualization": {
     "Mesh Filename Left":  "ev1/ev1_tire.obj",
     "Mesh Filename Right": "ev1/ev1_tire.obj"
