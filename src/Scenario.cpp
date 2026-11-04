@@ -577,6 +577,18 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
         // independent of whether the lamp's bank has B+.
         else if (f == "ipc_wait_drive")
             m_csv << (bus.GetIpcWaitDrive() ? 1 : 0);
+        // TEMP (CHASSIS_IPC_TEMP_TELLTALE), the lamp an APM over-temperature
+        // (HTCM DTC 46) lights. Blank until received.
+        else if (f == "ipc_temp_telltale") {
+            if (bus.HasReceivedIpcTempTelltale())
+                m_csv << (bus.GetIpcTempTelltale() ? 1 : 0);
+        }
+        // The APM's 12 V status code (0-7) the HTCM reads; bit n = STATUS n ON.
+        // Blank until all three lines are written.
+        else if (f == "apm_12v_status_code") {
+            if (bus.HasReceivedApm12vStatusCode())
+                m_csv << static_cast<int>(bus.GetApm12vStatusCode());
+        }
         // Latched precharge participation (derived from 5225) — sticky-true
         // once the precharge relay has ever been observed closed. Alias-proofs
         // a brief relay-closed transient the periodic sampler could step over,
