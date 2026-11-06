@@ -105,11 +105,11 @@ DashOdometer DecodeDscmResponse(const std::uint8_t* p) {
 
 DashGear DecodePrndCode(std::uint8_t code5) {
     switch (code5 & 0x1Fu) {
-        case 0x00u: return DashGear::kError;    // PIM_UART_PRND_CODE_ERROR
-        case 0x1Au: return DashGear::kPark;     // PIM_UART_PRND_CODE_PARK
-        case 0x0Eu: return DashGear::kReverse;  // PIM_UART_PRND_CODE_REVERSE
-        case 0x0Bu: return DashGear::kNeutral;  // PIM_UART_PRND_CODE_NEUTRAL
-        case 0x15u: return DashGear::kDrive;    // PIM_UART_PRND_CODE_DRIVE
+        case 0x01u: return DashGear::kError;    // PIM_UART_PRND_CODE_ERROR
+        case 0x10u: return DashGear::kPark;     // PIM_UART_PRND_CODE_PARK
+        case 0x08u: return DashGear::kReverse;  // PIM_UART_PRND_CODE_REVERSE
+        case 0x04u: return DashGear::kNeutral;  // PIM_UART_PRND_CODE_NEUTRAL
+        case 0x02u: return DashGear::kDrive;    // PIM_UART_PRND_CODE_DRIVE
         default:    return DashGear::kUnknown;  // "other combinations not used"
     }
 }
