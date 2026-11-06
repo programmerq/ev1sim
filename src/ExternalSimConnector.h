@@ -786,6 +786,9 @@ public:
     bool          GetIpcWaitTelltale() const;
     ///  - the IPC's command to ground circuit 2029 (IPC_ES_WAIT_TT_DRV).
     bool          GetIpcWaitDrive() const;
+    // The APM's 12 V status code the HTCM reads (WireTruthChassis::apm_12v_status_code).
+    std::uint8_t  GetApm12vStatusCode() const;
+    bool          HasReceivedApm12vStatusCode() const;
 
     /// Current vehicle speed from the ev1sim physics model (m/s).
     /// Derived from the VehicleState snapshot set each tick via SetVehicleState().

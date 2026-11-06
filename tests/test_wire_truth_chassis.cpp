@@ -1441,3 +1441,31 @@ TEST_CASE("Connector reads the window motor commands off the motor legs through 
     CHECK(c.GetPowerWindowMotor(1) == 1u);
     CHECK_FALSE(c.HasReceivedPowerWindowMotor(0));
 }
+
+TEST_CASE("WireTruthChassis::apm_12v_status_code reads the three 12 V status lines",
+          "[wire_truth][apm_status]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("apm12v");
+    auto producer = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(producer != nullptr);
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+
+    // Two of three lines written: no code yet.
+    REQUIRE(publish_conductor(*producer, topo::kWireHTCM_APM_12V_STATUS_0_IN, true));
+    REQUIRE(publish_conductor(*producer, topo::kWireHTCM_APM_12V_STATUS_1_IN, true));
+    CHECK(wire->apm_12v_status_code() == std::nullopt);
+
+    // All high (the APM driving every line): every line OFF, code 0.
+    REQUIRE(publish_conductor(*producer, topo::kWireHTCM_APM_12V_STATUS_2_IN, true));
+    CHECK(wire->apm_12v_status_code() == std::optional<std::uint8_t>(0u));
+
+    // STATUS 1 and 2 low (ON), STATUS 0 high: code 0b110.
+    REQUIRE(publish_conductor(*producer, topo::kWireHTCM_APM_12V_STATUS_1_IN, false));
+    REQUIRE(publish_conductor(*producer, topo::kWireHTCM_APM_12V_STATUS_2_IN, false));
+    CHECK(wire->apm_12v_status_code() == std::optional<std::uint8_t>(0b110u));
+
+    // All low (a dark APM): code 0b111.
+    REQUIRE(publish_conductor(*producer, topo::kWireHTCM_APM_12V_STATUS_0_IN, false));
+    CHECK(wire->apm_12v_status_code() == std::optional<std::uint8_t>(0b111u));
+}

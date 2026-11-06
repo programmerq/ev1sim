@@ -1373,6 +1373,8 @@ struct ExternalSimConnector::State {
     bool          ipc_wait_telltale               = false;
     bool          has_ipc_wait_telltale           = false;
     bool          ipc_wait_drive                  = false;
+    std::uint8_t  apm_12v_status_code             = 0u;
+    bool          has_apm_12v_status_code         = false;
     // Injected insulation fault (scenario action hv_isolation_fault).
     bool          hv_iso_fault_armed              = false;
     std::uint8_t  hv_iso_fault_lead               = 0u;
@@ -2180,6 +2182,12 @@ bool ExternalSimConnector::GetIpcWaitTelltale() const {
 }
 bool ExternalSimConnector::GetIpcWaitDrive() const {
     return m_state->ipc_wait_drive;
+}
+std::uint8_t ExternalSimConnector::GetApm12vStatusCode() const {
+    return m_state->apm_12v_status_code;
+}
+bool ExternalSimConnector::HasReceivedApm12vStatusCode() const {
+    return m_state->has_apm_12v_status_code;
 }
 
 float ExternalSimConnector::GetVehicleSpeedMps() const {
@@ -3342,6 +3350,10 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             st.has_ipc_wait_telltale = true;
         }
         if (auto v = st.wire->ipc_wait_drive())    st.ipc_wait_drive    = *v;
+        if (auto v = st.wire->apm_12v_status_code()) {
+            st.apm_12v_status_code     = *v;
+            st.has_apm_12v_status_code = true;
+        }
 
         // BTCM liveness (was the kSigBtcmUartFrame 5050 heartbeat). The full
         // canonical-frame payload reconstruction off GM8192_BTCM_TX (a kBitStream
