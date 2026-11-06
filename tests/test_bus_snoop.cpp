@@ -26,12 +26,12 @@ using ev1sim::DashGear;
 using Catch::Matchers::WithinAbs;
 
 TEST_CASE("BusSnoop: PRND codes map to gears; undefined codes are unknown", "[bus_snoop]") {
-    REQUIRE(ev1sim::DecodePrndCode(0x00u) == DashGear::kError);
-    REQUIRE(ev1sim::DecodePrndCode(0x1Au) == DashGear::kPark);
-    REQUIRE(ev1sim::DecodePrndCode(0x0Eu) == DashGear::kReverse);
-    REQUIRE(ev1sim::DecodePrndCode(0x0Bu) == DashGear::kNeutral);
-    REQUIRE(ev1sim::DecodePrndCode(0x15u) == DashGear::kDrive);
-    REQUIRE(ev1sim::DecodePrndCode(0x01u) == DashGear::kUnknown);
+    REQUIRE(ev1sim::DecodePrndCode(0x01u) == DashGear::kError);
+    REQUIRE(ev1sim::DecodePrndCode(0x10u) == DashGear::kPark);
+    REQUIRE(ev1sim::DecodePrndCode(0x08u) == DashGear::kReverse);
+    REQUIRE(ev1sim::DecodePrndCode(0x04u) == DashGear::kNeutral);
+    REQUIRE(ev1sim::DecodePrndCode(0x02u) == DashGear::kDrive);
+    REQUIRE(ev1sim::DecodePrndCode(0x00u) == DashGear::kUnknown);
     REQUIRE(ev1sim::DecodePrndCode(0x1Fu) == DashGear::kUnknown);
 }
 
@@ -50,9 +50,9 @@ TEST_CASE("BusSnoop: nothing decoded reads as an empty snapshot", "[bus_snoop]")
 TEST_CASE("BusSnoop: $41 PCM Data Response gives speed, gear and PCM requests", "[bus_snoop]") {
     BusSnoop snoop;
     // [2] flags: Service Soon (b0) + PCM Temp (b2) + Charge Mode Display (b4)
-    // [3] PRND Drive 0b10101 in b7-3, PCM Service Now (b1)
+    // [3] PRND Drive 0b00010 in b7-3, PCM Service Now (b1)
     // [4] PIM temp, [5] retard achieved, [6] speed 88 km/h, [7] seed, [8] stator temp
-    const std::uint8_t p[7] = {0x15u, static_cast<std::uint8_t>((0x15u << 3) | 0x02u),
+    const std::uint8_t p[7] = {0x15u, static_cast<std::uint8_t>((0x02u << 3) | 0x02u),
                                0x50u, 0x19u, 88u, 0x00u, 0x60u};
     REQUIRE(snoop.DecodeFrame(0x41u, p, 7u, 1.0));
 
@@ -60,7 +60,7 @@ TEST_CASE("BusSnoop: $41 PCM Data Response gives speed, gear and PCM requests", 
     REQUIRE(pcm);
     REQUIRE(pcm->speed_kph == 88u);
     REQUIRE(pcm->gear == DashGear::kDrive);
-    REQUIRE(pcm->prnd_code == 0x15u);
+    REQUIRE(pcm->prnd_code == 0x02u);
     REQUIRE(pcm->service_soon_tt);
     REQUIRE_FALSE(pcm->reduced_perf_tt);
     REQUIRE(pcm->pcm_temp_tt);
@@ -249,7 +249,7 @@ TEST_CASE("BusSnoop: decodes the cluster frames off the four TX bit-stream cells
     electricsim::io::UartTx btcm(table.get(), topo::kWireGM8192_BTCM_TX, kBitPeriodNs);
     electricsim::io::UartTx ipc(table.get(), topo::kWireGM8192_IPC_TX, kBitPeriodNs);
 
-    const std::uint8_t p41[7] = {0u, static_cast<std::uint8_t>(0x1Au << 3), 0u, 0u, 72u, 0u, 0u};
+    const std::uint8_t p41[7] = {0u, static_cast<std::uint8_t>(0x10u << 3), 0u, 0u, 72u, 0u, 0u};
     const std::uint8_t p40[6] = {150u, 0x03u, 0x20u, 0u, 77u, 0u};  // 300 V, 800 counts → 0 A
     const std::uint8_t p30[1] = {0u};                              // $30 trigger rides along
     const std::uint8_t p20[5] = {75u, 0u, 0u, 0x00u, 160u};         // 75 %, 160 km

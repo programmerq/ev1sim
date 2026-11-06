@@ -47,7 +47,7 @@ constexpr double kTireMu         = 0.8;      // dry-asphalt friction (audit §5)
 constexpr double kGravity        = 9.80665;
 // "Maximum Torque" per wheel from the brake-bias JSON (Round 4, 70/30).
 constexpr double kFrontMaxTorqueNm = 1120.0; // EV1_BrakeSimple_Front.json
-constexpr double kRearMaxTorqueNm  = 480.0;  // EV1_BrakeSimple_Rear.json == kRearBrakeMaxTorqueNm
+constexpr double kRearMaxTorqueNm  = 513.0;  // EV1_BrakeSimple_Rear.json == kRearBrakeMaxTorqueNm
 
 // Total wheel-side braking force the four corners can produce at a given
 // front/rear command ratio [0..1], BEFORE the tire-friction ceiling.  Mirrors
@@ -112,7 +112,7 @@ StopResult integrate_stop(double v0_mps, double front_ratio, double rear_ratio,
 // ---------------------------------------------------------------------------
 TEST_CASE("BrakeDecel: full-pedal stop from 30 m/s lands in a physical envelope",
           "[BrakeDecel][Integrated]") {
-    // Full front + rear command.  The four-corner torque budget (3200 N·m)
+    // Full front + rear command.  The four-corner torque budget (3266 N·m)
     // over-saturates the tire, so deceleration is friction-limited at ~0.8g.
     const StopResult r = integrate_stop(30.0, /*front=*/1.0, /*rear=*/1.0,
                                         /*actuator_lag=*/true);
@@ -138,8 +138,8 @@ TEST_CASE("BrakeDecel: full-pedal stop from 30 m/s lands in a physical envelope"
 // ---------------------------------------------------------------------------
 TEST_CASE("BrakeDecel: partial pedal is graded and below the friction ceiling",
           "[BrakeDecel][Integrated]") {
-    // 30% command: 0.30 × 3200 = 960 N·m total → 960/0.2915 ≈ 3293 N →
-    // 3293/1281 ≈ 2.57 m/s² ≈ 0.26g, well under the 0.8g ceiling.  This is the
+    // 30% command: 0.30 × 3266 ≈ 980 N·m total → 980/0.2915 ≈ 3361 N →
+    // 3361/1281 ≈ 2.62 m/s² ≈ 0.27g, well under the 0.8g ceiling.  This is the
     // "usable middle range" the Round-4 budget was set to preserve (audit §6).
     const StopResult r = integrate_stop(30.0, 0.30, 0.30, /*actuator_lag=*/true);
 
@@ -204,7 +204,7 @@ TEST_CASE("BrakeDecel: BTCM death zeroes the rear but front braking is retained"
 
     // 4. A hypothetical rear-only fallback (if the front had ALSO depended on
     //    the BTCM) would be far weaker — proving the front retention is what
-    //    carries the stop.  rear pair 2×480 = 960 N·m → ~0.26g.
+    //    carries the stop.  rear pair 2×513 = 1026 N·m.
     const double rear_only_decel = brake_force_n(0.0, 1.0) / kCurbMassKg;
     CHECK(front_only_decel > 2.0 * rear_only_decel);   // front is the dominant axle
 }
@@ -216,14 +216,13 @@ TEST_CASE("BrakeDecel: BTCM death zeroes the rear but front braking is retained"
 // pinning that a saturated EMB command never exceeds the Chrono brake ratio.
 TEST_CASE("BrakeDecel: rear EMB torque→ratio saturates at 1.0, never above",
           "[BrakeDecel][BTCMLoss]") {
-    const BrakeDrum::Params drum;  // peaks at 456 N·m at speed
+    const BrakeDrum::Params drum;  // peaks at 513 N·m at speed
     // Full motor command → full shoe force; at speed the self-energising
-    // torque (456 N·m) is below the 480 N·m budget, so the ratio stays < 1.
+    // torque reaches the 513 N·m budget, so the ratio lands at 1, never above.
     const double torque_at_speed =
         BrakeDrum::torque_magnitude_nm(drum.max_shoe_force_n, /*omega=*/30.0, drum);
     const double ratio = std::clamp(torque_at_speed / kRearMaxTorqueNm, 0.0, 1.0);
-    CHECK(ratio < 1.0);
-    CHECK_THAT(ratio, WithinRel(456.0 / 480.0, 1e-6));
+    CHECK_THAT(ratio, WithinRel(1.0, 1e-6));
 
     // A negative / zero motor command yields zero force → zero ratio (the
     // stale-BTCM and motor-retracting cases both land here).

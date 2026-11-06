@@ -46,10 +46,9 @@ public:
         /// temperature range.
         double mu = 0.38;
 
-        /// Effective drum radius in metres.  EV1 manuals don't quote
-        /// this explicitly; ~8" (0.10 m) is typical for a passenger-car
-        /// rear drum.
-        double drum_radius_m = 0.10;
+        /// Drum radius in metres: half the 225.0 mm rear drum inside
+        /// diameter.  @source:manual brakes-28 SPECIFICATIONS
+        double drum_radius_m = 0.1125;
 
         /// Self-energizing factor.  Set ≈ 2.0 for a double-leading
         /// (twin-leading) shoe arrangement, ≈ 0 for a trailing-only

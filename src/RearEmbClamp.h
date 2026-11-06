@@ -12,7 +12,7 @@ namespace ev1sim {
 /// (Round 4 brake bias).  Lives here, in a Chrono-free header, so the unit
 /// suite can check the JSON against the code constant itself rather than a
 /// re-typed literal; SimApp::kRearBrakeMaxTorqueNm aliases it.
-inline constexpr double kRearBrakeMaxTorqueNm = 480.0;
+inline constexpr double kRearBrakeMaxTorqueNm = 513.0;
 
 /// Shoe clamping force held by one electromechanical (EMB) rear brake,
 /// driven by the BTCM's signed rear-motor command
