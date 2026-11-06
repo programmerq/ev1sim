@@ -7,6 +7,7 @@
 #include <cmath>
 #include <fstream>
 #include <stdexcept>
+#include <vector>
 
 namespace ev1sim {
 
@@ -27,13 +28,20 @@ EV1TMeasyTire::EV1TMeasyTire(const std::string& filename)
                 "EV1TMeasyTire: Longitudinal Tire Dynamics needs Stiffness > 0 "
                 "and Damping > 0 in " + filename);
     }
+    if (j.contains("Longitudinal Grip Peak")) {
+        const auto& g = j["Longitudinal Grip Peak"];
+        m_grip.friction = g.at("Friction").get<std::vector<double>>();
+        m_grip.peak_slip = g.at("Peak Slip").get<std::vector<double>>();
+        m_grip.validate();
+    }
 }
 
 void EV1TMeasyTire::Advance(double step) {
     // Steady-state TMeasy force, Dahl bristle update, moments: all Chrono's.
     ChTMeasyTire::Advance(step);
 
-    if (!m_data.in_contact || m_cx <= 0.0) {
+    const bool dynamics = m_cx > 0.0;
+    if (!m_data.in_contact || (!dynamics && m_grip.empty())) {
         m_xe = 0.0;  // tread relaxes while unloaded
         return;
     }
@@ -63,17 +71,35 @@ void EV1TMeasyTire::Advance(double step) {
     tmxy_combined(f, fos, sc, df0, sm, fm, ss, fs);
     const double Fx_ss = (sc > 0.0) ? f * calpha : 0.0;  // = fos*sx = -ks*vsx
 
+    // The grip peak where published curves put it (TireGripPeak.h): the
+    // longitudinal peak and sliding-onset slips move by the table's factor
+    // instead of by road friction; forces, the lateral slips and the initial
+    // slope stay as TMeasy scaled them.
+    double Fx_peak = Fx_ss, fos_peak = fos;
+    if (!m_grip.empty()) {
+        // muscale is road friction over m_par.mu_0, the friction the slip
+        // parameters were written at ("Coefficient of Friction").
+        const double r = m_grip.slip_scale(mu * m_par.mu_0, m_par.mu_0);
+        const double smp = std::hypot(r * m_states.sxm * calpha, mu * m_states.sym * salpha);
+        const double ssp = std::hypot(r * m_states.sxs * calpha, mu * m_states.sys * salpha);
+        double fp = 0.0;
+        tmxy_combined(fp, fos_peak, sc, df0, smp, fm, ssp, fs);
+        Fx_peak = (sc > 0.0) ? fp * calpha : 0.0;
+    }
+
     // Series spring-damper (Rill's first-order tire dynamics), semi-implicit
     // in xe as Chrono 8's integration_method 2 ("absolutely stable").
-    const double ks = fos / m_states.vta;  // N per (m/s) of sliding speed
-    const double denom = m_dx + ks;
-    const double xe_dot =
-        (Fx_ss - m_cx * m_xe) / denom / (1.0 + step * m_cx / denom);
-    m_xe += step * xe_dot;
-    const double Fx_dyn = m_cx * m_xe + m_dx * xe_dot;
+    double Fx_dyn = Fx_peak;
+    if (dynamics) {
+        const double ks = fos_peak / m_states.vta;  // N per (m/s) of sliding speed
+        const double denom = m_dx + ks;
+        const double xe_dot =
+            (Fx_peak - m_cx * m_xe) / denom / (1.0 + step * m_cx / denom);
+        m_xe += step * xe_dot;
+        Fx_dyn = m_cx * m_xe + m_dx * xe_dot;
+    }
 
-    // Swap the TMeasy share of the base's blended force for its dynamic
-    // counterpart, with the same friction-blend and startup weights the base
+    // Swap the TMeasy share of the base's blended force for this one, with the same friction-blend and startup weights the base
     // applied: force.x = startup * ((1-fb)*Fx_dahl + fb*Fx_ss).
     const double fb = chrono::ChFunctionSineStep::Eval(
         m_data.vel.x(), m_frblend_begin, 0.0, m_frblend_end, 1.0);

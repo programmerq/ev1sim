@@ -502,6 +502,7 @@ if(BUILD_TESTS)
 
     add_executable(ev1sim_tests
         tests/test_config.cpp
+        tests/test_tire_grip_peak.cpp
         tests/test_driver_command.cpp
         tests/test_keyboard_input.cpp
         tests/test_external_sim_connector.cpp

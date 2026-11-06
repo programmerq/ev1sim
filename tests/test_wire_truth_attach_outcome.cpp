@@ -583,6 +583,32 @@ TEST_CASE("Master-cylinder pressure and BPM memory fault publish through Tick",
     CHECK(permille() == 1000u);
 }
 
+// The APM's 12 V status lines reach GetApm12vStatusCode through Tick.
+TEST_CASE("APM 12 V status code reaches the connector through Tick",
+          "[wire_truth][attach_outcome]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("apm12v");
+    auto table = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(table != nullptr);
+
+    ScopedWiresName guard(seg.c_str());
+    ExternalSimConnector::Options opts;
+    opts.enabled = true;
+    ExternalSimConnector c(opts);
+
+    c.Tick(0.0);
+    REQUIRE(c.IsConnected());
+    CHECK_FALSE(c.HasReceivedApm12vStatusCode());
+
+    electricsim::net_host::ConductorPublisher pub(*table);
+    REQUIRE(pub.publish(topo::kWireHTCM_APM_12V_STATUS_0_IN, true));
+    REQUIRE(pub.publish(topo::kWireHTCM_APM_12V_STATUS_1_IN, false));
+    REQUIRE(pub.publish(topo::kWireHTCM_APM_12V_STATUS_2_IN, true));
+    c.Tick(0.1);
+    REQUIRE(c.HasReceivedApm12vStatusCode());
+    CHECK(c.GetApm12vStatusCode() == 0b010u);
+}
+
 // The RSA's BTSI solenoid reaches the connector, which locks the lever in P.
 TEST_CASE("GetRsaBtsiEnergised reads the BTSI solenoid off the wire",
           "[wire_truth][attach_outcome]") {

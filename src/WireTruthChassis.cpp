@@ -785,6 +785,14 @@ ev1sim::DashRsaConsole WireTruthChassis::rsa_console() const {
     }
     return c;
 }
+std::optional<std::uint8_t> WireTruthChassis::apm_12v_status_code() const {
+    using namespace electricsim::topology;
+    const auto s0 = read_bit(ReadOnlyWireId(kWireHTCM_APM_12V_STATUS_0_IN));
+    const auto s1 = read_bit(ReadOnlyWireId(kWireHTCM_APM_12V_STATUS_1_IN));
+    const auto s2 = read_bit(ReadOnlyWireId(kWireHTCM_APM_12V_STATUS_2_IN));
+    if (!s0 || !s1 || !s2) return std::nullopt;
+    return static_cast<std::uint8_t>((*s0 ? 0u : 1u) | (*s1 ? 0u : 2u) | (*s2 ? 0u : 4u));
+}
 std::optional<bool> WireTruthChassis::ipc_wait_drive() const {
     if (!attached()) return std::nullopt;
     electricsim::io::WireTable::Sample<bool> s;
@@ -1113,6 +1121,9 @@ std::optional<bool> WireTruthChassis::ipc_wait_telltale() const {
 }
 ev1sim::DashRsaConsole WireTruthChassis::rsa_console() const { return {}; }
 std::optional<bool> WireTruthChassis::ipc_wait_drive() const {
+    return std::nullopt;
+}
+std::optional<std::uint8_t> WireTruthChassis::apm_12v_status_code() const {
     return std::nullopt;
 }
 bool WireTruthChassis::publish_bpm_memory_fault(std::uint8_t) { return false; }

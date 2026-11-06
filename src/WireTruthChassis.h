@@ -269,6 +269,11 @@ public:
     // consumes. Separate from the lamp because the lamp also needs its bank's
     // B+ feed.
     std::optional<bool>          ipc_wait_drive() const;
+    // The APM's 12 V status code as the HTCM reads it off circuits 1262/1263/1264
+    // (HTCM_APM_12V_STATUS_0/1/2_IN): bit n set when STATUS n is ON (reads low),
+    // the coding electricsim ev1/htcm/htcm_apm_status_lines.hpp decodes. nullopt
+    // until all three lines are written.
+    std::optional<std::uint8_t>  apm_12v_status_code() const;
 
     // The vehicle's injected insulation fault: HV_ISOLATION_FAULT_LEAD (0 none,
     // 1 HV+, 2 HV-) and HV_ISOLATION_FAULT_KOHM. ev1sim is these cells'

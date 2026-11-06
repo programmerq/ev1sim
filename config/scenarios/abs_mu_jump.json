@@ -51,21 +51,9 @@
       "action": "key_on_cycle"
     },
     {
-      "at_time_s": 0.9,
-      "action": "prnd_up"
-    },
-    {
-      "at_time_s": 1.1,
-      "action": "prnd_up"
-    },
-    {
-      "at_time_s": 1.3,
-      "action": "prnd_up"
-    },
-    {
       "//": "No launch. config/abs_mu_jump.json spawns the car rolling at 14.0 m/s at x = -35.0 m",
       "//1": "(spawn.speed_mps), and it coasts with the KEY OFF brake clamp lifted",
-      "//2": "through the key-on and shift above.  It used to launch from rest and",
+      "//2": "through the key-on above in Drive (spawn.prnd).  It used to launch from rest and",
       "//3": "wait_for_speed, braking at 12.019 s at 13.049 m/s and x = 5.89 m.  The spawn was",
       "//4": "taken from that run's state 3.04 s before its brake (2026-10-08,",
       "//5": "ev1sim 81b163a + electricsim f6d09099), so the brake now lands at",
