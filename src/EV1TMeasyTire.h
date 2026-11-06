@@ -56,6 +56,8 @@
 
 #include "chrono_vehicle/wheeled_vehicle/tire/TMeasyTire.h"
 
+#include "TireGripPeak.h"
+
 #include <memory>
 #include <string>
 
@@ -63,15 +65,19 @@ namespace ev1sim {
 
 class EV1TMeasyTire : public chrono::vehicle::TMeasyTire {
   public:
-    /// Reads the stock TMeasy JSON plus the "Longitudinal Tire Dynamics"
-    /// block ("Stiffness [N/m]", "Damping [Ns/m]").  A file without the block
-    /// behaves exactly like Chrono's TMeasyTire.
+    /// Reads the stock TMeasy JSON plus two optional blocks: "Longitudinal
+    /// Tire Dynamics" ("Stiffness [N/m]", "Damping [Ns/m]") and "Longitudinal
+    /// Grip Peak" ("Friction", "Peak Slip").  A file with neither behaves
+    /// exactly like Chrono's TMeasyTire.
     explicit EV1TMeasyTire(const std::string& filename);
 
     double GetLongitudinalTireStiffness() const { return m_cx; }
     double GetLongitudinalTireDamping() const { return m_dx; }
     /// Current tread deflection state xe [m].
     double GetLongitudinalDeflection() const { return m_xe; }
+    /// Where the longitudinal grip peak sits against road friction (the
+    /// "Longitudinal Grip Peak" block; empty = TMeasy's own scaling).
+    const TireGripPeak& GetLongitudinalGripPeak() const { return m_grip; }
 
   protected:
     virtual void Advance(double step) override;
@@ -80,6 +86,7 @@ class EV1TMeasyTire : public chrono::vehicle::TMeasyTire {
     double m_cx = 0.0;  ///< longitudinal tire (tread+carcass) stiffness [N/m]
     double m_dx = 0.0;  ///< longitudinal tire damping [N.s/m]
     double m_xe = 0.0;  ///< longitudinal deflection state [m]
+    TireGripPeak m_grip;    ///< peak slip vs road friction (TireGripPeak.h)
 };
 
 /// Build the EV1 tire from its JSON (the factory VehicleWorld and the plant

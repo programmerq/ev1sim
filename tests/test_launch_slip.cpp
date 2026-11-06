@@ -146,3 +146,11 @@ TEST_CASE("Launch: the EV1 tire carries its longitudinal tire dynamics",
     CHECK(tire.GetLongitudinalTireStiffness() > 0.0);
     CHECK(tire.GetLongitudinalTireDamping() > 0.0);
 }
+
+TEST_CASE("Tire: the shipped EV1 tire loads its longitudinal grip-peak table",
+          "[plant][tire]") {
+    vehicle::SetDataPath(EV1SIM_VEHICLE_DATA_DIR);
+    const auto tire = ev1sim::ReadEV1TireJSON(
+        vehicle::GetDataFile("ev1/tire/EV1_TMeasyTire.json"));
+    CHECK_FALSE(tire->GetLongitudinalGripPeak().empty());
+}
