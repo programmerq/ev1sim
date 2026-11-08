@@ -215,7 +215,7 @@ TEST_CASE("Cluster panel from the bus: TX cells → BusSnoop → panel view", "[
         return out;
     };
     // $41: Drive, 100 km/h. $20: 64 %, 150 km. $21: 1000.0 km.
-    const std::uint8_t p41[7] = {0u, static_cast<std::uint8_t>(0x15u << 3), 0u, 0u, 100u, 0u, 0u};
+    const std::uint8_t p41[7] = {0u, static_cast<std::uint8_t>(0x02u << 3), 0u, 0u, 100u, 0u, 0u};
     const std::uint8_t p20[5] = {64u, 0u, 0u, 0x00u, 150u};
     const std::uint8_t p21[3] = {0x00u, 0x27u, 0x10u};
     const auto f41 = encode(0x41u, p41, 7u);

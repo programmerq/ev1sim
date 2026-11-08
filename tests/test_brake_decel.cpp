@@ -112,7 +112,7 @@ StopResult integrate_stop(double v0_mps, double front_ratio, double rear_ratio,
 // ---------------------------------------------------------------------------
 TEST_CASE("BrakeDecel: full-pedal stop from 30 m/s lands in a physical envelope",
           "[BrakeDecel][Integrated]") {
-    // Full front + rear command.  The four-corner torque budget (3200 N·m)
+    // Full front + rear command.  The four-corner torque budget (3266 N·m)
     // over-saturates the tire, so deceleration is friction-limited at ~0.8g.
     const StopResult r = integrate_stop(30.0, /*front=*/1.0, /*rear=*/1.0,
                                         /*actuator_lag=*/true);
@@ -138,8 +138,8 @@ TEST_CASE("BrakeDecel: full-pedal stop from 30 m/s lands in a physical envelope"
 // ---------------------------------------------------------------------------
 TEST_CASE("BrakeDecel: partial pedal is graded and below the friction ceiling",
           "[BrakeDecel][Integrated]") {
-    // 30% command: 0.30 × 3200 = 960 N·m total → 960/0.2915 ≈ 3293 N →
-    // 3293/1281 ≈ 2.57 m/s² ≈ 0.26g, well under the 0.8g ceiling.  This is the
+    // 30% command: 0.30 × 3266 ≈ 980 N·m total → 980/0.2915 ≈ 3361 N →
+    // 3361/1281 ≈ 2.62 m/s² ≈ 0.27g, well under the 0.8g ceiling.  This is the
     // "usable middle range" the Round-4 budget was set to preserve (audit §6).
     const StopResult r = integrate_stop(30.0, 0.30, 0.30, /*actuator_lag=*/true);
 

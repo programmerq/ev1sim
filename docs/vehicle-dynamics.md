@@ -15,27 +15,24 @@ regression guard that runs in the normal unit-test suite:
 
 ## Brake bias — front disc / rear drum
 
-The real EV1 runs **front vented discs + rear drums**.  Previously all four
-wheels shared one `EV1_BrakeSimple.json` at 800 N·m/wheel (3200 N·m total,
-sized for ~0.88 g friction-limited peak decel).  Round 4 splits that into two
-per-axle files and **biases the split front while preserving the total**:
+The real EV1 runs **front vented discs + rear drums**, each axle with its own
+`BrakeSimple` file:
 
 | File | Wheel | Pair | Share |
 |------|------:|-----:|------:|
-| [`EV1_BrakeSimple_Front.json`](../data/vehicle/ev1/brake/EV1_BrakeSimple_Front.json) | **1120 N·m** | 2240 | 70 % |
-| [`EV1_BrakeSimple_Rear.json`](../data/vehicle/ev1/brake/EV1_BrakeSimple_Rear.json)  | **480 N·m**  | 960  | 30 % |
-| **Total** | | **3200 N·m** | 100 % |
+| [`EV1_BrakeSimple_Front.json`](../data/vehicle/ev1/brake/EV1_BrakeSimple_Front.json) | **1120 N·m** | 2240 | 69 % |
+| [`EV1_BrakeSimple_Rear.json`](../data/vehicle/ev1/brake/EV1_BrakeSimple_Rear.json)  | **513 N·m**  | 1026 | 31 % |
+| **Total** | | **3266 N·m** | 100 % |
 
-### Why 70/30
+### Why front-biased
 
 The EV1's static weight is ~**50/50** (CG at chassis x≈0.09 m, almost mid-
 wheelbase of 2.512 m — the T-shaped battery pack sits low and central).  But a
 ~0.8 g stop transfers load **forward**, so the front axle carries far more than
-half the braking load at the limit.  A 70/30 front bias matches that dynamic
-load distribution, keeps the rears away from premature lock-up, and respects the
-front disc's larger thermal capacity.  The total is held at 3200 N·m so the
-already-calibrated peak deceleration is unchanged — Round 4 redistributes
-braking, it does not add or remove it.
+half the braking load at the limit.  A front bias near 70/30 matches that
+dynamic load distribution, keeps the rears away from premature lock-up, and
+respects the front disc's larger thermal capacity.  The total over-saturates
+the tires, so peak deceleration is friction-limited (~0.88 g).
 
 ### Coupling to the rear EMB
 
@@ -44,10 +41,11 @@ motor command into a shoe force, runs it through the self-energizing
 [`BrakeDrum`](../src/BrakeDrum.h) model, and divides the resulting physical
 torque by `SimApp::kRearBrakeMaxTorqueNm` to get the [0,1] ratio Chrono's brake
 takes.  **That constant must equal the rear JSON's `Maximum Torque`** or the
-applied torque is wrong, so both are pinned at **480 N·m** and the test asserts
-it.  The drum peaks at ~456 N·m at speed
-(μ0.38 × 4000 N × 0.10 m × (1 + α2.0)), so a 480 N·m allocation lets the EMB
-nearly saturate its share without clipping.
+applied torque is wrong, so both are pinned at **513 N·m** and the test asserts
+it.  513 N·m is the drum's peak at speed
+(μ0.38 × 4000 N × 0.1125 m × (1 + α2.0); the 0.1125 m radius is the manual's
+225.0 mm drum ID, brakes-28), so a full EMB command maps to ratio 1 without
+clipping.
 
 ---
 
