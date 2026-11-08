@@ -955,7 +955,7 @@ TEST_CASE("Connector dash snapshot: bus frames via BusSnoop plus the IPC lamp ce
         out.resize(len);
         return out;
     };
-    const std::uint8_t p41[7] = {0u, static_cast<std::uint8_t>(0x15u << 3), 0u, 0u, 50u, 0u, 0u};
+    const std::uint8_t p41[7] = {0u, static_cast<std::uint8_t>(0x02u << 3), 0u, 0u, 50u, 0u, 0u};
     const std::uint8_t p40[6] = {150u, 0x03u, 0x20u, 0u, 80u, 0u};
     const auto f41 = encode(0x41u, p41, 7u);
     const auto f40 = encode(0x40u, p40, 6u);
@@ -1019,7 +1019,7 @@ TEST_CASE("Connector dash snapshot: bus frames via BusSnoop plus the IPC lamp ce
     // a fresh one, and the snoop must decode from it, not the freed table.
     c.Stop();
     c.Start();
-    const std::uint8_t p41b[7] = {0u, static_cast<std::uint8_t>(0x15u << 3), 0u, 0u, 60u, 0u, 0u};
+    const std::uint8_t p41b[7] = {0u, static_cast<std::uint8_t>(0x02u << 3), 0u, 0u, 60u, 0u, 0u};
     const auto f41b = encode(0x41u, p41b, 7u);
     now += 4'000'000'000ull;
     c.Tick(static_cast<double>(now) / 1.0e9);

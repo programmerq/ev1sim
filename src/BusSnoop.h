@@ -51,8 +51,7 @@ inline constexpr std::uint8_t kDashMsgBtcmResponse = 0x91u;  // BTCM_UART_FRAME_
 inline constexpr std::uint8_t kDashMsgDscmResponse = 0x21u;  // IPC_UART_FRAME_ID (ev1/ipc/ipc_uart_frame.h)
 
 // PRND 5-bit wire code → gear. Codes are PIM_UART_PRND_CODE_* in the external
-// sim's ev1/pim/pim_uart_frame.h (Park/Reverse/Neutral from the frame spec;
-// Error/Drive are that header's own inferences, flagged there for re-check).
+// sim's ev1/pim/pim_uart_frame.h (@source:manual bus-015).
 DashGear DecodePrndCode(std::uint8_t code5);
 
 class BusSnoop {
