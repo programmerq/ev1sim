@@ -15,7 +15,7 @@
 // external sim actually drives, using the same derivations as its wire-mode RSA
 // panel (examples/ev1_rsa_panel/wire_panel_sink.cpp):
 //
-//   RUN LED      = RSA_RUN1_OUT
+//   RUN LED      = RHJB_PMM_RUN1_CMD_IN
 //   OFF/ACC LED  = RSA_ES_WSW_ENABLE_OUT (the ACC command out) and not RUN
 //   VALID CODE   = CHASSIS_RSA_VALID_CODE (also lights the exterior KEYPAD lamp)
 //   P R N D      = the four CHASSIS_RSA_SELECTOR_LED_* cells

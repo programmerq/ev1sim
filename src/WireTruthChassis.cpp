@@ -673,24 +673,10 @@ std::optional<bool> WireTruthChassis::horn_high_drive() const {
 }
 
 // ── ECU-bus semantic helpers (wire-truth Phase 4) ───────────────────────────
-// The RSA's RUN 1 command (circuit 819) is a command line with a REST level:
-// the level it sits at when nothing commands it. The external sim's topology
-// declares that level as the cell's default, so "commanded" is any written
-// level other than the default. Reading it this way, not as a raw bit, keeps
-// this side correct whichever level the external sim models the line at: on
-// the car the line idles high (pulled up by the power moding module) and the
-// RSA commands RUN by grounding it (ESM ELPD 321).
-bool WireTruthChassis::rsa_run_commanded_level(bool level) {
-    return level != electricsim::topology::kWireRSA_RUN1_OUT_Default;
-}
-
 std::optional<bool> WireTruthChassis::rsa_run_active() const {
-    // RSA_RUN1_OUT and RSA_RUN2_OUT are written identically by the RSA
-    // controller; read RUN1 as the representative.
-    if (auto level = read_bit(electricsim::topology::kWireRSA_RUN1_OUT)) {
-        return rsa_run_commanded_level(*level);
-    }
-    return std::nullopt;
+    // The power moding module's RUN 1 input: energised while the RSA grounds
+    // circuit 819. RUN 2 tracks it; RUN 1 is the representative.
+    return read_bit(ReadOnlyWireId(electricsim::topology::kWireRHJB_PMM_RUN1_CMD_IN));
 }
 
 std::optional<bool> WireTruthChassis::ad_main_contactor_closed() const {
@@ -1090,9 +1076,6 @@ std::optional<bool> WireTruthChassis::horn_low_drive() const {
 }
 std::optional<bool> WireTruthChassis::horn_high_drive() const {
     return std::nullopt;
-}
-bool WireTruthChassis::rsa_run_commanded_level(bool level) {
-    return level;
 }
 std::optional<bool> WireTruthChassis::rsa_run_active() const {
     return std::nullopt;

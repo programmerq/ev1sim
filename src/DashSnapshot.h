@@ -119,7 +119,7 @@ struct DashLamps {
 // wire_panel_sink.cpp), so the two front-ends show the same state. Each is
 // nullopt until its cell has been written.
 struct DashRsaConsole {
-    std::optional<bool> run;            // RSA_RUN1_OUT
+    std::optional<bool> run;            // RHJB_PMM_RUN1_CMD_IN
     std::optional<bool> acc;            // RSA_ES_WSW_ENABLE_OUT (ACC command out)
     std::optional<bool> valid_code;     // CHASSIS_RSA_VALID_CODE
     std::optional<bool> security;       // CHASSIS_SECURITY_TELLTALE

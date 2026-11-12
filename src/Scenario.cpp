@@ -708,7 +708,7 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
             m_csv << (bus.GetHornLowCmd() ? 1 : 0);
         else if (f == "horn_high_cmd")
             m_csv << (bus.GetHornHighCmd() ? 1 : 0);
-        // RSA power mode as ev1sim resolves it from RSA_RUN1_OUT: 0 = OFF,
+        // RSA power mode as ev1sim resolves it from RHJB_PMM_RUN1_CMD_IN: 0 = OFF,
         // 2 = RUN.  ev1sim cannot see the ACC detent (the RSA's ACC output has
         // no wire cell), so this column is a two-state "is the RSA commanding
         // run mode" readout, NOT the full OFF/ACC/RUN/START enum.
