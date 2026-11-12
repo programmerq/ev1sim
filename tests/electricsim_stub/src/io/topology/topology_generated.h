@@ -26,17 +26,17 @@
 namespace electricsim::topology {
 
 inline constexpr std::uint32_t kFormatVersion = 2U;
-inline constexpr std::uint32_t kTopologyHash = 0x00351852U;
-inline constexpr std::size_t kWireCount = 584;
+inline constexpr std::uint32_t kTopologyHash = 0x5E5159F0U;
+inline constexpr std::size_t kWireCount = 586;
 
 // Per-class cell counts. Emitted so a
 // receipt can print the classification without re-parsing YAML,
 // and so a test can assert against them. The legacy count is held
 // by a DECREASING ratchet in the generator that fails on !=.
-inline constexpr std::size_t kConductorCellCount = 210;
-inline constexpr std::size_t kElementStateCellCount = 169;
-inline constexpr std::size_t kSemanticCellCount = 178;
-inline constexpr std::size_t kUnclassifiedLegacyCellCount = 27;
+inline constexpr std::size_t kConductorCellCount = 212;
+inline constexpr std::size_t kElementStateCellCount = 171;
+inline constexpr std::size_t kSemanticCellCount = 194;
+inline constexpr std::size_t kUnclassifiedLegacyCellCount = 9;
 
 // Named cell ids, each stated by its cell's `id:`; changing an
 // id or adding/removing a net changes kTopologyHash.
@@ -49,8 +49,10 @@ inline constexpr std::size_t kUnclassifiedLegacyCellCount = 27;
 //                            solver-read)
 //   everything else       -> WireId          (unchanged)
 inline constexpr ::electricsim::io::ConductorId kWireRUN1{1U};
-inline constexpr ::electricsim::io::WireId kWireRSA_RUN1_OUT = 2U;
-inline constexpr ::electricsim::io::WireId kWireRSA_RUN2_OUT = 3U;
+inline constexpr ::electricsim::io::ElementStateId kWireRSA_ES_RUN1_CMD_OUT{1277U};
+inline constexpr ::electricsim::io::ElementStateId kWireRSA_ES_RUN2_CMD_OUT{1278U};
+inline constexpr ::electricsim::io::ConductorId kWireRHJB_PMM_RUN1_CMD_IN{1279U};
+inline constexpr ::electricsim::io::ConductorId kWireRHJB_PMM_RUN2_CMD_IN{1280U};
 inline constexpr ::electricsim::io::ConductorId kWireAD_STATE_A{4U};
 inline constexpr ::electricsim::io::ConductorId kWireAD_STATE_B{5U};
 inline constexpr ::electricsim::io::ConductorId kWireAD_STATE_C{6U};
@@ -58,7 +60,6 @@ inline constexpr ::electricsim::io::ConductorId kWireAD_POWER_SUPPLY{7U};
 inline constexpr ::electricsim::io::ConductorId kWireAD_HVIL_CONTINUITY{8U};
 inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_STEER_PUMP_SPEED_DUTY{9U};
 inline constexpr ::electricsim::io::ConductorId kWireBTCM_BRAKE_SWITCH_OUT{10U};
-inline constexpr ::electricsim::io::WireId kWireRSA_AUTO_PARK_BRAKE_REQ = 11U;
 inline constexpr ::electricsim::io::ConductorId kWireLHJB_CHARGE_WAKE_PASSTHRU{16U};
 inline constexpr ::electricsim::io::WireId kWirePSCM_CASE_TEMP_Q8 = 17U;
 inline constexpr ::electricsim::io::WireId kWireAPM_AUX_BATTERY_RAIL_MV = 18U;
@@ -114,6 +115,7 @@ inline constexpr ::electricsim::io::WireId kWireGM8192_HTCM_TX = 71U;
 inline constexpr ::electricsim::io::WireId kWireGM8192_IPC_TX = 72U;
 inline constexpr ::electricsim::io::WireId kWireGM8192_APM_TX = 73U;
 inline constexpr ::electricsim::io::WireId kWireGM8192_SCANTOOL_TX = 74U;
+inline constexpr ::electricsim::io::WireId kWireGM8192_SDM_TX = 1700U;
 inline constexpr ::electricsim::io::WireId kWireGM8192_BPM_TX_CLASS2 = 75U;
 inline constexpr ::electricsim::io::WireId kWireGM8192_CHARGER_TX_CLASS2 = 76U;
 inline constexpr ::electricsim::io::ConductorId kWireBULB_FEED_LINE_LBL{77U};
@@ -640,10 +642,14 @@ inline constexpr ::electricsim::io::WireId kWireBPM_INTERNAL_MEMORY_FAULT = 1533
 // disagreement is caught by the attach-time hash check.
 inline constexpr auto kWireRUN1_Default = false;
 inline constexpr InitPolicy kWireRUN1_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireRSA_RUN1_OUT_Default = true;
-inline constexpr InitPolicy kWireRSA_RUN1_OUT_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireRSA_RUN2_OUT_Default = true;
-inline constexpr InitPolicy kWireRSA_RUN2_OUT_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRSA_ES_RUN1_CMD_OUT_Default = false;
+inline constexpr InitPolicy kWireRSA_ES_RUN1_CMD_OUT_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRSA_ES_RUN2_CMD_OUT_Default = false;
+inline constexpr InitPolicy kWireRSA_ES_RUN2_CMD_OUT_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRHJB_PMM_RUN1_CMD_IN_Default = false;
+inline constexpr InitPolicy kWireRHJB_PMM_RUN1_CMD_IN_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireRHJB_PMM_RUN2_CMD_IN_Default = false;
+inline constexpr InitPolicy kWireRHJB_PMM_RUN2_CMD_IN_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireAD_STATE_A_Default = false;
 inline constexpr InitPolicy kWireAD_STATE_A_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireAD_STATE_B_Default = false;
@@ -658,8 +664,6 @@ inline constexpr auto kWireIPC_ES_STEER_PUMP_SPEED_DUTY_Default = static_cast<st
 inline constexpr InitPolicy kWireIPC_ES_STEER_PUMP_SPEED_DUTY_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireBTCM_BRAKE_SWITCH_OUT_Default = false;
 inline constexpr InitPolicy kWireBTCM_BRAKE_SWITCH_OUT_InitPolicy = InitPolicy::kHold;
-inline constexpr auto kWireRSA_AUTO_PARK_BRAKE_REQ_Default = false;
-inline constexpr InitPolicy kWireRSA_AUTO_PARK_BRAKE_REQ_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireLHJB_CHARGE_WAKE_PASSTHRU_Default = false;
 inline constexpr InitPolicy kWireLHJB_CHARGE_WAKE_PASSTHRU_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWirePSCM_CASE_TEMP_Q8_Default = static_cast<std::uint16_t>(0x0U);
@@ -770,6 +774,8 @@ inline constexpr auto kWireGM8192_APM_TX_Default = true;
 inline constexpr InitPolicy kWireGM8192_APM_TX_InitPolicy = InitPolicy::kDefault;
 inline constexpr auto kWireGM8192_SCANTOOL_TX_Default = true;
 inline constexpr InitPolicy kWireGM8192_SCANTOOL_TX_InitPolicy = InitPolicy::kDefault;
+inline constexpr auto kWireGM8192_SDM_TX_Default = true;
+inline constexpr InitPolicy kWireGM8192_SDM_TX_InitPolicy = InitPolicy::kDefault;
 inline constexpr auto kWireGM8192_BPM_TX_CLASS2_Default = true;
 inline constexpr InitPolicy kWireGM8192_BPM_TX_CLASS2_InitPolicy = InitPolicy::kDefault;
 inline constexpr auto kWireGM8192_CHARGER_TX_CLASS2_Default = true;
@@ -1812,8 +1818,10 @@ inline constexpr InitPolicy kWireBPM_INTERNAL_MEMORY_FAULT_InitPolicy = InitPoli
 inline bool declare_all(::electricsim::io::WireTable& table) {
   bool ok = true;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRUN1), ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(kWireRSA_RUN1_OUT, ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(kWireRSA_RUN2_OUT, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRSA_ES_RUN1_CMD_OUT), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRSA_ES_RUN2_CMD_OUT), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRHJB_PMM_RUN1_CMD_IN), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireRHJB_PMM_RUN2_CMD_IN), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireAD_STATE_A), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireAD_STATE_B), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireAD_STATE_C), ::electricsim::io::WireType::kBit) && ok;
@@ -1821,7 +1829,6 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireAD_HVIL_CONTINUITY), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireIPC_ES_STEER_PUMP_SPEED_DUTY), ::electricsim::io::WireType::kUint16) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_BRAKE_SWITCH_OUT), ::electricsim::io::WireType::kBit) && ok;
-  ok = table.declare(kWireRSA_AUTO_PARK_BRAKE_REQ, ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireLHJB_CHARGE_WAKE_PASSTHRU), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(kWirePSCM_CASE_TEMP_Q8, ::electricsim::io::WireType::kUint16) && ok;
   ok = table.declare(kWireAPM_AUX_BATTERY_RAIL_MV, ::electricsim::io::WireType::kUint32) && ok;
@@ -1877,6 +1884,7 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(kWireGM8192_IPC_TX, ::electricsim::io::WireType::kBitStream) && ok;
   ok = table.declare(kWireGM8192_APM_TX, ::electricsim::io::WireType::kBitStream) && ok;
   ok = table.declare(kWireGM8192_SCANTOOL_TX, ::electricsim::io::WireType::kBitStream) && ok;
+  ok = table.declare(kWireGM8192_SDM_TX, ::electricsim::io::WireType::kBitStream) && ok;
   ok = table.declare(kWireGM8192_BPM_TX_CLASS2, ::electricsim::io::WireType::kBitStream) && ok;
   ok = table.declare(kWireGM8192_CHARGER_TX_CLASS2, ::electricsim::io::WireType::kBitStream) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBULB_FEED_LINE_LBL), ::electricsim::io::WireType::kBit) && ok;
@@ -2404,8 +2412,10 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
 inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
   switch (id) {
     case static_cast<::electricsim::io::WireId>(kWireRUN1): return "RUN1";
-    case kWireRSA_RUN1_OUT: return "RSA_RUN1_OUT";
-    case kWireRSA_RUN2_OUT: return "RSA_RUN2_OUT";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_ES_RUN1_CMD_OUT): return "RSA_ES_RUN1_CMD_OUT";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_ES_RUN2_CMD_OUT): return "RSA_ES_RUN2_CMD_OUT";
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_PMM_RUN1_CMD_IN): return "RHJB_PMM_RUN1_CMD_IN";
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_PMM_RUN2_CMD_IN): return "RHJB_PMM_RUN2_CMD_IN";
     case static_cast<::electricsim::io::WireId>(kWireAD_STATE_A): return "AD_STATE_A";
     case static_cast<::electricsim::io::WireId>(kWireAD_STATE_B): return "AD_STATE_B";
     case static_cast<::electricsim::io::WireId>(kWireAD_STATE_C): return "AD_STATE_C";
@@ -2413,7 +2423,6 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case static_cast<::electricsim::io::WireId>(kWireAD_HVIL_CONTINUITY): return "AD_HVIL_CONTINUITY";
     case static_cast<::electricsim::io::WireId>(kWireIPC_ES_STEER_PUMP_SPEED_DUTY): return "IPC_ES_STEER_PUMP_SPEED_DUTY";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_BRAKE_SWITCH_OUT): return "BTCM_BRAKE_SWITCH_OUT";
-    case kWireRSA_AUTO_PARK_BRAKE_REQ: return "RSA_AUTO_PARK_BRAKE_REQ";
     case static_cast<::electricsim::io::WireId>(kWireLHJB_CHARGE_WAKE_PASSTHRU): return "LHJB_CHARGE_WAKE_PASSTHRU";
     case kWirePSCM_CASE_TEMP_Q8: return "PSCM_CASE_TEMP_Q8";
     case kWireAPM_AUX_BATTERY_RAIL_MV: return "APM_AUX_BATTERY_RAIL_MV";
@@ -2469,6 +2478,7 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case kWireGM8192_IPC_TX: return "GM8192_IPC_TX";
     case kWireGM8192_APM_TX: return "GM8192_APM_TX";
     case kWireGM8192_SCANTOOL_TX: return "GM8192_SCANTOOL_TX";
+    case kWireGM8192_SDM_TX: return "GM8192_SDM_TX";
     case kWireGM8192_BPM_TX_CLASS2: return "GM8192_BPM_TX_CLASS2";
     case kWireGM8192_CHARGER_TX_CLASS2: return "GM8192_CHARGER_TX_CLASS2";
     case static_cast<::electricsim::io::WireId>(kWireBULB_FEED_LINE_LBL): return "BULB_FEED_LINE_LBL";
@@ -2995,8 +3005,10 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
 // sparse, so look a name up here rather than walking 1..kWireCount.
 inline ::electricsim::io::WireId wire_id_for(::std::string_view name) noexcept {
   if (name == "RUN1") return static_cast<::electricsim::io::WireId>(kWireRUN1);
-  if (name == "RSA_RUN1_OUT") return kWireRSA_RUN1_OUT;
-  if (name == "RSA_RUN2_OUT") return kWireRSA_RUN2_OUT;
+  if (name == "RSA_ES_RUN1_CMD_OUT") return static_cast<::electricsim::io::WireId>(kWireRSA_ES_RUN1_CMD_OUT);
+  if (name == "RSA_ES_RUN2_CMD_OUT") return static_cast<::electricsim::io::WireId>(kWireRSA_ES_RUN2_CMD_OUT);
+  if (name == "RHJB_PMM_RUN1_CMD_IN") return static_cast<::electricsim::io::WireId>(kWireRHJB_PMM_RUN1_CMD_IN);
+  if (name == "RHJB_PMM_RUN2_CMD_IN") return static_cast<::electricsim::io::WireId>(kWireRHJB_PMM_RUN2_CMD_IN);
   if (name == "AD_STATE_A") return static_cast<::electricsim::io::WireId>(kWireAD_STATE_A);
   if (name == "AD_STATE_B") return static_cast<::electricsim::io::WireId>(kWireAD_STATE_B);
   if (name == "AD_STATE_C") return static_cast<::electricsim::io::WireId>(kWireAD_STATE_C);
@@ -3004,7 +3016,6 @@ inline ::electricsim::io::WireId wire_id_for(::std::string_view name) noexcept {
   if (name == "AD_HVIL_CONTINUITY") return static_cast<::electricsim::io::WireId>(kWireAD_HVIL_CONTINUITY);
   if (name == "IPC_ES_STEER_PUMP_SPEED_DUTY") return static_cast<::electricsim::io::WireId>(kWireIPC_ES_STEER_PUMP_SPEED_DUTY);
   if (name == "BTCM_BRAKE_SWITCH_OUT") return static_cast<::electricsim::io::WireId>(kWireBTCM_BRAKE_SWITCH_OUT);
-  if (name == "RSA_AUTO_PARK_BRAKE_REQ") return kWireRSA_AUTO_PARK_BRAKE_REQ;
   if (name == "LHJB_CHARGE_WAKE_PASSTHRU") return static_cast<::electricsim::io::WireId>(kWireLHJB_CHARGE_WAKE_PASSTHRU);
   if (name == "PSCM_CASE_TEMP_Q8") return kWirePSCM_CASE_TEMP_Q8;
   if (name == "APM_AUX_BATTERY_RAIL_MV") return kWireAPM_AUX_BATTERY_RAIL_MV;
@@ -3060,6 +3071,7 @@ inline ::electricsim::io::WireId wire_id_for(::std::string_view name) noexcept {
   if (name == "GM8192_IPC_TX") return kWireGM8192_IPC_TX;
   if (name == "GM8192_APM_TX") return kWireGM8192_APM_TX;
   if (name == "GM8192_SCANTOOL_TX") return kWireGM8192_SCANTOOL_TX;
+  if (name == "GM8192_SDM_TX") return kWireGM8192_SDM_TX;
   if (name == "GM8192_BPM_TX_CLASS2") return kWireGM8192_BPM_TX_CLASS2;
   if (name == "GM8192_CHARGER_TX_CLASS2") return kWireGM8192_CHARGER_TX_CLASS2;
   if (name == "BULB_FEED_LINE_LBL") return static_cast<::electricsim::io::WireId>(kWireBULB_FEED_LINE_LBL);
@@ -3591,8 +3603,10 @@ inline ::electricsim::io::WireId wire_id_for(::std::string_view name) noexcept {
 inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept {
   switch (id) {
     case static_cast<::electricsim::io::WireId>(kWireRUN1): return "rhjb";
-    case kWireRSA_RUN1_OUT: return "rsa_ecu";
-    case kWireRSA_RUN2_OUT: return "rsa_ecu";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_ES_RUN1_CMD_OUT): return "rsa_ecu";
+    case static_cast<::electricsim::io::WireId>(kWireRSA_ES_RUN2_CMD_OUT): return "rsa_ecu";
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_PMM_RUN1_CMD_IN): return "";
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_PMM_RUN2_CMD_IN): return "";
     case static_cast<::electricsim::io::WireId>(kWireAD_STATE_A): return "ad_ecu";
     case static_cast<::electricsim::io::WireId>(kWireAD_STATE_B): return "ad_ecu";
     case static_cast<::electricsim::io::WireId>(kWireAD_STATE_C): return "ad_ecu";
@@ -3600,7 +3614,6 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case static_cast<::electricsim::io::WireId>(kWireAD_HVIL_CONTINUITY): return "ad_ecu";
     case static_cast<::electricsim::io::WireId>(kWireIPC_ES_STEER_PUMP_SPEED_DUTY): return "ipc_ecu";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_BRAKE_SWITCH_OUT): return "btcm_ecu";
-    case kWireRSA_AUTO_PARK_BRAKE_REQ: return "rsa_ecu";
     case static_cast<::electricsim::io::WireId>(kWireLHJB_CHARGE_WAKE_PASSTHRU): return "lhjb_ecu";
     case kWirePSCM_CASE_TEMP_Q8: return "pscm_ecu";
     case kWireAPM_AUX_BATTERY_RAIL_MV: return "apm_ecu";
@@ -3656,6 +3669,7 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case kWireGM8192_IPC_TX: return "ipc_ecu";
     case kWireGM8192_APM_TX: return "apm_ecu";
     case kWireGM8192_SCANTOOL_TX: return "scantool_host";
+    case kWireGM8192_SDM_TX: return "sdm_ecu";
     case kWireGM8192_BPM_TX_CLASS2: return "bpm_ecu";
     case kWireGM8192_CHARGER_TX_CLASS2: return "charger";
     case static_cast<::electricsim::io::WireId>(kWireBULB_FEED_LINE_LBL): return "";
@@ -4192,8 +4206,10 @@ inline ::std::size_t for_each_unwritten(
   ::std::size_t count = 0;
   ::std::uint32_t gen = 0;
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRUN1), &gen) && gen == 0) { visitor(::std::string_view{"RUN1"}, static_cast<::electricsim::io::WireId>(kWireRUN1)); ++count; }
-  if (table.write_gen(kWireRSA_RUN1_OUT, &gen) && gen == 0) { visitor(::std::string_view{"RSA_RUN1_OUT"}, kWireRSA_RUN1_OUT); ++count; }
-  if (table.write_gen(kWireRSA_RUN2_OUT, &gen) && gen == 0) { visitor(::std::string_view{"RSA_RUN2_OUT"}, kWireRSA_RUN2_OUT); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRSA_ES_RUN1_CMD_OUT), &gen) && gen == 0) { visitor(::std::string_view{"RSA_ES_RUN1_CMD_OUT"}, static_cast<::electricsim::io::WireId>(kWireRSA_ES_RUN1_CMD_OUT)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRSA_ES_RUN2_CMD_OUT), &gen) && gen == 0) { visitor(::std::string_view{"RSA_ES_RUN2_CMD_OUT"}, static_cast<::electricsim::io::WireId>(kWireRSA_ES_RUN2_CMD_OUT)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRHJB_PMM_RUN1_CMD_IN), &gen) && gen == 0) { visitor(::std::string_view{"RHJB_PMM_RUN1_CMD_IN"}, static_cast<::electricsim::io::WireId>(kWireRHJB_PMM_RUN1_CMD_IN)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireRHJB_PMM_RUN2_CMD_IN), &gen) && gen == 0) { visitor(::std::string_view{"RHJB_PMM_RUN2_CMD_IN"}, static_cast<::electricsim::io::WireId>(kWireRHJB_PMM_RUN2_CMD_IN)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireAD_STATE_A), &gen) && gen == 0) { visitor(::std::string_view{"AD_STATE_A"}, static_cast<::electricsim::io::WireId>(kWireAD_STATE_A)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireAD_STATE_B), &gen) && gen == 0) { visitor(::std::string_view{"AD_STATE_B"}, static_cast<::electricsim::io::WireId>(kWireAD_STATE_B)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireAD_STATE_C), &gen) && gen == 0) { visitor(::std::string_view{"AD_STATE_C"}, static_cast<::electricsim::io::WireId>(kWireAD_STATE_C)); ++count; }
@@ -4201,7 +4217,6 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireAD_HVIL_CONTINUITY), &gen) && gen == 0) { visitor(::std::string_view{"AD_HVIL_CONTINUITY"}, static_cast<::electricsim::io::WireId>(kWireAD_HVIL_CONTINUITY)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireIPC_ES_STEER_PUMP_SPEED_DUTY), &gen) && gen == 0) { visitor(::std::string_view{"IPC_ES_STEER_PUMP_SPEED_DUTY"}, static_cast<::electricsim::io::WireId>(kWireIPC_ES_STEER_PUMP_SPEED_DUTY)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_BRAKE_SWITCH_OUT), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_BRAKE_SWITCH_OUT"}, static_cast<::electricsim::io::WireId>(kWireBTCM_BRAKE_SWITCH_OUT)); ++count; }
-  if (table.write_gen(kWireRSA_AUTO_PARK_BRAKE_REQ, &gen) && gen == 0) { visitor(::std::string_view{"RSA_AUTO_PARK_BRAKE_REQ"}, kWireRSA_AUTO_PARK_BRAKE_REQ); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireLHJB_CHARGE_WAKE_PASSTHRU), &gen) && gen == 0) { visitor(::std::string_view{"LHJB_CHARGE_WAKE_PASSTHRU"}, static_cast<::electricsim::io::WireId>(kWireLHJB_CHARGE_WAKE_PASSTHRU)); ++count; }
   if (table.write_gen(kWirePSCM_CASE_TEMP_Q8, &gen) && gen == 0) { visitor(::std::string_view{"PSCM_CASE_TEMP_Q8"}, kWirePSCM_CASE_TEMP_Q8); ++count; }
   if (table.write_gen(kWireAPM_AUX_BATTERY_RAIL_MV, &gen) && gen == 0) { visitor(::std::string_view{"APM_AUX_BATTERY_RAIL_MV"}, kWireAPM_AUX_BATTERY_RAIL_MV); ++count; }
@@ -4257,6 +4272,7 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(kWireGM8192_IPC_TX, &gen) && gen == 0) { visitor(::std::string_view{"GM8192_IPC_TX"}, kWireGM8192_IPC_TX); ++count; }
   if (table.write_gen(kWireGM8192_APM_TX, &gen) && gen == 0) { visitor(::std::string_view{"GM8192_APM_TX"}, kWireGM8192_APM_TX); ++count; }
   if (table.write_gen(kWireGM8192_SCANTOOL_TX, &gen) && gen == 0) { visitor(::std::string_view{"GM8192_SCANTOOL_TX"}, kWireGM8192_SCANTOOL_TX); ++count; }
+  if (table.write_gen(kWireGM8192_SDM_TX, &gen) && gen == 0) { visitor(::std::string_view{"GM8192_SDM_TX"}, kWireGM8192_SDM_TX); ++count; }
   if (table.write_gen(kWireGM8192_BPM_TX_CLASS2, &gen) && gen == 0) { visitor(::std::string_view{"GM8192_BPM_TX_CLASS2"}, kWireGM8192_BPM_TX_CLASS2); ++count; }
   if (table.write_gen(kWireGM8192_CHARGER_TX_CLASS2, &gen) && gen == 0) { visitor(::std::string_view{"GM8192_CHARGER_TX_CLASS2"}, kWireGM8192_CHARGER_TX_CLASS2); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBULB_FEED_LINE_LBL), &gen) && gen == 0) { visitor(::std::string_view{"BULB_FEED_LINE_LBL"}, static_cast<::electricsim::io::WireId>(kWireBULB_FEED_LINE_LBL)); ++count; }
@@ -4789,8 +4805,10 @@ inline ::std::size_t for_each_unwritten(
 inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id) noexcept {
   switch (id) {
     case static_cast<::electricsim::io::WireId>(kWireRUN1): return ::electricsim::io::CellClass::kConductor;
-    case kWireRSA_RUN1_OUT: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
-    case kWireRSA_RUN2_OUT: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
+    case static_cast<::electricsim::io::WireId>(kWireRSA_ES_RUN1_CMD_OUT): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireRSA_ES_RUN2_CMD_OUT): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_PMM_RUN1_CMD_IN): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireRHJB_PMM_RUN2_CMD_IN): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireAD_STATE_A): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireAD_STATE_B): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireAD_STATE_C): return ::electricsim::io::CellClass::kConductor;
@@ -4798,7 +4816,6 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case static_cast<::electricsim::io::WireId>(kWireAD_HVIL_CONTINUITY): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireIPC_ES_STEER_PUMP_SPEED_DUTY): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireBTCM_BRAKE_SWITCH_OUT): return ::electricsim::io::CellClass::kConductor;
-    case kWireRSA_AUTO_PARK_BRAKE_REQ: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
     case static_cast<::electricsim::io::WireId>(kWireLHJB_CHARGE_WAKE_PASSTHRU): return ::electricsim::io::CellClass::kConductor;
     case kWirePSCM_CASE_TEMP_Q8: return ::electricsim::io::CellClass::kSemantic;
     case kWireAPM_AUX_BATTERY_RAIL_MV: return ::electricsim::io::CellClass::kSemantic;
@@ -4847,13 +4864,14 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case kWireAPM_HV_CONTACTOR_CLOSED: return ::electricsim::io::CellClass::kSemantic;
     case kWireAPM_OUTPUT_CURRENT_Q8: return ::electricsim::io::CellClass::kSemantic;
     case kWireGM8192_BPM_TX: return ::electricsim::io::CellClass::kSemantic;
-    case kWireGM8192_BTCM_TX: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
+    case kWireGM8192_BTCM_TX: return ::electricsim::io::CellClass::kSemantic;
     case kWireGM8192_PIM_TX: return ::electricsim::io::CellClass::kSemantic;
     case kWireGM8192_RSA_TX: return ::electricsim::io::CellClass::kSemantic;
     case kWireGM8192_HTCM_TX: return ::electricsim::io::CellClass::kSemantic;
     case kWireGM8192_IPC_TX: return ::electricsim::io::CellClass::kSemantic;
     case kWireGM8192_APM_TX: return ::electricsim::io::CellClass::kSemantic;
     case kWireGM8192_SCANTOOL_TX: return ::electricsim::io::CellClass::kSemantic;
+    case kWireGM8192_SDM_TX: return ::electricsim::io::CellClass::kSemantic;
     case kWireGM8192_BPM_TX_CLASS2: return ::electricsim::io::CellClass::kSemantic;
     case kWireGM8192_CHARGER_TX_CLASS2: return ::electricsim::io::CellClass::kSemantic;
     case static_cast<::electricsim::io::WireId>(kWireBULB_FEED_LINE_LBL): return ::electricsim::io::CellClass::kConductor;
@@ -4916,7 +4934,7 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case kWireCHASSIS_MOTOR_TORQUE_NM: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
     case kWireCHASSIS_MOTOR_CURRENT_A: return ::electricsim::io::CellClass::kSemantic;
     case kWireCHASSIS_THROTTLE_CMD_Q8: return ::electricsim::io::CellClass::kSemantic;
-    case kWireCHASSIS_BRAKE_MASTER_PRESSURE_KPA: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
+    case kWireCHASSIS_BRAKE_MASTER_PRESSURE_KPA: return ::electricsim::io::CellClass::kSemantic;
     case kWireCHASSIS_SIM_TIME_NS: return ::electricsim::io::CellClass::kSemantic;
     case kWireCHASSIS_WIPER_MOTOR_COMMAND: return ::electricsim::io::CellClass::kSemantic;
     case kWireCHASSIS_WASHER_PUMP_COMMAND: return ::electricsim::io::CellClass::kSemantic;
@@ -4931,19 +4949,19 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case kWireCHASSIS_ACCEL_LAT: return ::electricsim::io::CellClass::kSemantic;
     case kWireCHASSIS_YAW_RATE: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
     case kWireCHASSIS_APPLIED_THROTTLE: return ::electricsim::io::CellClass::kSemantic;
-    case kWireCHASSIS_APPLIED_FRONT_BRAKE: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
-    case kWireCHASSIS_APPLIED_REAR_BRAKE: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
-    case kWireCHASSIS_FRONT_BRAKE_PRESSURE: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
-    case kWireCHASSIS_REAR_BRAKE_POSITION: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
+    case kWireCHASSIS_APPLIED_FRONT_BRAKE: return ::electricsim::io::CellClass::kSemantic;
+    case kWireCHASSIS_APPLIED_REAR_BRAKE: return ::electricsim::io::CellClass::kSemantic;
+    case kWireCHASSIS_FRONT_BRAKE_PRESSURE: return ::electricsim::io::CellClass::kSemantic;
+    case kWireCHASSIS_REAR_BRAKE_POSITION: return ::electricsim::io::CellClass::kSemantic;
     case kWireCHASSIS_STEERING_TORQUE: return ::electricsim::io::CellClass::kSemantic;
     case kWireCHASSIS_WHEEL_OMEGA_FL: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
     case kWireCHASSIS_WHEEL_OMEGA_FR: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
     case kWireCHASSIS_WHEEL_OMEGA_RL: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
     case kWireCHASSIS_WHEEL_OMEGA_RR: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
-    case kWireCHASSIS_SLIP_RATIO_FL: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
-    case kWireCHASSIS_SLIP_RATIO_FR: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
-    case kWireCHASSIS_SLIP_RATIO_RL: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
-    case kWireCHASSIS_SLIP_RATIO_RR: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
+    case kWireCHASSIS_SLIP_RATIO_FL: return ::electricsim::io::CellClass::kSemantic;
+    case kWireCHASSIS_SLIP_RATIO_FR: return ::electricsim::io::CellClass::kSemantic;
+    case kWireCHASSIS_SLIP_RATIO_RL: return ::electricsim::io::CellClass::kSemantic;
+    case kWireCHASSIS_SLIP_RATIO_RR: return ::electricsim::io::CellClass::kSemantic;
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_IPC_SEATBELT_TELLTALE_DRIVER): return ::electricsim::io::CellClass::kConductor;
     case kWireCHASSIS_IPC_TRIP_DISTANCE_M: return ::electricsim::io::CellClass::kSemantic;
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_IPC_BRAKE_TELLTALE): return ::electricsim::io::CellClass::kConductor;
@@ -4998,17 +5016,17 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_AUX_BATTERY_PRESENT): return ::electricsim::io::CellClass::kConductor;
     case kWireCHASSIS_AUX_BATTERY_SOC_PCT: return ::electricsim::io::CellClass::kSemantic;
     case kWireCHASSIS_APM_TWELVE_VOLT_OUTPUT_MA: return ::electricsim::io::CellClass::kSemantic;
-    case kWireDRIVER_BRAKE_PEDAL_Q8: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
+    case kWireDRIVER_BRAKE_PEDAL_Q8: return ::electricsim::io::CellClass::kSemantic;
     case kWireDRIVER_STEERING_DEG_Q8: return ::electricsim::io::CellClass::kSemantic;
     case kWireDRIVER_GEAR_SELECTOR: return ::electricsim::io::CellClass::kSemantic;
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_PEDAL_TRAVEL): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_PEDAL_SENSOR_OPEN): return ::electricsim::io::CellClass::kElementState;
     case kWireDRIVER_THROTTLE_Q8: return ::electricsim::io::CellClass::kSemantic;
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_SEATBELT_SWITCH): return ::electricsim::io::CellClass::kElementState;
-    case kWireEXT_WHEEL_SPEED_FL: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
-    case kWireEXT_WHEEL_SPEED_FR: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
-    case kWireEXT_WHEEL_SPEED_RL: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
-    case kWireEXT_WHEEL_SPEED_RR: return ::electricsim::io::CellClass::kUnclassifiedLegacy;
+    case kWireEXT_WHEEL_SPEED_FL: return ::electricsim::io::CellClass::kSemantic;
+    case kWireEXT_WHEEL_SPEED_FR: return ::electricsim::io::CellClass::kSemantic;
+    case kWireEXT_WHEEL_SPEED_RL: return ::electricsim::io::CellClass::kSemantic;
+    case kWireEXT_WHEEL_SPEED_RR: return ::electricsim::io::CellClass::kSemantic;
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_1): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_2): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_EXT_KEYPAD_3): return ::electricsim::io::CellClass::kElementState;

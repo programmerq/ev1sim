@@ -466,8 +466,7 @@ inline constexpr std::uint32_t kSigChassisAmbientHumidityPct   = 4091U;
 // floating UI can reflect the lamp state independently of the full IPC LCD
 // summary (5600).
 // Encoding: uint8 bool — 0=lamp off, 1=lamp on.
-// Lit when the driver belt is unbuckled AND vehicle speed exceeds ~8 km/h
-// (IPC_SUPERVISOR_SEATBELT_SPEED_THRESHOLD_MPS).
+// Lit while the driver belt is unbuckled (elec-249).
 // 4131 — reserved: the cluster has no passenger belt input (elec-249). Do not
 // reuse the slot.
 // ---------------------------------------------------------------------------
