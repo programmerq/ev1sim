@@ -2032,6 +2032,21 @@ int SimApp::RunWithVisualization() {
 
         m_lights->ApplyToScene();
 
+        // --- Interior lamps: lit from their circuits at the RHJB, dimmed by
+        //     its interior-lamp module's level ---
+        {
+            const std::optional<std::uint8_t> level =
+                m_external_sim->HasReceivedDilmLevel()
+                    ? std::optional<std::uint8_t>(m_external_sim->GetDilmLevel())
+                    : std::nullopt;
+            for (int i = 0; i < ev1sim::kNumInteriorLamps; ++i)
+                m_interior_lamp_brightness[i] =
+                    ev1sim::InteriorLampBrightness(m_external_sim->GetInteriorLamp(i), level);
+            if (!m_interior_lamps3d)
+                m_interior_lamps3d = std::make_unique<ev1sim::InteriorLamps3D>(m_vis->GetDevice());
+            m_interior_lamps3d->Update(m_world->GetPose(), m_interior_lamp_brightness);
+        }
+
         // --- Wiper renderer tick ---
         // Pull the latest motor command from RHJB (0xFF if never received →
         // Tick() treats it as OFF since no valid enum matches).
@@ -2077,7 +2092,7 @@ int SimApp::RunWithVisualization() {
                              m_world->GetTerrainLabel(),
                              mu.mu,
                              &abs_phase);
-        m_lights->DrawHUD(m_vis->GetDevice());
+        m_lights->DrawHUD(m_vis->GetDevice(), m_interior_lamp_brightness);
         {
             using S = ev1sim::DoorLocks::State;
             const auto& locks = m_physical->door_locks();

@@ -214,6 +214,10 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   panel). The lid is its own mesh, `ev1_trunk_lid.obj`, split out of the
   chassis visual mesh by `ev1model/split_trunk_lid.py`; open angle and travel
   time are `@design`.
+- [x] Interior lamps: `InteriorLamps3D` (`src/InteriorLamps3D.{h,cpp}`) lights
+  the four-bar lamp and the mirror map lamp in the cabin from their circuits at
+  the RHJB, dimmed by its interior-lamp module's level; the lights diagram shows
+  both. Mounts are read off the visual mesh (`@inferred`).
 
 ## Bus-mediated physics
 - [ ] **Regen ↔ friction blending (S15 — documented gap, do NOT fabricate).**

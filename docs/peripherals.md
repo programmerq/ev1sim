@@ -241,6 +241,35 @@ the next motor pulse from the RHJB starts from where the knob left it.
 
 ---
 
+## `interior_lamp` — four-bar lamp and mirror map lamp
+
+The RHJB's delayed interior lamp module drives two cabin lamps off the
+always-hot interior-lamp bus (circuit 1732) and sinks their returns (156
+family) through one low-side switch:
+
+| Lamp | Feed / return (RHJB J6) | Lit-or-dark cell |
+|---|---|---|
+| Four-bar lamp, the centre rear lamp bar | 1732G A3 / 156B B6 | `CHASSIS_RHJB_DILM_FOUR_BAR_LAMP` |
+| Inside rear-view mirror map lamp | 1732F A4 / 156 B7 | `CHASSIS_RHJB_DILM_MIRROR_LAMP` |
+
+electricsim's solver publishes each lamp's cell from the circuit, so a lamp is
+lit only while both its feed and its sink are live. The module's fade level,
+`CHASSIS_RHJB_DILM_LEVEL` (4186, 0 = off .. 255 = full), sets how bright a lit
+lamp shows: `InteriorLampBrightness` gives `level / 255` for a lit lamp, full
+when the level is unwritten or 0 with the circuit still live, and 0 for a dark
+one.
+
+`InteriorLamps3D` draws each lamp as a lens plus a warm point light that lights
+the cabin around it, placed on the visual mesh's mirror and headliner (positions
+read off the mesh, marked inferred in `InteriorLamps3D.h`). The lights diagram
+shows both on the car's centreline (MAP, BAR). Scenario CSV columns:
+`four_bar_lamp`, `mirror_map_lamp` (1 = lit) and `dilm_level`.
+
+Connector accessors: `GetInteriorLamp(lamp)` / `HasReceivedInteriorLamp(lamp)`
+(0 = four-bar, 1 = mirror map) and `GetDilmLevel()` / `HasReceivedDilmLevel()`.
+
+---
+
 ## Signal-ID summary
 
 | ID   | Peripheral                  | Encoding   | Direction      |
@@ -256,6 +285,7 @@ the next motor pulse from the RHJB starts from where the knob left it.
 | 4183 | door_lock_motor LH unlock   | bool       | RHJB → ev1sim  |
 | 4184 | door_lock_motor RH lock     | bool       | RHJB → ev1sim  |
 | 4185 | door_lock_motor RH unlock   | bool       | RHJB → ev1sim  |
+| 4186 | interior_lamp dimming level | uint8      | RHJB → ev1sim  |
 
 (4092-4095 are the retired ev1sim-side door-lock-motor allocation; electricsim
 adopted the same four wires at 4182-4185.)

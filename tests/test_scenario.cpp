@@ -880,6 +880,45 @@ TEST_CASE("Scenario: pim_coast_drag_nm stats field reads the PIM's drag",
     std::filesystem::remove(tmp_csv);
 }
 
+TEST_CASE("Scenario: interior lamp stats fields read the connector",
+          "[Scenario]") {
+    using ev1sim::Scenario;
+    using ev1sim::ScenarioStats;
+
+    auto tmp_csv = std::filesystem::temp_directory_path() /
+                   "ev1sim_scenario_stats_interior_lamps_test.csv";
+    Scenario s;
+    ScenarioStats st{tmp_csv.string(),
+                     {"sim_time_s", "four_bar_lamp", "mirror_map_lamp", "dilm_level"},
+                     0.10};
+    s.set_stats(st);
+    s.OpenStats();
+
+    ExternalSimConnector bus;
+    ev1sim::PhysicalWorld phys;
+    DriverCommand cmd{};
+    VehicleState state{};
+
+    // Row 1: nothing received. Row 2: the RHJB's dimming level mid-fade
+    // (the lamps' lit state arrives only from their conductor cells).
+    s.MaybeSampleStats(0.0, state, phys, bus, cmd);
+    bus.DebugInjectU8(4186, 128u);
+    s.MaybeSampleStats(0.15, state, phys, bus, cmd);
+    s.Close();
+
+    std::ifstream f(tmp_csv);
+    REQUIRE(f.is_open());
+    std::string header, row1, row2;
+    std::getline(f, header);
+    std::getline(f, row1);
+    std::getline(f, row2);
+    CHECK(header == "sim_time_s,four_bar_lamp,mirror_map_lamp,dilm_level");
+    CHECK(row1 == "0,0,0,0");
+    CHECK(row2 == "0.15,0,0,128");
+    f.close();
+    std::filesystem::remove(tmp_csv);
+}
+
 TEST_CASE("Scenario: IPC air-bag telltale stats field reads the bus mirror",
           "[Scenario]") {
     using ev1sim::Scenario;

@@ -510,6 +510,18 @@ public:
     std::uint8_t GetPowerWindowMotor(int side) const;
     bool         HasReceivedPowerWindowMotor(int side) const;
 
+    /// Interior lamps, read every tick from their conductor cells at the
+    /// RHJB (WireTruthChassis::dilm_four_bar_lamp / dilm_mirror_lamp):
+    /// true = lit. lamp: 0 = four-bar lamp, 1 = inside-mirror map lamp.
+    /// false until received.
+    bool GetInteriorLamp(int lamp) const;
+    bool HasReceivedInteriorLamp(int lamp) const;
+
+    /// The RHJB's interior-lamp dimming level (ID 4186, CHASSIS_RHJB_DILM_LEVEL):
+    /// 0 = off .. 255 = full. 0 until received.
+    std::uint8_t GetDilmLevel() const;
+    bool         HasReceivedDilmLevel() const;
+
     /// Incoming HVAC blower level from HTCM (ID 4082, chassis segment).
     /// uint8: 0=OFF, 1=LOW, 2=MED, 3=HIGH.  Returns 0xFF if never received.
     std::uint8_t GetHvacBlowerLevel() const;

@@ -745,6 +745,11 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
         else if (f == "tjb_rr_tail_lamp")  m_csv << (bus.GetTjbLampBranch(1) ? 1 : 0);
         else if (f == "tjb_lr_stop_lamp")  m_csv << (bus.GetTjbLampBranch(2) ? 1 : 0);
         else if (f == "tjb_rr_stop_lamp")  m_csv << (bus.GetTjbLampBranch(3) ? 1 : 0);
+        // Interior lamps: 1 = lit (each lamp's circuit through the RHJB's
+        // interior-lamp module is live), and the module's dimming level 0..255.
+        else if (f == "four_bar_lamp")   m_csv << (bus.GetInteriorLamp(0) ? 1 : 0);
+        else if (f == "mirror_map_lamp") m_csv << (bus.GetInteriorLamp(1) ? 1 : 0);
+        else if (f == "dilm_level")      m_csv << static_cast<int>(bus.GetDilmLevel());
         // Sounder / piezo drive (LHJB flasher module).
         else if (f == "sounder_piezo_drive")
             m_csv << (bus.GetSounderPiezoDrive() ? 1 : 0);

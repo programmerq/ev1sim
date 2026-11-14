@@ -16,6 +16,7 @@
 // @design 2026-06-15 — wire-truth migration kickoff.
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 
 #include <cstdint>
 #include <cstdio>
@@ -31,6 +32,7 @@
 #include "WireTruthIds.h"
 #include "ExternalSimConnector.h"  // end-to-end: wire -> overlay -> getter
 #include "BusSnoop.h"              // kDefaultStaleAfterS (dash snoop test)
+#include "InteriorLamps3D.h"       // interior lamp brightness
 #include "PhysicalWorld.h"         // plant models the e2e tests step
 
 // external sim substrate (creator side) — same headers env_open.cpp uses.
@@ -1427,6 +1429,76 @@ TEST_CASE("Connector reads the window motor commands off the motor legs through 
     REQUIRE(c.HasReceivedPowerWindowMotor(1));
     CHECK(c.GetPowerWindowMotor(1) == 1u);
     CHECK_FALSE(c.HasReceivedPowerWindowMotor(0));
+}
+
+TEST_CASE("WireTruthChassis: each interior lamp is lit from its own conductor cell",
+          "[wire_truth]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("dilm_lamps");
+    auto fleet = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(fleet != nullptr);
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+
+    CHECK_FALSE(wire->dilm_four_bar_lamp().has_value());   // never solved
+    CHECK_FALSE(wire->dilm_mirror_lamp().has_value());
+    REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_RHJB_DILM_FOUR_BAR_LAMP, true));
+    CHECK(wire->dilm_four_bar_lamp() == std::optional<bool>(true));
+    CHECK_FALSE(wire->dilm_mirror_lamp().has_value());     // the other lamp's own cell
+    REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_RHJB_DILM_MIRROR_LAMP, false));
+    CHECK(wire->dilm_mirror_lamp() == std::optional<bool>(false));
+}
+
+TEST_CASE("Interior lamps: conductor cells + dimming level -> connector -> brightness",
+          "[wire_truth][e2e]") {
+    // The RHJB lights the four-bar lamp and fades its level; the mirror map
+    // lamp's circuit stays dead. SimApp turns the connector's view into each
+    // lamp's brightness with InteriorLampBrightness.
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("e2e_dilm_lamps");
+    auto fleet = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(fleet != nullptr);
+    ScopedEnv env("ELECTRICSIM_WIRES_NAME", seg.c_str());
+
+    ExternalSimConnector::Options opts;
+    opts.enabled = true;
+    ExternalSimConnector c(opts);
+    c.Tick(0.0);
+    REQUIRE(c.IsConnected());
+    CHECK_FALSE(c.HasReceivedInteriorLamp(0));
+    CHECK_FALSE(c.HasReceivedDilmLevel());
+
+    auto brightness = [&](int lamp) {
+        const std::optional<std::uint8_t> level =
+            c.HasReceivedDilmLevel() ? std::optional<std::uint8_t>(c.GetDilmLevel())
+                                     : std::nullopt;
+        return ev1sim::InteriorLampBrightness(c.GetInteriorLamp(lamp), level);
+    };
+
+    REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_RHJB_DILM_FOUR_BAR_LAMP, true));
+    REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_RHJB_DILM_MIRROR_LAMP, false));
+    REQUIRE(fleet->write_byte(topo::kWireCHASSIS_RHJB_DILM_LEVEL, 255u));
+    c.Tick(0.1);
+    REQUIRE(c.HasReceivedInteriorLamp(0));
+    REQUIRE(c.HasReceivedInteriorLamp(1));
+    REQUIRE(c.HasReceivedDilmLevel());
+    CHECK(c.GetInteriorLamp(0));
+    CHECK_FALSE(c.GetInteriorLamp(1));
+    CHECK(c.GetDilmLevel() == 255u);
+    CHECK(brightness(0) == 1.0);
+    CHECK(brightness(1) == 0.0);
+
+    // Halfway through the module's fade-out.
+    REQUIRE(fleet->write_byte(topo::kWireCHASSIS_RHJB_DILM_LEVEL, 51u));
+    c.Tick(0.2);
+    CHECK(c.GetDilmLevel() == 51u);
+    CHECK(brightness(0) == Catch::Approx(0.2));
+
+    // The circuit opens: dark, whatever the level still says.
+    REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_RHJB_DILM_FOUR_BAR_LAMP, false));
+    c.Tick(0.3);
+    CHECK_FALSE(c.GetInteriorLamp(0));
+    CHECK(brightness(0) == 0.0);
 }
 
 TEST_CASE("Window glass follows the RHJB's motor legs: wire -> connector -> plant",

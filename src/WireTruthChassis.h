@@ -344,6 +344,13 @@ public:
     // 1 = passenger (RH). nullopt until the solver writes both legs.
     std::optional<std::uint8_t> window_motor_cmd(int side) const;
 
+    // Whether an interior lamp is lit, from the solver's conductor cell for
+    // that lamp's circuit through the RHJB's dimming module
+    // (CHASSIS_RHJB_DILM_FOUR_BAR_LAMP / _MIRROR_LAMP): true only while both
+    // its feed and its return sink are live. nullopt until the solver writes it.
+    std::optional<bool> dilm_four_bar_lamp() const;
+    std::optional<bool> dilm_mirror_lamp() const;
+
     // The wiper blades' position, percent of one full sweep cycle (0 = park,
     // 50 = end of sweep), from the RHJB's wiper-motor plant. nullopt until the
     // RHJB writes CHASSIS_WIPER_SWEEP_POSITION.

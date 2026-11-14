@@ -25,6 +25,7 @@
 #include "VehiclePanels.h"
 #include "VehicleWorld.h"
 #include "WiperRenderer.h"
+#include "InteriorLamps3D.h"
 #include "TrunkLid3D.h"
 #include "WiperBlades3D.h"
 
@@ -219,6 +220,8 @@ private:
     std::unique_ptr<WiperRenderer>          m_wiper;
     std::unique_ptr<ev1sim::WiperBlades3D>  m_wiper3d;
     std::unique_ptr<ev1sim::TrunkLid3D>     m_trunk_lid3d;
+    std::unique_ptr<ev1sim::InteriorLamps3D> m_interior_lamps3d;
+    double m_interior_lamp_brightness[ev1sim::kNumInteriorLamps] = {0.0, 0.0};
     std::unique_ptr<FloatingUiPanel>        m_floating_ui;
     PanelDriverOverride                     m_panel_override;  // floating-panel sliders
     /// IPC instrument cluster (docs/ipc_rsa_display_plan.md Phase 1): drawn

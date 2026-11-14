@@ -906,6 +906,14 @@ std::optional<std::uint8_t> WireTruthChassis::window_motor_cmd(int side) const {
     return std::uint8_t{*up ? 1u : 2u};
 }
 
+std::optional<bool> WireTruthChassis::dilm_four_bar_lamp() const {
+    return read_bit(ReadOnlyWireId(electricsim::topology::kWireCHASSIS_RHJB_DILM_FOUR_BAR_LAMP));
+}
+
+std::optional<bool> WireTruthChassis::dilm_mirror_lamp() const {
+    return read_bit(ReadOnlyWireId(electricsim::topology::kWireCHASSIS_RHJB_DILM_MIRROR_LAMP));
+}
+
 bool WireTruthChassis::publish_coast_down_switch(bool on) {
     if (!attached()) return false;
     return write_bit(ProducerWireId(electricsim::topology::kWireDRIVER_ES_COAST_DOWN_SWITCH), on);
@@ -1160,6 +1168,8 @@ std::optional<std::uint8_t> WireTruthChassis::wiper_sweep_position_pct() const {
 std::optional<std::uint8_t> WireTruthChassis::window_motor_cmd(int) const {
     return std::nullopt;
 }
+std::optional<bool> WireTruthChassis::dilm_four_bar_lamp() const { return std::nullopt; }
+std::optional<bool> WireTruthChassis::dilm_mirror_lamp() const { return std::nullopt; }
 bool WireTruthChassis::publish_coast_down_switch(bool) { return false; }
 bool WireTruthChassis::publish_pedal_travel(std::uint16_t) { return false; }
 bool WireTruthChassis::publish_outside_air_temp(float) { return false; }
