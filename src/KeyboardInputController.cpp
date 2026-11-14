@@ -177,10 +177,10 @@ DriverCommand KeyboardInputController::Update(double dt) {
         m_snapshot_toggle = true;
     m_z_prev = z_now;
 
-    // --- Climate readout toggle (J one-shot, consumed via ConsumeClimateReadoutToggle) ---
+    // --- Readout page step (J one-shot, consumed via ConsumeReadoutPageStep) ---
     bool j_now = m_keys[irr::KEY_KEY_J];
     if (j_now && !m_j_prev)
-        m_climate_toggle = true;
+        m_readout_page_step = true;
     m_j_prev = j_now;
 
     // --- UI mode toggle (TAB one-shot, consumed via ConsumeUiModeToggle) ---
@@ -344,9 +344,9 @@ bool KeyboardInputController::ConsumeSnapshotToggle() {
     return v;
 }
 
-bool KeyboardInputController::ConsumeClimateReadoutToggle() {
-    bool v = m_climate_toggle;
-    m_climate_toggle = false;
+bool KeyboardInputController::ConsumeReadoutPageStep() {
+    bool v = m_readout_page_step;
+    m_readout_page_step = false;
     return v;
 }
 

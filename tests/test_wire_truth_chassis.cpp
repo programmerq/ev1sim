@@ -1636,6 +1636,63 @@ TEST_CASE("Climate readout: HTCM / APM cells -> connector -> decoded readings",
     CHECK(at(R::kReversingValve) == std::optional<double>(0.0));
 }
 
+TEST_CASE("Drive readout: BTCM / AD / PIM / APM cells -> connector -> decoded readings",
+          "[wire_truth][e2e]") {
+    namespace topo = electricsim::topology;
+    using R = ev1sim::DriveReading;
+    const std::string seg = unique_segment("e2e_drive_readout");
+    auto fleet = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(fleet != nullptr);
+    ScopedEnv env("ELECTRICSIM_WIRES_NAME", seg.c_str());
+
+    ExternalSimConnector::Options opts;
+    opts.enabled = true;
+    ExternalSimConnector c(opts);
+    c.Tick(0.0);
+    REQUIRE(c.IsConnected());
+    for (const auto& v : c.GetDriveReadings()) CHECK_FALSE(v.has_value());
+
+    auto at = [&](R r) { return c.GetDriveReadings()[static_cast<int>(r)]; };
+    // One cell of each encoding.
+    REQUIRE(fleet->write_float32(topo::kWireCHASSIS_BTCM_WHEEL_SPEED_RR, 42.5f));
+    REQUIRE(fleet->write_float32(topo::kWireCHASSIS_BTCM_VEHICLE_SPEED, 12.5f));
+    REQUIRE(fleet->write_bit(topo::kWireCHASSIS_BTCM_IND_ANTILOCK, true));
+    REQUIRE(fleet->write_uint32(topo::kWireCHASSIS_AD_PACK_VOLTAGE_MV, 312400u));
+    REQUIRE(fleet->write_uint32(topo::kWireCHASSIS_AD_ISOLATION_KOHM, 606u));
+    REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_PIM_INVERTER_ENERGISED, true));
+    REQUIRE(fleet->write_byte(topo::kWireCHASSIS_APM_RUN_MODE, 3u));
+    REQUIRE(fleet->write_uint32(topo::kWireCHASSIS_APM_MODULE_TEMP_CDEG,
+                                static_cast<std::uint32_t>(-525)));   // -5.25 C
+    REQUIRE(fleet->write_byte(topo::kWireCHASSIS_APM_SUBSYS_ENABLED_MASK, 0x05u));
+    REQUIRE(fleet->write_uint16(topo::kWireCHASSIS_APM_HWS_FEEDBACK_MV, 40500u));
+    REQUIRE(fleet->write_uint16(topo::kWireCHASSIS_APM_LOAD_SHED_ACTIVATION_COUNT, 7u));
+    REQUIRE(fleet->write_byte(topo::kWireCHASSIS_IPC_ACTIVE_DTC_COUNT, 2u));
+    c.Tick(0.1);
+    CHECK(at(R::kWheelSpeedRr) == std::optional<double>(42.5));
+    CHECK(at(R::kReferenceSpeed) == std::optional<double>(12.5));
+    CHECK(at(R::kAntilockLamp) == std::optional<double>(1.0));
+    REQUIRE(at(R::kPackVolts).has_value());
+    CHECK(*at(R::kPackVolts) == Catch::Approx(312.4));
+    CHECK(at(R::kIsolationKohm) == std::optional<double>(606.0));
+    CHECK(at(R::kTractionInverterDelivering) == std::optional<double>(1.0));
+    CHECK(at(R::kApmRunMode) == std::optional<double>(3.0));
+    REQUIRE(at(R::kApmModuleTemp).has_value());
+    CHECK(*at(R::kApmModuleTemp) == Catch::Approx(-5.25));
+    CHECK(at(R::kApmSubsystems) == std::optional<double>(5.0));
+    REQUIRE(at(R::kApmWindshieldFeedbackVolts).has_value());
+    CHECK(*at(R::kApmWindshieldFeedbackVolts) == Catch::Approx(40.5));
+    CHECK(at(R::kApmLoadShedCount) == std::optional<double>(7.0));
+    CHECK(at(R::kIpcActiveCodes) == std::optional<double>(2.0));
+    CHECK_FALSE(at(R::kWheelSpeedLf).has_value());   // never written
+    CHECK(ev1sim::FormatDriveReading(R::kApmSubsystems, at(R::kApmSubsystems)) ==
+          "Subsystems: REGULATING, HV PRESENT");
+
+    // A reading follows its cell as it changes.
+    REQUIRE(fleet->write_bit(topo::kWireCHASSIS_BTCM_IND_ANTILOCK, false));
+    c.Tick(0.2);
+    CHECK(at(R::kAntilockLamp) == std::optional<double>(0.0));
+}
+
 TEST_CASE("Window glass follows the RHJB's motor legs: wire -> connector -> plant",
           "[wire_truth][e2e]") {
     // The passenger window goes down while the RHJB drives the DOWN leg, and

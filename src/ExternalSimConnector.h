@@ -3,6 +3,7 @@
 #include "ClimateLoads.h"
 #include "ChargerStatus.h"
 #include "ClimateReadout.h"
+#include "DriveReadout.h"
 #include "DashSnapshot.h"
 #include "VehicleLights.h"
 #include "VehiclePanels.h"
@@ -537,6 +538,10 @@ public:
     /// The climate readout (ClimateReadout.h), read every tick; a reading
     /// keeps its last value until written again, nullopt until first written.
     const ev1sim::ClimateReadings& GetClimateReadings() const;
+    /// The drive and power readout (DriveReadout.h), read every tick; a
+    /// reading keeps its last value until written again, nullopt until first
+    /// written.
+    const ev1sim::DriveReadings& GetDriveReadings() const;
 
     /// Incoming HVAC blower level from HTCM (ID 4082, chassis segment).
     /// uint8: 0=OFF, 1=LOW, 2=MED, 3=HIGH.  Returns 0xFF if never received.

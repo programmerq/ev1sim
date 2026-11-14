@@ -15,6 +15,7 @@
 #include "KeyboardInputController.h"
 #include "PhysicalWorld.h"
 #include "RigInputDevices.h"
+#include "ReadoutPanel.h"
 #include "RearEmbClamp.h"
 #include "SdlContext.h"
 #include "Scenario.h"
@@ -347,7 +348,8 @@ private:
 
     // Physical-world snapshot overlay — toggled by Z key.
     bool m_show_snapshot = false;
-    bool m_show_climate_readout = false;
+    // Readout panel page — stepped by J.
+    ev1sim::ReadoutPage m_readout_page = ev1sim::ReadoutPage::kNone;
 
     // UI mode — when true the cursor is shown and mouse clicks go to the
     // floating panel instead of the camera.  Toggled by TAB.

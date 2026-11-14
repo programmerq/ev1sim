@@ -998,6 +998,57 @@ ClimateReadings WireTruthChassis::climate_readings() const {
     return out;
 }
 
+DriveReadings WireTruthChassis::drive_readings() const {
+    using namespace electricsim::topology;
+    using R = DriveReading;
+    DriveReadings out{};
+    auto at = [&out](R r) -> std::optional<double>& { return out[static_cast<int>(r)]; };
+    auto f32 = [&](R r, std::uint32_t id) {
+        if (auto v = read_float32(id)) at(r) = *v;
+    };
+    auto u32 = [&](R r, std::uint32_t id, double scale) {
+        if (auto v = read_uint32(id)) at(r) = *v * scale;
+    };
+    auto u16 = [&](R r, std::uint32_t id, double scale) {
+        if (auto v = read_uint16(id)) at(r) = *v * scale;
+    };
+    auto byte = [&](R r, std::uint32_t id) {
+        if (auto v = read_byte(id)) at(r) = *v;
+    };
+    auto bit = [&](R r, std::uint32_t id) {
+        if (auto v = read_bit(id)) at(r) = *v ? 1.0 : 0.0;
+    };
+    f32(R::kWheelSpeedLf, kWireCHASSIS_BTCM_WHEEL_SPEED_FL);
+    f32(R::kWheelSpeedRf, kWireCHASSIS_BTCM_WHEEL_SPEED_FR);
+    f32(R::kWheelSpeedLr, kWireCHASSIS_BTCM_WHEEL_SPEED_RL);
+    f32(R::kWheelSpeedRr, kWireCHASSIS_BTCM_WHEEL_SPEED_RR);
+    f32(R::kReferenceSpeed, kWireCHASSIS_BTCM_VEHICLE_SPEED);
+    bit(R::kAntilockLamp, kWireCHASSIS_BTCM_IND_ANTILOCK);
+    bit(R::kBrakeLamp, kWireCHASSIS_BTCM_IND_BRAKE);
+    bit(R::kLowTractionLamp, kWireCHASSIS_BTCM_IND_LOW_TRAC);
+    bit(R::kParkBrakeLamp, kWireCHASSIS_BTCM_IND_PARK_BRAKE);
+    u32(R::kPackVolts, kWireCHASSIS_AD_PACK_VOLTAGE_MV, 0.001);
+    u32(R::kInverterCapVolts, kWireCHASSIS_AD_CAP_VOLTAGE_MV, 0.001);
+    u32(R::kIsolationKohm, kWireCHASSIS_AD_ISOLATION_KOHM, 1.0);
+    bit(R::kTractionInverterDelivering, ReadOnlyWireId(kWireCHASSIS_PIM_INVERTER_ENERGISED));
+    bit(R::kApmKeyOn, kWireCHASSIS_APM_KEY_ON);
+    byte(R::kApmRunMode, kWireCHASSIS_APM_RUN_MODE);
+    // Signed hundredths of a degree carried as the uint32 bit pattern of an int32.
+    if (auto v = read_uint32(kWireCHASSIS_APM_MODULE_TEMP_CDEG))
+        at(R::kApmModuleTemp) = SignedFromCell(*v) / 100.0;
+    bit(R::kApm12vInBand, kWireCHASSIS_APM_STATUS_12V_NOMINAL);
+    bit(R::kApmSetpointHigh, kWireCHASSIS_APM_APS_COMMAND_QUALIFIED);
+    bit(R::kApmSetpointStale, kWireCHASSIS_APM_APS_COMMAND_STALE);
+    byte(R::kApmSubsystems, kWireCHASSIS_APM_SUBSYS_ENABLED_MASK);
+    byte(R::kApmLampRequests, kWireCHASSIS_APM_LAMP_REQUEST_MASK);
+    byte(R::kApmActiveFaults, kWireCHASSIS_APM_ACTIVE_DTC_COUNT);
+    u16(R::kApmWindshieldFeedbackVolts, kWireCHASSIS_APM_HWS_FEEDBACK_MV, 0.001);
+    u16(R::kApmLoadShedCount, kWireCHASSIS_APM_LOAD_SHED_ACTIVATION_COUNT, 1.0);
+    bit(R::kHtcmWakeUp, kWireCHASSIS_HTCM_WAKE_UP);
+    byte(R::kIpcActiveCodes, kWireCHASSIS_IPC_ACTIVE_DTC_COUNT);
+    return out;
+}
+
 bool WireTruthChassis::publish_coast_down_switch(bool on) {
     if (!attached()) return false;
     return write_bit(ProducerWireId(electricsim::topology::kWireDRIVER_ES_COAST_DOWN_SWITCH), on);
@@ -1259,6 +1310,7 @@ std::optional<bool> WireTruthChassis::climate_load_energised(ClimateLoad) const 
 }
 ChargerStatus WireTruthChassis::charger_status() const { return {}; }
 ClimateReadings WireTruthChassis::climate_readings() const { return {}; }
+DriveReadings WireTruthChassis::drive_readings() const { return {}; }
 bool WireTruthChassis::publish_coast_down_switch(bool) { return false; }
 bool WireTruthChassis::publish_pedal_travel(std::uint16_t) { return false; }
 bool WireTruthChassis::publish_outside_air_temp(float) { return false; }

@@ -207,18 +207,18 @@ TEST_CASE("Cruise RESUME/ACCEL contact closes while Y or '+' is held", "[Keyboar
 }
 
 // -----------------------------------------------------------------------
-TEST_CASE("Climate readout toggle is a one-shot on J press", "[Keyboard]") {
+TEST_CASE("Readout page step is a one-shot on J press", "[Keyboard]") {
     auto ctrl = MakeController();
 
     ctrl.SetKeyPressed(irr::KEY_KEY_J, true);
     ctrl.Update(0.016);
-    CHECK(ctrl.ConsumeClimateReadoutToggle() == true);
-    CHECK(ctrl.ConsumeClimateReadoutToggle() == false);  // consumed
+    CHECK(ctrl.ConsumeReadoutPageStep() == true);
+    CHECK(ctrl.ConsumeReadoutPageStep() == false);  // consumed
     ctrl.Update(0.016);                                   // still held: no repeat
-    CHECK(ctrl.ConsumeClimateReadoutToggle() == false);
+    CHECK(ctrl.ConsumeReadoutPageStep() == false);
     ctrl.SetKeyPressed(irr::KEY_KEY_J, false);
     ctrl.Update(0.016);
     ctrl.SetKeyPressed(irr::KEY_KEY_J, true);
     ctrl.Update(0.016);
-    CHECK(ctrl.ConsumeClimateReadoutToggle() == true);   // a second press toggles again
+    CHECK(ctrl.ConsumeReadoutPageStep() == true);   // a second press steps again
 }

@@ -759,6 +759,10 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
         else if (auto reading = ClimateReadingForColumn(f)) {
             if (const auto& v = bus.GetClimateReadings()[static_cast<int>(*reading)]) m_csv << *v;
         }
+        // Drive and power readout (DriveReadout.h), "drive_<reading>", same rules.
+        else if (auto reading = DriveReadingForColumn(f)) {
+            if (const auto& v = bus.GetDriveReadings()[static_cast<int>(*reading)]) m_csv << *v;
+        }
         // The off-board charger's report (ChargerStatus.h), blank until the
         // charger has written the cell (-1 would read as a real temperature or
         // current). Current is signed, charging negative.
