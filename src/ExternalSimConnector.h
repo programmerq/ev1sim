@@ -559,9 +559,10 @@ public:
     /// Last value latched by SetDoorLockSwitchContacts.  Out-of-range → false.
     bool GetDoorLockSwitchContact(int contact) const;
 
-    /// Incoming sounder / piezo drive from the LHJB flasher (ID 4096, chassis segment).
-    /// bool: true = piezo energised (the TURN/HAZ "click").  Returns false if
-    /// never received.  Consumed by ev1sim::Sounder.
+    /// Incoming turn/hazard tick sounder drive (ID 4096; electricsim's
+    /// TURN_TICK_SOUNDER_DRIVE, wire id 1741).  true while the LHJB drives the
+    /// sounder X56 for the ON half of a flash.  Returns false if never
+    /// received.  Consumed by ev1sim::Sounder.
     bool GetSounderPiezoDrive() const;
     bool HasReceivedSounderPiezoDrive() const;
 

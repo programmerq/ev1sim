@@ -1254,35 +1254,59 @@ private:
     bool   m_observed = false;  // the press has been seen by at least one update()
 };
 
-/// Piezo sounder — the LHJB turn/hazard "click" (and any future chime).
+/// Piezo sounder — the turn-signal and hazard tick (X56 on the LHJB board).
 ///
-/// Consumes a single boolean drive (the LHJB flasher's piezo square-wave
-/// output, chassis ID 4096).  The flasher toggles the drive each flash
-/// half-cycle; the sounder emits an audible tick while the drive is high.
-/// No frequency model — the piezo is a fixed-pitch element; a fancier model
-/// could carry a frequency/level later.
+/// Consumes one boolean drive: electricsim's TURN_TICK_SOUNDER_DRIVE conductor
+/// (wire id 1741), which the connector serves on chassis id 4096.  The LHJB's
+/// TURN/HAZ/DRL module drives the sounder for the ON half of each flash, so the
+/// drive toggles at the flash rate while a turn signal or the hazard is on.
+/// electricsim's 3D-sim contract (docs/3d_sim_contract.md section 2.6) asks for
+/// one tick per rising edge; this class turns edges into ticks stamped with the
+/// sim time they were seen at, so the cabin audio follows the sim clock: a paused
+/// or stalled sim produces no edges and therefore no ticks.
 ///
-/// The piezo is a real LHJB-internal component the printed EV1 schematics are
-/// silent on (no first-class component_id) — see docs/peripherals.md.
+/// No frequency model — the piezo is a fixed-pitch element.
 class Sounder {
 public:
-    /// Update from the piezo drive line.  Call once per tick.  Each rising
-    /// edge (false→true) counts one audible click.
-    void update(bool drive) {
-        if (drive && !m_drive) ++m_click_count;   // rising edge
+    /// Update from the sounder drive at sim time `sim_time_s`.  Call once per
+    /// tick.  Each rising edge (false -> true) is one audible tick.
+    void update(bool drive, double sim_time_s) {
+        if (drive && !m_drive) {
+            if (m_tick_count > 0) m_last_period_s = sim_time_s - m_last_tick_s;
+            m_last_tick_s = sim_time_s;
+            ++m_tick_count;
+            ++m_pending_ticks;
+        }
         m_drive = drive;
     }
 
-    /// true while the piezo is energised — the audible-output signal a future
-    /// 3D-sim audio backend plays.
+    /// true while the sounder is driven (the ON half of a flash).
     bool sounding() const { return m_drive; }
 
-    /// Number of rising edges (clicks) since construction.
-    unsigned long click_count() const { return m_click_count; }
+    /// Number of ticks (rising edges) since construction.
+    unsigned long click_count() const { return m_tick_count; }
+
+    /// Ticks seen since the last call, for the audio backend to play; clears
+    /// the count.  Normally 0 or 1 per frame at a 1-1.5 Hz flash rate.
+    unsigned take_pending_ticks() {
+        const unsigned n = m_pending_ticks;
+        m_pending_ticks = 0;
+        return n;
+    }
+
+    /// Sim time of the most recent tick; negative before the first.
+    double last_tick_time_s() const { return m_last_tick_s; }
+
+    /// Sim-time interval between the last two ticks (the flash period);
+    /// 0 until two ticks have been seen.
+    double last_tick_period_s() const { return m_last_period_s; }
 
 private:
-    bool          m_drive       = false;
-    unsigned long m_click_count = 0;
+    bool          m_drive         = false;
+    unsigned long m_tick_count    = 0;
+    unsigned      m_pending_ticks = 0;
+    double        m_last_tick_s   = -1.0;
+    double        m_last_period_s = 0.0;
 };
 
 /// Power-steering pump motor (3-phase BLDC driven by the PSCM HV inverter).

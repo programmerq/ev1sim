@@ -1688,27 +1688,68 @@ TEST_CASE("DoorLockSwitch: release opens the contact immediately",
 }
 
 // ---------------------------------------------------------------------------
-// Sounder — LHJB flasher piezo "click".
+// Sounder — the turn-signal and hazard tick (X56 on the LHJB board).
 // ---------------------------------------------------------------------------
 
 TEST_CASE("Sounder: silent at construction", "[PhysicalWorld][Sounder]") {
     Sounder s;
     CHECK_FALSE(s.sounding());
     CHECK(s.click_count() == 0);
+    CHECK(s.take_pending_ticks() == 0);
+    CHECK(s.last_tick_time_s() < 0.0);
+    CHECK(s.last_tick_period_s() == 0.0);
 }
 
-TEST_CASE("Sounder: counts one click per rising edge", "[PhysicalWorld][Sounder]") {
+TEST_CASE("Sounder: counts one tick per rising edge", "[PhysicalWorld][Sounder]") {
     Sounder s;
-    s.update(true);                 // rising edge → click 1
+    s.update(true, 0.00);           // rising edge -> tick 1
     CHECK(s.sounding());
     CHECK(s.click_count() == 1);
-    s.update(true);                 // still high → no new click
+    s.update(true, 0.01);           // still high -> no new tick
     CHECK(s.click_count() == 1);
-    s.update(false);                // falling edge — silent, count unchanged
+    s.update(false, 0.02);          // falling edge: silent, count unchanged
     CHECK_FALSE(s.sounding());
     CHECK(s.click_count() == 1);
-    s.update(true);                 // next rising edge → click 2
+    s.update(true, 0.03);           // next rising edge -> tick 2
     CHECK(s.click_count() == 2);
+    CHECK(s.take_pending_ticks() == 2);
+    CHECK(s.take_pending_ticks() == 0);   // taking clears them
+}
+
+// The drive electricsim's LHJB puts on TURN_TICK_SOUNDER_DRIVE with the hazard
+// on: driven for the ON half of each flash.  electricsim's own sounder test sees
+// 8 ticks in 6 s of sim time, a 0.75 s flash period; replay that square wave on
+// a 10 ms sim step and check the ticks land on the sim clock.
+TEST_CASE("Sounder: ticks follow the flash on the sim clock", "[PhysicalWorld][Sounder]") {
+    constexpr double kPeriod = 0.75;
+    constexpr double kStep   = 0.01;
+    Sounder s;
+    unsigned played = 0;
+    for (int i = 0; i < 600; ++i) {                 // 6 s of sim time
+        const double t = i * kStep;
+        const bool on = std::fmod(t + 1e-9, kPeriod) < kPeriod / 2.0;
+        s.update(on, t);
+        played += s.take_pending_ticks();           // the audio backend's read
+    }
+    CHECK(s.click_count() == 8);
+    CHECK(played == 8);
+    CHECK_THAT(s.last_tick_period_s(), Catch::Matchers::WithinAbs(kPeriod, kStep));
+    CHECK_THAT(s.last_tick_time_s(), Catch::Matchers::WithinAbs(7 * kPeriod, kStep));
+}
+
+TEST_CASE("Sounder: a stalled sim clock plays no ticks", "[PhysicalWorld][Sounder]") {
+    // Paused: electricsim holds the flash phase, so the drive does not move and
+    // however many frames render, no tick plays.
+    Sounder s;
+    s.update(true, 1.0);
+    REQUIRE(s.take_pending_ticks() == 1);
+    for (int frame = 0; frame < 300; ++frame) s.update(true, 1.0);
+    CHECK(s.take_pending_ticks() == 0);
+    CHECK(s.click_count() == 1);
+    // The sounder's lead cut or the LHJB dark: the drive reads 0, no ticks.
+    for (int i = 0; i < 300; ++i) s.update(false, 1.0 + i * 0.01);
+    CHECK(s.take_pending_ticks() == 0);
+    CHECK_FALSE(s.sounding());
 }
 
 // ---------------------------------------------------------------------------

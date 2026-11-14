@@ -1430,14 +1430,17 @@ void SimApp::ConsumeBodyActuatorPeripherals(double dt, double steering) {
                 ev1sim::PowerSteeringPumpMotor::case_temp_q8(pump.case_temp_c()));
     }
 
-    // --- Sounder / piezo "tick" (chassis 4096 in) ---
-    // The LHJB flasher gates the piezo on/off each flash half-cycle; that
-    // toggling IS the audible TURN/HAZ tick.  Drive the buzz from sounding()
-    // (continuous while energised); SounderAudio is a no-op off macOS.
+    // --- Turn-signal / hazard tick (sounder X56, chassis 4096 in) ---
+    // electricsim's TURN_TICK_SOUNDER_DRIVE toggles at the flash rate in sim
+    // time while a turn signal or the hazard is on.  The Sounder stamps each
+    // rising edge with the sim time, and the cabin plays one tick per edge
+    // (electricsim docs/3d_sim_contract.md 2.6).  A paused sim holds the flash
+    // phase, so no edges and no ticks.  SounderAudio is a no-op off macOS.
     {
-        m_physical->sounder().update(m_external_sim->GetSounderPiezoDrive());
-        if (m_sounder_audio)
-            m_sounder_audio->SetSounding(m_physical->sounder().sounding());
+        auto& sounder = m_physical->sounder();
+        sounder.update(m_external_sim->GetSounderPiezoDrive(), m_world->GetSimTime());
+        const unsigned ticks = sounder.take_pending_ticks();
+        if (ticks > 0 && m_sounder_audio) m_sounder_audio->PlayTick();
     }
 
     // --- Door-lock rockers LH/RH (chassis 4170-4173 out) ---

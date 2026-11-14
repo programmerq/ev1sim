@@ -2,22 +2,22 @@
 
 #include <memory>
 
-// Real-time piezo "sounder" audio — the LHJB turn/hazard tick and the
-// door-lock solenoid click.  Uses CoreAudio (AudioUnit) on macOS; no-op on
-// other platforms.  Mirrors HornAudio's structure.
+// Real-time piezo "sounder" audio: the turn-signal / hazard tick (sounder X56
+// on the LHJB board) and the door-lock solenoid click.  Uses CoreAudio
+// (AudioUnit) on macOS; no-op on other platforms.  Mirrors HornAudio's
+// structure.
 //
-// The EV1 piezo is a square-wave-driven buzzer: while energised it buzzes, and
-// the LHJB flasher gates it on/off each flash half-cycle — that toggling IS the
-// audible TURN/HAZ "tick".  Drive SetSounding() from ev1sim::Sounder
-// (chassis 4096) each frame; fire PlayClick() for a one-shot actuation click
-// (e.g. a door-lock motor reaching end-of-travel).
+// Both are one-shot square-wave bursts at the piezo's fixed pitch.  SimApp
+// calls PlayTick() once per rising edge of electricsim's TURN_TICK_SOUNDER_DRIVE
+// (ev1sim::Sounder, chassis 4096), and PlayClick() when a door-lock motor
+// reaches end of travel.
 class SounderAudio {
 public:
     SounderAudio();
     ~SounderAudio();
 
-    // Continuous piezo buzz while `sounding` is true.  Call once per frame.
-    void SetSounding(bool sounding);
+    // One short tick (~12 ms) — one turn-signal / hazard flash.
+    void PlayTick();
 
     // One-shot short buzz (~40 ms) — e.g. the door-lock solenoid click.
     void PlayClick();

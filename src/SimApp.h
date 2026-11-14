@@ -134,7 +134,7 @@ private:
     // directions, each tick:
     //   - power-steering pump motor   (chassis 4097 in / 4098 out, case
     //                                  temperature out once the pump is driven)
-    //   - sounder / piezo "click"     (chassis 4096 in)
+    //   - turn/hazard tick sounder    (chassis 4096 in, one tick per edge)
     //   - door-lock motors LH/RH      (chassis 4182-4185 in)
     //   - door-lock rockers LH/RH     (chassis 4170-4173 out)
     // Advances the PhysicalWorld plant models from the connector's latched
