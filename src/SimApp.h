@@ -347,6 +347,7 @@ private:
 
     // Physical-world snapshot overlay — toggled by Z key.
     bool m_show_snapshot = false;
+    bool m_show_climate_readout = false;
 
     // UI mode — when true the cursor is shown and mouse clicks go to the
     // floating panel instead of the camera.  Toggled by TAB.

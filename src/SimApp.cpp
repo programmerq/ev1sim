@@ -1072,7 +1072,7 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
                      "P=pause  R=respawn  C=camera  Scroll=zoom  B=horn  O=hi  L=lo  "
                      "H=headlights  K=key-on  .=PRND-up  ,=PRND-down  "
                      "Q=turn-L  E=turn-R  X=hazard  "
-                     "F=hood  T=trunk  [=doorL  ]=doorR  Z=snapshot  "
+                     "F=hood  T=trunk  [=doorL  ]=doorR  Z=snapshot  J=climate  "
                      "TAB=UI panel  Esc=quit\n";
         if (m_paused)
             std::cout << "[SimApp] Started PAUSED — press P to begin simulation\n";
@@ -1772,6 +1772,9 @@ int SimApp::RunWithVisualization() {
         // Z = toggle physical-world snapshot overlay.
         if (m_keyboard->ConsumeSnapshotToggle())
             m_show_snapshot = !m_show_snapshot;
+        // J = toggle the climate readout panel.
+        if (m_keyboard->ConsumeClimateReadoutToggle())
+            m_show_climate_readout = !m_show_climate_readout;
 
         // TAB = toggle UI mode (mouse cursor + floating panel).
         if (m_keyboard->ConsumeUiModeToggle()) {
@@ -2196,6 +2199,9 @@ int SimApp::RunWithVisualization() {
                                         m_external_sim->GetRsaRunMode(),
                                         m_external_sim->HasReceivedRunMode(),
                                         m_trip_reset_count);
+        if (m_show_climate_readout)
+            ev1sim::DrawClimateReadout(m_vis->GetDevice(),
+                                       m_external_sim->GetClimateReadings());
 
         // Draw PAUSED overlay.
         if (m_paused) {
@@ -2265,6 +2271,7 @@ int SimApp::RunWithVisualization() {
                 drawL(L"T            trunk toggle",                        norm);
                 drawL(L"[ / ]        door L / R toggle",                  norm);
                 drawL(L"Z            physical-world snapshot overlay",     norm);
+                drawL(L"J            climate readout",                     norm);
                 drawL(L"TAB          UI panel (mouse clicks)",            norm);
                 drawL(L"C            camera mode cycle",                   norm);
                 drawL(L"P            pause",                               norm);

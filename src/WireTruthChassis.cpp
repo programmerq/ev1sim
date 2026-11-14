@@ -951,6 +951,53 @@ ChargerStatus WireTruthChassis::charger_status() const {
     return s;
 }
 
+ClimateReadings WireTruthChassis::climate_readings() const {
+    using namespace electricsim::topology;
+    using R = ClimateReading;
+    ClimateReadings out{};
+    auto at = [&out](R r) -> std::optional<double>& { return out[static_cast<int>(r)]; };
+    auto temp = [&](R r, std::uint32_t id) {
+        if (auto v = read_uint16(id)) at(r) = DegCFromQ8Cell(*v);
+    };
+    auto u16 = [&](R r, std::uint32_t id, double scale) {
+        if (auto v = read_uint16(id)) at(r) = *v * scale;
+    };
+    auto byte = [&](R r, std::uint32_t id) {
+        if (auto v = read_byte(id)) at(r) = *v;
+    };
+    auto bit = [&](R r, std::uint32_t id) {
+        if (auto v = read_bit(id)) at(r) = *v ? 1.0 : 0.0;
+    };
+    temp(R::kOutsideAirTemp, kWireCHASSIS_HTCM_OUTSIDE_AIR_TEMP_Q8);
+    temp(R::kInletTemp, kWireCHASSIS_HTCM_INLET_TEMP_Q8);
+    temp(R::kPackTemp, kWireCHASSIS_HTCM_PACK_TEMP_Q8);
+    temp(R::kPimTemp, kWireCHASSIS_HTCM_PIM_TEMP_Q8);
+    temp(R::kCoolantTemp, kWireCHASSIS_HTCM_COOLANT_TEMP_Q8);
+    temp(R::kCoolantPumpTemp, kWireCHASSIS_HTCM_COOLANT_PUMP_TEMP_Q8);
+    temp(R::kDriveMotorCoolantTemp, kWireCHASSIS_HTCM_DRIVE_MOTOR_COOLANT_TEMP_Q8);
+    bit(R::kCoolantLevelLow, kWireCHASSIS_HTCM_COOLANT_LEVEL_LOW);
+    u16(R::kRefrigLowKpa, kWireCHASSIS_HTCM_REFRIG_LOW_KPA, 1.0);
+    u16(R::kRefrigHighKpa, kWireCHASSIS_HTCM_REFRIG_HIGH_KPA, 1.0);
+    temp(R::kRefrigTemp, kWireCHASSIS_HTCM_REFRIG_TEMP_Q8);
+    temp(R::kRefrigDischargeTemp, kWireCHASSIS_HTCM_REFRIG_DISCHARGE_TEMP_Q8);
+    byte(R::kModeDoor, kWireCHASSIS_HTCM_MODE_DOOR_CMD);
+    bit(R::kOutsideAirValve, kWireCHASSIS_HTCM_OUTSIDE_AIR_VALVE_CMD);
+    bit(R::kReversingValve, kWireCHASSIS_HTCM_REVERSING_VALVE_CMD);
+    bit(R::kThreeWayCoolantValve, kWireCHASSIS_HTCM_THREE_WAY_COOLANT_VALVE_CMD);
+    bit(R::kCoolantRecoveryValve, kWireCHASSIS_HTCM_COOLANT_RECOVERY_VALVE_CMD);
+    bit(R::kHeaterValveFeed, ReadOnlyWireId(kWireCHASSIS_HTCM_HEATER_VALVE_FEED));
+    bit(R::kCoolantPumpFeed, ReadOnlyWireId(kWireCHASSIS_HTCM_COOLANT_PUMP_FEED));
+    byte(R::kCompressorDutyPct, kWireCHASSIS_APM_CMC_PWM_DUTY_PCT);
+    byte(R::kCompressorFreqHz, kWireCHASSIS_APM_CMC_TARGET_FREQ_HZ);
+    bit(R::kCompressorDriveEnabled, kWireCHASSIS_APM_CMC_DRIVE_ENABLED);
+    bit(R::kCompressorInterlockClosed, kWireCHASSIS_APM_CMC_MOTOR_INTERLOCK_CLOSED);
+    bit(R::kCompressorInverterFault, kWireCHASSIS_APM_CMC_IGBT_FAULT_ACTIVE);
+    bit(R::kWindshieldHeatCommanded, kWireCHASSIS_APM_HWS_COMMAND_ACTIVE);
+    bit(R::kWindshieldHeatDriving, kWireCHASSIS_APM_HWS_DRIVE_ENABLED);
+    u16(R::kWindshieldRailV, kWireCHASSIS_APM_HWS_47V_OUTPUT_MV, 0.001);
+    return out;
+}
+
 bool WireTruthChassis::publish_coast_down_switch(bool on) {
     if (!attached()) return false;
     return write_bit(ProducerWireId(electricsim::topology::kWireDRIVER_ES_COAST_DOWN_SWITCH), on);
@@ -1211,6 +1258,7 @@ std::optional<bool> WireTruthChassis::climate_load_energised(ClimateLoad) const 
     return std::nullopt;
 }
 ChargerStatus WireTruthChassis::charger_status() const { return {}; }
+ClimateReadings WireTruthChassis::climate_readings() const { return {}; }
 bool WireTruthChassis::publish_coast_down_switch(bool) { return false; }
 bool WireTruthChassis::publish_pedal_travel(std::uint16_t) { return false; }
 bool WireTruthChassis::publish_outside_air_temp(float) { return false; }

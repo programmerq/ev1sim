@@ -1459,6 +1459,7 @@ struct ExternalSimConnector::State {
     bool          has_dilm_level          = false;
     std::optional<bool> climate_load[ev1sim::kNumClimateLoads] = {};
     ev1sim::ChargerStatus charger;          // CHASSIS_CHARGER_* cells
+    ev1sim::ClimateReadings climate{};      // ClimateReadout.h
 
     // Door-lock motor leg drives (IDs 4182-4185, chassis segment) — received from RHJB.
     // dual-H-bridge: [0]=LH lock, [1]=LH unlock, [2]=RH lock, [3]=RH unlock.
@@ -1864,6 +1865,9 @@ std::optional<bool> ExternalSimConnector::GetClimateLoad(ev1sim::ClimateLoad loa
 }
 std::uint8_t ExternalSimConnector::GetDilmLevel() const { return m_state->dilm_level; }
 bool ExternalSimConnector::HasReceivedDilmLevel() const { return m_state->has_dilm_level; }
+const ev1sim::ClimateReadings& ExternalSimConnector::GetClimateReadings() const {
+    return m_state->climate;
+}
 const ev1sim::ChargerStatus& ExternalSimConnector::GetChargerStatus() const {
     return m_state->charger;
 }
@@ -3487,6 +3491,12 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             keep(st.charger.coupler_temp_c, now.coupler_temp_c);
             keep(st.charger.ac_input_v, now.ac_input_v);
             keep(st.charger.fault_bits, now.fault_bits);
+        }
+        // The climate readout; a reading keeps its last value until rewritten.
+        {
+            const ev1sim::ClimateReadings now = st.wire->climate_readings();
+            for (int i = 0; i < ev1sim::kNumClimateReadings; ++i)
+                if (now[i]) st.climate[i] = now[i];
         }
         // Retard request at the PIM, permille duty; 0 while the line is dark.
         if (auto duty = st.wire->pim_retard_request_permille()) {

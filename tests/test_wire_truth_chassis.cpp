@@ -1593,6 +1593,49 @@ TEST_CASE("Charger report: CHASSIS_CHARGER_* cells -> connector -> decoded statu
 }
 
 
+TEST_CASE("Climate readout: HTCM / APM cells -> connector -> decoded readings",
+          "[wire_truth][e2e]") {
+    namespace topo = electricsim::topology;
+    using R = ev1sim::ClimateReading;
+    const std::string seg = unique_segment("e2e_climate_readout");
+    auto fleet = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(fleet != nullptr);
+    ScopedEnv env("ELECTRICSIM_WIRES_NAME", seg.c_str());
+
+    ExternalSimConnector::Options opts;
+    opts.enabled = true;
+    ExternalSimConnector c(opts);
+    c.Tick(0.0);
+    REQUIRE(c.IsConnected());
+    for (const auto& v : c.GetClimateReadings()) CHECK_FALSE(v.has_value());
+
+    auto at = [&](R r) { return c.GetClimateReadings()[static_cast<int>(r)]; };
+    // One cell of each encoding.
+    REQUIRE(fleet->write_uint16(topo::kWireCHASSIS_HTCM_OUTSIDE_AIR_TEMP_Q8,
+                                static_cast<std::uint16_t>(-10 * 256)));   // Q8 temperature
+    REQUIRE(fleet->write_uint16(topo::kWireCHASSIS_HTCM_REFRIG_HIGH_KPA, 1520u));
+    REQUIRE(fleet->write_byte(topo::kWireCHASSIS_HTCM_MODE_DOOR_CMD, 128u));
+    REQUIRE(fleet->write_bit(topo::kWireCHASSIS_HTCM_REVERSING_VALVE_CMD, true));
+    REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_HTCM_HEATER_VALVE_FEED, true));
+    REQUIRE(fleet->write_byte(topo::kWireCHASSIS_APM_CMC_PWM_DUTY_PCT, 45u));
+    REQUIRE(fleet->write_uint16(topo::kWireCHASSIS_APM_HWS_47V_OUTPUT_MV, 47100u));
+    c.Tick(0.1);
+    CHECK(at(R::kOutsideAirTemp) == std::optional<double>(-10.0));
+    CHECK(at(R::kRefrigHighKpa) == std::optional<double>(1520.0));
+    CHECK(at(R::kModeDoor) == std::optional<double>(128.0));
+    CHECK(at(R::kReversingValve) == std::optional<double>(1.0));
+    CHECK(at(R::kHeaterValveFeed) == std::optional<double>(1.0));
+    CHECK(at(R::kCompressorDutyPct) == std::optional<double>(45.0));
+    REQUIRE(at(R::kWindshieldRailV).has_value());
+    CHECK(*at(R::kWindshieldRailV) == Catch::Approx(47.1));
+    CHECK_FALSE(at(R::kPackTemp).has_value());   // never written
+
+    // A reading follows its cell as it changes.
+    REQUIRE(fleet->write_bit(topo::kWireCHASSIS_HTCM_REVERSING_VALVE_CMD, false));
+    c.Tick(0.2);
+    CHECK(at(R::kReversingValve) == std::optional<double>(0.0));
+}
+
 TEST_CASE("Window glass follows the RHJB's motor legs: wire -> connector -> plant",
           "[wire_truth][e2e]") {
     // The passenger window goes down while the RHJB drives the DOWN leg, and

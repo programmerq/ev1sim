@@ -317,6 +317,29 @@ Scenario CSV columns, blank until the charger writes the cell: `charger_state`,
 
 ---
 
+## Climate readout — what the climate controller senses and commands
+
+Press J for the climate readout panel. electricsim publishes the climate
+controller's (HTCM's) sensor readings and outputs, and the APM's compressor and
+heated-windshield drive state, as scan-tool cells; ev1sim decodes them per
+[`src/ClimateReadout.h`](../src/ClimateReadout.h), one reading per cell:
+
+- **Sensors:** outside air, cabin inlet air, battery pack, inverter, coolant
+  (three points), coolant level low, refrigerant low- and high-side pressures,
+  refrigerant and compressor-discharge temperatures.
+- **Controller outputs:** mode door position, outside-air, reversing,
+  three-way coolant and coolant recovery valve commands, heater valve and
+  coolant pump feeds.
+- **Compressor drive:** speed-command duty, target drive frequency, drive
+  enabled, motor interlock, inverter fault.
+- **Windshield heat drive:** commanded, driving, output rail voltage.
+
+The connector keeps the latest of each (`GetClimateReadings()`, nullopt until
+written). Scenario CSV columns are `climate_<reading>` (the names in
+`kClimateReadingInfo`, e.g. `climate_refrig_high_kpa`), blank until written.
+
+---
+
 ## Signal-ID summary
 
 | ID   | Peripheral                  | Encoding   | Direction      |
