@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ClimateLoads.h"
+#include "ChargerStatus.h"
 #include "DashSnapshot.h"
 #include "VehicleLights.h"
 #include "VehiclePanels.h"
@@ -509,6 +511,27 @@ public:
     /// side: 0=driver, 1=passenger.
     std::uint8_t GetPowerWindowMotor(int side) const;
     bool         HasReceivedPowerWindowMotor(int side) const;
+
+    /// Interior lamps, read every tick from their conductor cells at the
+    /// RHJB (WireTruthChassis::dilm_four_bar_lamp / dilm_mirror_lamp):
+    /// true = lit. lamp: 0 = four-bar lamp, 1 = inside-mirror map lamp.
+    /// false until received.
+    bool GetInteriorLamp(int lamp) const;
+    bool HasReceivedInteriorLamp(int lamp) const;
+
+    /// The RHJB's interior-lamp dimming level (ID 4186, CHASSIS_RHJB_DILM_LEVEL):
+    /// 0 = off .. 255 = full. 0 until received.
+    std::uint8_t GetDilmLevel() const;
+    bool         HasReceivedDilmLevel() const;
+
+    /// Whether current flows through each climate load (compressor, heated
+    /// windshield, both rear defog grids, radiator fan), read every tick from
+    /// the solver's conductor cells (ClimateLoads.h). nullopt until received.
+    std::optional<bool> GetClimateLoad(ev1sim::ClimateLoad load) const;
+    /// What the off-board charger reports, read every tick from its
+    /// CHASSIS_CHARGER_* cells (ChargerStatus.h). Each field nullopt until
+    /// the charger has written it.
+    const ev1sim::ChargerStatus& GetChargerStatus() const;
 
     /// Incoming HVAC blower level from HTCM (ID 4082, chassis segment).
     /// uint8: 0=OFF, 1=LOW, 2=MED, 3=HIGH.  Returns 0xFF if never received.

@@ -460,7 +460,16 @@ void VehicleLights::ApplyToScene() {
 // HUD: top-down vehicle silhouette with bulb indicators
 // ---------------------------------------------------------------------------
 
-void VehicleLights::DrawHUD(irr::IrrlichtDevice* device) const {
+SColor VehicleLights::InteriorLampHudColour(double brightness) {
+    const double b = brightness < 0.0 ? 0.0 : (brightness > 1.0 ? 1.0 : brightness);
+    // The unlit bulb dot (35, 35, 40) blended toward warm white (255, 225, 160).
+    auto mix = [b](int dark, int lit) {
+        return static_cast<u32>(dark + (lit - dark) * b + 0.5);
+    };
+    return SColor(255, mix(35, 255), mix(35, 225), mix(40, 160));
+}
+
+void VehicleLights::DrawHUD(irr::IrrlichtDevice* device, const double* interior) const {
     if (!device) return;
 
     auto* driver = device->getVideoDriver();
@@ -596,6 +605,17 @@ void VehicleLights::DrawHUD(irr::IrrlichtDevice* device) const {
             irr::core::recti(bx - dot, by - dot, bx + dot, by + dot));
     }
 
+    // Interior lamps on the centreline: the mirror map lamp at the top of
+    // the windshield, the four-bar lamp over the rear of the cabin.
+    if (interior != nullptr) {
+        const int map_y = car_top + fwd + 75;
+        const int bar_y = car_top + fwd + 110;
+        driver->draw2DRectangle(InteriorLampHudColour(interior[1]),
+            irr::core::recti(cx - dot, map_y - dot, cx + dot, map_y + dot));
+        driver->draw2DRectangle(InteriorLampHudColour(interior[0]),
+            irr::core::recti(cx - 8, bar_y - 2, cx + 8, bar_y + 2));
+    }
+
     // Labels along the edges.
     auto label = [&](int x, int y, const wchar_t* text, bool right_align = false) {
         int tx = right_align ? x - 42 : x + 5;
@@ -622,4 +642,8 @@ void VehicleLights::DrawHUD(irr::IrrlichtDevice* device) const {
     // Center labels.
     label(cx + 6, car_top + rear - 8, L"CHMSL");
     label(cx - 4, car_top + rear + 6, L"BKP");
+    if (interior != nullptr) {
+        label(cx + 4, car_top + fwd + 75, L"MAP");
+        label(cx + 8, car_top + fwd + 110, L"BAR");
+    }
 }
