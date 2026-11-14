@@ -26,8 +26,10 @@ SdlContext::SdlContext() {
 }
 
 SdlContext::~SdlContext() {
+    // Quit only what this context started: CabinAudio holds SDL's audio
+    // subsystem on its own count and may outlive this object.
     if (m_ok) {
-        SDL_Quit();
+        SDL_QuitSubSystem(SDL_INIT_JOYSTICK | SDL_INIT_HAPTIC);
     }
 }
 
