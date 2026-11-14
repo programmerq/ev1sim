@@ -145,6 +145,10 @@ private:
     // steering is the tick's normalized steering command (the pump's load).
     void ConsumeBodyActuatorPeripherals(double dt, double steering);
 
+    // Step both power-window glasses from the junction blocks' window motor
+    // legs (PhysicalWorld::StepPowerWindowPlant).  Both loops, once per tick.
+    void StepPowerWindows(double dt);
+
     // Publish the motor operating point on the chassis bus: RPM (4070) and
     // shaft torque (4071).  DC pack current (4072) is the external PIM's to
     // derive from these — ev1sim publishes only the mechanical state.

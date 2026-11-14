@@ -765,8 +765,9 @@ private:
 /// closed while held (DRIVER_ES_WINDOW_{DRIVER,PASSENGER}_{UP,DOWN}); the RSA
 /// reads it as a level.
 ///
-/// No keyboard binding — the floating UI panel will call press()/release()
-/// when its widget set expands.
+/// The floating UI panel's window rows hold them (set_held) and a rig button
+/// box can bind them (RigSwitches); there is no keyboard binding.  The glass
+/// itself is PowerWindowMotor, driven by the junction blocks' motor legs.
 class PowerWindows {
 public:
     enum class Window    { DRIVER, PASSENGER };
@@ -806,18 +807,14 @@ private:
     Direction m_passenger = Direction::NONE;
 };
 
-/// Door lock state model.
+/// Door lock latch state: driver door, passenger door, and trunk.
 ///
-/// Tracks the lock/unlock state of driver door, passenger door, and trunk.
-/// All doors default to UNLOCKED (vehicle starts unlocked per docs/TODO.md).
-///
-/// No keyboard binding for now — lock toggles will land via the floating-UI
-/// panel (see docs/TODO.md "Floating UI panel" item).
-///
-/// No bus signal pinning for now — wait until an external sim consumer wants it.
-/// TODO: when an RSA central locking consumer exists in external sim, add a
-///       chassis bus signal (e.g. a per-door lock state signal) and publish it
-///       from SimApp alongside the other PhysicalWorld signals.
+/// All locks start UNLOCKED unless the config's
+/// body.door_locks_locked_at_start says otherwise.  The door latches move when
+/// a door-lock motor reaches an end of travel (StepDoorLockPlant); the floating
+/// UI panel's lock rows set them by hand, like the knob inside the door.  SimApp
+/// publishes all three as CHASSIS_DOOR_LOCK_STATE_{DRIVER,PASSENGER,TRUNK}
+/// (4165-4167).
 class DoorLocks {
 public:
     enum class State { LOCKED, UNLOCKED };
@@ -826,32 +823,8 @@ public:
     State passenger() const { return m_passenger; }
     State trunk()     const { return m_trunk; }
 
-    void lock_all() {
-        m_driver    = State::LOCKED;
-        m_passenger = State::LOCKED;
-        m_trunk     = State::LOCKED;
-    }
-
-    void unlock_all() {
-        m_driver    = State::UNLOCKED;
-        m_passenger = State::UNLOCKED;
-        m_trunk     = State::UNLOCKED;
-    }
-
-    void toggle_driver() {
-        m_driver = (m_driver == State::LOCKED) ? State::UNLOCKED : State::LOCKED;
-    }
-
-    void toggle_passenger() {
-        m_passenger = (m_passenger == State::LOCKED) ? State::UNLOCKED : State::LOCKED;
-    }
-
-    void toggle_trunk() {
-        m_trunk = (m_trunk == State::LOCKED) ? State::UNLOCKED : State::LOCKED;
-    }
-
-    /// Set the lock state for a specific door directly (the door-lock plant at
-    /// end of travel, and the config's locked-at-start).
+    /// Set one latch.  The door-lock plant does this at end of travel; by hand,
+    /// go through PhysicalWorld::SetLockByHand so the actuator follows.
     void set_driver(State s)    { m_driver    = s; }
     void set_passenger(State s) { m_passenger = s; }
     void set_trunk(State s)     { m_trunk     = s; }
@@ -864,7 +837,7 @@ public:
     }
 
 private:
-    State m_driver    = State::UNLOCKED;  // doors default unlocked per docs/TODO.md
+    State m_driver    = State::UNLOCKED;
     State m_passenger = State::UNLOCKED;
     State m_trunk     = State::UNLOCKED;
 };
@@ -1194,6 +1167,70 @@ private:
     bool   m_lock_energised   = false;
     bool   m_unlock_energised = false;
     bool   m_ran              = false;
+};
+
+/// Power window motor and glass (one per door: LH driver, RH passenger).
+///
+/// A reversible DC motor across two legs, like the door-lock motor: the LHJB
+/// (LH) and RHJB (RH) each switch one leg to B+ through their window relays,
+/// and electricsim publishes the legs as CHASSIS_{LH,RH}_WINDOW_{UP,DOWN}_DRIVE.
+/// The motor turns only while the legs differ, so a module that closes both
+/// relays leaves the glass still.  The glass runs between its stops at a fixed
+/// rate and stalls against them while still driven.
+///
+/// travel_time_s is an estimate: no EV1 window travel time is in hand, and
+/// 4 s is a typical full-travel time for a car's power window.  The motor has
+/// no load or voltage dependence.
+class PowerWindowMotor {
+public:
+    struct Config {
+        double travel_time_s = 4.0;   // full travel, closed <-> open (estimate)
+    };
+
+    /// The connector's window command: 0 = stopped, 1 = UP leg alone,
+    /// 2 = DOWN leg alone (WireTruthChassis::window_motor_cmd).
+    enum class Drive : std::uint8_t { STOP = 0, UP = 1, DOWN = 2 };
+
+    PowerWindowMotor() = default;
+    explicit PowerWindowMotor(const Config& cfg) : m_cfg(cfg) {}
+
+    /// Advance the glass for dt seconds under `drive`.  Any other command
+    /// value (an unknown code) leaves the motor off.
+    void update(double dt, std::uint8_t drive) {
+        m_up_energised   = drive == static_cast<std::uint8_t>(Drive::UP);
+        m_down_energised = drive == static_cast<std::uint8_t>(Drive::DOWN);
+        if (dt <= 0.0 || m_cfg.travel_time_s <= 0.0) return;
+        const double step = dt / m_cfg.travel_time_s;
+        if (m_up_energised)        m_open -= step;
+        else if (m_down_energised) m_open += step;
+        if (m_open < 0.0) m_open = 0.0;
+        if (m_open > 1.0) m_open = 1.0;
+    }
+
+    /// How far the glass is down: 0 = closed (up stop), 1 = fully open.
+    double open_fraction() const { return m_open; }
+
+    bool closed()     const { return m_open <= 0.0; }
+    bool fully_open() const { return m_open >= 1.0; }
+
+    /// The glass is moving: a leg is driven and the glass is off that stop.
+    bool moving() const {
+        return (m_up_energised && m_open > 0.0) || (m_down_energised && m_open < 1.0);
+    }
+
+    /// Driven against the stop it is already at; the motor stalls there.
+    bool stalled() const {
+        return (m_up_energised && m_open <= 0.0) || (m_down_energised && m_open >= 1.0);
+    }
+
+    /// Seed the glass position (tests).
+    void set_open_fraction(double f) { m_open = f < 0.0 ? 0.0 : (f > 1.0 ? 1.0 : f); }
+
+private:
+    Config m_cfg{};
+    double m_open           = 0.0;   // windows start closed
+    bool   m_up_energised   = false;
+    bool   m_down_energised = false;
 };
 
 /// The door-mounted lock/unlock rocker (one per door: LH driver, RH passenger).
@@ -1651,11 +1688,51 @@ public:
         return out;
     }
 
+    /// Set a lock by hand, the way the knob inside the door (or the key in the
+    /// trunk) does.  A door's knob is linked to its lock actuator, so moving it
+    /// moves the motor's stroke too; without that, the latch would say LOCKED
+    /// while the motor sat at its UNLOCKED stop, and the next unlock pulse would
+    /// stall against that stop and never move the latch.
+    enum class LockSite { DRIVER, PASSENGER, TRUNK };
+    void SetLockByHand(LockSite site, bool locked) {
+        const auto st = locked ? DoorLocks::State::LOCKED : DoorLocks::State::UNLOCKED;
+        if (site == LockSite::TRUNK) { m_door_locks.set_trunk(st); return; }
+        const int door = (site == LockSite::DRIVER) ? 0 : 1;
+        DoorLockMotor& m = door == 0 ? m_door_lock_motor_lh : m_door_lock_motor_rh;
+        m.set_position(locked ? 1.0 : 0.0);
+        m_last_dlm_stroke[door] = static_cast<int>(m.stroke());
+        if (door == 0) m_door_locks.set_driver(st);
+        else           m_door_locks.set_passenger(st);
+    }
+
+    /// Every lock by hand at once (the UI's Lock All / Unlock All, the
+    /// config's locked-at-start).
+    void SetAllLocksByHand(bool locked) {
+        SetLockByHand(LockSite::DRIVER, locked);
+        SetLockByHand(LockSite::PASSENGER, locked);
+        SetLockByHand(LockSite::TRUNK, locked);
+    }
+
     /// Age both door-lock rockers one tick.  Call once per tick, before reading
     /// the contacts for publish.
     void StepDoorLockSwitches(double dt) {
         m_door_lock_sw_lh.update(dt);
         m_door_lock_sw_rh.update(dt);
+    }
+
+    // Window glass, driven by the junction blocks' window motor legs.
+    PowerWindowMotor&       power_window_motor_lh()       { return m_window_motor_lh; }
+    const PowerWindowMotor& power_window_motor_lh() const { return m_window_motor_lh; }
+    PowerWindowMotor&       power_window_motor_rh()       { return m_window_motor_rh; }
+    const PowerWindowMotor& power_window_motor_rh() const { return m_window_motor_rh; }
+
+    /// Advance both window motors one tick from the connector's window
+    /// commands (index 0 = LH/driver, 1 = RH/passenger; see
+    /// PowerWindowMotor::Drive).  A side with no command yet stays still.
+    void StepPowerWindowPlant(double dt, const std::optional<std::uint8_t> drive[2]) {
+        PowerWindowMotor* motors[2] = {&m_window_motor_lh, &m_window_motor_rh};
+        for (int side = 0; side < 2; ++side)
+            motors[side]->update(dt, drive[side].value_or(0u));
     }
 
     Sounder&       sounder()       { return m_sounder; }
@@ -1714,6 +1791,8 @@ private:
     HeldContact        m_sdm_unplugged;
     DoorHandles        m_door_handles;
     // Actuator/plant peripherals driven by the external electrical sim.
+    PowerWindowMotor       m_window_motor_lh;      // driver window glass
+    PowerWindowMotor       m_window_motor_rh;      // passenger window glass
     DoorLockMotor          m_door_lock_motor_lh;   // driver door
     DoorLockMotor          m_door_lock_motor_rh;   // passenger door
     DoorLockSwitch         m_door_lock_sw_lh;      // driver-door rocker

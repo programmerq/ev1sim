@@ -208,6 +208,39 @@ stays unwritten.
 
 ---
 
+## `power_window_motor` — window glass (LH + RH)
+
+Each door's window glass rides a reversible motor across two legs that the
+LHJB (driver) and RHJB (passenger) switch to B+ through their window relays.
+electricsim publishes the legs as conductors and `WireTruthChassis::window_motor_cmd`
+reads them as one command per side: `0` stopped, `1` UP leg alone, `2` DOWN leg
+alone. Both legs live, or both dark, is stopped: the motor turns only while the
+legs differ.
+
+| Side | UP leg | DOWN leg |
+|---|---|---|
+| LH / driver (LHJB) | `CHASSIS_LH_WINDOW_UP_DRIVE` (1513) | `CHASSIS_LH_WINDOW_DOWN_DRIVE` (1514) |
+| RH / passenger (RHJB) | `CHASSIS_RH_WINDOW_UP_DRIVE` | `CHASSIS_RH_WINDOW_DOWN_DRIVE` |
+
+`PhysicalWorld::StepPowerWindowPlant()` advances `PowerWindowMotor` per side
+from those commands, every tick in both loops: the glass runs between its
+closed and fully-open stops at a fixed rate and stalls against a stop while
+still driven. The full travel time, 4 s, is an **estimate** (a typical car
+window); no EV1 figure is in hand. The body diagram draws each window as a bar
+inside its door, full length when closed, amber while moving.
+
+Connector accessors: `GetPowerWindowMotor(side)` / `HasReceivedPowerWindowMotor(side)`.
+
+### Locks by hand
+
+The floating UI panel's lock rows, the `door_lock_all` / `door_unlock_all`
+scenario actions and `body.door_locks_locked_at_start` set a lock the way the
+knob inside the door does (`PhysicalWorld::SetLockByHand`). A door's knob is
+linked to its lock actuator, so the door-lock motor's stroke moves with it, and
+the next motor pulse from the RHJB starts from where the knob left it.
+
+---
+
 ## Signal-ID summary
 
 | ID   | Peripheral                  | Encoding   | Direction      |

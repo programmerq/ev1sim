@@ -31,6 +31,7 @@
 #include "WireTruthIds.h"
 #include "ExternalSimConnector.h"  // end-to-end: wire -> overlay -> getter
 #include "BusSnoop.h"              // kDefaultStaleAfterS (dash snoop test)
+#include "PhysicalWorld.h"         // PowerWindowMotor (window glass e2e)
 
 // external sim substrate (creator side) — same headers env_open.cpp uses.
 #include "topology/topology_generated.h"
@@ -1426,6 +1427,47 @@ TEST_CASE("Connector reads the window motor commands off the motor legs through 
     REQUIRE(c.HasReceivedPowerWindowMotor(1));
     CHECK(c.GetPowerWindowMotor(1) == 1u);
     CHECK_FALSE(c.HasReceivedPowerWindowMotor(0));
+}
+
+TEST_CASE("Window glass follows the RHJB's motor legs: wire -> connector -> plant",
+          "[wire_truth][e2e]") {
+    // The passenger window goes down while the RHJB drives the DOWN leg, and
+    // stops where it is when the module releases it, as SimApp steps it.
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("e2e_window_glass");
+    auto fleet = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(fleet != nullptr);
+    ScopedEnv env("ELECTRICSIM_WIRES_NAME", seg.c_str());
+
+    ExternalSimConnector::Options opts;
+    opts.enabled = true;
+    ExternalSimConnector c(opts);
+    c.Tick(0.0);
+    REQUIRE(c.IsConnected());
+
+    ev1sim::PhysicalWorld world;
+    auto step = [&](double t, double dt) {
+        c.Tick(t);
+        std::optional<std::uint8_t> drive[2];
+        for (int side = 0; side < 2; ++side)
+            if (c.HasReceivedPowerWindowMotor(side)) drive[side] = c.GetPowerWindowMotor(side);
+        world.StepPowerWindowPlant(dt, drive);
+    };
+
+    REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_RH_WINDOW_UP_DRIVE, false));
+    REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_RH_WINDOW_DOWN_DRIVE, true));
+    double t = 0.0;
+    for (int i = 0; i < 100; ++i) step(t += 0.01, 0.01);     // 1 s of DOWN
+    const double after_down = world.power_window_motor_rh().open_fraction();
+    CHECK(after_down > 0.2);
+    CHECK(after_down < 0.3);                                 // 1 s of the 4 s travel
+    CHECK(world.power_window_motor_rh().moving());
+    CHECK(world.power_window_motor_lh().closed());           // the LH legs never solved
+
+    REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_RH_WINDOW_DOWN_DRIVE, false));
+    for (int i = 0; i < 100; ++i) step(t += 0.01, 0.01);     // released
+    CHECK(world.power_window_motor_rh().open_fraction() == after_down);
+    CHECK_FALSE(world.power_window_motor_rh().moving());
 }
 
 TEST_CASE("WireTruthChassis::apm_12v_status_code reads the three 12 V status lines",

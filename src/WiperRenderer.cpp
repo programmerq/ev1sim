@@ -8,9 +8,8 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-// Irrlicht headers — only needed for DrawHUD / ApplyToScene, both of which
-// are guarded by a device/node pointer check, so the headers compile fine in
-// headless unit-test builds too.
+// Irrlicht headers — only needed for DrawHUD, which is guarded by a device
+// pointer check, so the headers compile fine in headless unit-test builds too.
 #include "irrlicht.h"
 
 using namespace irr;
@@ -69,25 +68,6 @@ void WiperRenderer::Tick(double dt_s, Mode mode) {
     m_phase_rad = std::fmod(m_phase_rad, 2.0 * M_PI);
     if (m_phase_rad < 0.0)
         m_phase_rad += 2.0 * M_PI;
-}
-
-// ---------------------------------------------------------------------------
-// Scene-graph
-// ---------------------------------------------------------------------------
-
-bool WiperRenderer::FindWiperNode(ISceneNode* root) {
-    // The EV1 chassis model (ev1_chassis_vis.obj) has no wiper mesh.
-    // This method always returns false until wiper geometry is added.
-    (void)root;
-    m_wiper_node = nullptr;
-    return false;
-}
-
-void WiperRenderer::ApplyToScene() {
-    if (!m_wiper_node) return;
-    // TODO: when a wiper mesh node exists, apply rotation here:
-    //   float angle_deg = GetAngleDeg();
-    //   m_wiper_node->setRotation(core::vector3df(0.0f, angle_deg, 0.0f));
 }
 
 // ---------------------------------------------------------------------------

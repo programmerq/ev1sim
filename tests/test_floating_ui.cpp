@@ -93,12 +93,7 @@ TEST_CASE("FloatingUI callback: lock_all / unlock_all via label-driven logic",
     CHECK(FormatLockAllLabel(world.door_locks().any_locked()) == L"Lock All");
 
     // Simulate the "Lock All / Unlock All" button callback.
-    auto cb = [&]() {
-        if (world.door_locks().any_locked())
-            world.door_locks().unlock_all();
-        else
-            world.door_locks().lock_all();
-    };
+    auto cb = [&]() { world.SetAllLocksByHand(!world.door_locks().any_locked()); };
 
     cb();  // locks all
     CHECK(world.door_locks().any_locked());
@@ -109,12 +104,15 @@ TEST_CASE("FloatingUI callback: lock_all / unlock_all via label-driven logic",
     CHECK(FormatLockAllLabel(world.door_locks().any_locked()) == L"Lock All");
 }
 
-TEST_CASE("FloatingUI callback: toggle_driver changes only driver",
+TEST_CASE("FloatingUI callback: the Driver row changes only the driver lock",
           "[FloatingUI][Callbacks]") {
     ev1sim::PhysicalWorld world;
     using S = ev1sim::DoorLocks::State;
 
-    auto cb = [&]() { world.door_locks().toggle_driver(); };
+    auto cb = [&]() {
+        world.SetLockByHand(ev1sim::PhysicalWorld::LockSite::DRIVER,
+                            world.door_locks().driver() != S::LOCKED);
+    };
     cb();
     CHECK(world.door_locks().driver()    == S::LOCKED);
     CHECK(world.door_locks().passenger() == S::UNLOCKED);
