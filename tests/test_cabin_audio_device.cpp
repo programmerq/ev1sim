@@ -15,10 +15,16 @@
 #include <thread>
 #include <vector>
 
-#include <unistd.h>
+#ifdef _WIN32
+#include <process.h>   // _getpid
+#define EV1SIM_GETPID _getpid
+#else
+#include <unistd.h>    // getpid
+#define EV1SIM_GETPID ::getpid
+#endif
 
 TEST_CASE("CabinAudio: a tick reaches the SDL output device", "[CabinAudio][sdl]") {
-    const std::string path = "ev1sim_cabin_audio_" + std::to_string(static_cast<long>(::getpid())) + ".raw";
+    const std::string path = "ev1sim_cabin_audio_" + std::to_string(static_cast<long>(EV1SIM_GETPID())) + ".raw";
     SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "disk");
     SDL_SetHint(SDL_HINT_AUDIO_DISK_OUTPUT_FILE, path.c_str());
     SDL_SetHint(SDL_HINT_AUDIO_DISK_TIMESCALE, "1.0");

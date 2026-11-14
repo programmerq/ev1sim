@@ -32,7 +32,7 @@ void CabinAudioSynth::Render(float* out, std::size_t frames) {
     const bool hi = m_high_on.load(std::memory_order_relaxed);
 
     // Take the whole countdown, use what this buffer needs, and hand back the
-    // rest unless a new burst started meanwhile.
+    // rest; if a new burst started meanwhile, keep whichever runs longer.
     const int taken = m_burst_frames.exchange(0, std::memory_order_relaxed);
     int burst = taken;
 
@@ -54,10 +54,7 @@ void CabinAudioSynth::Render(float* out, std::size_t frames) {
         Advance(m_phase_piezo, inc_piezo);
     }
 
-    if (burst > 0) {
-        int expected = 0;
-        m_burst_frames.compare_exchange_strong(expected, burst, std::memory_order_relaxed);
-    }
+    if (burst > 0) StartBurst(burst);
 }
 
 }  // namespace ev1sim
