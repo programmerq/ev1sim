@@ -7,6 +7,17 @@
 
 #include <fstream>
 #include <string>
+#include <vector>
+
+/// The HUD's text, top to bottom: speed, pedals and steering, the ABS line
+/// (when `abs_phase` is given), camera, surface, per-wheel friction (when
+/// `wheel_mu` is given; values <0 show as "-"), sim time. The first two lines
+/// draw white, the rest yellow. Pure.
+std::vector<std::string> TelemetryHudLines(const VehicleState& state,
+                                           const std::string& camera_mode,
+                                           const std::string& surface,
+                                           const double* wheel_mu,
+                                           const ExternalSimConnector::AbsPhaseFront* abs_phase);
 
 class Telemetry {
 public:

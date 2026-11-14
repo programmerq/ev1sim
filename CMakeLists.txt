@@ -543,6 +543,8 @@ if(BUILD_TESTS)
         tests/test_hood.cpp
         tests/test_host_clock_reads.cpp
         tests/test_cabin_audio.cpp
+        tests/test_camera_manager.cpp
+        tests/test_telemetry.cpp
         ${EV1SIM_WHEEL_IO_TEST_SRC}
         ${EV1SIM_WIRE_TRUTH_TEST_SRC}
         src/Config.cpp
@@ -569,6 +571,8 @@ if(BUILD_TESTS)
         src/VehiclePanels.cpp
         src/CabinAudio.cpp
         src/CabinAudioSynth.cpp
+        src/CameraManager.cpp
+        src/Telemetry.cpp
         ${EV1SIM_WHEEL_IO_SRC}
     )
 
