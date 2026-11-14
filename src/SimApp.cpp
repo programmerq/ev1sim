@@ -508,6 +508,34 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
                 },
                 []() {});   // no-op: display-only row
 
+            // --- Climate loads actually running (display-only): current
+            //     through each load from the solver's conductor cells, beside
+            //     the HTCM's requests above. ---
+            {
+                using ev1sim::ClimateLoad;
+                auto load_row = [this](const wchar_t* name, ClimateLoad load) {
+                    m_floating_ui->AddButton(
+                        [this, name, load]() -> std::wstring {
+                            return ev1sim::FormatClimateLoadLabel(
+                                name, m_external_sim ? m_external_sim->GetClimateLoad(load)
+                                                     : std::nullopt);
+                        },
+                        []() {});   // display-only row
+                };
+                load_row(L"Compressor", ClimateLoad::kCompressor);
+                load_row(L"Windshield heat", ClimateLoad::kWindshieldHeat);
+                m_floating_ui->AddButton(
+                    [this]() -> std::wstring {
+                        if (!m_external_sim) return ev1sim::FormatRearDefogGridsLabel(
+                                                 std::nullopt, std::nullopt);
+                        return ev1sim::FormatRearDefogGridsLabel(
+                            m_external_sim->GetClimateLoad(ClimateLoad::kRearDefogPrimary),
+                            m_external_sim->GetClimateLoad(ClimateLoad::kRearDefogSecondary));
+                    },
+                    []() {});   // display-only row
+                load_row(L"Radiator fan", ClimateLoad::kRadiatorFan);
+            }
+
             // --- HVAC driver controls (drive ev1sim::HvacControls, published on
             //     chassis 4124-4128, which no electricsim module reads; the car's
             //     HEAT / VENT / A/C buttons are on the RSA console panel).

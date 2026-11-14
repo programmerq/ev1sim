@@ -1501,6 +1501,46 @@ TEST_CASE("Interior lamps: conductor cells + dimming level -> connector -> brigh
     CHECK(brightness(0) == 0.0);
 }
 
+TEST_CASE("Climate loads: each conductor cell reaches the connector through Tick",
+          "[wire_truth][e2e]") {
+    namespace topo = electricsim::topology;
+    using ev1sim::ClimateLoad;
+    const std::string seg = unique_segment("e2e_climate_loads");
+    auto fleet = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(fleet != nullptr);
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+    ScopedEnv env("ELECTRICSIM_WIRES_NAME", seg.c_str());
+
+    ExternalSimConnector::Options opts;
+    opts.enabled = true;
+    ExternalSimConnector c(opts);
+    c.Tick(0.0);
+    REQUIRE(c.IsConnected());
+    for (int i = 0; i < ev1sim::kNumClimateLoads; ++i) {
+        CHECK_FALSE(wire->climate_load_energised(static_cast<ClimateLoad>(i)).has_value());
+        CHECK_FALSE(c.GetClimateLoad(static_cast<ClimateLoad>(i)).has_value());
+    }
+
+    // Each load from its own cell: light one at a time and check only it moves.
+    const std::pair<ClimateLoad, ConductorId> cells[] = {
+        {ClimateLoad::kCompressor, topo::kWireCHASSIS_APM_CMC_MOTOR_ENERGISED},
+        {ClimateLoad::kWindshieldHeat, topo::kWireCHASSIS_APM_HWS_GRID_ENERGISED},
+        {ClimateLoad::kRearDefogPrimary, topo::kWireCHASSIS_TJB_PRI_DEFOG_LO},
+        {ClimateLoad::kRearDefogSecondary, topo::kWireCHASSIS_TJB_SEC_DEFOG_LO},
+        {ClimateLoad::kRadiatorFan, topo::kWireCHASSIS_HTCM_RADIATOR_FAN_FEED},
+    };
+    for (const auto& [load, cell] : cells) REQUIRE(publish_conductor(*fleet, cell, false));
+    double t = 0.0;
+    for (const auto& [load, cell] : cells) {
+        REQUIRE(publish_conductor(*fleet, cell, true));
+        c.Tick(t += 0.1);
+        for (const auto& [other, other_cell] : cells)
+            CHECK(c.GetClimateLoad(other) == std::optional<bool>(other == load));
+        REQUIRE(publish_conductor(*fleet, cell, false));
+    }
+}
+
 TEST_CASE("Window glass follows the RHJB's motor legs: wire -> connector -> plant",
           "[wire_truth][e2e]") {
     // The passenger window goes down while the RHJB drives the DOWN leg, and

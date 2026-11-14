@@ -914,6 +914,23 @@ std::optional<bool> WireTruthChassis::dilm_mirror_lamp() const {
     return read_bit(ReadOnlyWireId(electricsim::topology::kWireCHASSIS_RHJB_DILM_MIRROR_LAMP));
 }
 
+std::optional<bool> WireTruthChassis::climate_load_energised(ClimateLoad load) const {
+    using namespace electricsim::topology;
+    switch (load) {
+        case ClimateLoad::kCompressor:
+            return read_bit(ReadOnlyWireId(kWireCHASSIS_APM_CMC_MOTOR_ENERGISED));
+        case ClimateLoad::kWindshieldHeat:
+            return read_bit(ReadOnlyWireId(kWireCHASSIS_APM_HWS_GRID_ENERGISED));
+        case ClimateLoad::kRearDefogPrimary:
+            return read_bit(ReadOnlyWireId(kWireCHASSIS_TJB_PRI_DEFOG_LO));
+        case ClimateLoad::kRearDefogSecondary:
+            return read_bit(ReadOnlyWireId(kWireCHASSIS_TJB_SEC_DEFOG_LO));
+        case ClimateLoad::kRadiatorFan:
+            return read_bit(ReadOnlyWireId(kWireCHASSIS_HTCM_RADIATOR_FAN_FEED));
+    }
+    return std::nullopt;
+}
+
 bool WireTruthChassis::publish_coast_down_switch(bool on) {
     if (!attached()) return false;
     return write_bit(ProducerWireId(electricsim::topology::kWireDRIVER_ES_COAST_DOWN_SWITCH), on);
@@ -1170,6 +1187,9 @@ std::optional<std::uint8_t> WireTruthChassis::window_motor_cmd(int) const {
 }
 std::optional<bool> WireTruthChassis::dilm_four_bar_lamp() const { return std::nullopt; }
 std::optional<bool> WireTruthChassis::dilm_mirror_lamp() const { return std::nullopt; }
+std::optional<bool> WireTruthChassis::climate_load_energised(ClimateLoad) const {
+    return std::nullopt;
+}
 bool WireTruthChassis::publish_coast_down_switch(bool) { return false; }
 bool WireTruthChassis::publish_pedal_travel(std::uint16_t) { return false; }
 bool WireTruthChassis::publish_outside_air_temp(float) { return false; }

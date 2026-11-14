@@ -270,6 +270,28 @@ Connector accessors: `GetInteriorLamp(lamp)` / `HasReceivedInteriorLamp(lamp)`
 
 ---
 
+## Climate loads — what is actually running
+
+The HTCM's blower level and defrost command (4082 / 4083) are what it asks
+for. Whether each climate load is running is a separate question that
+electricsim's solver answers from the circuit, one conductor cell per load,
+true only while both sides of the load are live
+([`src/ClimateLoads.h`](../src/ClimateLoads.h) lists them):
+
+| Load | Cell | Scenario CSV column |
+|---|---|---|
+| Heat-pump compressor motor (APM 902 / 903) | `CHASSIS_APM_CMC_MOTOR_ENERGISED` | `compressor_energised` |
+| Heated-windshield grid (APM 365A / 364A) | `CHASSIS_APM_HWS_GRID_ENERGISED` | `windshield_heat_energised` |
+| Rear defog, primary grid (TJB J2.G, 292) | `CHASSIS_TJB_PRI_DEFOG_LO` | `rear_defog_primary_energised` |
+| Rear defog, secondary grid (TJB J2.H, 681) | `CHASSIS_TJB_SEC_DEFOG_LO` | `rear_defog_secondary_energised` |
+| Radiator fan feed (HTCM) | `CHASSIS_HTCM_RADIATOR_FAN_FEED` | `radiator_fan_energised` |
+
+The connector reads them every tick (`GetClimateLoad(load)`, nullopt until the
+solver writes the cell), and the floating UI panel shows them as display-only
+rows beside the HTCM's requests; the rear defog row counts its two grids.
+
+---
+
 ## Signal-ID summary
 
 | ID   | Peripheral                  | Encoding   | Direction      |

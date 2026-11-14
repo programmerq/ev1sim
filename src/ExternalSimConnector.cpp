@@ -1457,6 +1457,7 @@ struct ExternalSimConnector::State {
     bool          has_interior_lamp[2]    = {false, false};
     std::uint8_t  dilm_level              = 0u;
     bool          has_dilm_level          = false;
+    std::optional<bool> climate_load[ev1sim::kNumClimateLoads] = {};
 
     // Door-lock motor leg drives (IDs 4182-4185, chassis segment) — received from RHJB.
     // dual-H-bridge: [0]=LH lock, [1]=LH unlock, [2]=RH lock, [3]=RH unlock.
@@ -1854,6 +1855,11 @@ bool ExternalSimConnector::GetInteriorLamp(int lamp) const {
 bool ExternalSimConnector::HasReceivedInteriorLamp(int lamp) const {
     if (lamp < 0 || lamp > 1) return false;
     return m_state->has_interior_lamp[lamp];
+}
+std::optional<bool> ExternalSimConnector::GetClimateLoad(ev1sim::ClimateLoad load) const {
+    const int i = static_cast<int>(load);
+    if (i < 0 || i >= ev1sim::kNumClimateLoads) return std::nullopt;
+    return m_state->climate_load[i];
 }
 std::uint8_t ExternalSimConnector::GetDilmLevel() const { return m_state->dilm_level; }
 bool ExternalSimConnector::HasReceivedDilmLevel() const { return m_state->has_dilm_level; }
@@ -3454,6 +3460,11 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         if (auto lit = st.wire->dilm_mirror_lamp()) {
             st.interior_lamp[1]     = *lit;
             st.has_interior_lamp[1] = true;
+        }
+        // Climate loads: current through each, from its conductor cell.
+        for (int i = 0; i < ev1sim::kNumClimateLoads; ++i) {
+            if (auto on = st.wire->climate_load_energised(static_cast<ev1sim::ClimateLoad>(i)))
+                st.climate_load[i] = *on;
         }
         // Retard request at the PIM, permille duty; 0 while the line is dark.
         if (auto duty = st.wire->pim_retard_request_permille()) {

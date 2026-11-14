@@ -218,6 +218,9 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   the four-bar lamp and the mirror map lamp in the cabin from their circuits at
   the RHJB, dimmed by its interior-lamp module's level; the lights diagram shows
   both. Mounts are read off the visual mesh (`@inferred`).
+- [x] Climate loads: the floating UI panel and the scenario CSV show whether the
+  compressor, heated windshield, both rear defog grids and radiator fan are
+  actually energised (`src/ClimateLoads.h`), beside the HTCM's requests.
 
 ## Bus-mediated physics
 - [ ] **Regen ↔ friction blending (S15 — documented gap, do NOT fabricate).**

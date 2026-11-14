@@ -28,6 +28,7 @@
 #ifndef EV1SIM_WIRE_TRUTH_CHASSIS_H
 #define EV1SIM_WIRE_TRUTH_CHASSIS_H
 
+#include "ClimateLoads.h"
 #include "DashSnapshot.h"
 
 #include <cstdint>
@@ -350,6 +351,11 @@ public:
     // its feed and its return sink are live. nullopt until the solver writes it.
     std::optional<bool> dilm_four_bar_lamp() const;
     std::optional<bool> dilm_mirror_lamp() const;
+
+    // Whether current flows through a climate load, from the solver's
+    // conductor cell for it (ClimateLoads.h names each cell). nullopt until
+    // the solver writes it.
+    std::optional<bool> climate_load_energised(ClimateLoad load) const;
 
     // The wiper blades' position, percent of one full sweep cycle (0 = park,
     // 50 = end of sweep), from the RHJB's wiper-motor plant. nullopt until the

@@ -750,6 +750,10 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
         else if (f == "four_bar_lamp")   m_csv << (bus.GetInteriorLamp(0) ? 1 : 0);
         else if (f == "mirror_map_lamp") m_csv << (bus.GetInteriorLamp(1) ? 1 : 0);
         else if (f == "dilm_level")      m_csv << static_cast<int>(bus.GetDilmLevel());
+        // Climate loads, 1 = current flowing through the load (ClimateLoads.h
+        // names the columns), 0 also before the solver writes it.
+        else if (auto load = ClimateLoadForColumn(f))
+            m_csv << (bus.GetClimateLoad(*load).value_or(false) ? 1 : 0);
         // Sounder / piezo drive (LHJB flasher module).
         else if (f == "sounder_piezo_drive")
             m_csv << (bus.GetSounderPiezoDrive() ? 1 : 0);

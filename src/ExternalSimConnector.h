@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ClimateLoads.h"
 #include "DashSnapshot.h"
 #include "VehicleLights.h"
 #include "VehiclePanels.h"
@@ -521,6 +522,11 @@ public:
     /// 0 = off .. 255 = full. 0 until received.
     std::uint8_t GetDilmLevel() const;
     bool         HasReceivedDilmLevel() const;
+
+    /// Whether current flows through each climate load (compressor, heated
+    /// windshield, both rear defog grids, radiator fan), read every tick from
+    /// the solver's conductor cells (ClimateLoads.h). nullopt until received.
+    std::optional<bool> GetClimateLoad(ev1sim::ClimateLoad load) const;
 
     /// Incoming HVAC blower level from HTCM (ID 4082, chassis segment).
     /// uint8: 0=OFF, 1=LOW, 2=MED, 3=HIGH.  Returns 0xFF if never received.
