@@ -28,6 +28,8 @@
 #ifndef EV1SIM_WIRE_TRUTH_CHASSIS_H
 #define EV1SIM_WIRE_TRUTH_CHASSIS_H
 
+#include "ClimateLoads.h"
+#include "ChargerStatus.h"
 #include "DashSnapshot.h"
 
 #include <cstdint>
@@ -343,6 +345,21 @@ public:
     // (both legs live, or both dark, is stop). side 0 = driver (LH),
     // 1 = passenger (RH). nullopt until the solver writes both legs.
     std::optional<std::uint8_t> window_motor_cmd(int side) const;
+
+    // Whether an interior lamp is lit, from the solver's conductor cell for
+    // that lamp's circuit through the RHJB's dimming module
+    // (CHASSIS_RHJB_DILM_FOUR_BAR_LAMP / _MIRROR_LAMP): true only while both
+    // its feed and its return sink are live. nullopt until the solver writes it.
+    std::optional<bool> dilm_four_bar_lamp() const;
+    std::optional<bool> dilm_mirror_lamp() const;
+
+    // Whether current flows through a climate load, from the solver's
+    // conductor cell for it (ClimateLoads.h names each cell). nullopt until
+    // the solver writes it.
+    std::optional<bool> climate_load_energised(ClimateLoad load) const;
+    // What the off-board charger reports (the CHASSIS_CHARGER_* cells,
+    // decoded per ChargerStatus.h). Each field nullopt until written.
+    ChargerStatus charger_status() const;
 
     // The wiper blades' position, percent of one full sweep cycle (0 = park,
     // 50 = end of sweep), from the RHJB's wiper-motor plant. nullopt until the

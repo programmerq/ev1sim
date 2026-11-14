@@ -390,6 +390,14 @@ constexpr std::uint32_t kSigTjbRrTailLamp = 4199U;
 constexpr std::uint32_t kSigTjbLrStopLamp = 4203U;
 constexpr std::uint32_t kSigTjbRrStopLamp = 4204U;
 
+// Locked in lockstep with the external sim's chassis-signal header
+// kSigChassisRhjbDilmLevel = 4186.
+// Interior-lamp dimming level from the RHJB's delayed interior lamp module
+// (CHASSIS_RHJB_DILM_LEVEL): 0 = off .. 255 = full, the module's fade ramp.
+// It sets how bright a lit lamp is; whether each lamp is lit comes from its
+// own conductor cell (WireTruthChassis::dilm_four_bar_lamp / _mirror_lamp).
+constexpr std::uint32_t kSigRhjbDilmLevel = 4186U;
+
 // Door-lock motor leg drives (the external RHJB → ev1sim, chassis segment).
 // RHJB's rhjb_door_lock behavioral model is a 4-output dual-H-bridge driving
 // BOTH door-lock motors (LH driver + RH passenger) in lockstep.  Each motor has
@@ -1445,6 +1453,12 @@ struct ExternalSimConnector::State {
     bool          tjb_lr_stop_lamp        = false;
     bool          tjb_rr_stop_lamp        = false;
     bool          has_tjb_lamps           = false;
+    bool          interior_lamp[2]        = {false, false};  // [0]=four-bar, [1]=mirror map
+    bool          has_interior_lamp[2]    = {false, false};
+    std::uint8_t  dilm_level              = 0u;
+    bool          has_dilm_level          = false;
+    std::optional<bool> climate_load[ev1sim::kNumClimateLoads] = {};
+    ev1sim::ChargerStatus charger;          // CHASSIS_CHARGER_* cells
 
     // Door-lock motor leg drives (IDs 4182-4185, chassis segment) — received from RHJB.
     // dual-H-bridge: [0]=LH lock, [1]=LH unlock, [2]=RH lock, [3]=RH unlock.
@@ -1833,6 +1847,25 @@ std::uint8_t ExternalSimConnector::GetDoorLockCmd(int side) const {
 bool ExternalSimConnector::HasReceivedDoorLockCmd(int side) const {
     if (side < 0 || side > 1) return false;
     return m_state->has_door_lock_cmd[side];
+}
+
+bool ExternalSimConnector::GetInteriorLamp(int lamp) const {
+    if (lamp < 0 || lamp > 1) return false;
+    return m_state->interior_lamp[lamp];
+}
+bool ExternalSimConnector::HasReceivedInteriorLamp(int lamp) const {
+    if (lamp < 0 || lamp > 1) return false;
+    return m_state->has_interior_lamp[lamp];
+}
+std::optional<bool> ExternalSimConnector::GetClimateLoad(ev1sim::ClimateLoad load) const {
+    const int i = static_cast<int>(load);
+    if (i < 0 || i >= ev1sim::kNumClimateLoads) return std::nullopt;
+    return m_state->climate_load[i];
+}
+std::uint8_t ExternalSimConnector::GetDilmLevel() const { return m_state->dilm_level; }
+bool ExternalSimConnector::HasReceivedDilmLevel() const { return m_state->has_dilm_level; }
+const ev1sim::ChargerStatus& ExternalSimConnector::GetChargerStatus() const {
+    return m_state->charger;
 }
 
 std::uint8_t ExternalSimConnector::GetPowerWindowMotor(int side) const {
@@ -2793,6 +2826,9 @@ void ExternalSimConnector::DebugInjectU8(std::uint32_t signal_id,
     } else if (signal_id == kSigDefrostGridActive) {
         m_state->hvac_defrost_grid_active     = (value != 0u);
         m_state->has_hvac_defrost_grid_active = true;
+    } else if (signal_id == kSigRhjbDilmLevel) {
+        m_state->dilm_level     = value;
+        m_state->has_dilm_level = true;
     } else if (signal_id == kSigIpcSeatbeltTelltaleDriver) {
         m_state->ipc_seatbelt_telltale_driver     = (value != 0u);
         m_state->has_ipc_seatbelt_telltale_driver = true;
@@ -3015,6 +3051,7 @@ EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockMotorLhLockDrive,   kSigChassisRhjbDlmLhLo
 EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockMotorLhUnlockDrive, kSigChassisRhjbDlmLhUnlock);
 EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockMotorRhLockDrive,   kSigChassisRhjbDlmRhLock);
 EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockMotorRhUnlockDrive, kSigChassisRhjbDlmRhUnlock);
+EV1SIM_CHASSIS_ID_MATCHES(kSigRhjbDilmLevel,              kSigChassisRhjbDilmLevel);
 // ...and the switch contacts it PRODUCES to make them move.
 EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockSwLhLockOut,   kSigDoorLockSw_LhLockOut);
 EV1SIM_CHASSIS_ID_MATCHES(kSigDoorLockSwLhUnlockOut, kSigDoorLockSw_LhUnlockOut);
@@ -3418,6 +3455,36 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                 st.pw_motor_cmd[side]     = *cmd;
                 st.has_pw_motor_cmd[side] = true;
             }
+        }
+        // Interior lamps, lit or dark, from their conductor cells at the RHJB.
+        if (auto lit = st.wire->dilm_four_bar_lamp()) {
+            st.interior_lamp[0]     = *lit;
+            st.has_interior_lamp[0] = true;
+        }
+        if (auto lit = st.wire->dilm_mirror_lamp()) {
+            st.interior_lamp[1]     = *lit;
+            st.has_interior_lamp[1] = true;
+        }
+        // Climate loads: current through each, from its conductor cell.
+        for (int i = 0; i < ev1sim::kNumClimateLoads; ++i) {
+            if (auto on = st.wire->climate_load_energised(static_cast<ev1sim::ClimateLoad>(i)))
+                st.climate_load[i] = *on;
+        }
+        // The off-board charger's report; a field keeps its last value until
+        // the charger writes it again.
+        {
+            const ev1sim::ChargerStatus now = st.wire->charger_status();
+            auto keep = [](auto& held, const auto& fresh) {
+                if (fresh) held = fresh;
+            };
+            keep(st.charger.state, now.state);
+            keep(st.charger.delivering, now.delivering);
+            keep(st.charger.current_a, now.current_a);
+            keep(st.charger.voltage_v, now.voltage_v);
+            keep(st.charger.charger_temp_c, now.charger_temp_c);
+            keep(st.charger.coupler_temp_c, now.coupler_temp_c);
+            keep(st.charger.ac_input_v, now.ac_input_v);
+            keep(st.charger.fault_bits, now.fault_bits);
         }
         // Retard request at the PIM, permille duty; 0 while the line is dark.
         if (auto duty = st.wire->pim_retard_request_permille()) {

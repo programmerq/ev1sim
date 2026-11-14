@@ -745,6 +745,34 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
         else if (f == "tjb_rr_tail_lamp")  m_csv << (bus.GetTjbLampBranch(1) ? 1 : 0);
         else if (f == "tjb_lr_stop_lamp")  m_csv << (bus.GetTjbLampBranch(2) ? 1 : 0);
         else if (f == "tjb_rr_stop_lamp")  m_csv << (bus.GetTjbLampBranch(3) ? 1 : 0);
+        // Interior lamps: 1 = lit (each lamp's circuit through the RHJB's
+        // interior-lamp module is live), and the module's dimming level 0..255.
+        else if (f == "four_bar_lamp")   m_csv << (bus.GetInteriorLamp(0) ? 1 : 0);
+        else if (f == "mirror_map_lamp") m_csv << (bus.GetInteriorLamp(1) ? 1 : 0);
+        else if (f == "dilm_level")      m_csv << static_cast<int>(bus.GetDilmLevel());
+        // Climate loads, 1 = current flowing through the load (ClimateLoads.h
+        // names the columns), 0 also before the solver writes it.
+        else if (auto load = ClimateLoadForColumn(f))
+            m_csv << (bus.GetClimateLoad(*load).value_or(false) ? 1 : 0);
+        // The off-board charger's report (ChargerStatus.h), blank until the
+        // charger has written the cell (-1 would read as a real temperature or
+        // current). Current is signed, charging negative.
+        else if (f.rfind("charger_", 0) == 0) {
+            const ChargerStatus& c = bus.GetChargerStatus();
+            auto put = [this](const auto& v) {
+                if (v) m_csv << *v;
+            };
+            if (f == "charger_state")                put(c.state);
+            else if (f == "charger_delivering")
+                put(c.delivering ? std::optional<int>(*c.delivering ? 1 : 0) : std::nullopt);
+            else if (f == "charger_current_a")       put(c.current_a);
+            else if (f == "charger_voltage_v")       put(c.voltage_v);
+            else if (f == "charger_temp_c")          put(c.charger_temp_c);
+            else if (f == "charger_coupler_temp_c")  put(c.coupler_temp_c);
+            else if (f == "charger_ac_input_v")      put(c.ac_input_v);
+            else if (f == "charger_fault_bits")      put(c.fault_bits);
+            else { WarnUnknownField(f); m_csv << ""; }
+        }
         // Sounder / piezo drive (LHJB flasher module).
         else if (f == "sounder_piezo_drive")
             m_csv << (bus.GetSounderPiezoDrive() ? 1 : 0);

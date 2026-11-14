@@ -353,6 +353,9 @@ add_executable(ev1sim
     src/WiperRenderer.cpp
     src/TrunkLid3D.cpp
     src/WiperBlades3D.cpp
+    src/InteriorLamps3D.cpp
+    src/ClimateLoads.cpp
+    src/ChargerStatus.cpp
     src/PhysicalWorld.cpp
     src/RigSwitches.cpp
     src/FloatingUiPanel.cpp
@@ -521,6 +524,9 @@ if(BUILD_TESTS)
         tests/test_dash_screens_3d.cpp
         tests/test_trunk_lid_3d.cpp
         tests/test_wiper_blades_3d.cpp
+        tests/test_interior_lamps_3d.cpp
+        tests/test_climate_loads.cpp
+        tests/test_charger_status.cpp
         tests/test_throttle_bus.cpp
         tests/test_scenario.cpp
         tests/test_brake_pedal.cpp
@@ -548,6 +554,9 @@ if(BUILD_TESTS)
         src/WiperRenderer.cpp
         src/TrunkLid3D.cpp
         src/WiperBlades3D.cpp
+        src/InteriorLamps3D.cpp
+        src/ClimateLoads.cpp
+        src/ChargerStatus.cpp
         src/PhysicalWorld.cpp
         src/RigSwitches.cpp
         src/FloatingUiPanel.cpp

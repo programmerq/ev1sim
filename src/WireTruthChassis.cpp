@@ -906,6 +906,47 @@ std::optional<std::uint8_t> WireTruthChassis::window_motor_cmd(int side) const {
     return std::uint8_t{*up ? 1u : 2u};
 }
 
+std::optional<bool> WireTruthChassis::dilm_four_bar_lamp() const {
+    return read_bit(ReadOnlyWireId(electricsim::topology::kWireCHASSIS_RHJB_DILM_FOUR_BAR_LAMP));
+}
+
+std::optional<bool> WireTruthChassis::dilm_mirror_lamp() const {
+    return read_bit(ReadOnlyWireId(electricsim::topology::kWireCHASSIS_RHJB_DILM_MIRROR_LAMP));
+}
+
+std::optional<bool> WireTruthChassis::climate_load_energised(ClimateLoad load) const {
+    using namespace electricsim::topology;
+    switch (load) {
+        case ClimateLoad::kCompressor:
+            return read_bit(ReadOnlyWireId(kWireCHASSIS_APM_CMC_MOTOR_ENERGISED));
+        case ClimateLoad::kWindshieldHeat:
+            return read_bit(ReadOnlyWireId(kWireCHASSIS_APM_HWS_GRID_ENERGISED));
+        case ClimateLoad::kRearDefogPrimary:
+            return read_bit(ReadOnlyWireId(kWireCHASSIS_TJB_PRI_DEFOG_LO));
+        case ClimateLoad::kRearDefogSecondary:
+            return read_bit(ReadOnlyWireId(kWireCHASSIS_TJB_SEC_DEFOG_LO));
+        case ClimateLoad::kRadiatorFan:
+            return read_bit(ReadOnlyWireId(kWireCHASSIS_HTCM_RADIATOR_FAN_FEED));
+    }
+    return std::nullopt;
+}
+
+ChargerStatus WireTruthChassis::charger_status() const {
+    using namespace electricsim::topology;
+    ChargerStatus s;
+    s.state = read_uint32(kWireCHASSIS_CHARGER_SM_STATE);
+    s.delivering = read_bit(kWireCHASSIS_CHARGER_ENABLED);
+    if (auto v = read_uint32(kWireCHASSIS_CHARGER_ACTUAL_CURRENT_DA))
+        s.current_a = SignedFromCell(*v) / 10.0;
+    if (auto v = read_uint32(kWireCHASSIS_CHARGER_ACTUAL_VOLTAGE_DV)) s.voltage_v = *v / 10.0;
+    if (auto v = read_uint32(kWireCHASSIS_CHARGER_TEMP_C)) s.charger_temp_c = SignedFromCell(*v);
+    if (auto v = read_uint32(kWireCHASSIS_CHARGER_COUPLER_TEMP_C))
+        s.coupler_temp_c = SignedFromCell(*v);
+    if (auto v = read_uint32(kWireCHASSIS_CHARGER_AC_INPUT_MV)) s.ac_input_v = *v / 1000.0;
+    s.fault_bits = read_uint32(kWireCHASSIS_CHARGER_FAULT_BITS);
+    return s;
+}
+
 bool WireTruthChassis::publish_coast_down_switch(bool on) {
     if (!attached()) return false;
     return write_bit(ProducerWireId(electricsim::topology::kWireDRIVER_ES_COAST_DOWN_SWITCH), on);
@@ -1160,6 +1201,12 @@ std::optional<std::uint8_t> WireTruthChassis::wiper_sweep_position_pct() const {
 std::optional<std::uint8_t> WireTruthChassis::window_motor_cmd(int) const {
     return std::nullopt;
 }
+std::optional<bool> WireTruthChassis::dilm_four_bar_lamp() const { return std::nullopt; }
+std::optional<bool> WireTruthChassis::dilm_mirror_lamp() const { return std::nullopt; }
+std::optional<bool> WireTruthChassis::climate_load_energised(ClimateLoad) const {
+    return std::nullopt;
+}
+ChargerStatus WireTruthChassis::charger_status() const { return {}; }
 bool WireTruthChassis::publish_coast_down_switch(bool) { return false; }
 bool WireTruthChassis::publish_pedal_travel(std::uint16_t) { return false; }
 bool WireTruthChassis::publish_outside_air_temp(float) { return false; }

@@ -73,8 +73,15 @@ public:
     void ApplyToScene();
 
     /// Draw a top-down vehicle silhouette with bulb status indicators.
+    /// `interior`, when given, is the two interior lamps' brightness 0..1
+    /// ([0] four-bar lamp, [1] mirror map lamp, as InteriorLampBrightness),
+    /// drawn on the centreline inside the cabin.
     /// Call between BeginScene/EndScene.
-    void DrawHUD(irr::IrrlichtDevice* device) const;
+    void DrawHUD(irr::IrrlichtDevice* device, const double* interior = nullptr) const;
+
+    /// The diagram's colour for an interior lamp at brightness 0..1: the
+    /// unlit dot at 0, warm white at 1, blended between. Pure.
+    static irr::video::SColor InteriorLampHudColour(double brightness);
 
     /// The chassis scene node (may be null before initialization).
     irr::scene::ISceneNode* GetChassisNode() const { return m_chassis_node; }

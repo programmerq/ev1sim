@@ -16,6 +16,7 @@
 // @design 2026-06-15 — wire-truth migration kickoff.
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 
 #include <cstdint>
 #include <cstdio>
@@ -31,6 +32,7 @@
 #include "WireTruthIds.h"
 #include "ExternalSimConnector.h"  // end-to-end: wire -> overlay -> getter
 #include "BusSnoop.h"              // kDefaultStaleAfterS (dash snoop test)
+#include "InteriorLamps3D.h"       // interior lamp brightness
 #include "PhysicalWorld.h"         // plant models the e2e tests step
 
 // external sim substrate (creator side) — same headers env_open.cpp uses.
@@ -1428,6 +1430,167 @@ TEST_CASE("Connector reads the window motor commands off the motor legs through 
     CHECK(c.GetPowerWindowMotor(1) == 1u);
     CHECK_FALSE(c.HasReceivedPowerWindowMotor(0));
 }
+
+TEST_CASE("WireTruthChassis: each interior lamp is lit from its own conductor cell",
+          "[wire_truth]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("dilm_lamps");
+    auto fleet = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(fleet != nullptr);
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+
+    CHECK_FALSE(wire->dilm_four_bar_lamp().has_value());   // never solved
+    CHECK_FALSE(wire->dilm_mirror_lamp().has_value());
+    REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_RHJB_DILM_FOUR_BAR_LAMP, true));
+    CHECK(wire->dilm_four_bar_lamp() == std::optional<bool>(true));
+    CHECK_FALSE(wire->dilm_mirror_lamp().has_value());     // the other lamp's own cell
+    REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_RHJB_DILM_MIRROR_LAMP, false));
+    CHECK(wire->dilm_mirror_lamp() == std::optional<bool>(false));
+}
+
+TEST_CASE("Interior lamps: conductor cells + dimming level -> connector -> brightness",
+          "[wire_truth][e2e]") {
+    // The RHJB lights the four-bar lamp and fades its level; the mirror map
+    // lamp's circuit stays dead. SimApp turns the connector's view into each
+    // lamp's brightness with InteriorLampBrightness.
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("e2e_dilm_lamps");
+    auto fleet = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(fleet != nullptr);
+    ScopedEnv env("ELECTRICSIM_WIRES_NAME", seg.c_str());
+
+    ExternalSimConnector::Options opts;
+    opts.enabled = true;
+    ExternalSimConnector c(opts);
+    c.Tick(0.0);
+    REQUIRE(c.IsConnected());
+    CHECK_FALSE(c.HasReceivedInteriorLamp(0));
+    CHECK_FALSE(c.HasReceivedDilmLevel());
+
+    auto brightness = [&](int lamp) {
+        const std::optional<std::uint8_t> level =
+            c.HasReceivedDilmLevel() ? std::optional<std::uint8_t>(c.GetDilmLevel())
+                                     : std::nullopt;
+        return ev1sim::InteriorLampBrightness(c.GetInteriorLamp(lamp), level);
+    };
+
+    REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_RHJB_DILM_FOUR_BAR_LAMP, true));
+    REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_RHJB_DILM_MIRROR_LAMP, false));
+    REQUIRE(fleet->write_byte(topo::kWireCHASSIS_RHJB_DILM_LEVEL, 255u));
+    c.Tick(0.1);
+    REQUIRE(c.HasReceivedInteriorLamp(0));
+    REQUIRE(c.HasReceivedInteriorLamp(1));
+    REQUIRE(c.HasReceivedDilmLevel());
+    CHECK(c.GetInteriorLamp(0));
+    CHECK_FALSE(c.GetInteriorLamp(1));
+    CHECK(c.GetDilmLevel() == 255u);
+    CHECK(brightness(0) == 1.0);
+    CHECK(brightness(1) == 0.0);
+
+    // Halfway through the module's fade-out.
+    REQUIRE(fleet->write_byte(topo::kWireCHASSIS_RHJB_DILM_LEVEL, 51u));
+    c.Tick(0.2);
+    CHECK(c.GetDilmLevel() == 51u);
+    CHECK(brightness(0) == Catch::Approx(0.2));
+
+    // The circuit opens: dark, whatever the level still says.
+    REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_RHJB_DILM_FOUR_BAR_LAMP, false));
+    c.Tick(0.3);
+    CHECK_FALSE(c.GetInteriorLamp(0));
+    CHECK(brightness(0) == 0.0);
+}
+
+TEST_CASE("Climate loads: each conductor cell reaches the connector through Tick",
+          "[wire_truth][e2e]") {
+    namespace topo = electricsim::topology;
+    using ev1sim::ClimateLoad;
+    const std::string seg = unique_segment("e2e_climate_loads");
+    auto fleet = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(fleet != nullptr);
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+    ScopedEnv env("ELECTRICSIM_WIRES_NAME", seg.c_str());
+
+    ExternalSimConnector::Options opts;
+    opts.enabled = true;
+    ExternalSimConnector c(opts);
+    c.Tick(0.0);
+    REQUIRE(c.IsConnected());
+    for (int i = 0; i < ev1sim::kNumClimateLoads; ++i) {
+        CHECK_FALSE(wire->climate_load_energised(static_cast<ClimateLoad>(i)).has_value());
+        CHECK_FALSE(c.GetClimateLoad(static_cast<ClimateLoad>(i)).has_value());
+    }
+
+    // Each load from its own cell: light one at a time and check only it moves.
+    const std::pair<ClimateLoad, ConductorId> cells[] = {
+        {ClimateLoad::kCompressor, topo::kWireCHASSIS_APM_CMC_MOTOR_ENERGISED},
+        {ClimateLoad::kWindshieldHeat, topo::kWireCHASSIS_APM_HWS_GRID_ENERGISED},
+        {ClimateLoad::kRearDefogPrimary, topo::kWireCHASSIS_TJB_PRI_DEFOG_LO},
+        {ClimateLoad::kRearDefogSecondary, topo::kWireCHASSIS_TJB_SEC_DEFOG_LO},
+        {ClimateLoad::kRadiatorFan, topo::kWireCHASSIS_HTCM_RADIATOR_FAN_FEED},
+    };
+    for (const auto& [load, cell] : cells) REQUIRE(publish_conductor(*fleet, cell, false));
+    double t = 0.0;
+    for (const auto& [load, cell] : cells) {
+        REQUIRE(publish_conductor(*fleet, cell, true));
+        c.Tick(t += 0.1);
+        for (const auto& [other, other_cell] : cells)
+            CHECK(c.GetClimateLoad(other) == std::optional<bool>(other == load));
+        REQUIRE(publish_conductor(*fleet, cell, false));
+    }
+}
+
+TEST_CASE("Charger report: CHASSIS_CHARGER_* cells -> connector -> decoded status",
+          "[wire_truth][e2e]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("e2e_charger");
+    auto charger = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(charger != nullptr);
+    ScopedEnv env("ELECTRICSIM_WIRES_NAME", seg.c_str());
+
+    ExternalSimConnector::Options opts;
+    opts.enabled = true;
+    ExternalSimConnector c(opts);
+    c.Tick(0.0);
+    REQUIRE(c.IsConnected());
+    CHECK_FALSE(c.GetChargerStatus().state.has_value());   // charger not running
+    CHECK_FALSE(c.GetChargerStatus().current_a.has_value());
+
+    // Charging at 12.5 A into 352 V from 240 V mains; a cold paddle.
+    REQUIRE(charger->write_uint32(topo::kWireCHASSIS_CHARGER_SM_STATE, 2u));
+    REQUIRE(charger->write_bit(topo::kWireCHASSIS_CHARGER_ENABLED, true));
+    REQUIRE(charger->write_uint32(topo::kWireCHASSIS_CHARGER_ACTUAL_CURRENT_DA,
+                                  static_cast<std::uint32_t>(std::int32_t{-125})));
+    REQUIRE(charger->write_uint32(topo::kWireCHASSIS_CHARGER_ACTUAL_VOLTAGE_DV, 3520u));
+    REQUIRE(charger->write_uint32(topo::kWireCHASSIS_CHARGER_TEMP_C, 41u));
+    REQUIRE(charger->write_uint32(topo::kWireCHASSIS_CHARGER_COUPLER_TEMP_C,
+                                  static_cast<std::uint32_t>(std::int32_t{-5})));
+    REQUIRE(charger->write_uint32(topo::kWireCHASSIS_CHARGER_AC_INPUT_MV, 240000u));
+    REQUIRE(charger->write_uint32(topo::kWireCHASSIS_CHARGER_FAULT_BITS, 0u));
+    c.Tick(0.1);
+    const ev1sim::ChargerStatus& s = c.GetChargerStatus();
+    CHECK(s.state == std::optional<std::uint32_t>(2u));
+    CHECK(s.delivering == std::optional<bool>(true));
+    CHECK(s.current_a == std::optional<double>(-12.5));
+    CHECK(s.voltage_v == std::optional<double>(352.0));
+    CHECK(s.charger_temp_c == std::optional<int>(41));
+    CHECK(s.coupler_temp_c == std::optional<int>(-5));
+    CHECK(s.ac_input_v == std::optional<double>(240.0));
+    CHECK(s.fault_bits == std::optional<std::uint32_t>(0u));
+
+    // The paddle overheats: the charger faults and stops delivering.
+    REQUIRE(charger->write_uint32(topo::kWireCHASSIS_CHARGER_SM_STATE, 5u));
+    REQUIRE(charger->write_bit(topo::kWireCHASSIS_CHARGER_ENABLED, false));
+    REQUIRE(charger->write_uint32(topo::kWireCHASSIS_CHARGER_FAULT_BITS,
+                                  ev1sim::ChargerFault::kCouplerOvertemp));
+    c.Tick(0.2);
+    CHECK(ev1sim::FormatChargerStateLabel(c.GetChargerStatus()) == L"Charger: FAULT");
+    CHECK(ev1sim::FormatChargerFaultsLabel(c.GetChargerStatus()) ==
+          L"Charger faults: PADDLE OVERTEMP");
+    CHECK(c.GetChargerStatus().delivering == std::optional<bool>(false));
+}
+
 
 TEST_CASE("Window glass follows the RHJB's motor legs: wire -> connector -> plant",
           "[wire_truth][e2e]") {

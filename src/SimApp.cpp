@@ -299,6 +299,22 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
                                       ? "PLUGGED" : "UNPLUGGED") << "\n";
                 });
 
+            // --- Charger report while the paddle is in (display-only rows,
+            //     from the charger's CHASSIS_CHARGER_* cells) ---
+            {
+                using Fmt = std::wstring (*)(const ev1sim::ChargerStatus&);
+                for (Fmt fmt : {&ev1sim::FormatChargerStateLabel, &ev1sim::FormatChargerOutputLabel,
+                                &ev1sim::FormatChargerMainsLabel, &ev1sim::FormatChargerTempsLabel,
+                                &ev1sim::FormatChargerFaultsLabel}) {
+                    m_floating_ui->AddButton(
+                        [this, fmt]() -> std::wstring {
+                            return fmt(m_external_sim ? m_external_sim->GetChargerStatus()
+                                                      : ev1sim::ChargerStatus{});
+                        },
+                        []() {});   // display-only row
+                }
+            }
+
             // --- Exterior Keypad section: 5 buttons (tap = lower digit) ---
             // Button labels are static; clicking queues a tap (a short hold).
             for (int ki = 0; ki < 5; ++ki) {
@@ -507,6 +523,34 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
                         m_external_sim->GetDefrostGridActive());
                 },
                 []() {});   // no-op: display-only row
+
+            // --- Climate loads actually running (display-only): current
+            //     through each load from the solver's conductor cells, beside
+            //     the HTCM's requests above. ---
+            {
+                using ev1sim::ClimateLoad;
+                auto load_row = [this](const wchar_t* name, ClimateLoad load) {
+                    m_floating_ui->AddButton(
+                        [this, name, load]() -> std::wstring {
+                            return ev1sim::FormatClimateLoadLabel(
+                                name, m_external_sim ? m_external_sim->GetClimateLoad(load)
+                                                     : std::nullopt);
+                        },
+                        []() {});   // display-only row
+                };
+                load_row(L"Compressor", ClimateLoad::kCompressor);
+                load_row(L"Windshield heat", ClimateLoad::kWindshieldHeat);
+                m_floating_ui->AddButton(
+                    [this]() -> std::wstring {
+                        if (!m_external_sim) return ev1sim::FormatRearDefogGridsLabel(
+                                                 std::nullopt, std::nullopt);
+                        return ev1sim::FormatRearDefogGridsLabel(
+                            m_external_sim->GetClimateLoad(ClimateLoad::kRearDefogPrimary),
+                            m_external_sim->GetClimateLoad(ClimateLoad::kRearDefogSecondary));
+                    },
+                    []() {});   // display-only row
+                load_row(L"Radiator fan", ClimateLoad::kRadiatorFan);
+            }
 
             // --- HVAC driver controls (drive ev1sim::HvacControls, published on
             //     chassis 4124-4128, which no electricsim module reads; the car's
@@ -2032,6 +2076,21 @@ int SimApp::RunWithVisualization() {
 
         m_lights->ApplyToScene();
 
+        // --- Interior lamps: lit from their circuits at the RHJB, dimmed by
+        //     its interior-lamp module's level ---
+        {
+            const std::optional<std::uint8_t> level =
+                m_external_sim->HasReceivedDilmLevel()
+                    ? std::optional<std::uint8_t>(m_external_sim->GetDilmLevel())
+                    : std::nullopt;
+            for (int i = 0; i < ev1sim::kNumInteriorLamps; ++i)
+                m_interior_lamp_brightness[i] =
+                    ev1sim::InteriorLampBrightness(m_external_sim->GetInteriorLamp(i), level);
+            if (!m_interior_lamps3d)
+                m_interior_lamps3d = std::make_unique<ev1sim::InteriorLamps3D>(m_vis->GetDevice());
+            m_interior_lamps3d->Update(m_world->GetPose(), m_interior_lamp_brightness);
+        }
+
         // --- Wiper renderer tick ---
         // Pull the latest motor command from RHJB (0xFF if never received →
         // Tick() treats it as OFF since no valid enum matches).
@@ -2077,7 +2136,7 @@ int SimApp::RunWithVisualization() {
                              m_world->GetTerrainLabel(),
                              mu.mu,
                              &abs_phase);
-        m_lights->DrawHUD(m_vis->GetDevice());
+        m_lights->DrawHUD(m_vis->GetDevice(), m_interior_lamp_brightness);
         {
             using S = ev1sim::DoorLocks::State;
             const auto& locks = m_physical->door_locks();
