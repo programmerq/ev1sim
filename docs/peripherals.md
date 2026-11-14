@@ -139,7 +139,7 @@ ev1sim's `PhysicalWorld::sounder()` turns that drive into cabin ticks:
 `update(drive, sim_time_s)` counts one tick per rising edge and stamps it with
 the sim time, `take_pending_ticks()` hands the ticks to the audio backend, and
 `last_tick_period_s()` is the flash period in sim time. SimApp plays one short
-piezo burst (`SounderAudio::PlayTick()`, about 12 ms, a by-ear estimate) per
+piezo burst (`CabinAudio::PlayTick()`, about 12 ms, a by-ear estimate) per
 tick. The flash timing comes from electricsim's sim clock, so a paused sim
 holds the flash phase and plays nothing. The IPC's extended-turn-signal chime
 is a different sound, the cluster's own.

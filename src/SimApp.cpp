@@ -130,9 +130,9 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
         m_config.telemetry.log_file,
         m_config.telemetry.show_hud);
 
-    // 4. Horn audio — CoreAudio on macOS, no-op elsewhere.  Safe headless.
-    m_horn = std::make_unique<HornAudio>();
-    m_sounder_audio = std::make_unique<SounderAudio>();
+    // 4. Cabin audio (horn, turn/hazard tick, door-lock click) through SDL3.
+    //    Headless runs open no audio device.
+    m_cabin_audio = std::make_unique<CabinAudio>(/*open_device=*/!headless);
 
     // 4b. Physical-world inputs — constructed early (before visualization) so
     //     floating-UI panel lambdas can safely dereference m_physical during
@@ -1435,12 +1435,12 @@ void SimApp::ConsumeBodyActuatorPeripherals(double dt, double steering) {
     // time while a turn signal or the hazard is on.  The Sounder stamps each
     // rising edge with the sim time, and the cabin plays one tick per edge
     // (electricsim docs/3d_sim_contract.md 2.6).  A paused sim holds the flash
-    // phase, so no edges and no ticks.  SounderAudio is a no-op off macOS.
+    // phase, so no edges and no ticks.
     {
         auto& sounder = m_physical->sounder();
         sounder.update(m_external_sim->GetSounderPiezoDrive(), m_world->GetSimTime());
         const unsigned ticks = sounder.take_pending_ticks();
-        if (ticks > 0 && m_sounder_audio) m_sounder_audio->PlayTick();
+        if (ticks > 0 && m_cabin_audio) m_cabin_audio->PlayTick();
     }
 
     // --- Door-lock rockers LH/RH (chassis 4170-4173 out) ---
@@ -1484,7 +1484,7 @@ void SimApp::ConsumeBodyActuatorPeripherals(double dt, double steering) {
                           << (door == 0 ? "LH/driver" : "RH/passenger")
                           << " reached "
                           << (step.now_locked[door] ? "LOCKED" : "UNLOCKED") << "\n";
-                if (m_sounder_audio) m_sounder_audio->PlayClick();  // solenoid click
+                if (m_cabin_audio) m_cabin_audio->PlayClick();  // solenoid click
             }
         }
     }
@@ -2241,7 +2241,7 @@ int SimApp::RunWithVisualization() {
             horn_low  = horn_low  || m_external_sim->GetHornLowCmd();
             horn_high = horn_high || m_external_sim->GetHornHighCmd();
         }
-        m_horn->SetTones(horn_low, horn_high);
+        m_cabin_audio->SetHorn(horn_low, horn_high);
 
         // --- Telemetry logging ---
         m_telemetry->Record(m_world->GetState(), render_dt);
@@ -2612,7 +2612,7 @@ int SimApp::RunHeadless() {
             horn_low  = m_external_sim->GetHornLowCmd();
             horn_high = m_external_sim->GetHornHighCmd();
         }
-        m_horn->SetTones(horn_low, horn_high);
+        m_cabin_audio->SetHorn(horn_low, horn_high);
 
         // --- Telemetry logging ---
         m_telemetry->Record(m_world->GetState(), tick_dt);

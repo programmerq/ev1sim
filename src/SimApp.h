@@ -8,11 +8,10 @@
 #include "ExternalSimConnector.h"
 #include "FloatingUiPanel.h"
 #include "PanelDriverOverride.h"
-#include "HornAudio.h"
+#include "CabinAudio.h"
 #include "InstrumentClusterPanel.h"
 #include "RsaConsoleInput.h"
 #include "RsaConsolePanel.h"
-#include "SounderAudio.h"
 #include "KeyboardInputController.h"
 #include "PhysicalWorld.h"
 #include "RigInputDevices.h"
@@ -187,8 +186,7 @@ private:
     std::unique_ptr<KeyboardInputController> m_keyboard;
     std::unique_ptr<CameraManager>          m_camera;
     std::unique_ptr<Telemetry>              m_telemetry;
-    std::unique_ptr<HornAudio>              m_horn;
-    std::unique_ptr<SounderAudio>           m_sounder_audio;
+    std::unique_ptr<CabinAudio>             m_cabin_audio;
     std::unique_ptr<VehicleLights>          m_lights;
     std::unique_ptr<VehiclePanels>          m_panels;
     std::unique_ptr<ev1sim::PhysicalWorld>  m_physical;

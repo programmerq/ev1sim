@@ -133,7 +133,7 @@ that way when adding endpoints.
 `SimApp::Run()` dispatches on `Config::simulation.headless`:
 
 - **Interactive (`RunWithVisualization`)** — Irrlicht window, keyboard
-  driver, Chrono chase camera, HUD overlays, horn audio on macOS.
+  driver, Chrono chase camera, HUD overlays, cabin audio (horn, turn/hazard tick, door-lock click) through SDL3.
 - **Headless (`RunHeadless`)** — no Irrlicht device, no OpenGL
   context.  Physics, telemetry, and the external-sim connector still
   run.  A run requires a terminator (`max_time_s > 0` or a scripted
