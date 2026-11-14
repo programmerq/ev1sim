@@ -605,94 +605,39 @@ TEST_CASE("DoorLocks: default state is all unlocked", "[PhysicalWorld][DoorLocks
     CHECK_FALSE(locks.any_locked());
 }
 
-TEST_CASE("DoorLocks: lock_all sets all three to LOCKED", "[PhysicalWorld][DoorLocks]") {
-    DoorLocks locks;
-    using S = DoorLocks::State;
-    locks.lock_all();
-    CHECK(locks.driver()    == S::LOCKED);
-    CHECK(locks.passenger() == S::LOCKED);
-    CHECK(locks.trunk()     == S::LOCKED);
-    CHECK(locks.any_locked());
+TEST_CASE("SetLockByHand: each lock moves alone", "[PhysicalWorld][DoorLocks]") {
+    using S    = DoorLocks::State;
+    using Site = PhysicalWorld::LockSite;
+    PhysicalWorld w;
+    w.SetLockByHand(Site::DRIVER, true);
+    CHECK(w.door_locks().driver()    == S::LOCKED);
+    CHECK(w.door_locks().passenger() == S::UNLOCKED);
+    CHECK(w.door_locks().trunk()     == S::UNLOCKED);
+    CHECK(w.door_locks().any_locked());
+    w.SetLockByHand(Site::TRUNK, true);
+    w.SetLockByHand(Site::DRIVER, false);
+    CHECK(w.door_locks().driver() == S::UNLOCKED);
+    CHECK(w.door_locks().trunk()  == S::LOCKED);
+    w.SetAllLocksByHand(true);
+    CHECK(w.door_locks().passenger() == S::LOCKED);
+    w.SetAllLocksByHand(false);
+    CHECK_FALSE(w.door_locks().any_locked());
 }
 
-TEST_CASE("DoorLocks: unlock_all resets all three to UNLOCKED", "[PhysicalWorld][DoorLocks]") {
-    DoorLocks locks;
-    using S = DoorLocks::State;
-    locks.lock_all();
-    locks.unlock_all();
-    CHECK(locks.driver()    == S::UNLOCKED);
-    CHECK(locks.passenger() == S::UNLOCKED);
-    CHECK(locks.trunk()     == S::UNLOCKED);
-    CHECK_FALSE(locks.any_locked());
-}
+TEST_CASE("SetLockByHand: the door's actuator follows the knob", "[PhysicalWorld][DoorLocks]") {
+    using S    = DoorLocks::State;
+    using Site = PhysicalWorld::LockSite;
+    PhysicalWorld w;
+    w.SetLockByHand(Site::PASSENGER, true);
+    CHECK(w.door_lock_motor_rh().stroke() == DoorLockMotor::Stroke::LOCKED);
+    CHECK(w.door_lock_motor_lh().stroke() == DoorLockMotor::Stroke::UNLOCKED);
 
-TEST_CASE("DoorLocks: any_locked is true if exactly one door is locked", "[PhysicalWorld][DoorLocks]") {
-    {
-        DoorLocks locks;
-        locks.toggle_driver();
-        CHECK(locks.any_locked());
-        CHECK(locks.driver() == DoorLocks::State::LOCKED);
-        CHECK(locks.passenger() == DoorLocks::State::UNLOCKED);
-        CHECK(locks.trunk()     == DoorLocks::State::UNLOCKED);
-    }
-    {
-        DoorLocks locks;
-        locks.toggle_passenger();
-        CHECK(locks.any_locked());
-        CHECK(locks.driver()    == DoorLocks::State::UNLOCKED);
-        CHECK(locks.passenger() == DoorLocks::State::LOCKED);
-        CHECK(locks.trunk()     == DoorLocks::State::UNLOCKED);
-    }
-    {
-        DoorLocks locks;
-        locks.toggle_trunk();
-        CHECK(locks.any_locked());
-        CHECK(locks.driver()    == DoorLocks::State::UNLOCKED);
-        CHECK(locks.passenger() == DoorLocks::State::UNLOCKED);
-        CHECK(locks.trunk()     == DoorLocks::State::LOCKED);
-    }
-}
-
-TEST_CASE("DoorLocks: independent toggle — only the toggled door changes", "[PhysicalWorld][DoorLocks]") {
-    DoorLocks locks;
-    using S = DoorLocks::State;
-
-    // Toggle driver twice: UNLOCKED → LOCKED → UNLOCKED.
-    locks.toggle_driver();
-    CHECK(locks.driver()    == S::LOCKED);
-    CHECK(locks.passenger() == S::UNLOCKED);  // unchanged
-    CHECK(locks.trunk()     == S::UNLOCKED);  // unchanged
-
-    locks.toggle_driver();
-    CHECK(locks.driver()    == S::UNLOCKED);  // back to unlocked
-    CHECK_FALSE(locks.any_locked());
-}
-
-TEST_CASE("DoorLocks: toggle_passenger leaves other doors unaffected", "[PhysicalWorld][DoorLocks]") {
-    DoorLocks locks;
-    using S = DoorLocks::State;
-
-    locks.lock_all();
-    locks.toggle_passenger();  // LOCKED → UNLOCKED
-    CHECK(locks.driver()    == S::LOCKED);   // unchanged
-    CHECK(locks.passenger() == S::UNLOCKED); // toggled
-    CHECK(locks.trunk()     == S::LOCKED);   // unchanged
-    CHECK(locks.any_locked());  // driver and trunk still locked
-}
-
-TEST_CASE("DoorLocks: toggle_trunk leaves other doors unaffected", "[PhysicalWorld][DoorLocks]") {
-    DoorLocks locks;
-    using S = DoorLocks::State;
-
-    locks.toggle_trunk();
-    CHECK(locks.driver()    == S::UNLOCKED);
-    CHECK(locks.passenger() == S::UNLOCKED);
-    CHECK(locks.trunk()     == S::LOCKED);
-    CHECK(locks.any_locked());
-
-    locks.toggle_trunk();
-    CHECK(locks.trunk() == S::UNLOCKED);
-    CHECK_FALSE(locks.any_locked());
+    // Locked by hand, then the RHJB unlocks with a motor pulse: the motor runs
+    // off its LOCKED stop and the latch follows.  Before the actuator followed
+    // the knob, the motor sat at its UNLOCKED stop, stalled there, and the
+    // latch stayed locked.
+    for (int i = 0; i < 60; ++i) w.StepDoorLockPlant(0.01, false, false, false, true);
+    CHECK(w.door_locks().passenger() == S::UNLOCKED);
 }
 
 // ---------------------------------------------------------------------------
@@ -1349,7 +1294,7 @@ TEST_CASE("test_door_handles_attempt_when_locked_does_not_change_panel",
     // We verify DoorHandles itself doesn't touch panel state — that logic is in SimApp.
     DoorHandles dh;
     DoorLocks   locks;
-    locks.lock_all();
+    locks.set_driver(DoorLocks::State::LOCKED);
 
     dh.attempt_driver();
     // DoorHandles::driver_attempt() is true regardless of lock state;
@@ -1709,6 +1654,71 @@ TEST_CASE("Sounder: counts one click per rising edge", "[PhysicalWorld][Sounder]
     CHECK(s.click_count() == 1);
     s.update(true);                 // next rising edge → click 2
     CHECK(s.click_count() == 2);
+}
+
+// ---------------------------------------------------------------------------
+// PowerWindowMotor — window glass on the junction blocks' window motor legs.
+// ---------------------------------------------------------------------------
+
+namespace {
+constexpr std::uint8_t kWinStop = 0, kWinUp = 1, kWinDown = 2;
+}
+
+TEST_CASE("PowerWindowMotor: closed and still by default", "[PhysicalWorld][PowerWindow]") {
+    PowerWindowMotor m;
+    CHECK(m.closed());
+    CHECK(m.open_fraction() == 0.0);
+    CHECK_FALSE(m.moving());
+    CHECK_FALSE(m.stalled());
+}
+
+TEST_CASE("PowerWindowMotor: DOWN runs the glass open over the travel time", "[PhysicalWorld][PowerWindow]") {
+    PowerWindowMotor m({4.0});
+    for (int i = 0; i < 200; ++i) m.update(0.01, kWinDown);    // 2 s
+    CHECK_THAT(m.open_fraction(), Catch::Matchers::WithinAbs(0.5, 1e-9));
+    CHECK(m.moving());
+    for (int i = 0; i < 300; ++i) m.update(0.01, kWinDown);    // past the stop
+    CHECK(m.fully_open());
+    CHECK_FALSE(m.moving());
+    CHECK(m.stalled());                                          // still driven at the stop
+    m.update(0.01, kWinStop);
+    CHECK_FALSE(m.stalled());
+}
+
+TEST_CASE("PowerWindowMotor: UP closes it and stops at the top", "[PhysicalWorld][PowerWindow]") {
+    PowerWindowMotor m({4.0});
+    m.set_open_fraction(1.0);
+    for (int i = 0; i < 100; ++i) m.update(0.01, kWinUp);      // 1 s
+    CHECK_THAT(m.open_fraction(), Catch::Matchers::WithinAbs(0.75, 1e-9));
+    for (int i = 0; i < 500; ++i) m.update(0.01, kWinUp);
+    CHECK(m.closed());
+    CHECK(m.stalled());
+}
+
+TEST_CASE("PowerWindowMotor: stop, or an unknown command, leaves the glass where it is",
+          "[PhysicalWorld][PowerWindow]") {
+    PowerWindowMotor m({4.0});
+    m.set_open_fraction(0.4);
+    for (int i = 0; i < 100; ++i) m.update(0.01, kWinStop);
+    CHECK(m.open_fraction() == 0.4);
+    for (int i = 0; i < 100; ++i) m.update(0.01, 0xFFu);
+    CHECK(m.open_fraction() == 0.4);
+    CHECK_FALSE(m.moving());
+}
+
+TEST_CASE("PhysicalWorld: each window follows its own side's command", "[PhysicalWorld][PowerWindow]") {
+    PhysicalWorld world;
+    const std::optional<std::uint8_t> drive[2] = {kWinDown, std::nullopt};
+    for (int i = 0; i < 100; ++i) world.StepPowerWindowPlant(0.01, drive);
+    CHECK(world.power_window_motor_lh().open_fraction() > 0.2);
+    CHECK(world.power_window_motor_rh().closed());               // no command yet: still
+}
+
+TEST_CASE("VehiclePanels: window glass bar shortens as the glass goes down", "[VehiclePanels][PowerWindow]") {
+    CHECK(VehiclePanels::WindowGlassPx({0.0, false}) == VehiclePanels::kWindowGlassPx);
+    CHECK(VehiclePanels::WindowGlassPx({1.0, false}) == 0);
+    CHECK(VehiclePanels::WindowGlassPx({0.5, true}) == VehiclePanels::kWindowGlassPx / 2);
+    CHECK(VehiclePanels::WindowGlassPx({-1.0, false}) == VehiclePanels::kWindowGlassPx);  // clamped
 }
 
 // ---------------------------------------------------------------------------

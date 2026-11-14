@@ -57,9 +57,8 @@ public:
     // OFF→RIGHT, RIGHT→OFF, LEFT→RIGHT.
     bool ConsumeTurnSignalRight();
 
-    // True once after X was tapped — toggle hazard switch on/off.
-    // TODO: temporary keybinding; move to floating-UI panel when that lands
-    //       per docs/TODO.md.
+    // True once after X was tapped — toggle hazard switch on/off.  (The
+    // floating UI panel's Hazard button toggles the same switch.)
     bool ConsumeHazardToggle();
 
     // True once after '?' (Shift+/) was tapped — toggle keyboard help overlay.

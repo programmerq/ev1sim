@@ -40,6 +40,18 @@ struct BodyLockIndicators {
     LockIndicator driver, passenger, trunk;
 };
 
+/// One window as the body diagram shows it: how far the glass is down
+/// (PowerWindowMotor::open_fraction(), 0 = closed) and whether it is moving.
+struct WindowIndicator {
+    double open01 = 0.0;
+    bool   moving = false;
+};
+
+/// The two windows on the diagram: driver (LH) and passenger (RH).
+struct BodyWindowIndicators {
+    WindowIndicator driver, passenger;
+};
+
 /// Tracks open/closed state of body panels (hood, trunk, doors).
 /// Each panel maps to a physical sensor in the electronic harness.
 /// No geometry or animation — just state and HUD indicators.
@@ -57,15 +69,21 @@ public:
     Hood&       hood()       { return m_hood; }
     const Hood& hood() const { return m_hood; }
 
-    /// Draw panel status indicators on the top-down vehicle HUD, and when
-    /// `locks` is given a lock knob inside each door and the trunk.
-    /// Call between BeginScene/EndScene.
-    void DrawHUD(irr::IrrlichtDevice* device, const BodyLockIndicators* locks = nullptr) const;
+    /// Draw panel status indicators on the top-down vehicle HUD, when `locks`
+    /// is given a lock knob inside each door and the trunk, and when `windows`
+    /// is given each door's window glass.  Call between BeginScene/EndScene.
+    void DrawHUD(irr::IrrlichtDevice* device, const BodyLockIndicators* locks = nullptr,
+                 const BodyWindowIndicators* windows = nullptr) const;
 
     /// Pixel offset of a lock knob along its travel (0 at the unlocked end,
     /// kLockKnobTravelPx at the locked end).
     static int LockKnobOffsetPx(const LockIndicator& li);
     static constexpr int kLockKnobTravelPx = 8;
+
+    /// Pixel length of a window's glass bar: the full kWindowGlassPx when
+    /// closed, shrinking to 0 as the glass goes down.
+    static int WindowGlassPx(const WindowIndicator& wi);
+    static constexpr int kWindowGlassPx = 22;
 
     static constexpr int NUM_PANELS = static_cast<int>(PanelID::COUNT);
 

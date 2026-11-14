@@ -14,8 +14,7 @@ static const char* HoodStateName(Hood::State s) {
 }
 
 VehiclePanels::VehiclePanels() {
-    // All panels default to closed (open=false).
-    // Doors initialised unlocked; locking model deferred per docs/TODO.md.
+    // All panels default to closed (open=false).  Door locks are DoorLocks'.
     m_panels[static_cast<int>(PanelID::HOOD)]       = {"HOOD"};
     m_panels[static_cast<int>(PanelID::TRUNK)]      = {"TRUNK"};
     m_panels[static_cast<int>(PanelID::DOOR_LEFT)]  = {"DOOR_L"};
@@ -57,7 +56,13 @@ int VehiclePanels::LockKnobOffsetPx(const LockIndicator& li) {
     return static_cast<int>(s * kLockKnobTravelPx + 0.5);
 }
 
-void VehiclePanels::DrawHUD(irr::IrrlichtDevice* device, const BodyLockIndicators* locks) const {
+int VehiclePanels::WindowGlassPx(const WindowIndicator& wi) {
+    double open = wi.open01 < 0.0 ? 0.0 : (wi.open01 > 1.0 ? 1.0 : wi.open01);
+    return static_cast<int>((1.0 - open) * kWindowGlassPx + 0.5);
+}
+
+void VehiclePanels::DrawHUD(irr::IrrlichtDevice* device, const BodyLockIndicators* locks,
+                            const BodyWindowIndicators* windows) const {
     if (!device) return;
 
     auto* driver = device->getVideoDriver();
@@ -122,6 +127,21 @@ void VehiclePanels::DrawHUD(irr::IrrlichtDevice* device, const BodyLockIndicator
         int y2 = car_top + 85;
         driver->draw2DRectangle(c,
             irr::core::recti(x, y1, x + 2, y2));
+    }
+
+    // Window glass: a thin bar just inside each door, below the lock knob,
+    // full length when closed and shorter as the glass goes down; light blue
+    // at rest, amber while the motor is moving it.
+    if (windows != nullptr) {
+        auto glass = [&](const WindowIndicator& wi, int x) {
+            const int len = WindowGlassPx(wi);
+            if (len <= 0) return;
+            const SColor c = wi.moving ? SColor(230, 230, 170, 30) : SColor(220, 120, 190, 240);
+            const int y0 = car_top + 62;
+            driver->draw2DRectangle(c, irr::core::recti(x, y0, x + 2, y0 + len));
+        };
+        glass(windows->driver, cx - car_hw + 1);
+        glass(windows->passenger, cx + car_hw - 3);
     }
 
     if (locks == nullptr) return;
