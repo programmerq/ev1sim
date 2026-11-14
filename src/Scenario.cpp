@@ -754,14 +754,14 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
         // names the columns), 0 also before the solver writes it.
         else if (auto load = ClimateLoadForColumn(f))
             m_csv << (bus.GetClimateLoad(*load).value_or(false) ? 1 : 0);
-        // The off-board charger's report (ChargerStatus.h), blank until the
-        // charger has written the cell (-1 would read as a real temperature or
-        // current). Current is signed, charging negative.
         // Climate readout (ClimateReadout.h), "climate_<reading>", in the
         // reading's unit; blank until electricsim writes the cell.
         else if (auto reading = ClimateReadingForColumn(f)) {
             if (const auto& v = bus.GetClimateReadings()[static_cast<int>(*reading)]) m_csv << *v;
         }
+        // The off-board charger's report (ChargerStatus.h), blank until the
+        // charger has written the cell (-1 would read as a real temperature or
+        // current). Current is signed, charging negative.
         else if (f.rfind("charger_", 0) == 0) {
             const ChargerStatus& c = bus.GetChargerStatus();
             auto put = [this](const auto& v) {
