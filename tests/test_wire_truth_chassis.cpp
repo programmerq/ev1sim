@@ -32,7 +32,7 @@
 #include "WireTruthIds.h"
 #include "ExternalSimConnector.h"  // end-to-end: wire -> overlay -> getter
 #include "BusSnoop.h"              // kDefaultStaleAfterS (dash snoop test)
-#include "PhysicalWorld.h"         // ev1sim::Sounder (turn tick e2e)
+#include "PhysicalWorld.h"         // plant models the e2e tests step
 
 // external sim substrate (creator side) — same headers env_open.cpp uses.
 #include "topology/topology_generated.h"
