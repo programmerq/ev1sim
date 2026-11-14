@@ -8,11 +8,10 @@
 #include "ExternalSimConnector.h"
 #include "FloatingUiPanel.h"
 #include "PanelDriverOverride.h"
-#include "HornAudio.h"
+#include "CabinAudio.h"
 #include "InstrumentClusterPanel.h"
 #include "RsaConsoleInput.h"
 #include "RsaConsolePanel.h"
-#include "SounderAudio.h"
 #include "KeyboardInputController.h"
 #include "PhysicalWorld.h"
 #include "RigInputDevices.h"
@@ -134,7 +133,7 @@ private:
     // directions, each tick:
     //   - power-steering pump motor   (chassis 4097 in / 4098 out, case
     //                                  temperature out once the pump is driven)
-    //   - sounder / piezo "click"     (chassis 4096 in)
+    //   - turn/hazard tick sounder    (chassis 4096 in, one tick per edge)
     //   - door-lock motors LH/RH      (chassis 4182-4185 in)
     //   - door-lock rockers LH/RH     (chassis 4170-4173 out)
     // Advances the PhysicalWorld plant models from the connector's latched
@@ -191,8 +190,7 @@ private:
     std::unique_ptr<KeyboardInputController> m_keyboard;
     std::unique_ptr<CameraManager>          m_camera;
     std::unique_ptr<Telemetry>              m_telemetry;
-    std::unique_ptr<HornAudio>              m_horn;
-    std::unique_ptr<SounderAudio>           m_sounder_audio;
+    std::unique_ptr<CabinAudio>             m_cabin_audio;
     std::unique_ptr<VehicleLights>          m_lights;
     std::unique_ptr<VehiclePanels>          m_panels;
     std::unique_ptr<ev1sim::PhysicalWorld>  m_physical;

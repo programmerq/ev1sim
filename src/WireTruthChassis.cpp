@@ -523,6 +523,10 @@ static const std::unordered_map<std::uint32_t, ConsumerCell>& ConsumerRegistry()
         // Horn drive lines (bit)
         {4020U, {ReadOnlyWireId(kWireHORN_DRIVE_LINE_LOW),              WireType::kBit}},
         {4021U, {ReadOnlyWireId(kWireHORN_DRIVE_LINE_HIGH),             WireType::kBit}},
+        // Turn-signal / hazard tick sounder X56 on the LHJB board (bit). The
+        // solver publishes it as a load; 1 while the LHJB drives the piezo for
+        // the ON half of a flash. electricsim docs/3d_sim_contract.md 2.6.
+        {4096U, {ReadOnlyWireId(kWireTURN_TICK_SOUNDER_DRIVE),          WireType::kBit}},
         // Motor current (float32)
         {4072U, {kWireCHASSIS_MOTOR_CURRENT_A,          WireType::kFloat32}},
         // PIM commanded throttle (byte, PIM -> ev1sim). MISSING from the

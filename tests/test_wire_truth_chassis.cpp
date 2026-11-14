@@ -17,6 +17,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -1496,4 +1497,61 @@ TEST_CASE("WireTruthChassis::apm_12v_status_code reads the three 12 V status lin
     // All low (a dark APM): code 0b111.
     REQUIRE(publish_conductor(*producer, topo::kWireHTCM_APM_12V_STATUS_0_IN, false));
     CHECK(wire->apm_12v_status_code() == std::optional<std::uint8_t>(0b111u));
+}
+
+// ---------------------------------------------------------------------------
+// Turn-signal / hazard tick: electricsim publishes the LHJB's sounder X56 as the
+// TURN_TICK_SOUNDER_DRIVE conductor (docs/3d_sim_contract.md 2.6). It reaches the
+// connector's sounder input (4096) through the consumer overlay, and the Sounder
+// turns each rising edge into one cabin tick stamped with the sim time.
+// ---------------------------------------------------------------------------
+TEST_CASE("Turn tick sounder: wire -> connector overlay -> one tick per flash",
+          "[wire_truth][e2e]") {
+    const std::string seg = unique_segment("e2e_tick");
+    auto solver = create_fleet_table(seg, electricsim::topology::kTopologyHash);
+    REQUIRE(solver != nullptr);
+
+    ExternalSimConnector c;
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+    ev1sim::WireTruthChassis::ConsumerSinks sinks;
+    sinks.on_bit    = [&c](std::uint32_t id, bool v)          { c.DebugInjectDelta(id, v); };
+    sinks.on_byte   = [&c](std::uint32_t id, std::uint8_t v)  { c.DebugInjectU8(id, v); };
+    sinks.on_float  = [&c](std::uint32_t id, float v)         { c.DebugInjectFloat(id, v); };
+    sinks.on_uint32 = [&c](std::uint32_t id, std::uint32_t v) { c.DebugInjectU32(id, v); };
+
+    // Never written: no drive, nothing received.
+    wire->apply_consumer_overlay(sinks);
+    CHECK_FALSE(c.HasReceivedSounderPiezoDrive());
+    CHECK_FALSE(c.GetSounderPiezoDrive());
+
+    // Hazard on: the solver toggles the sounder at a 0.75 s flash period (8 ticks
+    // in 6 s of sim time in electricsim's own lhjb_tick_sounder test). ev1sim
+    // overlays each 10 ms sim step and feeds the Sounder, as SimApp does.
+    constexpr double kPeriod = 0.75;
+    constexpr double kStep   = 0.01;
+    ev1sim::Sounder sounder;
+    unsigned played = 0;
+    for (int i = 0; i < 600; ++i) {
+        const double t = i * kStep;
+        const bool on = std::fmod(t + 1e-9, kPeriod) < kPeriod / 2.0;
+        REQUIRE(publish_conductor(*solver, electricsim::topology::kWireTURN_TICK_SOUNDER_DRIVE, on));
+        wire->apply_consumer_overlay(sinks);
+        REQUIRE(c.GetSounderPiezoDrive() == on);
+        sounder.update(c.GetSounderPiezoDrive(), t);
+        played += sounder.take_pending_ticks();
+    }
+    CHECK(c.HasReceivedSounderPiezoDrive());
+    CHECK(played == 8);
+    CHECK(std::abs(sounder.last_tick_period_s() - kPeriod) <= kStep);
+
+    // Hazard off (or the sounder's lead cut): the conductor reads 0 and the cabin
+    // goes quiet.
+    REQUIRE(publish_conductor(*solver, electricsim::topology::kWireTURN_TICK_SOUNDER_DRIVE, false));
+    for (int i = 0; i < 200; ++i) {
+        wire->apply_consumer_overlay(sinks);
+        sounder.update(c.GetSounderPiezoDrive(), 6.0 + i * kStep);
+    }
+    CHECK(sounder.take_pending_ticks() == 0);
+    CHECK_FALSE(sounder.sounding());
 }

@@ -442,14 +442,14 @@ constexpr std::uint32_t kSigDoorLockSwRhLockOut   = 4172U;
 constexpr std::uint32_t kSigDoorLockSwRhUnlockOut = 4173U;
 constexpr int           kNumDoorLockSwitchSignals = 4;
 
-// Sounder / piezo drive (the external LHJB → ev1sim, chassis segment).
-//   4096  vehicle.body.sounder.piezo_drive   uint8 bool: 1 = piezo energised
-// The LHJB turn/hazard flasher produces a piezo square-wave (the TURN/HAZ
-// "click" in a real GM vehicle).  ev1sim's sounder peripheral
-// (ev1sim::Sounder) consumes the boolean drive and exposes an
-// audible-output signal for the 3D-sim audio contract; each rising edge is one
-// click.  The piezo is a real LHJB-internal component the printed schematics
-// are silent on (no first-class component_id) — see docs/peripherals.md.
+// Turn-signal / hazard tick sounder (the external LHJB → ev1sim).
+//   4096  vehicle.body.sounder.piezo_drive   bool: 1 = sounder driven
+// 4096 is ev1sim's own id for this input.  On the wire it is electricsim's
+// TURN_TICK_SOUNDER_DRIVE conductor (wire id 1741): the solver publishes the
+// piezo X56 on the LHJB board as a load, driven for the ON half of each turn or
+// hazard flash (electricsim docs/3d_sim_contract.md 2.6).  WireTruthChassis's
+// consumer registry maps it here.  ev1sim::Sounder turns each rising edge into
+// one cabin tick on the sim clock — see docs/peripherals.md.
 constexpr std::uint32_t kSigSounderPiezoDrive = 4096U;
 constexpr int           kNumSounderSignals    = 1;
 
@@ -1459,8 +1459,8 @@ struct ExternalSimConnector::State {
     bool          door_lock_switch_contact[4]     = {};
     std::int8_t   door_lock_switch_contact_pub[4] = {-1, -1, -1, -1};
 
-    // Sounder / piezo drive (ID 4096, chassis segment) — received from LHJB flasher.
-    // bool: true = piezo energised.  Consumed by ev1sim::Sounder.
+    // Turn/hazard tick sounder drive (ID 4096; wire TURN_TICK_SOUNDER_DRIVE 1741).
+    // bool: true = sounder driven.  Consumed by ev1sim::Sounder.
     bool          sounder_piezo_drive     = false;
     bool          has_sounder_piezo_drive = false;
 
@@ -3037,7 +3037,9 @@ EV1SIM_CHASSIS_ID_MATCHES(kDynamicsBase,                 kSigChassisSpeedMps);
 // 4182-4185) and the three door-lock STATE cells (adopted at 4165-4167 and
 // guarded since contract 1.3.0, but never struck from this list — a row here
 // for an ID that IS guarded is the same stale claim in the other direction).
-//   kSigSounderPiezoDrive          (4096) → kSigChassisSounderPiezoDrive
+// The sounder drive (4096) left it when electricsim published the tick sounder
+// as a topology conductor, TURN_TICK_SOUNDER_DRIVE: the consumer registry in
+// WireTruthChassis.cpp names that kWire* constant, which is its drift guard.
 //   kSigPscmPumpSpeedCmdQ8         (4097) → kSigChassisPscmPumpSpeedCmdQ8
 //   kSigPscmPumpInterlockClosed    (4098) → kSigChassisPscmPumpInterlockClosed
 //   kSigHvacTempSetpointC          (4124) → kSigChassisHvacTempSetpointC

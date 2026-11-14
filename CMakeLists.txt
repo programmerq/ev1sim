@@ -118,9 +118,10 @@ FetchContent_MakeAvailable(json)
 
 # ── SDL3 (wheel input + force feedback) — optional, compile-out-able ─────────
 # Prefer a system/Homebrew SDL3 (fast); otherwise vendor it via FetchContent
-# (matches the json/Catch2 pattern).  Only the joystick + haptic subsystems are
-# used — never video/audio — so SDL coexists with Irrlicht's window/GL context.
-option(EV1SIM_HAVE_WHEEL_IO "Build SDL3 wheel input + force feedback" ON)
+# (matches the json/Catch2 pattern).  The joystick, haptic and audio subsystems
+# are used (audio for the cabin sounds, src/CabinAudio.cpp) — never video — so
+# SDL coexists with Irrlicht's window/GL context.
+option(EV1SIM_HAVE_WHEEL_IO "Build SDL3 wheel input, force feedback and cabin audio" ON)
 set(EV1SIM_WHEEL_IO_SRC "")
 set(EV1SIM_WHEEL_IO_TEST_SRC "")
 set(_ev1sim_wheel_io FALSE)
@@ -152,7 +153,7 @@ if(EV1SIM_HAVE_WHEEL_IO)
         src/ForceFeedback.cpp
         src/ControllerRumble.cpp
         src/RigInputDevices.cpp)
-    set(EV1SIM_WHEEL_IO_TEST_SRC tests/test_wheel_input.cpp)
+    set(EV1SIM_WHEEL_IO_TEST_SRC tests/test_wheel_input.cpp tests/test_cabin_audio_device.cpp)
     set(_ev1sim_wheel_io TRUE)
 endif()
 
@@ -346,8 +347,8 @@ add_executable(ev1sim
     src/Scenario.cpp
     src/ScriptedDriver.cpp
     src/Telemetry.cpp
-    src/HornAudio.cpp
-    src/SounderAudio.cpp
+    src/CabinAudio.cpp
+    src/CabinAudioSynth.cpp
     src/VehicleLights.cpp
     src/VehiclePanels.cpp
     src/WiperRenderer.cpp
@@ -391,12 +392,11 @@ if(_ev1sim_wheel_io)
     target_compile_definitions(ev1sim PRIVATE EV1SIM_HAVE_WHEEL_IO=1)
 endif()
 
-# Link macOS frameworks for platform fixes and audio.
+# Link macOS frameworks for platform fixes (cabin audio goes through SDL3).
 if(APPLE)
     target_link_libraries(ev1sim PRIVATE
         "-framework Cocoa"
         "-framework OpenGL"
-        "-framework AudioToolbox"
     )
 endif()
 
@@ -536,6 +536,7 @@ if(BUILD_TESTS)
         tests/test_input_actions.cpp
         tests/test_hood.cpp
         tests/test_host_clock_reads.cpp
+        tests/test_cabin_audio.cpp
         ${EV1SIM_WHEEL_IO_TEST_SRC}
         ${EV1SIM_WIRE_TRUTH_TEST_SRC}
         src/Config.cpp
@@ -557,6 +558,8 @@ if(BUILD_TESTS)
         src/DashScreens3D.cpp
         src/BusSnoop.cpp
         src/VehiclePanels.cpp
+        src/CabinAudio.cpp
+        src/CabinAudioSynth.cpp
         ${EV1SIM_WHEEL_IO_SRC}
     )
 
