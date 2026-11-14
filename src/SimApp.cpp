@@ -153,7 +153,7 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
     // Optional initial-state config: start with the cabin locked (DoorLocks
     // otherwise defaults UNLOCKED).  Applied once, here at init.
     if (m_config.body.door_locks_locked_at_start)
-        m_physical->door_locks().lock_all();
+        m_physical->SetAllLocksByHand(true);
 
     // 4c. Vehicle panels (hood, trunk, doors) — constructed early, alongside
     //     m_physical and for the same reason: a floating-UI label lambda (the
@@ -235,10 +235,7 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
                     return FormatLockAllLabel(m_physical->door_locks().any_locked());
                 },
                 [this]() {
-                    if (m_physical->door_locks().any_locked())
-                        m_physical->door_locks().unlock_all();
-                    else
-                        m_physical->door_locks().lock_all();
+                    m_physical->SetAllLocksByHand(!m_physical->door_locks().any_locked());
                     std::cout << "[UI] Doors: "
                               << (m_physical->door_locks().any_locked()
                                       ? "some locked" : "all unlocked") << "\n";
@@ -251,7 +248,8 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
                         m_physical->door_locks().driver() == ev1sim::DoorLocks::State::LOCKED);
                 },
                 [this]() {
-                    m_physical->door_locks().toggle_driver();
+                    m_physical->SetLockByHand(ev1sim::PhysicalWorld::LockSite::DRIVER,
+                        m_physical->door_locks().driver() != ev1sim::DoorLocks::State::LOCKED);
                     using S = ev1sim::DoorLocks::State;
                     std::cout << "[UI] Driver door: "
                               << (m_physical->door_locks().driver() == S::LOCKED
@@ -265,7 +263,8 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
                         m_physical->door_locks().passenger() == ev1sim::DoorLocks::State::LOCKED);
                 },
                 [this]() {
-                    m_physical->door_locks().toggle_passenger();
+                    m_physical->SetLockByHand(ev1sim::PhysicalWorld::LockSite::PASSENGER,
+                        m_physical->door_locks().passenger() != ev1sim::DoorLocks::State::LOCKED);
                     using S = ev1sim::DoorLocks::State;
                     std::cout << "[UI] Passenger door: "
                               << (m_physical->door_locks().passenger() == S::LOCKED
@@ -279,7 +278,8 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
                         m_physical->door_locks().trunk() == ev1sim::DoorLocks::State::LOCKED);
                 },
                 [this]() {
-                    m_physical->door_locks().toggle_trunk();
+                    m_physical->SetLockByHand(ev1sim::PhysicalWorld::LockSite::TRUNK,
+                        m_physical->door_locks().trunk() != ev1sim::DoorLocks::State::LOCKED);
                     using S = ev1sim::DoorLocks::State;
                     std::cout << "[UI] Trunk: "
                               << (m_physical->door_locks().trunk() == S::LOCKED
@@ -1407,6 +1407,25 @@ void SimApp::PublishMotorState() {
 // and publishes the one body stimulus that flows the other way — the door-lock
 // switch contacts.  Called once per tick from both the windowed and headless
 // loops, after the connector has drained inbound frames.
+// Step both window glasses from the window motor legs the LHJB / RHJB drive
+// (WireTruthChassis::window_motor_cmd), and log each change of drive.  Called
+// once per tick from both the windowed and headless loops.
+void SimApp::StepPowerWindows(double dt) {
+    if (!m_external_sim) return;
+    static const char* kPwNames[]   = {"STOP", "UP", "DOWN"};
+    static const char* kSideNames[] = {"driver", "passenger"};
+    std::optional<std::uint8_t> drive[2];
+    for (int side = 0; side < 2; ++side) {
+        if (!m_external_sim->HasReceivedPowerWindowMotor(side)) continue;
+        drive[side] = m_external_sim->GetPowerWindowMotor(side);
+        if (*drive[side] == m_last_pw_motor_cmd[side]) continue;
+        m_last_pw_motor_cmd[side] = *drive[side];
+        const char* name = (*drive[side] <= 2u) ? kPwNames[*drive[side]] : "UNKNOWN";
+        std::cout << "[SimApp] Power window " << kSideNames[side] << ": " << name << "\n";
+    }
+    m_physical->StepPowerWindowPlant(dt, drive);
+}
+
 void SimApp::ConsumeBodyActuatorPeripherals(double dt, double steering) {
     if (!m_external_sim) return;
 
@@ -2027,7 +2046,6 @@ int SimApp::RunWithVisualization() {
             m_wiper->Tick(render_dt, wiper_cmd);
             m_wiper->SetPlantSweepPosition(m_external_sim->GetWiperSweepPositionPct());
         }
-        m_wiper->ApplyToScene();
         // The two wipers on the windshield, swung to the renderer's sweep
         // fraction. Created on the first frame, like the dash screens, once
         // the visual system's scene is set up.
@@ -2041,21 +2059,8 @@ int SimApp::RunWithVisualization() {
                 m_vis->GetDevice(), GetDataFile("ev1/ev1_trunk_lid.obj"));
         m_trunk_lid3d->Update(m_world->GetPose(), m_panels->IsOpen(PanelID::TRUNK), render_dt);
 
-        // --- Power window motor log (motor legs at the junction blocks) — no visual yet ---
-        {
-            static const char* kPwNames[] = {"STOP", "UP", "DOWN"};
-            static const char* kSideNames[] = {"driver", "passenger"};
-            for (int side = 0; side < 2; ++side) {
-                if (!m_external_sim->HasReceivedPowerWindowMotor(side)) continue;
-                const std::uint8_t cmd = m_external_sim->GetPowerWindowMotor(side);
-                if (cmd == m_last_pw_motor_cmd[side]) continue;
-                m_last_pw_motor_cmd[side] = cmd;
-                const char* name = (cmd <= 2u) ? kPwNames[cmd] : "UNKNOWN";
-                // TODO: drive window position animation when geometry is available.
-                std::cout << "[SimApp] Power window " << kSideNames[side]
-                          << ": " << name << "\n";
-            }
-        }
+        // --- Power windows: glass driven by the junction blocks' motor legs ---
+        StepPowerWindows(render_dt);
 
         // --- Body actuator peripherals (door-lock motors / sounder / pump) ---
         ConsumeBodyActuatorPeripherals(render_dt, cmd.steering);
@@ -2085,7 +2090,11 @@ int SimApp::RunWithVisualization() {
                 MakeLockIndicator(locks.driver() == S::LOCKED, lh.position(), lh.moving()),
                 MakeLockIndicator(locks.passenger() == S::LOCKED, rh.position(), rh.moving()),
                 MakeLockIndicator(locks.trunk() == S::LOCKED, 0.0, false)};
-            m_panels->DrawHUD(m_vis->GetDevice(), &lock_view);
+            const auto& wl = m_physical->power_window_motor_lh();
+            const auto& wr = m_physical->power_window_motor_rh();
+            const BodyWindowIndicators window_view{{wl.open_fraction(), wl.moving()},
+                                                   {wr.open_fraction(), wr.moving()}};
+            m_panels->DrawHUD(m_vis->GetDevice(), &lock_view, &window_view);
         }
         m_wiper->DrawHUD(m_vis->GetDevice());
 
@@ -2587,21 +2596,8 @@ int SimApp::RunHeadless() {
             m_wiper->Tick(tick_dt, wiper_cmd);
         }
 
-        // --- Power window motor log (motor legs at the junction blocks) — no visual yet ---
-        {
-            static const char* kPwNames[] = {"STOP", "UP", "DOWN"};
-            static const char* kSideNames[] = {"driver", "passenger"};
-            for (int side = 0; side < 2; ++side) {
-                if (!m_external_sim->HasReceivedPowerWindowMotor(side)) continue;
-                const std::uint8_t cmd = m_external_sim->GetPowerWindowMotor(side);
-                if (cmd == m_last_pw_motor_cmd[side]) continue;
-                m_last_pw_motor_cmd[side] = cmd;
-                const char* name = (cmd <= 2u) ? kPwNames[cmd] : "UNKNOWN";
-                // TODO: drive window position animation when geometry is available.
-                std::cout << "[SimApp] Power window " << kSideNames[side]
-                          << ": " << name << "\n";
-            }
-        }
+        // --- Power windows: glass driven by the junction blocks' motor legs ---
+        StepPowerWindows(tick_dt);
 
         // --- Body actuator peripherals (door-lock motors / sounder / pump) ---
         ConsumeBodyActuatorPeripherals(tick_dt, cmd.steering);
@@ -2795,11 +2791,11 @@ void SimApp::CruiseSpeedDown() {
 }
 
 void SimApp::DoorLockAll() {
-    if (m_physical) m_physical->door_locks().lock_all();
+    if (m_physical) m_physical->SetAllLocksByHand(true);
 }
 
 void SimApp::DoorUnlockAll() {
-    if (m_physical) m_physical->door_locks().unlock_all();
+    if (m_physical) m_physical->SetAllLocksByHand(false);
 }
 
 void SimApp::DoorLockSwitchPress(bool lock, bool driver_door) {

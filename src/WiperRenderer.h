@@ -6,7 +6,6 @@
 // Forward declarations to avoid pulling in Irrlicht headers.
 namespace irr {
     class IrrlichtDevice;
-    namespace scene { class ISceneNode; }
 }
 
 /// Animates the windshield wiper sweep based on the motor-command signal
@@ -19,14 +18,12 @@ namespace irr {
 ///   3 = HIGH  — ~85 wipes/min
 ///
 /// A "wipe" is one full out-and-back arc modelled as one revolution (2π) of
-/// the internal phase accumulator.  The wiper angle exposed to the scene graph
-/// (or HUD) is `sin(phase) × max_angle_deg`, which naturally produces the
+/// the internal phase accumulator.  The wiper angle (GetAngleDeg) is `sin(phase) × max_angle_deg`, which naturally produces the
 /// symmetric left↔right sweep without any extra bookkeeping.
 ///
 /// Visuals: a small "WIPER" HUD block above the lights snapshot panel, and
 /// the wipers on the windshield, which WiperBlades3D draws from
-/// GetSweepFraction() (the chassis mesh has no wiper parts, so FindWiperNode()
-/// finds none).
+/// GetSweepFraction() (the chassis mesh has no wiper parts).
 class WiperRenderer {
 public:
     /// Wiper motor command enum — mirrors kSigChassisWiperMotorCommand values.
@@ -55,7 +52,7 @@ public:
     // Runtime
     // -----------------------------------------------------------------
     /// Update the phase accumulator by dt seconds using the current motor
-    /// command.  Call once per simulation tick before DrawHUD() / ApplyToScene().
+    /// command.  Call once per simulation tick before DrawHUD().
     void Tick(double dt_s, std::uint8_t motor_cmd_raw);
 
     /// Convenience overload that takes the Mode enum directly.
@@ -78,14 +75,6 @@ public:
     /// position when published, else (1 - cos(phase)) / 2.
     double GetSweepFraction() const;
 
-    /// Attempt to find a wiper scene-graph node.  Returns true if found.
-    /// When a node is found, ApplyToScene() rotates it instead of drawing HUD.
-    bool FindWiperNode(irr::scene::ISceneNode* root);
-
-    /// Apply the current wiper angle to the scene graph (if a mesh node was
-    /// found) or do nothing (HUD path handles the visual).
-    void ApplyToScene();
-
     /// Draw the WIPER HUD overlay block.  Should be called from the same render
     /// context as VehicleLights::DrawHUD().
     void DrawHUD(irr::IrrlichtDevice* device) const;
@@ -99,9 +88,6 @@ public:
     /// Current wiper angle in degrees (sin(phase) × max_angle).
     float  GetAngleDeg() const;
 
-    /// True if a wiper mesh node was found in the scene graph.
-    bool   HasMeshNode() const { return m_wiper_node != nullptr; }
-
 private:
     /// Returns cadence in wipes/minute for the given mode.
     static double CadenceForMode(Mode mode);
@@ -110,7 +96,4 @@ private:
     double m_phase_rad = 0.0;
     float  m_max_angle_deg = kDefaultMaxAngleDeg;
     std::optional<std::uint8_t> m_plant_position_pct;
-
-    /// Non-owning pointer to the wiper scene-graph node, or null if absent.
-    irr::scene::ISceneNode* m_wiper_node = nullptr;
 };

@@ -111,8 +111,7 @@ DriverCommand KeyboardInputController::Update(double dt) {
     m_e_prev = e_now;
 
     // --- Hazard toggle (X one-shot, consumed via ConsumeHazardToggle) ---
-    // TODO: temporary keybinding; move to floating-UI panel when that lands
-    //       per docs/TODO.md.
+    // The floating UI panel's Hazard button toggles the same switch.
     bool x_now = m_keys[irr::KEY_KEY_X];
     if (x_now && !m_x_prev)
         m_hazard_toggle = true;
