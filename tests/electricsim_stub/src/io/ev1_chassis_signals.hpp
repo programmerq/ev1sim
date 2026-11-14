@@ -306,12 +306,10 @@ inline constexpr std::uint32_t kSigChassisSlipRatioRR        = 4123U;
 inline constexpr std::uint32_t kSigChassisMotorRpm           = 4070U;  // signed rpm (negative = reverse)
 inline constexpr std::uint32_t kSigChassisMotorTorqueNm      = 4071U;  // signed Nm (positive = drive, negative = regen)
 
-// Derived motor current (electricsim/PIM → chassis bus) — IEEE 754 float32 LE, 4 bytes.
-// Computed by PIM each tick: I = (torque_nm × omega_rad_s) / (V_pack × eta).
-// Negative = regen (current flowing into pack). Published at 1/kTickMs Hz cadence.
-// TODO: replace V_pack=312V nominal + eta=0.92 constant with real pack voltage
-// subscription (BPM publishes pack_v in its 16-byte status frame) and a 2-D
-// efficiency map once the manufacturer efficiency curve is digitized.
+// Derived DC-link motor current (electricsim/PIM → chassis bus) — IEEE 754 float32 LE,
+// 4 bytes. Computed by PIM each tick from shaft power over the live DC-link voltage
+// (ev1/pim/pim_motor.h holds the formula and its efficiencies). Negative = regen
+// (current flowing into pack). Published at 1/kTickMs Hz cadence.
 inline constexpr std::uint32_t kSigChassisMotorCurrentA      = 4072U;  // signed A, float32 LE
 
 // ---------------------------------------------------------------------------
@@ -359,12 +357,10 @@ inline constexpr std::uint32_t kSigChassisBrakeMasterPressureKpa = 4074U;
 // sim start (i.e. monotonic, zero-based).
 //
 // Published by ev1sim every Chrono physics step with the current simulated
-// time in nanoseconds.  Subscribed by each electricsim controller's
-// SimClock (src/io/sim_clock.{hpp,cpp}); when present, the controller
-// derives tick cadence, sleeps, and simavr cycle-advance budgets from
-// sim-time deltas instead of host wall-clock.  When absent (standalone
-// test-plant mode, no ev1sim) the SimClock stays on std::chrono::
-// steady_clock — the existing wall-clock pattern is the fallback.
+// time in nanoseconds (standalone: by electricsim_sim_time_pacer). The one
+// sim time: every electricsim controller and host takes one pass per sample
+// (src/io/sim_pass.hpp) and derives every dt, deadline, cadence and simavr
+// cycle budget from it through its SimClock (src/io/sim_clock.{hpp,cpp}).
 //
 // Why nanoseconds (uint64): a Chrono step is typically 1 ms (1e6 ns); a
 // uint64 nanosecond counter wraps after ~584 years of sim time which is
@@ -376,10 +372,9 @@ inline constexpr std::uint32_t kSigChassisBrakeMasterPressureKpa = 4074U;
 // kSigChassisSimTimeNs reflects sim time, so subscribers naturally
 // "see" the faster cadence without any host-side acceleration.
 //
-// Mid-run mode switches between realtime and non-realtime are out of
-// scope and require a controller restart; the SimClock has a
-// monotonicity guard but won't smoothly handle a downward-jumping
-// time source.
+// The SimClock ignores a sample that does not move time forward, so a
+// downward-jumping time source stalls every module until it passes the
+// last value seen.
 //
 // @design 2026-05-15 claude-opus-4.7 — slot 4075 chosen as the first
 // unused chassis ID after the motor/throttle/brake block (4070–4074).
@@ -494,26 +489,13 @@ inline constexpr std::uint32_t kSigChassisIpcTripDistanceM = 4132U;
 inline constexpr std::uint32_t kSigChassisApmBPlusActive = 4133U;
 
 // ---------------------------------------------------------------------------
-// IPC BTCM / airbag telltale outputs (electricsim/IPC → ev1sim chassis bus)
-// Signal IDs 4134–4138.  IPC publishes these on change each tick so the
-// floating UI can reflect BTCM-reported lamp state and the airbag indicator
-// independently of the full IPC LCD summary (5600).
+// IPC telltale lamps, legacy IDs 4134–4138 and 4140–4145.
+// Each ID is the `legacy_signal_id` of a CHASSIS_IPC_*_TELLTALE conductor in
+// config/topology.yaml. The solver publishes those lamps from the IPC's
+// output-stage causes (IPC_ES_*_DRV, elements in config/nets/ipc.yaml), which
+// ev1/ipc/ipc_telltale_causes.hpp derives from the supervisor's LCD symbol
+// mask.
 // Encoding: uint8 bool — 0=lamp off, 1=lamp on.
-//
-// Sources in the supervisor:
-//   4134 IPC_LCD_SYM_BRAKE      — DTC 42, set via ipc_supervisor_ingest_btcm_payload
-//   4135 IPC_LCD_SYM_PARK_BRAKE — DTC 44, set via ipc_supervisor_ingest_btcm_payload
-//   4136 IPC_LCD_SYM_ANTILOCK   — DTC 41, set via ipc_supervisor_ingest_btcm_payload
-//   4137 IPC_LCD_SYM_LOW_TRAC   — DTC 43, set via ipc_supervisor_ingest_btcm_payload
-//   4138 IPC_LCD_SYM_AIR_BAG    — DTC 40, set via ipc_supervisor_set_airbag_input
-//
-// Skipped (declared in ipc_lcd.h but never driven in current supervisor code):
-//   IPC_LCD_SYM_HIGH_BEAM, IPC_LCD_SYM_LEFT_TURN, IPC_LCD_SYM_RIGHT_TURN,
-//   IPC_LCD_SYM_WAIT — future work.
-// Deferred (driven but lower value / complex semantics; cap of 5 applied):
-//   IPC_LCD_SYM_SERVICE_NOW, IPC_LCD_SYM_TEMP, IPC_LCD_SYM_BATTERY_LIFE,
-//   IPC_LCD_SYM_REDUCED_PERF, IPC_LCD_SYM_CHECK_TIRE_PRESS,
-//   IPC_LCD_SYM_CHECK_MESSAGES — TODO: surface in a follow-up round.
 // ---------------------------------------------------------------------------
 inline constexpr std::uint32_t kSigChassisIpcBrakeTelltale     = 4134U;
 inline constexpr std::uint32_t kSigChassisIpcParkBrakeTelltale = 4135U;
@@ -522,38 +504,10 @@ inline constexpr std::uint32_t kSigChassisIpcLowTracTelltale   = 4137U;
 inline constexpr std::uint32_t kSigChassisIpcAirBagTelltale    = 4138U;
 
 // ---------------------------------------------------------------------------
-// 4139 — historical: kSigChassisBpmPackVoltageMv (BPM pack terminal voltage,
-// uint32 mV). Retired 2026-06-15 (retired rather than migrated): PIM, the
-// only consumer, moved to the modelled HV-bus rail (kSigChassisHvBusVoltageMv
-// 4155) because the rail is the physically-correct node for the motor-current
-// formula (see ev1/pim/controller.cpp ~L555). The BPM publish then had no live
-// consumer and no ev1sim contract use (0 mentions in docs/3d_sim_contract.md),
-// so it was removed instead of migrated to a wire. The numeric ID is held
-// reserved here (not reused) and the constant is left as a tombstone for
-// historical context. @design 2026-06-15 claude.
+// 4139 — reserved, not reused.
 
 // ---------------------------------------------------------------------------
-// IPC extra LCD telltale outputs (electricsim/IPC → ev1sim chassis bus)
-// Signal IDs 4140–4145.  IPC publishes these on change each tick so the
-// floating UI can reflect lamp state independently of the full IPC LCD
-// summary (5600).  All are driven by existing supervisor logic.
-// Encoding: uint8 bool — 0=lamp off, 1=lamp on.
-//
-// Sources in the supervisor (update_lcd_from_dtcs_):
-//   4140 IPC_LCD_SYM_SERVICE_NOW    — DTCs 31/33/35/45 via telltale requests
-//                                      (HTCM/PCM/BPM aggregator)
-//   4141 IPC_LCD_SYM_CHECK_MESSAGES — aggregate: any comm loss OR any request
-//                                      OR any BTCM indicator
-//   4142 IPC_LCD_SYM_TEMP           — DTCs 32/34/36 via telltale requests
-//                                      (HTCM/PCM/BPM aggregator)
-//   4143 IPC_LCD_SYM_BATTERY_LIFE   — DTC 38 via IPC_REQ_BATTERY_LIFE_FROM_BPM
-//   4144 IPC_LCD_SYM_REDUCED_PERF   — DTC 37 via IPC_REQ_REDUCED_PERF_FROM_PCM
-//   4145 IPC_LCD_SYM_CHECK_TIRE_PRESS — DTC 39 via
-//                                        IPC_REQ_CHECK_TIRE_PRESS_FROM_RSA
-//
-// Not yet exposed (declared in ipc_lcd.h but supervisor never drives them):
-//   IPC_LCD_SYM_WAIT, IPC_LCD_SYM_HIGH_BEAM, IPC_LCD_SYM_LEFT_TURN,
-//   IPC_LCD_SYM_RIGHT_TURN — future work; drive from supervisor first.
+// IPC telltale lamps, legacy IDs 4140–4145 (see the 4134 block above).
 // ---------------------------------------------------------------------------
 inline constexpr std::uint32_t kSigChassisIpcServiceNowTelltale    = 4140U;
 inline constexpr std::uint32_t kSigChassisIpcCheckMessagesTelltale = 4141U;

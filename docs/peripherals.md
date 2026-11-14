@@ -125,29 +125,34 @@ Headless scenarios reach it through the `door_lock_switch` action (see
 
 ---
 
-## `sounder` — LHJB flasher piezo "click"
+## `sounder` — turn-signal and hazard tick
 
-electricsim's `lhjb_flasher` produces a piezo square-wave (the TURN/HAZ "click"
-you hear in a real GM vehicle).  ev1sim's `PhysicalWorld::sounder()` consumes
-the boolean drive and exposes an audible-output signal for the 3D-sim audio
-contract: `sounding()` is high while the piezo is energised, and each rising
-edge increments `click_count()` (one click per flash half-cycle).  No frequency
-model — the piezo is a fixed-pitch element.
+The tick you hear with a turn signal or the hazard on comes from a piezo
+sounder, X56, soldered on the LHJB's own board. The LHJB's TURN/HAZ/DRL module
+drives it for the ON half of each flash. electricsim models it as a real
+circuit and its solver publishes the sounder as a load on the
+`TURN_TICK_SOUNDER_DRIVE` conductor (wire id 1741; electricsim
+`docs/3d_sim_contract.md` section 2.6). Like every two-sided load it reads 0 when
+the LHJB, its B+ or the sounder's lead is lost.
+
+ev1sim's `PhysicalWorld::sounder()` turns that drive into cabin ticks:
+`update(drive, sim_time_s)` counts one tick per rising edge and stamps it with
+the sim time, `take_pending_ticks()` hands the ticks to the audio backend, and
+`last_tick_period_s()` is the flash period in sim time. SimApp plays one short
+piezo burst (`CabinAudio::PlayTick()`, about 12 ms, a by-ear estimate) per
+tick. The flash timing comes from electricsim's sim clock, so a paused sim
+holds the flash phase and plays nothing. The IPC's extended-turn-signal chime
+is a different sound, the cluster's own.
 
 ### Wire-level mapping
 
-| Source                       | Chassis-bus signal ID | Endpoint (qualified name)         | Dir |
-|------------------------------|-----------------------|-----------------------------------|-----|
-| LHJB flasher piezo output    | **4096**              | `vehicle.body.sounder.piezo_drive` | LHJB → ev1sim |
+| Source                         | Wire (electricsim)                     | ev1sim input id | Endpoint (qualified name)          | Dir |
+|--------------------------------|----------------------------------------|-----------------|------------------------------------|-----|
+| LHJB tick sounder X56 (a load) | `TURN_TICK_SOUNDER_DRIVE` (1741, bit)  | **4096**        | `vehicle.body.sounder.piezo_drive` | LHJB → ev1sim |
 
-Wire level: `uint8`/bool, `1` = piezo energised.
+`WireTruthChassis`'s consumer registry maps the conductor onto 4096.
 Connector accessors: `GetSounderPiezoDrive()` / `HasReceivedSounderPiezoDrive()`.
-
-The LHJB-internal piezo is a real component that the printed EV1 schematics are
-silent on by design (no first-class `component_id`).  If electricsim's redux
-side wants to first-class it, a `module_lhjb_piezo` entry in
-`manual_supplements.yaml` (electricsim's evidence channel) is the natural home —
-but ev1sim does not require it.
+The headless scenario CSV column is `sounder_piezo_drive`.
 
 ---
 
@@ -245,7 +250,7 @@ the next motor pulse from the RHJB starts from where the knob left it.
 
 | ID   | Peripheral                  | Encoding   | Direction      |
 |------|-----------------------------|------------|----------------|
-| 4096 | sounder piezo drive         | bool       | LHJB → ev1sim  |
+| 4096 | turn/hazard tick sounder drive (wire 1741) | bool | LHJB → ev1sim  |
 | 4097 | power_steering_pump speed   | uint8 q8   | PSCM → ev1sim  |
 | 4098 | power_steering_pump interlock | bool     | ev1sim → PSCM  |
 | 4170 | door_lock_switch LH lock    | bool       | ev1sim → RHJB  |
