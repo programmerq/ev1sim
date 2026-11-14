@@ -754,6 +754,25 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
         // names the columns), 0 also before the solver writes it.
         else if (auto load = ClimateLoadForColumn(f))
             m_csv << (bus.GetClimateLoad(*load).value_or(false) ? 1 : 0);
+        // The off-board charger's report (ChargerStatus.h), blank until the
+        // charger has written the cell (-1 would read as a real temperature or
+        // current). Current is signed, charging negative.
+        else if (f.rfind("charger_", 0) == 0) {
+            const ChargerStatus& c = bus.GetChargerStatus();
+            auto put = [this](const auto& v) {
+                if (v) m_csv << *v;
+            };
+            if (f == "charger_state")                put(c.state);
+            else if (f == "charger_delivering")
+                put(c.delivering ? std::optional<int>(*c.delivering ? 1 : 0) : std::nullopt);
+            else if (f == "charger_current_a")       put(c.current_a);
+            else if (f == "charger_voltage_v")       put(c.voltage_v);
+            else if (f == "charger_temp_c")          put(c.charger_temp_c);
+            else if (f == "charger_coupler_temp_c")  put(c.coupler_temp_c);
+            else if (f == "charger_ac_input_v")      put(c.ac_input_v);
+            else if (f == "charger_fault_bits")      put(c.fault_bits);
+            else { WarnUnknownField(f); m_csv << ""; }
+        }
         // Sounder / piezo drive (LHJB flasher module).
         else if (f == "sounder_piezo_drive")
             m_csv << (bus.GetSounderPiezoDrive() ? 1 : 0);

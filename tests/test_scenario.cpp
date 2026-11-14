@@ -951,6 +951,41 @@ TEST_CASE("Scenario: climate load columns read 0 until the solver writes them",
     std::filesystem::remove(tmp_csv);
 }
 
+TEST_CASE("Scenario: charger columns are blank until the charger writes them",
+          "[Scenario]") {
+    using ev1sim::Scenario;
+    using ev1sim::ScenarioStats;
+
+    auto tmp_csv = std::filesystem::temp_directory_path() /
+                   "ev1sim_scenario_stats_charger_test.csv";
+    Scenario s;
+    ScenarioStats st{tmp_csv.string(),
+                     {"sim_time_s", "charger_state", "charger_current_a", "charger_coupler_temp_c",
+                      "charger_nope"},
+                     0.10};
+    s.set_stats(st);
+    s.OpenStats();
+
+    ExternalSimConnector bus;
+    ev1sim::PhysicalWorld phys;
+    DriverCommand cmd{};
+    VehicleState state{};
+    s.MaybeSampleStats(0.0, state, phys, bus, cmd);
+    s.Close();
+
+    std::ifstream f(tmp_csv);
+    REQUIRE(f.is_open());
+    std::string header, row1;
+    std::getline(f, header);
+    std::getline(f, row1);
+    CHECK(header == "sim_time_s,charger_state,charger_current_a,charger_coupler_temp_c,"
+                    "charger_nope");
+    CHECK(row1 == "0,,,,");   // no charger yet; never -1, a real temperature
+    f.close();
+    std::filesystem::remove(tmp_csv);
+}
+
+
 TEST_CASE("Scenario: IPC air-bag telltale stats field reads the bus mirror",
           "[Scenario]") {
     using ev1sim::Scenario;

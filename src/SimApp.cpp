@@ -299,6 +299,22 @@ SimApp::SimApp(const Config& config) : m_config(config), m_abs_feedback(config.i
                                       ? "PLUGGED" : "UNPLUGGED") << "\n";
                 });
 
+            // --- Charger report while the paddle is in (display-only rows,
+            //     from the charger's CHASSIS_CHARGER_* cells) ---
+            {
+                using Fmt = std::wstring (*)(const ev1sim::ChargerStatus&);
+                for (Fmt fmt : {&ev1sim::FormatChargerStateLabel, &ev1sim::FormatChargerOutputLabel,
+                                &ev1sim::FormatChargerMainsLabel, &ev1sim::FormatChargerTempsLabel,
+                                &ev1sim::FormatChargerFaultsLabel}) {
+                    m_floating_ui->AddButton(
+                        [this, fmt]() -> std::wstring {
+                            return fmt(m_external_sim ? m_external_sim->GetChargerStatus()
+                                                      : ev1sim::ChargerStatus{});
+                        },
+                        []() {});   // display-only row
+                }
+            }
+
             // --- Exterior Keypad section: 5 buttons (tap = lower digit) ---
             // Button labels are static; clicking queues a tap (a short hold).
             for (int ki = 0; ki < 5; ++ki) {

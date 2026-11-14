@@ -29,6 +29,7 @@
 #define EV1SIM_WIRE_TRUTH_CHASSIS_H
 
 #include "ClimateLoads.h"
+#include "ChargerStatus.h"
 #include "DashSnapshot.h"
 
 #include <cstdint>
@@ -356,6 +357,9 @@ public:
     // conductor cell for it (ClimateLoads.h names each cell). nullopt until
     // the solver writes it.
     std::optional<bool> climate_load_energised(ClimateLoad load) const;
+    // What the off-board charger reports (the CHASSIS_CHARGER_* cells,
+    // decoded per ChargerStatus.h). Each field nullopt until written.
+    ChargerStatus charger_status() const;
 
     // The wiper blades' position, percent of one full sweep cycle (0 = park,
     // 50 = end of sweep), from the RHJB's wiper-motor plant. nullopt until the

@@ -292,6 +292,26 @@ rows beside the HTCM's requests; the rear defog row counts its two grids.
 
 ---
 
+## Charger report — what the off-board charger says while the paddle is in
+
+The floating UI's coupler button mates the charge paddle (published on 4060).
+The charger then reports its state over the Class 2 data line, and
+electricsim's charger publishes the same report as eight `CHASSIS_CHARGER_*`
+cells. `WireTruthChassis::charger_status()` decodes them per
+[`src/ChargerStatus.h`](../src/ChargerStatus.h) (signed values ride as int32 bit
+patterns; current is negative while charging), and the connector keeps the
+latest of each (`GetChargerStatus()`, a field nullopt until written).
+
+The floating UI shows it under the coupler button: the state (WAIT FOR PADDLE,
+IDLE, CHARGING, TAPER, COMPLETE, FAULT), the charge current and voltage, the
+mains input, the charger and paddle temperatures, and the live faults by name.
+Scenario CSV columns, blank until the charger writes the cell: `charger_state`,
+`charger_delivering`, `charger_current_a`, `charger_voltage_v`,
+`charger_temp_c`, `charger_coupler_temp_c`, `charger_ac_input_v`,
+`charger_fault_bits`.
+
+---
+
 ## Signal-ID summary
 
 | ID   | Peripheral                  | Encoding   | Direction      |

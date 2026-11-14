@@ -1541,6 +1541,57 @@ TEST_CASE("Climate loads: each conductor cell reaches the connector through Tick
     }
 }
 
+TEST_CASE("Charger report: CHASSIS_CHARGER_* cells -> connector -> decoded status",
+          "[wire_truth][e2e]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("e2e_charger");
+    auto charger = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(charger != nullptr);
+    ScopedEnv env("ELECTRICSIM_WIRES_NAME", seg.c_str());
+
+    ExternalSimConnector::Options opts;
+    opts.enabled = true;
+    ExternalSimConnector c(opts);
+    c.Tick(0.0);
+    REQUIRE(c.IsConnected());
+    CHECK_FALSE(c.GetChargerStatus().state.has_value());   // charger not running
+    CHECK_FALSE(c.GetChargerStatus().current_a.has_value());
+
+    // Charging at 12.5 A into 352 V from 240 V mains; a cold paddle.
+    REQUIRE(charger->write_uint32(topo::kWireCHASSIS_CHARGER_SM_STATE, 2u));
+    REQUIRE(charger->write_bit(topo::kWireCHASSIS_CHARGER_ENABLED, true));
+    REQUIRE(charger->write_uint32(topo::kWireCHASSIS_CHARGER_ACTUAL_CURRENT_DA,
+                                  static_cast<std::uint32_t>(std::int32_t{-125})));
+    REQUIRE(charger->write_uint32(topo::kWireCHASSIS_CHARGER_ACTUAL_VOLTAGE_DV, 3520u));
+    REQUIRE(charger->write_uint32(topo::kWireCHASSIS_CHARGER_TEMP_C, 41u));
+    REQUIRE(charger->write_uint32(topo::kWireCHASSIS_CHARGER_COUPLER_TEMP_C,
+                                  static_cast<std::uint32_t>(std::int32_t{-5})));
+    REQUIRE(charger->write_uint32(topo::kWireCHASSIS_CHARGER_AC_INPUT_MV, 240000u));
+    REQUIRE(charger->write_uint32(topo::kWireCHASSIS_CHARGER_FAULT_BITS, 0u));
+    c.Tick(0.1);
+    const ev1sim::ChargerStatus& s = c.GetChargerStatus();
+    CHECK(s.state == std::optional<std::uint32_t>(2u));
+    CHECK(s.delivering == std::optional<bool>(true));
+    CHECK(s.current_a == std::optional<double>(-12.5));
+    CHECK(s.voltage_v == std::optional<double>(352.0));
+    CHECK(s.charger_temp_c == std::optional<int>(41));
+    CHECK(s.coupler_temp_c == std::optional<int>(-5));
+    CHECK(s.ac_input_v == std::optional<double>(240.0));
+    CHECK(s.fault_bits == std::optional<std::uint32_t>(0u));
+
+    // The paddle overheats: the charger faults and stops delivering.
+    REQUIRE(charger->write_uint32(topo::kWireCHASSIS_CHARGER_SM_STATE, 5u));
+    REQUIRE(charger->write_bit(topo::kWireCHASSIS_CHARGER_ENABLED, false));
+    REQUIRE(charger->write_uint32(topo::kWireCHASSIS_CHARGER_FAULT_BITS,
+                                  ev1sim::ChargerFault::kCouplerOvertemp));
+    c.Tick(0.2);
+    CHECK(ev1sim::FormatChargerStateLabel(c.GetChargerStatus()) == L"Charger: FAULT");
+    CHECK(ev1sim::FormatChargerFaultsLabel(c.GetChargerStatus()) ==
+          L"Charger faults: PADDLE OVERTEMP");
+    CHECK(c.GetChargerStatus().delivering == std::optional<bool>(false));
+}
+
+
 TEST_CASE("Window glass follows the RHJB's motor legs: wire -> connector -> plant",
           "[wire_truth][e2e]") {
     // The passenger window goes down while the RHJB drives the DOWN leg, and

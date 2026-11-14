@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ClimateLoads.h"
+#include "ChargerStatus.h"
 #include "DashSnapshot.h"
 #include "VehicleLights.h"
 #include "VehiclePanels.h"
@@ -527,6 +528,10 @@ public:
     /// windshield, both rear defog grids, radiator fan), read every tick from
     /// the solver's conductor cells (ClimateLoads.h). nullopt until received.
     std::optional<bool> GetClimateLoad(ev1sim::ClimateLoad load) const;
+    /// What the off-board charger reports, read every tick from its
+    /// CHASSIS_CHARGER_* cells (ChargerStatus.h). Each field nullopt until
+    /// the charger has written it.
+    const ev1sim::ChargerStatus& GetChargerStatus() const;
 
     /// Incoming HVAC blower level from HTCM (ID 4082, chassis segment).
     /// uint8: 0=OFF, 1=LOW, 2=MED, 3=HIGH.  Returns 0xFF if never received.

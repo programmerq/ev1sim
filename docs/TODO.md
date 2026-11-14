@@ -221,6 +221,10 @@ future-UI input on one side, chassis-segment signal publishing on the other.
 - [x] Climate loads: the floating UI panel and the scenario CSV show whether the
   compressor, heated windshield, both rear defog grids and radiator fan are
   actually energised (`src/ClimateLoads.h`), beside the HTCM's requests.
+- [x] Charger report: the floating UI and the scenario CSV show what the
+  off-board charger reports while the paddle is in (state, current, voltage,
+  mains, temperatures, faults), from its `CHASSIS_CHARGER_*` cells
+  (`src/ChargerStatus.h`).
 
 ## Bus-mediated physics
 - [ ] **Regen ↔ friction blending (S15 — documented gap, do NOT fabricate).**

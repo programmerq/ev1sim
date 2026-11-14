@@ -1458,6 +1458,7 @@ struct ExternalSimConnector::State {
     std::uint8_t  dilm_level              = 0u;
     bool          has_dilm_level          = false;
     std::optional<bool> climate_load[ev1sim::kNumClimateLoads] = {};
+    ev1sim::ChargerStatus charger;          // CHASSIS_CHARGER_* cells
 
     // Door-lock motor leg drives (IDs 4182-4185, chassis segment) — received from RHJB.
     // dual-H-bridge: [0]=LH lock, [1]=LH unlock, [2]=RH lock, [3]=RH unlock.
@@ -1863,6 +1864,9 @@ std::optional<bool> ExternalSimConnector::GetClimateLoad(ev1sim::ClimateLoad loa
 }
 std::uint8_t ExternalSimConnector::GetDilmLevel() const { return m_state->dilm_level; }
 bool ExternalSimConnector::HasReceivedDilmLevel() const { return m_state->has_dilm_level; }
+const ev1sim::ChargerStatus& ExternalSimConnector::GetChargerStatus() const {
+    return m_state->charger;
+}
 
 std::uint8_t ExternalSimConnector::GetPowerWindowMotor(int side) const {
     if (side < 0 || side > 1) return 0xFFu;
@@ -3465,6 +3469,22 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         for (int i = 0; i < ev1sim::kNumClimateLoads; ++i) {
             if (auto on = st.wire->climate_load_energised(static_cast<ev1sim::ClimateLoad>(i)))
                 st.climate_load[i] = *on;
+        }
+        // The off-board charger's report; a field keeps its last value until
+        // the charger writes it again.
+        {
+            const ev1sim::ChargerStatus now = st.wire->charger_status();
+            auto keep = [](auto& held, const auto& fresh) {
+                if (fresh) held = fresh;
+            };
+            keep(st.charger.state, now.state);
+            keep(st.charger.delivering, now.delivering);
+            keep(st.charger.current_a, now.current_a);
+            keep(st.charger.voltage_v, now.voltage_v);
+            keep(st.charger.charger_temp_c, now.charger_temp_c);
+            keep(st.charger.coupler_temp_c, now.coupler_temp_c);
+            keep(st.charger.ac_input_v, now.ac_input_v);
+            keep(st.charger.fault_bits, now.fault_bits);
         }
         // Retard request at the PIM, permille duty; 0 while the line is dark.
         if (auto duty = st.wire->pim_retard_request_permille()) {
