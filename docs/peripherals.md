@@ -317,6 +317,59 @@ Scenario CSV columns, blank until the charger writes the cell: `charger_state`,
 
 ---
 
+## Climate readout — what the climate controller senses and commands
+
+J steps the readout panel through its pages: climate, then drive and power
+(below), then off. The table, lines and panel are shared
+([`src/ReadoutPanel.h`](../src/ReadoutPanel.h)). electricsim publishes the climate
+controller's (HTCM's) sensor readings and outputs, and the APM's compressor and
+heated-windshield drive state, as scan-tool cells; ev1sim decodes them per
+[`src/ClimateReadout.h`](../src/ClimateReadout.h), one reading per cell:
+
+- **Sensors:** outside air, cabin inlet air, battery pack, inverter, coolant
+  (three points), coolant level low, refrigerant low- and high-side pressures,
+  refrigerant and compressor-discharge temperatures.
+- **Controller outputs:** mode door position, outside-air, reversing,
+  three-way coolant and coolant recovery valve commands, heater valve and
+  coolant pump feeds.
+- **Compressor drive:** speed-command duty, target drive frequency, drive
+  enabled, motor interlock, inverter fault.
+- **Windshield heat drive:** commanded, driving, output rail voltage.
+
+The connector keeps the latest of each (`GetClimateReadings()`, nullopt until
+written). Scenario CSV columns are `climate_<reading>` (the names in
+`kClimateReadingInfo`, e.g. `climate_refrig_high_kpa`), blank until written.
+
+---
+
+## Drive and power readout — brakes, high voltage, accessory power
+
+The second readout page. electricsim publishes these as scan-tool cells;
+ev1sim decodes them per [`src/DriveReadout.h`](../src/DriveReadout.h), one
+reading per cell:
+
+- **Brake controller (BTCM):** the four wheel speeds and the reference speed
+  its anti-lock logic computes, and the ANTILOCK, BRAKE, LOW TRACTION and
+  PARK BRAKE lamp states it commands (the cluster shows its own copy of the
+  lamps from the BTCM's data frame).
+- **High voltage:** pack voltage at the contactors, inverter capacitor
+  voltage and isolation to chassis as the AD sees them; whether the traction
+  inverter is delivering.
+- **Accessory power module (APM):** key on, run mode, module temperature,
+  12 V in band, the qualified setpoint command (high is 14.5 V) and whether it
+  is stale, subsystems running, lamp requests, active internal faults,
+  windshield-heat feedback voltage, load-shed activations.
+- **Other modules:** the climate controller's wake-up line, the cluster's
+  active trouble-code count.
+
+The connector keeps the latest of each (`GetDriveReadings()`, nullopt until
+written). Scenario CSV columns are `drive_<reading>` (the names in
+`kDriveReadingInfo`, e.g. `drive_pack_v`), in the stored unit (wheel speeds
+rad/s, reference speed m/s, run mode and the APM bitmasks as raw values),
+blank until written.
+
+---
+
 ## Signal-ID summary
 
 | ID   | Peripheral                  | Encoding   | Direction      |

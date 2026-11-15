@@ -177,6 +177,12 @@ DriverCommand KeyboardInputController::Update(double dt) {
         m_snapshot_toggle = true;
     m_z_prev = z_now;
 
+    // --- Readout page step (J one-shot, consumed via ConsumeReadoutPageStep) ---
+    bool j_now = m_keys[irr::KEY_KEY_J];
+    if (j_now && !m_j_prev)
+        m_readout_page_step = true;
+    m_j_prev = j_now;
+
     // --- UI mode toggle (TAB one-shot, consumed via ConsumeUiModeToggle) ---
     bool tab_now = m_keys[irr::KEY_TAB];
     if (tab_now && !m_tab_prev)
@@ -335,6 +341,12 @@ bool KeyboardInputController::ConsumeWiperWash() {
 bool KeyboardInputController::ConsumeSnapshotToggle() {
     bool v = m_snapshot_toggle;
     m_snapshot_toggle = false;
+    return v;
+}
+
+bool KeyboardInputController::ConsumeReadoutPageStep() {
+    bool v = m_readout_page_step;
+    m_readout_page_step = false;
     return v;
 }
 

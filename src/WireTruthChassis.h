@@ -30,6 +30,8 @@
 
 #include "ClimateLoads.h"
 #include "ChargerStatus.h"
+#include "ClimateReadout.h"
+#include "DriveReadout.h"
 #include "DashSnapshot.h"
 
 #include <cstdint>
@@ -360,6 +362,16 @@ public:
     // What the off-board charger reports (the CHASSIS_CHARGER_* cells,
     // decoded per ChargerStatus.h). Each field nullopt until written.
     ChargerStatus charger_status() const;
+
+    // What the climate controller senses and commands and what the APM's
+    // compressor and windshield-heat drives report (ClimateReadout.h), each
+    // decoded to its unit; nullopt until written.
+    ClimateReadings climate_readings() const;
+
+    // What the brake controller, the high-voltage side, the APM, the climate
+    // controller's wake line and the cluster report (DriveReadout.h), each
+    // nullopt until electricsim writes its cell.
+    DriveReadings drive_readings() const;
 
     // The wiper blades' position, percent of one full sweep cycle (0 = park,
     // 50 = end of sweep), from the RHJB's wiper-motor plant. nullopt until the
