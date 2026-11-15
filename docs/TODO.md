@@ -225,6 +225,13 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   off-board charger reports while the paddle is in (state, current, voltage,
   mains, temperatures, faults), from its `CHASSIS_CHARGER_*` cells
   (`src/ChargerStatus.h`).
+- [x] Climate readout: J shows the climate controller's sensor readings and
+  outputs and the APM's compressor and windshield-heat drives
+  (`src/ClimateReadout.h`); scenario CSV `climate_*` columns.
+- [x] Drive and power readout: J's second page shows the BTCM's wheel speeds
+  and lamp states, the AD's high-voltage readings, the APM's status and two
+  other modules' observability cells (`src/DriveReadout.h`); scenario CSV
+  `drive_*` columns.
 
 ## Bus-mediated physics
 - [ ] **Regen ↔ friction blending (S15 — documented gap, do NOT fabricate).**

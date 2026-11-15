@@ -108,6 +108,10 @@ public:
     // the [ / ] door bindings nearby are ajar-only (open/close), not lock state.
     bool ConsumeSnapshotToggle();
 
+    // True once after J was tapped — step to the next readout page
+    // (NextReadoutPage in ReadoutPanel.h).
+    bool ConsumeReadoutPageStep();
+
     // True once after TAB was tapped — toggle UI mode (release mouse to panel).
     // When UI mode is ON, CameraManager stops consuming mouse events and the
     // cursor becomes visible so the user can click floating-UI buttons.
@@ -147,6 +151,7 @@ private:
     bool m_v_prev      = false;   // wiper cycle
     bool m_m_prev      = false;   // wiper wash
     bool m_z_prev      = false;   // snapshot overlay toggle
+    bool m_j_prev      = false;   // readout page step
     bool m_tab_prev    = false;   // UI mode toggle
     bool m_camera_cycle       = false;
     bool m_pause_toggle       = false;
@@ -167,6 +172,7 @@ private:
     bool m_wiper_cycle        = false;
     bool m_wiper_wash         = false;
     bool m_snapshot_toggle    = false;
+    bool m_readout_page_step  = false;
     bool m_ui_mode_toggle     = false;
 
     // Panel toggle keys: KEY_KEY_1 through KEY_KEY_4

@@ -986,6 +986,71 @@ TEST_CASE("Scenario: charger columns are blank until the charger writes them",
 }
 
 
+TEST_CASE("Scenario: climate readout columns are blank until written",
+          "[Scenario]") {
+    using ev1sim::Scenario;
+    using ev1sim::ScenarioStats;
+
+    auto tmp_csv = std::filesystem::temp_directory_path() /
+                   "ev1sim_scenario_stats_climate_readout_test.csv";
+    Scenario s;
+    ScenarioStats st{tmp_csv.string(),
+                     {"sim_time_s", "climate_refrig_high_kpa", "climate_outside_air_temp_c"},
+                     0.10};
+    s.set_stats(st);
+    s.OpenStats();
+
+    ExternalSimConnector bus;
+    ev1sim::PhysicalWorld phys;
+    DriverCommand cmd{};
+    VehicleState state{};
+    s.MaybeSampleStats(0.0, state, phys, bus, cmd);
+    s.Close();
+
+    std::ifstream f(tmp_csv);
+    REQUIRE(f.is_open());
+    std::string header, row1;
+    std::getline(f, header);
+    std::getline(f, row1);
+    CHECK(header == "sim_time_s,climate_refrig_high_kpa,climate_outside_air_temp_c");
+    CHECK(row1 == "0,,");
+    f.close();
+    std::filesystem::remove(tmp_csv);
+}
+
+TEST_CASE("Scenario: drive readout columns are blank until written",
+          "[Scenario]") {
+    using ev1sim::Scenario;
+    using ev1sim::ScenarioStats;
+
+    auto tmp_csv = std::filesystem::temp_directory_path() /
+                   "ev1sim_scenario_stats_drive_readout_test.csv";
+    Scenario s;
+    ScenarioStats st{tmp_csv.string(),
+                     {"sim_time_s", "drive_pack_v", "drive_wheel_speed_lf_rad_s",
+                      "climate_pack_temp_c"},
+                     0.10};
+    s.set_stats(st);
+    s.OpenStats();
+
+    ExternalSimConnector bus;
+    ev1sim::PhysicalWorld phys;
+    DriverCommand cmd{};
+    VehicleState state{};
+    s.MaybeSampleStats(0.0, state, phys, bus, cmd);
+    s.Close();
+
+    std::ifstream f(tmp_csv);
+    REQUIRE(f.is_open());
+    std::string header, row1;
+    std::getline(f, header);
+    std::getline(f, row1);
+    CHECK(header == "sim_time_s,drive_pack_v,drive_wheel_speed_lf_rad_s,climate_pack_temp_c");
+    CHECK(row1 == "0,,,");
+    f.close();
+    std::filesystem::remove(tmp_csv);
+}
+
 TEST_CASE("Scenario: IPC air-bag telltale stats field reads the bus mirror",
           "[Scenario]") {
     using ev1sim::Scenario;
