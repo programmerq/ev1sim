@@ -84,62 +84,40 @@ void Telemetry::Record(const VehicleState& s, double dt) {
 }
 
 // ---------------------------------------------------------------------------
-void Telemetry::DrawHUD(irr::IrrlichtDevice* device,
-                        const VehicleState& state,
-                        const std::string& camera_mode,
-                        const std::string& surface,
-                        const double* wheel_mu,
-                        const ExternalSimConnector::AbsPhaseFront* abs_phase) {
-    if (!m_show_hud || !device) return;
-
-    auto* gui  = device->getGUIEnvironment();
-    auto* font = gui->getBuiltInFont();
-    if (!font) return;
-
-    irr::video::SColor white(255, 255, 255, 255);
-    irr::video::SColor yellow(255, 255, 255, 100);
-
-    int x = 10, y = 10, h = 18;
-
-    auto draw = [&](const std::string& text, irr::video::SColor col = {255, 255, 255, 255}) {
-        irr::core::stringw ws(text.c_str());
-        font->draw(ws, irr::core::rect<irr::s32>(x, y, x + 400, y + h), col);
-        y += h;
-    };
-
-    char buf[128];
-    double kph = state.speed_mps * 3.6;
-    std::snprintf(buf, sizeof(buf), "Speed: %.1f km/h  (%.1f m/s)", kph, state.speed_mps);
-    draw(buf, white);
+std::vector<std::string> TelemetryHudLines(const VehicleState& state,
+                                           const std::string& camera_mode,
+                                           const std::string& surface,
+                                           const double* wheel_mu,
+                                           const ExternalSimConnector::AbsPhaseFront* abs_phase) {
+    std::vector<std::string> lines;
+    char buf[160];
+    std::snprintf(buf, sizeof(buf), "Speed: %.1f km/h  (%.1f m/s)", state.speed_mps * 3.6,
+                  state.speed_mps);
+    lines.emplace_back(buf);
 
     std::snprintf(buf, sizeof(buf), "Throttle: %.0f%%   Brake: %.0f%%   Steer: %+.0f%%",
                   state.applied_throttle * 100, state.applied_front_brake * 100,
                   state.applied_steering * 100);
-    draw(buf, white);
+    lines.emplace_back(buf);
 
     // ABS phase line — shown only when BTCM data is available.
     if (abs_phase) {
-        char abs_buf[128];
         if (abs_phase->fl_fresh || abs_phase->fr_fresh) {
-            std::snprintf(abs_buf, sizeof(abs_buf),
-                          "ABS:  FL=%s%s  FR=%s%s",
-                          AbsPhaseStr(abs_phase->fl),
-                          abs_phase->fl_fresh ? "" : "(stale)",
-                          AbsPhaseStr(abs_phase->fr),
-                          abs_phase->fr_fresh ? "" : "(stale)");
+            std::snprintf(buf, sizeof(buf), "ABS:  FL=%s%s  FR=%s%s",
+                          AbsPhaseStr(abs_phase->fl), abs_phase->fl_fresh ? "" : "(stale)",
+                          AbsPhaseStr(abs_phase->fr), abs_phase->fr_fresh ? "" : "(stale)");
+            lines.emplace_back(buf);
         } else {
-            std::snprintf(abs_buf, sizeof(abs_buf), "ABS:  FL=local  FR=local");
+            lines.emplace_back("ABS:  FL=local  FR=local");
         }
-        draw(abs_buf, yellow);
     }
 
-    draw("Camera: " + camera_mode, yellow);
-    draw("Surface: " + surface, yellow);
+    lines.push_back("Camera: " + camera_mode);
+    lines.push_back("Surface: " + surface);
 
     // Per-wheel ground friction — makes split-mu and transition levels
     // legible at a glance (e.g. asphalt wheels at 0.90 vs ice at 0.08).
     if (wheel_mu) {
-        char mu_buf[160];
         auto fmt = [](double v, char* out, size_t n) {
             if (v < 0) std::snprintf(out, n, "  -  ");
             else       std::snprintf(out, n, "%.2f", v);
@@ -149,12 +127,37 @@ void Telemetry::DrawHUD(irr::IrrlichtDevice* device,
         fmt(wheel_mu[1], fr, sizeof(fr));
         fmt(wheel_mu[2], rl, sizeof(rl));
         fmt(wheel_mu[3], rr, sizeof(rr));
-        std::snprintf(mu_buf, sizeof(mu_buf),
-                      "mu:  FL=%s  FR=%s  RL=%s  RR=%s",
-                      fl, fr, rl, rr);
-        draw(mu_buf, yellow);
+        std::snprintf(buf, sizeof(buf), "mu:  FL=%s  FR=%s  RL=%s  RR=%s", fl, fr, rl, rr);
+        lines.emplace_back(buf);
     }
 
     std::snprintf(buf, sizeof(buf), "Sim time: %.1f s", state.sim_time);
-    draw(buf, yellow);
+    lines.emplace_back(buf);
+    return lines;
+}
+
+// ---------------------------------------------------------------------------
+void Telemetry::DrawHUD(irr::IrrlichtDevice* device,
+                        const VehicleState& state,
+                        const std::string& camera_mode,
+                        const std::string& surface,
+                        const double* wheel_mu,
+                        const ExternalSimConnector::AbsPhaseFront* abs_phase) {
+    if (!m_show_hud || !device) return;
+
+    auto* gui  = device->getGUIEnvironment();
+    auto* font = gui ? gui->getBuiltInFont() : nullptr;
+    if (!font) return;
+
+    const irr::video::SColor white(255, 255, 255, 255);
+    const irr::video::SColor yellow(255, 255, 255, 100);
+    const int x = 10, h = 18;
+    int y = 10;
+    const std::vector<std::string> lines =
+        TelemetryHudLines(state, camera_mode, surface, wheel_mu, abs_phase);
+    for (std::size_t i = 0; i < lines.size(); ++i) {
+        const irr::core::stringw ws(lines[i].c_str());
+        font->draw(ws, irr::core::rect<irr::s32>(x, y, x + 400, y + h), i < 2 ? white : yellow);
+        y += h;
+    }
 }

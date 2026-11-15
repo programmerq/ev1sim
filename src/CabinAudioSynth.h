@@ -10,7 +10,8 @@
 // audio thread, so the shared state is atomic.
 //
 // Pitches and levels:
-//   - Horn: 400 Hz (low) and 500 Hz (high) sine tones, mixed when both sound.
+//   - Horn: 400 Hz (low) and 500 Hz (high) sine tones, mixed when both sound
+//     (@source:manual EV1 electrical manual elec-227).
 //     LHJB drives both horns together (HORN_DRIVE_LINE_LOW/HIGH).
 //   - Piezo: a 2.7 kHz square wave, the typical pitch of a piezo buzzer
 //     element.  Not measured from the EV1's sounder X56.
