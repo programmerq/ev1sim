@@ -4,6 +4,8 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
+#include <string>
 
 // ---------------------------------------------------------------------------
 // BusSnoop — the dashboard's passive listener on the GM-8192 bus.
@@ -16,7 +18,7 @@
 //   GM8192_BPM_TX   $40 PCM Data Poll       pack voltage / current / SOC
 //                   $20 DSCM Data Poll      user SOC, range, time-to-full, BPM telltales
 //                   $90 BTCM Data Poll      power bargraph
-//   GM8192_BTCM_TX  $91 BTCM Data Response  brake / anti-lock telltales
+//   GM8192_BTCM_TX  $91 BTCM Data Response  every brake controller field
 //   GM8192_IPC_TX   $21 DSCM Data Response  season odometer
 //
 // It decodes already-framed application bytes only: the wire's bits become
@@ -53,6 +55,24 @@ inline constexpr std::uint8_t kDashMsgDscmResponse = 0x21u;  // IPC_UART_FRAME_I
 // PRND 5-bit wire code → gear. Codes are PIM_UART_PRND_CODE_* in the external
 // sim's ev1/pim/pim_uart_frame.h (@source:manual bus-015).
 DashGear DecodePrndCode(std::uint8_t code5);
+
+// $91 Redundant Retard Request bands, @source:redux
+// bus/messages/uart/91_btcm_data_response.yaml (bus-019): counts 25-45 are
+// coastdown drag, 100 % to 0 % reduction at 5 %/count; counts 46-230 are
+// braking, 0 to 1990 Nm at 10.875 Nm/count.
+inline constexpr std::uint8_t kRetardCoastdownMin = 25u;
+inline constexpr std::uint8_t kRetardCoastdownMax = 45u;
+inline constexpr std::uint8_t kRetardBrakingMin   = 46u;
+inline constexpr std::uint8_t kRetardBrakingMax   = 230u;
+
+// Fill the retard-request fields of `s` from one wire count.
+void DecodeRetardRequest(std::uint8_t count, DashBrakeStatus& s);
+
+// One $91 field by its DashBrakeStatus member name ("abs_tcs_active",
+// "retard_request_count", "wheel_tau_lf", ...) as a number: flags 1/0, the
+// band as 0 coastdown / 1 braking / 2 out of range. nullopt for an unknown
+// name. Scenario stats columns "btcm91_<name>" read through this.
+std::optional<double> BtcmResponseField(const DashBrakeStatus& b, const std::string& name);
 
 class BusSnoop {
 public:
@@ -94,6 +114,10 @@ public:
     double stale_after_s() const { return stale_after_s_; }
 
     std::uint64_t frames_decoded() const { return frames_decoded_; }
+    // Valid $91 frames decoded so far. The connector's brake-controller
+    // liveness advances on this count, so only a frame that framed, passed
+    // its SumCheck and carried N = 11 counts as the BTCM talking.
+    std::uint64_t btcm_responses() const { return btcm_responses_; }
     std::uint64_t frames_rejected() const { return frames_rejected_; }
 
 private:
@@ -118,6 +142,7 @@ private:
     double stale_after_s_ = kDefaultStaleAfterS;
     std::uint64_t frames_decoded_ = 0;
     std::uint64_t frames_rejected_ = 0;
+    std::uint64_t btcm_responses_ = 0;
 };
 
 }  // namespace ev1sim

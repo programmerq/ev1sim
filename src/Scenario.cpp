@@ -1,5 +1,7 @@
 #include "Scenario.h"
 
+#include "BusSnoop.h"  // BtcmResponseField
+
 #include <algorithm>
 #include <cctype>
 #include <chrono>
@@ -735,6 +737,18 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
         // torque the BTCM is asking the propulsion side to produce.
         else if (f == "btcm_retard_request_duty_q8")
             m_csv << static_cast<int>(bus.GetBtcmRetardRequestDutyQ8());
+        // The BTCM's $91 Data Response decoded off its serial line,
+        // "btcm91_<field>" (BusSnoop.h BtcmResponseField); blank until a $91
+        // is decoded and again once it goes stale.
+        else if (f.rfind("btcm91_", 0) == 0) {
+            const std::string name = f.substr(7);
+            if (!BtcmResponseField(DashBrakeStatus{}, name)) {
+                WarnUnknownField(f);
+                m_csv << "";
+            } else if (const auto b = bus.GetDashSnapshot().brake) {
+                m_csv << *BtcmResponseField(*b, name);
+            }
+        }
         // PIM coast-down drag (CHASSIS_PIM_COAST_DRAG_NM), Nm at the motor
         // shaft; -1 until the PIM has written it.
         else if (f == "pim_coast_drag_nm")

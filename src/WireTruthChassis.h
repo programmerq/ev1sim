@@ -291,17 +291,6 @@ public:
     // is this cell's producer (the pump peripheral). Returns false if not attached.
     bool publish_ps_motor_case_temp_q8(std::uint16_t q8);
 
-    // BTCM GM-8192 TX liveness proxy: the total bit count ever appended to the
-    // BTCM transmit bit-stream cell (GM8192_BTCM_TX). The BTCM broadcasts its
-    // canonical status frame at 5 Hz, so a growing total => "BTCM transmitting"
-    // (alive). The connector stamps btcm_uart_frame_ns whenever this advances —
-    // a cheap stand-in for the old kSigBtcmUartFrame (5050) heartbeat that keeps
-    // the ABS/EMB freshness gate (btcm_alive) live WITHOUT reconstructing frame
-    // payloads off the bit FIFO (deferred — see WireTruthChassis.cpp /
-    // ExternalSimConnector.cpp TODOs). nullopt when not attached / undeclared /
-    // never appended.  @inferred 2026-06-17 — total-bits-advancing ≈ alive.
-    std::optional<std::uint64_t> btcm_tx_total_bits() const;
-
     // The attached WireTable, for passive readers that drain cells on their own
     // schedule (BusSnoop's GM-8192 frame snoop for the instrument cluster,
     // docs/ipc_rsa_display_plan.md). nullptr when not attached or compiled out.

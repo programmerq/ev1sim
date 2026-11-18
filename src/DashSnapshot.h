@@ -72,14 +72,47 @@ struct DashBpmDisplay {
     std::uint16_t range_km = 0;         // b9-0, 1 km/count, 0..999
 };
 
-// $91 BTCM Data Response (BTCM → bus, 120 ms), N = 11 — brake telltales.
-// Contract: the external sim's ev1/btcm/btcm_uart_frame.h.
+// Redundant Retard Request, $91 wire [3]: one count, two bands.
+// @source:redux bus/messages/uart/91_btcm_data_response.yaml (bus-019).
+enum class DashRetardBand : std::uint8_t {
+    kCoastdown,   // counts 25..45: coastdown drag reduction, 100 % .. 0 %
+    kBraking,     // counts 46..230: braking retard, 0 .. 1990 Nm
+    kOutOfRange,  // any other count (the spec defines none)
+};
+
+// $91 BTCM Data Response (BTCM → BPM, 120 ms), N = 11, every field.
+// The BTCM sends it on J1 A2, circuit 800E, to LHJB J6 F4 (redux
+// harness/ev1_btcm_module.yaml). Contract: the external sim's
+// ev1/btcm/btcm_uart_frame.h; layout @source:redux
+// bus/messages/uart/91_btcm_data_response.yaml (bus-018/019).
 struct DashBrakeStatus {
-    bool park_brake = false;            // [2] b0
-    bool service_brake = false;         // [2] b1
-    bool brake_tt = false;              // [2] b2 Service Brake Telltale
-    bool antilock_tt = false;           // [2] b3 Anti-Lock Failure Telltale
-    bool abs_tcs_active = false;        // [2] b5
+    // wire [2] Status Flags
+    bool park_brake = false;            // b0
+    bool service_brake = false;         // b1
+    bool brake_tt = false;              // b2 Service Brake Telltale
+    bool antilock_tt = false;           // b3 Anti-Lock Failure Telltale
+    bool redundant_regen_disable = false; // b4 Redundant Regen Disable
+    bool abs_tcs_active = false;        // b5
+    bool retard_achieved_fault = false; // b6 Retard Achieved Fault
+    bool wheel_speed_valid = false;     // b7
+
+    // wire [3] Redundant Retard Request, raw count and its band reading.
+    std::uint8_t retard_request_count = 0;
+    DashRetardBand retard_band = DashRetardBand::kOutOfRange;
+    float coastdown_reduction_pct = 0.0f;  // kCoastdown only: 5 %/count, 25 = 100 %
+    float braking_retard_nm = 0.0f;        // kBraking only: 10.875 Nm/count from 46
+
+    // wire [4..11] Wheel Speed TAU, LF RF LR RR, uint16 big-endian. The spec
+    // prints no engineering unit ("1 count/Count"), so these stay raw counts
+    // and are good for wheel-to-wheel comparison only.
+    std::uint16_t wheel_tau[4] = {0, 0, 0, 0};
+
+    // wire [12] Status Flags
+    bool service_soon_req = false;      // b0 BTCM Service Soon Telltale Request
+    bool front_power_assist = false;    // b1 Front Brake Power Assist enabled
+    bool tim_wheel_accel = false;       // b2 Wheel Accelerating for TIM
+    bool tim_vehicle_accel = false;     // b3 Vehicle Accelerating for TIM
+    bool tim_accel_limit = false;       // b4 Exceeding Acceleration Limits for TIM
 };
 
 // $21 DSCM Data Response (IPC → BPM, 960 ms), N = 3 — the cluster's own odometer.

@@ -1047,6 +1047,15 @@ TEST_CASE("SetVehicleState stores values without crashing", "[ExternalSim]") {
 // BTCM front ABS solenoid — GetAbsPhaseFront freshness and phase decoding.
 // ---------------------------------------------------------------------------
 
+namespace {
+// One $91 BTCM Data Response (all-zero payload) through the connector's own
+// snoop decode: the BTCM talking, as far as liveness is concerned.
+void InjectBtcmResponse(ExternalSimConnector& c) {
+    const std::uint8_t p91[11] = {};
+    c.DebugInjectBusFrame(0x91u, p91, 11u);
+}
+}  // namespace
+
 TEST_CASE("GetAbsPhaseFront returns stale APPLY when no solenoid data received",
           "[ExternalSim][ABS]") {
     ExternalSimConnector c;
@@ -1060,19 +1069,18 @@ TEST_CASE("GetAbsPhaseFront returns stale APPLY when no solenoid data received",
     CHECK(phase.fr == Phase::APPLY);
 }
 
-// Liveness gate: freshness = (BTCM heartbeat alive) AND (pin ever seen).
-// Each test that expects fresh=true injects signal 5050 first to drive
-// the heartbeat timestamp.  The bool argument is ignored — DebugInjectDelta's
-// 5050 case just stamps NowNs() into btcm_uart_frame_ns.
+// Liveness gate: freshness = (a valid $91 decoded within the window) AND
+// (the wheel's actuator state ever seen). Each test that expects fresh=true
+// feeds a $91 first.
 TEST_CASE("GetAbsPhaseFront decodes APPLY phase: iso=0, dump=0",
           "[ExternalSim][ABS]") {
     ExternalSimConnector c;
-    c.DebugInjectDelta(5050, true);   // BTCM heartbeat — drives btcm_alive.
+    InjectBtcmResponse(c);
     // Inject iso=0, dump=0 for both wheels → APPLY.
-    c.DebugInjectDelta(5010, false);  // FL_ISO = 0
-    c.DebugInjectDelta(5011, false);  // FL_DMP = 0
-    c.DebugInjectDelta(5012, false);  // FR_ISO = 0
-    c.DebugInjectDelta(5013, false);  // FR_DMP = 0
+    c.DebugInjectDelta(4147, false);   // FL iso_close
+    c.DebugInjectBtcmMotorLeads(ExternalSimConnector::BrakeMotor::FrontLeft, 0.0f, 0.0f);   // FL release lead
+    c.DebugInjectDelta(4148, false);   // FR iso_close
+    c.DebugInjectBtcmMotorLeads(ExternalSimConnector::BrakeMotor::FrontRight, 0.0f, 0.0f);   // FR release lead
 
     auto phase = c.GetAbsPhaseFront(std::chrono::milliseconds(3000));
     using Phase = ExternalSimConnector::AbsPhaseFront::Phase;
@@ -1085,11 +1093,11 @@ TEST_CASE("GetAbsPhaseFront decodes APPLY phase: iso=0, dump=0",
 TEST_CASE("GetAbsPhaseFront decodes HOLD phase: iso=1, dump=0",
           "[ExternalSim][ABS]") {
     ExternalSimConnector c;
-    c.DebugInjectDelta(5050, true);   // BTCM heartbeat.
-    c.DebugInjectDelta(5010, true);   // FL_ISO = 1
-    c.DebugInjectDelta(5011, false);  // FL_DMP = 0
-    c.DebugInjectDelta(5012, true);   // FR_ISO = 1
-    c.DebugInjectDelta(5013, false);  // FR_DMP = 0
+    InjectBtcmResponse(c);
+    c.DebugInjectDelta(4147, true);   // FL iso_close
+    c.DebugInjectBtcmMotorLeads(ExternalSimConnector::BrakeMotor::FrontLeft, 0.0f, 0.0f);   // FL release lead
+    c.DebugInjectDelta(4148, true);   // FR iso_close
+    c.DebugInjectBtcmMotorLeads(ExternalSimConnector::BrakeMotor::FrontRight, 0.0f, 0.0f);   // FR release lead
 
     auto phase = c.GetAbsPhaseFront(std::chrono::milliseconds(3000));
     using Phase = ExternalSimConnector::AbsPhaseFront::Phase;
@@ -1102,11 +1110,11 @@ TEST_CASE("GetAbsPhaseFront decodes HOLD phase: iso=1, dump=0",
 TEST_CASE("GetAbsPhaseFront decodes DUMP phase: iso=1, dump=1",
           "[ExternalSim][ABS]") {
     ExternalSimConnector c;
-    c.DebugInjectDelta(5050, true);   // BTCM heartbeat.
-    c.DebugInjectDelta(5010, true);   // FL_ISO = 1
-    c.DebugInjectDelta(5011, true);   // FL_DMP = 1
-    c.DebugInjectDelta(5012, true);   // FR_ISO = 1
-    c.DebugInjectDelta(5013, true);   // FR_DMP = 1
+    InjectBtcmResponse(c);
+    c.DebugInjectDelta(4147, true);   // FL iso_close
+    c.DebugInjectBtcmMotorLeads(ExternalSimConnector::BrakeMotor::FrontLeft, 0.0f, 1.0f);   // FL release lead
+    c.DebugInjectDelta(4148, true);   // FR iso_close
+    c.DebugInjectBtcmMotorLeads(ExternalSimConnector::BrakeMotor::FrontRight, 0.0f, 1.0f);   // FR release lead
 
     auto phase = c.GetAbsPhaseFront(std::chrono::milliseconds(3000));
     using Phase = ExternalSimConnector::AbsPhaseFront::Phase;
@@ -1119,12 +1127,12 @@ TEST_CASE("GetAbsPhaseFront decodes DUMP phase: iso=1, dump=1",
 TEST_CASE("GetAbsPhaseFront treats invalid iso=0,dump=1 as APPLY",
           "[ExternalSim][ABS]") {
     ExternalSimConnector c;
-    c.DebugInjectDelta(5050, true);   // BTCM heartbeat.
+    InjectBtcmResponse(c);
     // Invalid combination: iso=0, dump=1 → treated as APPLY.
-    c.DebugInjectDelta(5010, false);  // FL_ISO = 0
-    c.DebugInjectDelta(5011, true);   // FL_DMP = 1  (invalid)
-    c.DebugInjectDelta(5012, false);  // FR_ISO = 0
-    c.DebugInjectDelta(5013, true);   // FR_DMP = 1  (invalid)
+    c.DebugInjectDelta(4147, false);   // FL iso_close
+    c.DebugInjectBtcmMotorLeads(ExternalSimConnector::BrakeMotor::FrontLeft, 0.0f, 1.0f);   // FL release lead
+    c.DebugInjectDelta(4148, false);   // FR iso_close
+    c.DebugInjectBtcmMotorLeads(ExternalSimConnector::BrakeMotor::FrontRight, 0.0f, 1.0f);   // FR release lead
 
     auto phase = c.GetAbsPhaseFront(std::chrono::milliseconds(3000));
     using Phase = ExternalSimConnector::AbsPhaseFront::Phase;
@@ -1137,11 +1145,11 @@ TEST_CASE("GetAbsPhaseFront treats invalid iso=0,dump=1 as APPLY",
 TEST_CASE("GetAbsPhaseFront marks stale after zero-length freshness window",
           "[ExternalSim][ABS]") {
     ExternalSimConnector c;
-    c.DebugInjectDelta(5050, true);   // BTCM heartbeat.
-    c.DebugInjectDelta(5010, true);
-    c.DebugInjectDelta(5011, false);
-    c.DebugInjectDelta(5012, true);
-    c.DebugInjectDelta(5013, false);
+    InjectBtcmResponse(c);
+    c.DebugInjectDelta(4147, true);   // FL iso_close
+    c.DebugInjectBtcmMotorLeads(ExternalSimConnector::BrakeMotor::FrontLeft, 0.0f, 0.0f);   // FL release lead
+    c.DebugInjectDelta(4148, true);   // FR iso_close
+    c.DebugInjectBtcmMotorLeads(ExternalSimConnector::BrakeMotor::FrontRight, 0.0f, 0.0f);   // FR release lead
 
     // A zero-length freshness window means the heartbeat is immediately stale.
     auto phase = c.GetAbsPhaseFront(std::chrono::milliseconds(0));
@@ -1158,24 +1166,24 @@ TEST_CASE("GetAbsPhaseFront stays fresh through HOLD↔DUMP cycling",
     // the heartbeat is alive the last-known iso/dump values stay
     // authoritative.
     ExternalSimConnector c;
-    c.DebugInjectDelta(5050, true);   // BTCM heartbeat.
+    InjectBtcmResponse(c);
     // Initial APPLY sample, then transition to HOLD → DUMP → HOLD → ...
-    c.DebugInjectDelta(5010, false);  // FL_ISO = 0 (APPLY)
-    c.DebugInjectDelta(5011, false);  // FL_DMP = 0
-    c.DebugInjectDelta(5012, false);
-    c.DebugInjectDelta(5013, false);
+    c.DebugInjectDelta(4147, false);   // FL iso_close
+    c.DebugInjectBtcmMotorLeads(ExternalSimConnector::BrakeMotor::FrontLeft, 0.0f, 0.0f);   // FL release lead
+    c.DebugInjectDelta(4148, false);   // FR iso_close
+    c.DebugInjectBtcmMotorLeads(ExternalSimConnector::BrakeMotor::FrontRight, 0.0f, 0.0f);   // FR release lead
 
     // Now ABS engages: iso goes high once and stays high.
-    c.DebugInjectDelta(5010, true);
-    c.DebugInjectDelta(5012, true);
+    c.DebugInjectDelta(4147, true);   // FL iso_close
+    c.DebugInjectDelta(4148, true);   // FR iso_close
 
     // Refresh the heartbeat and toggle dump (HOLD → DUMP).  Iso's
     // per-pin timestamp does not refresh; the heartbeat does.  50 ms of
     // *sim* time, since that is the clock the ages are kept on.
     c.SetSimTime(0.050);
-    c.DebugInjectDelta(5050, true);   // refresh heartbeat.
-    c.DebugInjectDelta(5011, true);
-    c.DebugInjectDelta(5013, true);
+    InjectBtcmResponse(c);
+    c.DebugInjectBtcmMotorLeads(ExternalSimConnector::BrakeMotor::FrontLeft, 0.0f, 1.0f);   // FL release lead
+    c.DebugInjectBtcmMotorLeads(ExternalSimConnector::BrakeMotor::FrontRight, 0.0f, 1.0f);   // FR release lead
 
     auto phase = c.GetAbsPhaseFront(std::chrono::milliseconds(3000));
     using Phase = ExternalSimConnector::AbsPhaseFront::Phase;
@@ -1217,11 +1225,11 @@ TEST_CASE("BTCM liveness ages on sim time, not on the host's wall clock",
           "[ExternalSim][ABS][determinism]") {
     ExternalSimConnector c;
     c.SetSimTime(1.0);
-    c.DebugInjectDelta(5050, true);   // heartbeat arrives at sim t = 1.0 s
-    c.DebugInjectDelta(5010, true);   // FL iso/dump ever-seen
-    c.DebugInjectDelta(5011, false);
-    c.DebugInjectDelta(5012, true);
-    c.DebugInjectDelta(5013, false);
+    InjectBtcmResponse(c);
+    c.DebugInjectDelta(4147, true);   // FL iso_close
+    c.DebugInjectBtcmMotorLeads(ExternalSimConnector::BrakeMotor::FrontLeft, 0.0f, 0.0f);   // FL release lead
+    c.DebugInjectDelta(4148, true);   // FR iso_close
+    c.DebugInjectBtcmMotorLeads(ExternalSimConnector::BrakeMotor::FrontRight, 0.0f, 0.0f);   // FR release lead
 
     // 1. Read at the same sim instant: alive.
     CHECK(c.GetAbsPhaseFront(kShortWindow).fl_fresh);
@@ -1248,9 +1256,9 @@ TEST_CASE("Rear EMB liveness ages on sim time, not on the host's wall clock",
     // a stale BTCM means zero rear brake force, not a fallback to hydraulics.
     ExternalSimConnector c;
     c.SetSimTime(2.0);
-    c.DebugInjectDelta(5050, true);      // heartbeat
-    c.DebugInjectFloat(5014, 0.75f);     // rear motor LR
-    c.DebugInjectFloat(5015, 0.75f);     // rear motor RR
+    InjectBtcmResponse(c);
+    c.DebugInjectBtcmMotorLeads(ExternalSimConnector::BrakeMotor::RearLeft, 0.75f, 0.0f);
+    c.DebugInjectBtcmMotorLeads(ExternalSimConnector::BrakeMotor::RearRight, 0.75f, 0.0f);
 
     CHECK(c.GetRearEmbCmd(kShortWindow).lr_fresh);
 
@@ -1295,9 +1303,9 @@ TEST_CASE("A signal arriving on the very first tick is not read as never-seen",
     CHECK_FALSE(c.GetAbsPhaseFront(kShortWindow).fl_fresh);   // nothing received
 
     // No SetSimTime call: the clock starts at 0 and this is the first tick.
-    c.DebugInjectDelta(5050, true);
-    c.DebugInjectDelta(5010, true);
-    c.DebugInjectDelta(5011, false);
+    InjectBtcmResponse(c);
+    c.DebugInjectDelta(4147, true);   // FL iso_close
+    c.DebugInjectBtcmMotorLeads(ExternalSimConnector::BrakeMotor::FrontLeft, 0.0f, 0.0f);   // FL release lead
     CHECK(c.GetAbsPhaseFront(kShortWindow).fl_fresh);
 }
 
@@ -1307,9 +1315,9 @@ TEST_CASE("The sim clock never runs backwards", "[ExternalSim][determinism]") {
     // holds the high-water mark so callers cannot do that.
     ExternalSimConnector c;
     c.SetSimTime(5.0);
-    c.DebugInjectDelta(5050, true);
-    c.DebugInjectDelta(5010, true);
-    c.DebugInjectDelta(5011, false);
+    InjectBtcmResponse(c);
+    c.DebugInjectDelta(4147, true);   // FL iso_close
+    c.DebugInjectBtcmMotorLeads(ExternalSimConnector::BrakeMotor::FrontLeft, 0.0f, 0.0f);   // FL release lead
     CHECK(c.GetAbsPhaseFront(kShortWindow).fl_fresh);
 
     c.SetSimTime(1.0);                       // ignored
@@ -1322,10 +1330,10 @@ TEST_CASE("The sim clock never runs backwards", "[ExternalSim][determinism]") {
 TEST_CASE("GetAbsPhaseFront can mix fresh and stale per wheel",
           "[ExternalSim][ABS]") {
     ExternalSimConnector c;
-    c.DebugInjectDelta(5050, true);   // BTCM heartbeat.
+    InjectBtcmResponse(c);
     // Only inject FL signals; FR has no data.
-    c.DebugInjectDelta(5010, true);   // FL_ISO = 1
-    c.DebugInjectDelta(5011, false);  // FL_DMP = 0  → FL=HOLD
+    c.DebugInjectDelta(4147, true);   // FL iso_close
+    c.DebugInjectBtcmMotorLeads(ExternalSimConnector::BrakeMotor::FrontLeft, 0.0f, 0.0f);   // FL release lead
     // FR signals not injected → timestamps remain 0 → stale.
 
     auto phase = c.GetAbsPhaseFront(std::chrono::milliseconds(3000));
@@ -1337,37 +1345,13 @@ TEST_CASE("GetAbsPhaseFront can mix fresh and stale per wheel",
 }
 
 // ---------------------------------------------------------------------------
-// BTCM chassis-bus mirror (4147-4154): preference rules and cylinder pressure.
+// BTCM actuator cells (4147-4154 and the motor leads) and cylinder pressure.
 // ---------------------------------------------------------------------------
-
-TEST_CASE("GetAbsPhaseFront prefers chassis-bus iso/dump over main-harness",
-          "[ExternalSim][ABS][chassis-bus]") {
-    ExternalSimConnector c;
-    c.DebugInjectDelta(5050, true);   // BTCM heartbeat.
-    // Main-harness says APPLY (iso=0, dump=0) for both wheels.
-    c.DebugInjectDelta(5010, false);
-    c.DebugInjectDelta(5011, false);
-    c.DebugInjectDelta(5012, false);
-    c.DebugInjectDelta(5013, false);
-    // Chassis side says DUMP (iso closed, motor on its release leg) for both wheels.
-    using M = ExternalSimConnector::BrakeMotor;
-    c.DebugInjectDelta(4147, true);   // iso_close FL
-    c.DebugInjectBtcmMotorLeads(M::FrontLeft, false, true);
-    c.DebugInjectDelta(4148, true);   // iso_close FR
-    c.DebugInjectBtcmMotorLeads(M::FrontRight, false, true);
-
-    auto phase = c.GetAbsPhaseFront(std::chrono::milliseconds(3000));
-    using Phase = ExternalSimConnector::AbsPhaseFront::Phase;
-    CHECK(phase.fl_fresh);
-    CHECK(phase.fr_fresh);
-    CHECK(phase.fl == Phase::DUMP);   // chassis-bus wins
-    CHECK(phase.fr == Phase::DUMP);
-}
 
 TEST_CASE("GetAbsPhaseFront reads a sealed iso with the motor restoring as APPLY",
           "[ExternalSim][ABS][chassis-bus]") {
     ExternalSimConnector c;
-    c.DebugInjectDelta(5050, true);   // BTCM heartbeat.
+    InjectBtcmResponse(c);
     // Both wheels sealed, neither motor lead driven: the BTCM's mid-event state.
     using M = ExternalSimConnector::BrakeMotor;
     c.DebugInjectDelta(4147, true);   // iso_close FL
@@ -1395,49 +1379,10 @@ TEST_CASE("GetAbsPhaseFront reads a sealed iso with the motor restoring as APPLY
     CHECK(phase.fl == Phase::APPLY);
 }
 
-TEST_CASE("GetAbsPhaseFront falls back to main-harness when chassis-bus silent",
+TEST_CASE("GetRearEmbCmd reads apply minus release off the rear motor leads",
           "[ExternalSim][ABS][chassis-bus]") {
     ExternalSimConnector c;
-    c.DebugInjectDelta(5050, true);   // BTCM heartbeat.
-    // Only main-harness publishes; chassis-bus signals never arrive.
-    c.DebugInjectDelta(5010, true);
-    c.DebugInjectDelta(5011, false);  // FL = HOLD
-    c.DebugInjectDelta(5012, true);
-    c.DebugInjectDelta(5013, true);   // FR = DUMP
-
-    auto phase = c.GetAbsPhaseFront(std::chrono::milliseconds(3000));
-    using Phase = ExternalSimConnector::AbsPhaseFront::Phase;
-    CHECK(phase.fl_fresh);
-    CHECK(phase.fr_fresh);
-    CHECK(phase.fl == Phase::HOLD);
-    CHECK(phase.fr == Phase::DUMP);
-}
-
-TEST_CASE("GetAbsPhaseFront source preference is per-wheel",
-          "[ExternalSim][ABS][chassis-bus]") {
-    ExternalSimConnector c;
-    c.DebugInjectDelta(5050, true);   // BTCM heartbeat.
-    // FL only on chassis bus; FR only on main harness.
-    c.DebugInjectDelta(4147, true);   // FL iso_close
-    c.DebugInjectBtcmMotorLeads(ExternalSimConnector::BrakeMotor::FrontLeft,
-                                false, true);   // FL releasing → DUMP via chassis
-    c.DebugInjectDelta(5012, true);   // FR_ISO main harness
-    c.DebugInjectDelta(5013, false);  // FR_DMP main harness → FR=HOLD
-
-    auto phase = c.GetAbsPhaseFront(std::chrono::milliseconds(3000));
-    using Phase = ExternalSimConnector::AbsPhaseFront::Phase;
-    CHECK(phase.fl_fresh);
-    CHECK(phase.fr_fresh);
-    CHECK(phase.fl == Phase::DUMP);
-    CHECK(phase.fr == Phase::HOLD);
-}
-
-TEST_CASE("GetRearEmbCmd prefers chassis-bus EMB cmd over main-harness",
-          "[ExternalSim][ABS][chassis-bus]") {
-    ExternalSimConnector c;
-    c.DebugInjectDelta(5050, true);    // BTCM heartbeat.
-    c.DebugInjectFloat(5014, 0.0f);    // main harness LR = idle
-    c.DebugInjectFloat(5015, 0.0f);    // main harness RR = idle
+    InjectBtcmResponse(c);
     using M = ExternalSimConnector::BrakeMotor;
     c.DebugInjectBtcmMotorLeads(M::RearLeft,  true,  false);   // LR apply lead
     c.DebugInjectBtcmMotorLeads(M::RearRight, false, true);    // RR release lead
@@ -1445,14 +1390,14 @@ TEST_CASE("GetRearEmbCmd prefers chassis-bus EMB cmd over main-harness",
     auto cmd = c.GetRearEmbCmd(std::chrono::milliseconds(3000));
     CHECK(cmd.lr_fresh);
     CHECK(cmd.rr_fresh);
-    CHECK(cmd.lr ==  1.0f);   // chassis wins
+    CHECK(cmd.lr ==  1.0f);
     CHECK(cmd.rr == -1.0f);
 }
 
 TEST_CASE("GetRearEmbCmd carries the rear motors' duty as a signed fraction",
           "[ExternalSim][ABS][chassis-bus]") {
     ExternalSimConnector c;
-    c.DebugInjectDelta(5050, true);    // BTCM heartbeat.
+    InjectBtcmResponse(c);
     using M = ExternalSimConnector::BrakeMotor;
     c.DebugInjectBtcmMotorLeads(M::RearLeft,  0.4f, 0.0f);
     c.DebugInjectBtcmMotorLeads(M::RearRight, 0.0f, 0.25f);
@@ -1460,21 +1405,6 @@ TEST_CASE("GetRearEmbCmd carries the rear motors' duty as a signed fraction",
     auto cmd = c.GetRearEmbCmd(std::chrono::milliseconds(3000));
     CHECK(cmd.lr ==  0.4f);
     CHECK(cmd.rr == -0.25f);
-}
-
-TEST_CASE("GetRearEmbCmd falls back to main-harness when chassis-bus silent",
-          "[ExternalSim][ABS][chassis-bus]") {
-    ExternalSimConnector c;
-    c.DebugInjectDelta(5050, true);    // BTCM heartbeat.
-    c.DebugInjectFloat(5014, 0.7f);    // main harness LR
-    c.DebugInjectFloat(5015, -0.3f);   // main harness RR
-    // The rear motor leads are never written.
-
-    auto cmd = c.GetRearEmbCmd(std::chrono::milliseconds(3000));
-    CHECK(cmd.lr_fresh);
-    CHECK(cmd.rr_fresh);
-    CHECK(cmd.lr ==  0.7f);
-    CHECK(cmd.rr == -0.3f);
 }
 
 TEST_CASE("GetFrontWheelCylinderPressuresKpa stale by default",
@@ -1490,7 +1420,7 @@ TEST_CASE("GetFrontWheelCylinderPressuresKpa stale by default",
 TEST_CASE("GetFrontWheelCylinderPressuresKpa returns injected values when fresh",
           "[ExternalSim][ABS][chassis-bus]") {
     ExternalSimConnector c;
-    c.DebugInjectDelta(5050, true);     // BTCM heartbeat.
+    InjectBtcmResponse(c);
     c.DebugInjectFloat(4153, 2450.0f);  // FL = 2450 kPa
     c.DebugInjectFloat(4154, 1750.0f);  // FR = 1750 kPa
 
