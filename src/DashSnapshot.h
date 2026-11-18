@@ -100,7 +100,10 @@ struct DashBrakeStatus {
     std::uint8_t retard_request_count = 0;
     DashRetardBand retard_band = DashRetardBand::kOutOfRange;
     float coastdown_reduction_pct = 0.0f;  // kCoastdown only: 5 %/count, 25 = 100 %
-    float braking_retard_nm = 0.0f;        // kBraking only: 10.875 Nm/count from 46
+    // kBraking only: 10.875 Nm/count from count 46. The page prints both that
+    // resolution and a 1990 Nm top at count 230, which disagree by 11 Nm; the
+    // decode follows the per-count resolution, so count 230 reads 2001 Nm.
+    float braking_retard_nm = 0.0f;
 
     // wire [4..11] Wheel Speed TAU, LF RF LR RR, uint16 big-endian. The spec
     // prints no engineering unit ("1 count/Count"), so these stay raw counts

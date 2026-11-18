@@ -1419,12 +1419,12 @@ TEST_CASE("Scenario: ad_precharge_participated latches once the relay closes",
 }
 
 TEST_CASE("Scenario: abs-phase / rear-EMB stats columns stay live across a "
-          "sub-3s heartbeat gap",
+          "sub-3s gap between $91 frames",
           "[Scenario][ABS]") {
     // Regression: the stats-CSV observer used to read the BTCM-sourced ABS
     // phase (and rear-EMB command) with a 200 ms freshness window while the
-    // control path used 3000 ms.  Liveness is gated on the BTCM's ~5 Hz
-    // canonical-frame heartbeat, so an inter-heartbeat gap between 200 ms and
+    // control path used 3000 ms.  Liveness is gated on the BTCM's 120 ms
+    // $91 Data Response, so a gap between frames of between 200 ms and
     // 3000 ms made the observer declare the BTCM dead and write the -1
     // no-data sentinel for a phase that was still live.  The observer now
     // uses the same 3000 ms window as the control path, so a gap in that band
@@ -1462,7 +1462,7 @@ TEST_CASE("Scenario: abs-phase / rear-EMB stats columns stay live across a "
     bus.DebugInjectBtcmMotorLeads(ExternalSimConnector::BrakeMotor::RearLeft,
                                   1.0f, 0.0f);  // LR apply lead = full apply
 
-    // Advance the heartbeat gap to exactly 260 ms of sim time: past the old
+    // Advance the gap since the $91 to exactly 260 ms of sim time: past the old
     // 200 ms window, well within the corrected 3000 ms window.
     bus.SetSimTime(0.260);
 

@@ -31,8 +31,8 @@ re-base ev1sim's dashboard on a faithful "snoop the bus" data source.
 ev1sim is a WireTable peer (post wire-truth); the GM-8192 module traffic lives
 on the bus as serialized `*_TX` bit-stream cells —
 `kWireGM8192_{BPM,BTCM,PIM,RSA,HTCM,IPC,APM,SCANTOOL}_TX` (+ `BPM_TX_CLASS2`).
-ev1sim already peeks `GM8192_BTCM_TX` (`WireTruthChassis::btcm_tx_total_bits`)
-and links `gm8192_rx_framer`, so the groundwork exists.
+ev1sim links `gm8192_rx_framer` and decodes the BTCM's $91 off
+`GM8192_BTCM_TX`; the connector's BTCM liveness keys on those frames.
 
 Add a `BusSnoop` decode layer that, each tick:
 - reads the relevant `*_TX` cells and runs `gm8192_rx_framer` to recover frames;

@@ -1151,7 +1151,7 @@ TEST_CASE("GetAbsPhaseFront marks stale after zero-length freshness window",
     c.DebugInjectDelta(4148, true);   // FR iso_close
     c.DebugInjectBtcmMotorLeads(ExternalSimConnector::BrakeMotor::FrontRight, 0.0f, 0.0f);   // FR release lead
 
-    // A zero-length freshness window means the heartbeat is immediately stale.
+    // A zero-length freshness window means the last $91 is immediately stale.
     auto phase = c.GetAbsPhaseFront(std::chrono::milliseconds(0));
     CHECK_FALSE(phase.fl_fresh);
     CHECK_FALSE(phase.fr_fresh);
@@ -1162,9 +1162,8 @@ TEST_CASE("GetAbsPhaseFront stays fresh through HOLD↔DUMP cycling",
     // BTCM publishes solenoid state on change only.  During HOLD↔DUMP
     // cycling iso stays at 1 the whole time, so its per-pin timestamp
     // never refreshes — only dump toggles.  Freshness is gated on the
-    // 5 Hz heartbeat (5050), not on the per-pin age, so as long as
-    // the heartbeat is alive the last-known iso/dump values stay
-    // authoritative.
+    // BTCM's $91 frames, not on the per-pin age, so as long as the
+    // BTCM is alive the last-known iso/dump values stay authoritative.
     ExternalSimConnector c;
     InjectBtcmResponse(c);
     // Initial APPLY sample, then transition to HOLD → DUMP → HOLD → ...
@@ -1177,8 +1176,8 @@ TEST_CASE("GetAbsPhaseFront stays fresh through HOLD↔DUMP cycling",
     c.DebugInjectDelta(4147, true);   // FL iso_close
     c.DebugInjectDelta(4148, true);   // FR iso_close
 
-    // Refresh the heartbeat and toggle dump (HOLD → DUMP).  Iso's
-    // per-pin timestamp does not refresh; the heartbeat does.  50 ms of
+    // Feed another $91 and toggle dump (HOLD → DUMP).  Iso's
+    // per-pin timestamp does not refresh; the BTCM liveness does.  50 ms of
     // *sim* time, since that is the clock the ages are kept on.
     c.SetSimTime(0.050);
     InjectBtcmResponse(c);
@@ -1241,7 +1240,7 @@ TEST_CASE("BTCM liveness ages on sim time, not on the host's wall clock",
     CHECK(c.GetAbsPhaseFront(kShortWindow).fl_fresh);
     CHECK(c.GetAbsPhaseFront(kShortWindow).fr_fresh);
 
-    // 3. Sim time passes the window with no new heartbeat: genuinely dead,
+    // 3. Sim time passes the window with no new $91: genuinely dead,
     //    and both wheels fall back to the hydraulic path (APPLY).
     c.SetSimTime(1.0 + 0.121);
     const auto dead = c.GetAbsPhaseFront(kShortWindow);
@@ -1297,7 +1296,7 @@ TEST_CASE("A signal arriving on the very first tick is not read as never-seen",
           "[ExternalSim][determinism]") {
     // The sim clock starts at 0, and every *_ns field reads 0 as "never
     // seen" — so the sim-time stamp is biased by +1 ns.  Without the bias a
-    // heartbeat delivered at sim t = 0 would stamp 0 and the BTCM would look
+    // $91 delivered at sim t = 0 would stamp 0 and the BTCM would look
     // as though it had never spoken.
     ExternalSimConnector c;
     CHECK_FALSE(c.GetAbsPhaseFront(kShortWindow).fl_fresh);   // nothing received
