@@ -43,6 +43,7 @@
 #include "gm8192/gm8192_frame.h"  // gm8192_encode (build frames for the dash snoop test)
 #include "uart/uart_tx.hpp"       // electricsim::io::UartTx (serialise onto a TX cell)
 #include "net_host/conductor_publisher.hpp"  // the publish edge for conductor cells
+#include "topology/power_grant.hpp"          // the grant an effect write needs
 
 namespace {
 
@@ -94,6 +95,18 @@ bool read_contact(const WireTable& table, electricsim::io::ElementStateId id, bo
 bool publish_conductor(WireTable& table, ConductorId id, bool energised) {
     electricsim::net_host::ConductorPublisher publisher(table);
     return publisher.publish(id, energised);
+}
+
+// An effect cell is written by its load's module and lands only while the load's
+// granting conductor is energised. The test stands in for both the solver (powering
+// the load) and the module (reporting the outcome).
+bool write_powered_effect_bit(WireTable& table, electricsim::io::EffectId id, bool v) {
+    return publish_conductor(table, electricsim::topology::granting_conductor(id), true) &&
+           electricsim::io::write_effect_bit(table, id, v);
+}
+bool write_powered_effect_byte(WireTable& table, electricsim::io::EffectId id, std::uint8_t v) {
+    return publish_conductor(table, electricsim::topology::granting_conductor(id), true) &&
+           electricsim::io::write_effect_byte(table, id, v);
 }
 
 // The permille form, for conductors carrying a duty or level.
@@ -572,8 +585,8 @@ TEST_CASE("WireTruthChassis::apply_consumer_overlay: written cells invoke matchi
 
     // external sim (LHJB / IPC / BTCM / BPM) writes one cell of each consumed type.
     REQUIRE(publish_conductor(*creator, electricsim::topology::kWireBULB_FEED_LINE_LBL, true));
-    REQUIRE(creator->write_byte(
-        electricsim::topology::kWireCHASSIS_HVAC_BLOWER_LEVEL,
+    REQUIRE(write_powered_effect_byte(
+        *creator, electricsim::topology::kWireCHASSIS_HVAC_BLOWER_LEVEL,
         static_cast<std::uint8_t>(2u)));
     REQUIRE(creator->write_float32(
         electricsim::topology::kWireCHASSIS_IPC_TRIP_DISTANCE_M, 123.5f));
@@ -712,8 +725,8 @@ TEST_CASE("Batches A/J/K/L render through the connector overlay (wire -> getter)
     REQUIRE(publish_conductor(*prod, topo::kWireBULB_FEED_LINE_LBL, true)); // A bit
     REQUIRE(prod->write_byte(topo::kWireCHASSIS_WIPER_MOTOR_COMMAND,  3u));   // J byte
     REQUIRE(prod->write_bit (topo::kWireCHASSIS_WASHER_PUMP_COMMAND,  true)); // J bit
-    REQUIRE(prod->write_byte(topo::kWireCHASSIS_HVAC_BLOWER_LEVEL,    4u));   // K byte
-    REQUIRE(prod->write_bit (topo::kWireCHASSIS_DEFROST_GRID_ACTIVE,  true)); // K bit (U8-served)
+    REQUIRE(write_powered_effect_byte(*prod, topo::kWireCHASSIS_HVAC_BLOWER_LEVEL, 4u));   // K byte
+    REQUIRE(write_powered_effect_bit(*prod, topo::kWireCHASSIS_DEFROST_GRID_ACTIVE, true)); // K bit (U8-served)
     REQUIRE(prod->write_bit (topo::kWireCHASSIS_RSA_SHIFT_BLOCKED,    true)); // L bit (U8-served)
 
     ExternalSimConnector c;
@@ -1005,7 +1018,7 @@ TEST_CASE("Connector dash snapshot: bus frames via BusSnoop plus the IPC lamp ce
     REQUIRE(fleet->write_element_state(topo::kWireRSA_ES_WSW_ENABLE_OUT, true));
     REQUIRE(publish_conductor(*fleet, topo::kWireCHASSIS_SECURITY_TELLTALE, true));
     REQUIRE(publish_conductor(*fleet, topo::kWireRHJB_PMM_RUN1_CMD_IN, false));  // not RUN
-    REQUIRE(fleet->write_bit(topo::kWireCHASSIS_RSA_SELECTOR_LED_PARK, true));
+    REQUIRE(write_powered_effect_bit(*fleet, topo::kWireCHASSIS_RSA_SELECTOR_LED_PARK, true));
 
     // Pump the transmitters and the connector's tick in lockstep.
     std::uint64_t now = 1000u;

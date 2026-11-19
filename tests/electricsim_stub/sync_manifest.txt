@@ -10,8 +10,8 @@
 # an opaque identifier, recorded so a reader can tell WHICH upstream state
 # this copy reflects — without it the manifest says the copy is consistent
 # but not what it is consistent with.
-provenance b3f63ce975c8e0be1fbfa25e61b0b26ae354961b
-count 17
+provenance e313c3594d30f6e074b99730fec43f67062f986e
+count 19
 5a570102b2976acab79c691b2ea5ddda0fd3d57ce93b042207093f2cdb78461d  src/io/ev1_chassis_signals.hpp
 43f11cacc108aba17425ce315b20200755871045bcc92a98aecf19106fce498c  src/io/gm8192/gm8192_frame.c
 07417f47c96a1d38cf187920610c293522c105b8620de6f85fccee10aee1f359  src/io/gm8192/gm8192_frame.h
@@ -19,13 +19,15 @@ count 17
 86431c2cad1c3e7c23241c575ebaa8eec5f02a5ab145f0ffa44ff24b10006d10  src/io/gm8192/gm8192_rx_framer.hpp
 d24d694d050610443cc3cecc989178bc6e8c5be472f724d700f01f5f528ae42e  src/io/topology/env_open.cpp
 89825d539f6866cb814022fbfe9197a7bae0a5623e2032fb7479b868be06a521  src/io/topology/env_open.hpp
+31f223e113e23c2b8bcafa44ceec21ef9df07c3f4b6bea2806e34a6b603a819f  src/io/topology/feed_query.hpp
+e9240d547fd263e4ecd4f8b9a9a98146fda939c8bcb80cf66a25d99cc79023b5  src/io/topology/power_grant.hpp
 f68e4031181b914cdb665797b5ffa296b9e5b4f2a2f50374e49b9a3679f790e6  src/io/topology/shm_test_helpers.hpp
-02e58c25e636c53dfee5e4adf6d11da4692fd85ea0737b22f303472303355d68  src/io/topology/topology_generated.h
+4974c9396c81177703ffd7a0c91feb16f54fd5ad7b3365e986a30acdf665eb55  src/io/topology/topology_generated.h
 1f1927b0c839c5903e22a50593d7e1a47ae440119e5ab62750374cb638587ad3  src/io/topology/wire_defaults.hpp
 b957dd474efdd69b0defaefd9a7303784bbcc2b6f31ff3390c95c8fecf7171b0  src/io/uart/uart_rx.cpp
 044f6ceb817a8673ce0e378f6d13691dba1661cf1d2c2aa3f22572e7ce43c2e6  src/io/uart/uart_rx.hpp
 5993ea0c491be788827a24783581e9db3534f3ce0b0fec42fcbc776e78605931  src/io/uart/uart_tx.cpp
 8dd8977b4775df71ff6c69f71d4ff3e8a3811797a271748820a95fb1f76670d8  src/io/uart/uart_tx.hpp
-3ffc4c7edd7e6a807e3b423d3d2b08bea2484d0d5c9ab2a21f4a6473dc584cf5  src/io/wire_table.cpp
-2ade1f2bef5c6e6312d7f4685b42b477ac8ed5f47e4c7abb3f7258e08b69f49a  src/io/wire_table.hpp
-31df69a8d7ce6418cb072da04beda32289d28e75cc58e697ae649a936a6283ad  src/net_host/conductor_publisher.hpp
+800f2e5df3621a25d689ccd67dc3026819133b4d92196ce9f4ac6e28b1ed9f93  src/io/wire_table.cpp
+c56f462fa2163e3ddcc19f588ad35f47b996d8c6fbcf6a401b37c50c1c630735  src/io/wire_table.hpp
+5c0357241d5df6fc0a423abcc1ff26b589db59faacf1af59e28ffd62f36ab990  src/net_host/conductor_publisher.hpp

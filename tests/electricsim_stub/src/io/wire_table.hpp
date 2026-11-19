@@ -75,12 +75,17 @@ using WireId = std::uint32_t;
 //                       Held by a DECREASING ratchet in the generator that fails on
 //                       `!=`, never `<=` — a `<=` check would let a module bank headroom
 //                       for two free writes later.
+//   kEffect             a physical outcome a module reports about a load it drives
+//                       (blower speed, grid heat, motor current). Emitted as EffectId:
+//                       readable like any cell, writable only with a PowerGrant, which
+//                       is live only while the load's granting conductor is energised.
 enum class CellClass : std::uint8_t {
   kUnknown = 0,
   kConductor = 1,
   kElementState = 2,
   kSemantic = 3,
   kUnclassifiedLegacy = 4,
+  kEffect = 5,
 };
 
 // ConductorId — the opaque handle for a `class: conductor` cell.
@@ -102,6 +107,41 @@ enum class ConductorId : WireId {};
 // Distinct from ConductorId because the write direction is the opposite one: modules may
 // write these and the solver may not.
 enum class ElementStateId : WireId {};
+
+// EffectId — the opaque handle for a `class: effect` cell. Every effect names, in
+// config/topology.yaml, the conductor that grants it (`granted_by:`, the energised
+// state of the load the outcome happens in). There is no write_bit/write_byte/...
+// overload for it: the only writes are write_effect_* with a PowerGrant for that
+// effect, and the solver's clear_effect when the granting conductor goes dark.
+enum class EffectId : WireId {};
+
+class PowerGrantIssuer;
+
+// PowerGrant — whether one effect's load is energised, read from its granting
+// conductor. Issued only by PowerGrantIssuer (src/io/topology/power_grant.hpp), which
+// reads the conductor the generated topology names for the effect; a module cannot
+// build one, copy one or point one at another effect. A dead grant still writes: it
+// writes zero. A grant is good only for the publish it was issued against: each write
+// re-reads the conductor, so a grant held past its load going dark writes zero too.
+class PowerGrant {
+ public:
+  PowerGrant(const PowerGrant&) = delete;
+  PowerGrant& operator=(const PowerGrant&) = delete;
+  PowerGrant(PowerGrant&&) = delete;
+  PowerGrant& operator=(PowerGrant&&) = delete;
+
+  bool live() const noexcept { return live_; }
+  EffectId effect() const noexcept { return effect_; }
+  ConductorId conductor() const noexcept { return conductor_; }
+
+ private:
+  PowerGrant(EffectId effect, ConductorId conductor, bool live) noexcept
+      : effect_(effect), conductor_(conductor), live_(live) {}
+  EffectId effect_;
+  ConductorId conductor_;
+  bool live_;
+  friend class PowerGrantIssuer;
+};
 
 // SolverToken — proof that a value is the output of a provenance computation.
 //
@@ -408,6 +448,37 @@ class WireTable {
   // zero: a level nobody has written publishes nothing.
   bool write_element_state_level(ElementStateId id, std::uint16_t permille);
   bool read_uint16_sample(ElementStateId id, Sample<std::uint16_t>* out) const;
+
+  // ─── Effect cells ───────────────────────────────────────────────────────
+  //
+  // Reads are the ordinary ones. Writes carry the effect's PowerGrant and land
+  // `value` only while it is live; a dead grant lands zero. A grant issued for a
+  // different effect writes nothing and returns false.
+  bool read_bit(EffectId id, bool* out) const;
+  bool read_byte(EffectId id, std::uint8_t* out) const;
+  bool read_uint16(EffectId id, std::uint16_t* out) const;
+  bool read_uint32(EffectId id, std::uint32_t* out) const;
+  bool read_float32(EffectId id, float* out) const;
+  bool read_bit_sample(EffectId id, Sample<bool>* out) const;
+  bool read_byte_sample(EffectId id, Sample<std::uint8_t>* out) const;
+  bool read_uint16_sample(EffectId id, Sample<std::uint16_t>* out) const;
+  bool read_uint32_sample(EffectId id, Sample<std::uint32_t>* out) const;
+  bool read_float32_sample(EffectId id, Sample<float>* out) const;
+  bool write_gen(EffectId id, std::uint32_t* out_gen) const;
+
+  bool write_effect_bit(EffectId id, bool value, const PowerGrant& grant);
+  bool write_effect_byte(EffectId id, std::uint8_t value, const PowerGrant& grant);
+  bool write_effect_uint16(EffectId id, std::uint16_t value, const PowerGrant& grant);
+  bool write_effect_uint32(EffectId id, std::uint32_t value, const PowerGrant& grant);
+  bool write_effect_float32(EffectId id, float value, const PowerGrant& grant);
+
+  // The solver's half: zero an effect whose granting conductor it has just published
+  // dark, so the outcome stops on the tick its load loses power rather than on the
+  // producer's next write. A cell that is already zero, or never written, is left as
+  // it is.
+  bool clear_effect(EffectId id, const SolverToken& token);
+  // A grant issued live whose conductor still reads energised now.
+  bool grant_live_now_(const PowerGrant& grant) const;
 
   // Typed write accessors. Return false if the id is undeclared or
   // the declared type does not match. Any attached process may write,

@@ -1571,6 +1571,93 @@ bool WireTable::read_uint16_sample(ElementStateId id, Sample<std::uint16_t>* out
   return read_uint16_sample(static_cast<WireId>(id), out);
 }
 
+// ─── Effect cells ──────────────────────────────────────────────────────────
+//
+// Reads forward to the WireId path. Writes go through the grant: the value lands only
+// while the grant is live and the grant was issued for this effect.
+
+bool WireTable::read_bit(EffectId id, bool* out) const {
+  return read_bit(static_cast<WireId>(id), out);
+}
+bool WireTable::read_byte(EffectId id, std::uint8_t* out) const {
+  return read_byte(static_cast<WireId>(id), out);
+}
+bool WireTable::read_uint16(EffectId id, std::uint16_t* out) const {
+  return read_uint16(static_cast<WireId>(id), out);
+}
+bool WireTable::read_uint32(EffectId id, std::uint32_t* out) const {
+  return read_uint32(static_cast<WireId>(id), out);
+}
+bool WireTable::read_float32(EffectId id, float* out) const {
+  return read_float32(static_cast<WireId>(id), out);
+}
+bool WireTable::read_bit_sample(EffectId id, Sample<bool>* out) const {
+  return read_bit_sample(static_cast<WireId>(id), out);
+}
+bool WireTable::read_byte_sample(EffectId id, Sample<std::uint8_t>* out) const {
+  return read_byte_sample(static_cast<WireId>(id), out);
+}
+bool WireTable::read_uint16_sample(EffectId id, Sample<std::uint16_t>* out) const {
+  return read_uint16_sample(static_cast<WireId>(id), out);
+}
+bool WireTable::read_uint32_sample(EffectId id, Sample<std::uint32_t>* out) const {
+  return read_uint32_sample(static_cast<WireId>(id), out);
+}
+bool WireTable::read_float32_sample(EffectId id, Sample<float>* out) const {
+  return read_float32_sample(static_cast<WireId>(id), out);
+}
+bool WireTable::write_gen(EffectId id, std::uint32_t* out_gen) const {
+  return write_gen(static_cast<WireId>(id), out_gen);
+}
+
+bool WireTable::grant_live_now_(const PowerGrant& grant) const {
+  if (!grant.live()) return false;
+  Sample<bool> s;
+  return read_bit_sample(grant.conductor(), &s) && s.written() && s.value;
+}
+
+bool WireTable::write_effect_bit(EffectId id, bool value, const PowerGrant& grant) {
+  if (grant.effect() != id) return false;
+  return write_bit(static_cast<WireId>(id), grant_live_now_(grant) && value);
+}
+bool WireTable::write_effect_byte(EffectId id, std::uint8_t value,
+                                  const PowerGrant& grant) {
+  if (grant.effect() != id) return false;
+  return write_byte(static_cast<WireId>(id), grant_live_now_(grant) ? value : std::uint8_t{0});
+}
+bool WireTable::write_effect_uint16(EffectId id, std::uint16_t value,
+                                    const PowerGrant& grant) {
+  if (grant.effect() != id) return false;
+  return write_uint16(static_cast<WireId>(id), grant_live_now_(grant) ? value : std::uint16_t{0});
+}
+bool WireTable::write_effect_uint32(EffectId id, std::uint32_t value,
+                                    const PowerGrant& grant) {
+  if (grant.effect() != id) return false;
+  return write_uint32(static_cast<WireId>(id), grant_live_now_(grant) ? value : 0U);
+}
+bool WireTable::write_effect_float32(EffectId id, float value, const PowerGrant& grant) {
+  if (grant.effect() != id) return false;
+  return write_float32(static_cast<WireId>(id), grant_live_now_(grant) ? value : 0.0f);
+}
+
+bool WireTable::clear_effect(EffectId id, const SolverToken& token) {
+  (void)token;
+  std::uint32_t idx = 0;
+  if (!impl_->resolve_index(static_cast<WireId>(id), &idx)) return false;
+  const auto type = impl_->directory[idx].type;
+  if (type == static_cast<std::uint8_t>(WireType::kBitStream)) return false;
+  Cell* cell = impl_->cell_at(idx);
+  if (cell->write_gen.load(std::memory_order_acquire) == 0U) return true;
+  if (cell->value.load(std::memory_order_acquire) == 0U &&
+      cell->value64.load(std::memory_order_acquire) == 0U) {
+    return true;
+  }
+  cell->value.store(0U, std::memory_order_release);
+  cell->value64.store(0U, std::memory_order_release);
+  bump_write_gen_saturating(*cell);
+  return true;
+}
+
 bool WireTable::write_byte(WireId id, std::uint8_t value) {
   std::uint32_t idx;
   if (!impl_->lookup(id, WireType::kByte, &idx)) return false;
