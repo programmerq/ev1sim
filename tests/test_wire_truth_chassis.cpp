@@ -18,6 +18,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
 
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -888,30 +889,70 @@ TEST_CASE("WireTruthChassis::ad_state_enum reconstructs the AD line code",
     REQUIRE(wire->ad_state_enum() == std::optional<std::uint32_t>(8u));
 }
 
-TEST_CASE("WireTruthChassis::btcm_tx_total_bits tracks the GM8192 TX bit-stream",
-          "[wire_truth][ecu]") {
+TEST_CASE("Connector: the BTCM is alive only on valid $91 frames off GM8192_BTCM_TX",
+          "[wire_truth][snoop][e2e][ABS]") {
     namespace topo = electricsim::topology;
-    const std::string seg = unique_segment("ecu_btcm");
-    auto btcm = create_fleet_table(seg, topo::kTopologyHash);
-    REQUIRE(btcm != nullptr);
+    using Motor = ExternalSimConnector::BrakeMotor;
+    const std::string seg = unique_segment("btcm91");
+    auto fleet = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(fleet != nullptr);
+    ScopedEnv env("ELECTRICSIM_WIRES_NAME", seg.c_str());
 
-    auto wire = ev1sim::WireTruthChassis::Attach(seg);
-    REQUIRE(wire != nullptr);
+    ExternalSimConnector::Options opts;
+    opts.enabled = true;
+    ExternalSimConnector c(opts);
+    constexpr auto kWindow = std::chrono::milliseconds(3000);
 
-    // Nothing appended yet -> nullopt (BTCM silent; btcm_alive stays false).
-    REQUIRE(wire->btcm_tx_total_bits() == std::nullopt);
+    c.Tick(0.0);
+    c.DebugInjectBtcmMotorLeads(Motor::RearLeft, 1.0f, 0.0f);
+    CHECK_FALSE(c.GetRearEmbCmd(kWindow).lr_fresh);  // nothing on the wire yet
 
-    // BTCM transmits a byte's worth of frame bits; the total advances.
-    REQUIRE(btcm->append_bit(topo::kWireGM8192_BTCM_TX, true));
-    auto t1 = wire->btcm_tx_total_bits();
-    REQUIRE(t1.has_value());
-    REQUIRE(*t1 >= 1u);
+    // [2] Wheel Speed valid (b7) + ABS/TCS Active (b5); [3] count 120 = braking
+    // band; four TAU words; [12] Front Brake Power Assist (b1).
+    const std::uint8_t p91[11] = {0xA0u, 120u, 0x12u, 0x34u, 0x12u, 0x35u,
+                                  0x11u, 0xF0u, 0x11u, 0xEEu, 0x02u};
+    std::vector<std::uint8_t> f91(GM8192_MAX_FRAME_LEN);
+    std::size_t len = 0;
+    REQUIRE(gm8192_encode(0x91u, p91, 11u, f91.data(), f91.size(), &len) == GM8192_OK);
+    f91.resize(len);
+    std::vector<std::uint8_t> bad = f91;
+    bad.back() = static_cast<std::uint8_t>(bad.back() ^ 0x01u);  // SumCheck off by one bit
 
-    const bool more[] = {false, true, true, false, true};
-    REQUIRE(btcm->append_bits(topo::kWireGM8192_BTCM_TX, more, 5u));
-    auto t2 = wire->btcm_tx_total_bits();
-    REQUIRE(t2.has_value());
-    REQUIRE(*t2 > *t1);  // advanced => "BTCM is transmitting" liveness proxy
+    constexpr std::uint64_t kBitPeriodNs = 122070;
+    electricsim::io::UartTx btcm(fleet.get(), topo::kWireGM8192_BTCM_TX, kBitPeriodNs);
+    std::uint64_t now = 1000u;
+    auto pump = [&](int bits) {
+        for (int i = 0; i < bits; ++i) {
+            now += kBitPeriodNs;
+            btcm.tick(now);
+            c.Tick(static_cast<double>(now) / 1.0e9);
+        }
+    };
+
+    // Bits on the line that never frame into a valid $91 are not the BTCM talking.
+    btcm.enqueue(bad.data(), bad.size());
+    pump(200);
+    CHECK_FALSE(c.GetRearEmbCmd(kWindow).lr_fresh);
+    CHECK_FALSE(c.GetDashSnapshot().brake);
+
+    btcm.enqueue(f91.data(), f91.size());
+    pump(200);
+    CHECK(c.GetRearEmbCmd(kWindow).lr_fresh);
+    const auto b = c.GetDashSnapshot().brake;
+    REQUIRE(b);
+    CHECK(b->wheel_speed_valid);
+    CHECK(b->abs_tcs_active);
+    CHECK_FALSE(b->park_brake);
+    CHECK(b->retard_band == ev1sim::DashRetardBand::kBraking);
+    CHECK(b->wheel_tau[0] == 0x1234u);
+    CHECK(b->wheel_tau[1] == 0x1235u);
+    CHECK(b->wheel_tau[2] == 0x11F0u);
+    CHECK(b->wheel_tau[3] == 0x11EEu);
+    CHECK(b->front_power_assist);
+
+    // The BTCM goes quiet for longer than the window: no longer alive.
+    c.Tick(static_cast<double>(now) / 1.0e9 + 3.5);
+    CHECK_FALSE(c.GetRearEmbCmd(kWindow).lr_fresh);
 }
 
 TEST_CASE("Connector dash snapshot: bus frames via BusSnoop plus the IPC lamp cells",

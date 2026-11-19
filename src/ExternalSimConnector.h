@@ -380,20 +380,12 @@ public:
     /// The BTCM's four brake motors, each driven through two leads.
     enum class BrakeMotor { FrontLeft, FrontRight, RearLeft, RearRight };
 
-    /// ABS phase decoded from the BTCM's front iso valve and modulator motor.
+    /// ABS phase decoded from the BTCM's front iso valve and modulator motor:
+    /// iso_close FL/FR (4147/4148) and the front modulator motors' restore and
+    /// release leads (BTCM_FRONT_MOD_{LF,RF}_{RESTORE,RELEASE}).
     ///
-    /// The connector reads two sources for the same actuator state:
-    ///   * Chassis bus (preferred): iso_close FL/FR (4147/4148) and the
-    ///     front modulator motors' restore and release leads
-    ///     (BTCM_FRONT_MOD_{LF,RF}_{RESTORE,RELEASE}).
-    ///   * Main-harness segment (legacy fallback): IDs 5010-5013
-    ///       kSigSolFL_ISO/DMP and kSigSolFR_ISO/DMP.
-    /// Whichever source first delivers data for a given wheel becomes
-    /// authoritative for that wheel; if a chassis-bus update has ever
-    /// arrived for a wheel it is preferred over the main-harness value.
-    ///
-    /// Decoding table (iso=iso_close, dump=the release lead (main harness:
-    /// DMP), motor = restore lead minus release lead, 0 on the main harness):
+    /// Decoding table (iso=iso_close, dump=the release lead, motor = restore
+    /// lead minus release lead):
     ///   iso=0, dump=0           → APPLY  (pedal pass-through, full local brake)
     ///   iso=1, dump=0, motor>0  → APPLY  (the modulator motor restoring the
     ///                                     sealed caliper toward the pedal)
@@ -407,25 +399,22 @@ public:
         enum class Phase { APPLY, HOLD, DUMP };
         Phase fl       = Phase::APPLY;
         Phase fr       = Phase::APPLY;
-        bool  fl_fresh = false;   ///< true if FL data arrived within freshness_window
-        bool  fr_fresh = false;   ///< true if FR data arrived within freshness_window
+        bool  fl_fresh = false;   ///< BTCM alive and FL actuator state ever seen
+        bool  fr_fresh = false;   ///< BTCM alive and FR actuator state ever seen
     };
 
     /// Return the current per-wheel ABS phase for the front axle.
-    /// A wheel's phase is APPLY and marked stale (!fresh) when no iso/dump
-    /// update has arrived within freshness_window.
+    /// "BTCM alive" means a valid $91 BTCM Data Response was decoded off
+    /// GM8192_BTCM_TX within freshness_window. A wheel is APPLY and stale
+    /// (!fresh) while the BTCM is not alive or its actuator state was never seen.
     AbsPhaseFront GetAbsPhaseFront(
         std::chrono::milliseconds freshness_window) const;
 
-    /// Rear EMB motor commands from BTCM, read from two sources:
-    ///   * Chassis bus (preferred): the rear apply motors' apply and release
-    ///     leads (BTCM_REAR_EMB_{LR,RR}_{APPLY,RELEASE}), apply minus release.
-    ///   * Main harness (legacy fallback): kSigRearMotorLR/RR = 5014/5015.
-    /// Float in [-1, +1]: +1=apply, 0=idle, -1=release.  Whichever source
-    /// has ever delivered a value for a given wheel becomes authoritative;
-    /// if a chassis-bus value has ever arrived it is preferred.
-    /// fresh = true when the producer is alive (per the BTCM canonical-frame
-    /// heartbeat freshness_window).
+    /// Rear EMB motor commands from BTCM: the rear apply motors' apply and
+    /// release leads (BTCM_REAR_EMB_{LR,RR}_{APPLY,RELEASE}), apply minus
+    /// release. Float in [-1, +1]: +1=apply, 0=idle, -1=release.
+    /// fresh = true when the BTCM is alive (a valid $91 within
+    /// freshness_window, as GetAbsPhaseFront) and the wheel's leads were seen.
     struct RearEmbCmd {
         float lr        = 0.0f;
         float rr        = 0.0f;
@@ -873,11 +862,20 @@ public:
     /// of the runtime path.
     void DebugInjectBtcmMotorLeads(BrakeMotor motor, float drive, float release);
 
+    /// Feed one already-framed GM-8192 frame (ID + payload, SumCheck verified)
+    /// through the same BusSnoop decode Tick uses, at the current sim time. A
+    /// valid $91 BTCM Data Response here is what makes the BTCM alive. Used by
+    /// unit tests; not part of the runtime path.
+    void DebugInjectBusFrame(std::uint8_t id, const std::uint8_t* payload, std::uint8_t n);
+
     /// Inject the wiper blade position (CHASSIS_WIPER_SWEEP_POSITION has no
     /// signal id).  Used by unit tests; not part of the runtime path.
     void DebugInjectWiperSweepPositionPct(std::uint8_t pct);
 
 private:
+    // A valid $91 BTCM Data Response decoded within freshness_window of now.
+    bool BtcmAlive(std::chrono::milliseconds freshness_window) const;
+
     Options m_opts;
 
     struct State;

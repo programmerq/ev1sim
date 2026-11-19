@@ -49,6 +49,18 @@ class ConductorPublisher {
     return ok;
   }
 
+  // Publish one conductor cell's solved CURRENT, in milliamps: a uint32 conductor, the
+  // same write as the mV form, counted only into `published_`.
+  bool publish_ma(io::ConductorId id, std::uint32_t milliamps) {
+    const bool ok = table_->publish_conductor_mv(id, milliamps, token_);
+    if (ok) {
+      ++published_;
+    } else {
+      ++refused_;
+    }
+    return ok;
+  }
+
   // Publish one conductor cell's derived POTENTIAL, in millivolts — the analog half of
   // publish() above, and it carries the same capability for the same reason. See
   // WireTable::publish_conductor_mv for that reason, stated once; it is not repeated

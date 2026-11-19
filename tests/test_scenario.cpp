@@ -1419,12 +1419,12 @@ TEST_CASE("Scenario: ad_precharge_participated latches once the relay closes",
 }
 
 TEST_CASE("Scenario: abs-phase / rear-EMB stats columns stay live across a "
-          "sub-3s heartbeat gap",
+          "sub-3s gap between $91 frames",
           "[Scenario][ABS]") {
     // Regression: the stats-CSV observer used to read the BTCM-sourced ABS
     // phase (and rear-EMB command) with a 200 ms freshness window while the
-    // control path used 3000 ms.  Liveness is gated on the BTCM's ~5 Hz
-    // canonical-frame heartbeat, so an inter-heartbeat gap between 200 ms and
+    // control path used 3000 ms.  Liveness is gated on the BTCM's 120 ms
+    // $91 Data Response, so a gap between frames of between 200 ms and
     // 3000 ms made the observer declare the BTCM dead and write the -1
     // no-data sentinel for a phase that was still live.  The observer now
     // uses the same 3000 ms window as the control path, so a gap in that band
@@ -1454,14 +1454,15 @@ TEST_CASE("Scenario: abs-phase / rear-EMB stats columns stay live across a "
     DriverCommand cmd{};
     VehicleState state{};
 
-    // Inject a BTCM heartbeat, an FL HOLD phase (iso=1, dump=0 -> phase 1),
+    // Inject a $91, an FL HOLD phase (iso=1, dump=0 -> phase 1),
     // and a rear-EMB LR command.  All timestamps are stamped "now".
-    bus.DebugInjectDelta(5050, true);   // BTCM canonical-frame heartbeat
-    bus.DebugInjectDelta(5010, true);   // FL_ISO = 1
-    bus.DebugInjectDelta(5011, false);  // FL_DMP = 0  -> HOLD
-    bus.DebugInjectFloat(5014, 1.0f);   // rear motor LR command = full apply
+    const std::uint8_t p91[11] = {};
+    bus.DebugInjectBusFrame(0x91u, p91, 11u);  // a $91 BTCM Data Response
+    bus.DebugInjectDelta(4147, true);          // FL iso_close, leads idle -> HOLD
+    bus.DebugInjectBtcmMotorLeads(ExternalSimConnector::BrakeMotor::RearLeft,
+                                  1.0f, 0.0f);  // LR apply lead = full apply
 
-    // Advance the heartbeat gap to exactly 260 ms of sim time: past the old
+    // Advance the gap since the $91 to exactly 260 ms of sim time: past the old
     // 200 ms window, well within the corrected 3000 ms window.
     bus.SetSimTime(0.260);
 
@@ -1484,6 +1485,48 @@ TEST_CASE("Scenario: abs-phase / rear-EMB stats columns stay live across a "
     // NOT the -1 no-data sentinel; abs_fresh_fl = 1; the rear-EMB command
     // mirrors through fresh too.
     CHECK(row1 == "0,1,1,1,1");
+    f.close();
+    std::filesystem::remove(tmp_csv);
+}
+
+TEST_CASE("Scenario: btcm91_* stats columns read the decoded $91, blank before one",
+          "[Scenario][stats]") {
+    using ev1sim::Scenario;
+    using ev1sim::ScenarioStats;
+
+    auto tmp_csv = std::filesystem::temp_directory_path() /
+                   "ev1sim_scenario_stats_btcm91_test.csv";
+    Scenario s;
+    ScenarioStats st{tmp_csv.string(),
+                     {"sim_time_s", "btcm91_abs_tcs_active", "btcm91_wheel_tau_rr",
+                      "btcm91_braking_retard_nm"},
+                     0.10};
+    s.set_stats(st);
+    s.OpenStats();
+
+    ExternalSimConnector bus;
+    ev1sim::PhysicalWorld phys;
+    DriverCommand cmd{};
+    VehicleState state{};
+
+    s.MaybeSampleStats(0.0, state, phys, bus, cmd);  // no $91 yet: blank cells
+    // ABS/TCS Active (b5); count 56 = 10 braking counts; RR TAU 0x0200.
+    const std::uint8_t p91[11] = {0x20u, 56u, 0u, 0u, 0u, 0u, 0u, 0u, 0x02u, 0x00u, 0u};
+    bus.SetSimTime(0.1);
+    bus.DebugInjectBusFrame(0x91u, p91, 11u);
+    s.MaybeSampleStats(0.1, state, phys, bus, cmd);
+    s.Close();
+
+    std::ifstream f(tmp_csv);
+    REQUIRE(f.is_open());
+    std::string header, row0, row1;
+    std::getline(f, header);
+    std::getline(f, row0);
+    std::getline(f, row1);
+    CHECK(header == "sim_time_s,btcm91_abs_tcs_active,btcm91_wheel_tau_rr,"
+                    "btcm91_braking_retard_nm");
+    CHECK(row0 == "0,,,");
+    CHECK(row1 == "0.1,1,512,108.75");
     f.close();
     std::filesystem::remove(tmp_csv);
 }

@@ -83,11 +83,21 @@ std::uint8_t DecodeBtcmPollBars(const std::uint8_t* p) {
 
 DashBrakeStatus DecodeBtcmResponse(const std::uint8_t* p) {
     DashBrakeStatus s;
-    s.park_brake     = Bit(p[0], 0);
-    s.service_brake  = Bit(p[0], 1);
-    s.brake_tt       = Bit(p[0], 2);
-    s.antilock_tt    = Bit(p[0], 3);
-    s.abs_tcs_active = Bit(p[0], 5);
+    s.park_brake              = Bit(p[0], 0);
+    s.service_brake           = Bit(p[0], 1);
+    s.brake_tt                = Bit(p[0], 2);
+    s.antilock_tt             = Bit(p[0], 3);
+    s.redundant_regen_disable = Bit(p[0], 4);
+    s.abs_tcs_active          = Bit(p[0], 5);
+    s.retard_achieved_fault   = Bit(p[0], 6);
+    s.wheel_speed_valid       = Bit(p[0], 7);
+    DecodeRetardRequest(p[1], s);
+    for (unsigned w = 0; w < 4u; ++w) s.wheel_tau[w] = BigEndian16(&p[2u + 2u * w]);
+    s.service_soon_req   = Bit(p[10], 0);
+    s.front_power_assist = Bit(p[10], 1);
+    s.tim_wheel_accel    = Bit(p[10], 2);
+    s.tim_vehicle_accel  = Bit(p[10], 3);
+    s.tim_accel_limit    = Bit(p[10], 4);
     return s;
 }
 
@@ -102,6 +112,47 @@ DashOdometer DecodeDscmResponse(const std::uint8_t* p) {
 }
 
 }  // namespace
+
+void DecodeRetardRequest(std::uint8_t count, DashBrakeStatus& s) {
+    s.retard_request_count = count;
+    s.coastdown_reduction_pct = 0.0f;
+    s.braking_retard_nm = 0.0f;
+    if (count >= kRetardCoastdownMin && count <= kRetardCoastdownMax) {
+        s.retard_band = DashRetardBand::kCoastdown;
+        s.coastdown_reduction_pct = 5.0f * static_cast<float>(kRetardCoastdownMax - count);
+    } else if (count >= kRetardBrakingMin && count <= kRetardBrakingMax) {
+        s.retard_band = DashRetardBand::kBraking;
+        s.braking_retard_nm = 10.875f * static_cast<float>(count - kRetardBrakingMin);
+    } else {
+        s.retard_band = DashRetardBand::kOutOfRange;
+    }
+}
+
+std::optional<double> BtcmResponseField(const DashBrakeStatus& b, const std::string& name) {
+    auto flag = [](bool v) { return std::optional<double>(v ? 1.0 : 0.0); };
+    if (name == "park_brake")              return flag(b.park_brake);
+    if (name == "service_brake")           return flag(b.service_brake);
+    if (name == "brake_tt")                return flag(b.brake_tt);
+    if (name == "antilock_tt")             return flag(b.antilock_tt);
+    if (name == "redundant_regen_disable") return flag(b.redundant_regen_disable);
+    if (name == "abs_tcs_active")          return flag(b.abs_tcs_active);
+    if (name == "retard_achieved_fault")   return flag(b.retard_achieved_fault);
+    if (name == "wheel_speed_valid")       return flag(b.wheel_speed_valid);
+    if (name == "retard_request_count")    return static_cast<double>(b.retard_request_count);
+    if (name == "retard_band")             return static_cast<double>(b.retard_band);
+    if (name == "coastdown_reduction_pct") return static_cast<double>(b.coastdown_reduction_pct);
+    if (name == "braking_retard_nm")       return static_cast<double>(b.braking_retard_nm);
+    if (name == "wheel_tau_lf")            return static_cast<double>(b.wheel_tau[0]);
+    if (name == "wheel_tau_rf")            return static_cast<double>(b.wheel_tau[1]);
+    if (name == "wheel_tau_lr")            return static_cast<double>(b.wheel_tau[2]);
+    if (name == "wheel_tau_rr")            return static_cast<double>(b.wheel_tau[3]);
+    if (name == "service_soon_req")        return flag(b.service_soon_req);
+    if (name == "front_power_assist")      return flag(b.front_power_assist);
+    if (name == "tim_wheel_accel")         return flag(b.tim_wheel_accel);
+    if (name == "tim_vehicle_accel")       return flag(b.tim_vehicle_accel);
+    if (name == "tim_accel_limit")         return flag(b.tim_accel_limit);
+    return std::nullopt;
+}
 
 DashGear DecodePrndCode(std::uint8_t code5) {
     switch (code5 & 0x1Fu) {
@@ -188,7 +239,10 @@ bool BusSnoop::DecodeFrame(std::uint8_t id, const std::uint8_t* payload,
         case kDashMsgPcmPoll:      pack_       = {DecodePcmPoll(payload), now_s};      break;
         case kDashMsgDscmPoll:     display_    = {DecodeDscmPoll(payload), now_s};     break;
         case kDashMsgBtcmPoll:     power_bars_ = {DecodeBtcmPollBars(payload), now_s}; break;
-        case kDashMsgBtcmResponse: brake_      = {DecodeBtcmResponse(payload), now_s}; break;
+        case kDashMsgBtcmResponse:
+            brake_ = {DecodeBtcmResponse(payload), now_s};
+            ++btcm_responses_;
+            break;
         case kDashMsgDscmResponse: odometer_   = {DecodeDscmResponse(payload), now_s}; break;
         default: break;
     }

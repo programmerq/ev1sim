@@ -532,32 +532,6 @@ constexpr std::uint32_t kSigAdMainContactor  = 5224U;
 constexpr std::uint32_t kSigAdPrechargeRelay = 5225U;
 constexpr std::uint32_t kSigAdStateEnum      = 5230U;
 
-// BTCM front ABS solenoid signals — published by BTCM on the main harness segment.
-// ev1sim subscribes (input_to_sim direction); not registered as published endpoints.
-// Locked in lockstep with the external sim's BTCM signal header:
-//   kSigSolFL_ISO = 5010, kSigSolFL_DMP = 5011
-//   kSigSolFR_ISO = 5012, kSigSolFR_DMP = 5013
-constexpr std::uint32_t kSigSolFL_ISO = 5010U;
-constexpr std::uint32_t kSigSolFL_DMP = 5011U;
-constexpr std::uint32_t kSigSolFR_ISO = 5012U;
-constexpr std::uint32_t kSigSolFR_DMP = 5013U;
-
-// BTCM canonical-frame heartbeat — supervisor broadcasts a 16-byte
-// status frame at 5 Hz regardless of ABS modulation state.  Used
-// as the "BTCM alive" liveness signal, separate from the iso/dump-pin
-// state (which encodes commanded valve position, not liveness).
-// Locked in lockstep with the external sim's BTCM signal header:
-//   kSigBtcmUartFrame = 5050
-constexpr std::uint32_t kSigBtcmUartFrame = 5050U;
-
-// BTCM rear EMB motor commands — published by BTCM on the main harness segment.
-// Float in [-1, +1]: +1=apply, 0=hold/idle, -1=release.  ev1sim consumes
-// these to drive the BrakeDrum self-energizing model and apply per-wheel
-// rear brake torque to Chrono.  Not registered as a published endpoint.
-//   kSigRearMotorLR = 5014, kSigRearMotorRR = 5015
-constexpr std::uint32_t kSigRearMotorLR = 5014U;
-constexpr std::uint32_t kSigRearMotorRR = 5015U;
-
 // 3D-sim integration contract — physics telemetry + cabin sensors published
 // on the main harness segment.  Locked to the external sim's 3D-sim signal contract
 // reservations 6920-6939 (physics telemetry), 6940-6959 (buttons), and
@@ -593,9 +567,7 @@ constexpr std::uint32_t kSigSensorKeyPosition         = 6966U;
 constexpr int kNumExtContractSignals = 15;
 
 // BTCM per-wheel actuator state published on the chassis bus (IDs 4147/4148
-// iso valves, 4153/4154 cylinder pressure).  The consumers in this file prefer
-// chassis-bus values whenever they have ever been observed for a given wheel,
-// and fall back to the main-harness equivalents otherwise.  Registered as input
+// iso valves, 4153/4154 cylinder pressure).  Registered as input
 // endpoints so the standard chassis-bus drain picks them up via FindEndpoint.
 // The brake motors' leads have no signal id; Tick reads them off the wire
 // (WireTruthChassis::btcm_motor_leads).
@@ -725,8 +697,7 @@ constexpr int kNumDynamics = static_cast<int>(sizeof(kDynamicsNames) /
 // +kNumIpcBtcmTelltaleSignals for IPC BTCM/airbag telltales (4134–4138) — IPC → ev1sim.
 // +kNumIpcExtraTelltaleSignals for IPC extra LCD telltales (4140–4145) — IPC → ev1sim.
 // +kNumBtcmActuatorChassisSignals for the BTCM per-wheel actuator state
-//   on the chassis bus (4147/4148, 4153/4154) — BTCM → ev1sim, parallel to the
-//   legacy main-harness 5010-5015 path.
+//   on the chassis bus (4147/4148, 4153/4154) — BTCM → ev1sim.
 // +kNumExtContractSignals for the 3D-sim integration contract publish
 //   (6920-6932 physics telemetry + 6960-6963 cabin sensors) on the main
 //   harness — ev1sim → external sim, locking the wire format for the
@@ -1529,54 +1500,31 @@ struct ExternalSimConnector::State {
     float         pim_cruise_setpoint_mps      = 0.0f;
     bool          has_pim_cruise_setpoint_mps  = false;
 
-    // BTCM front ABS solenoid states (IDs 5010-5013, main harness segment).
-    // Subscribed from BTCM.  Cached as persistent commanded-state — the
-    // BTCM publishes on-change only, so a sustained HOLD or DUMP phase
-    // keeps the last-known iso/dump values authoritative even when no
-    // new delta has arrived in a while.  Liveness is tracked separately
-    // via btcm_uart_frame_ns (the 5 Hz canonical-frame heartbeat).
-    // The split (cached commanded-state vs. heartbeat-based liveness)
-    // exists so a sudden road-friction (mu) jump — which can hold one
-    // iso/dump phase across many ticks — is not misread as a stale
-    // signal by a per-pin freshness check.
-    bool          sol_fl_iso              = false;
-    bool          sol_fl_dmp             = false;
-    bool          sol_fr_iso              = false;
-    bool          sol_fr_dmp             = false;
-    std::uint64_t sol_fl_iso_ns          = 0;  // sim-time ns of last update
-    std::uint64_t sol_fl_dmp_ns          = 0;
-    std::uint64_t sol_fr_iso_ns          = 0;
-    std::uint64_t sol_fr_dmp_ns          = 0;
+    // Brake-controller liveness: sim-time ns of the last valid $91 BTCM Data
+    // Response BusSnoop decoded off GM8192_BTCM_TX (0 = none yet), and the
+    // snoop's $91 count when it was stamped. The BTCM answers every 120 ms
+    // $90 poll (redux bus/messages/uart/91_btcm_data_response.yaml), whether
+    // or not its ABS phase changes, so this is the "BTCM alive" check. The
+    // actuator cells below are commanded state published on change; they stay
+    // authoritative while the BTCM is alive, so a phase held for many ticks
+    // is never misread as stale.
+    std::uint64_t btcm_response_ns     = 0;
+    std::uint64_t btcm_responses_seen  = 0;
 
-    // BTCM canonical-frame heartbeat (kSigBtcmUartFrame = 5050).  The
-    // BTCM supervisor broadcasts this at 5 Hz (200 ms cadence per the
-    // BTCM_UART_FRAME_BROADCAST_PERIOD_MS contract) regardless of ABS
-    // modulation state.  Used as the "BTCM alive" check, separate
-    // from the iso/dump-pin state which encodes commanded valve
-    // position rather than liveness.  0 = never received (BTCM never
-    // came up).
-    std::uint64_t btcm_uart_frame_ns      = 0;
-
-    // Rear EMB motor commands (IDs 5014-5015, main harness segment).
-    // Float in [-1, +1]: +1=apply, 0=idle, -1=release.  Freshness tracked
-    // via last-update timestamps so the consumer can fall back if BTCM is
-    // not connected (mirrors the front ABS pattern).
-    float         rear_motor_lr           = 0.0f;
-    float         rear_motor_rr           = 0.0f;
-    std::uint64_t rear_motor_lr_ns        = 0;
-    std::uint64_t rear_motor_rr_ns        = 0;
+    // Stamp btcm_response_ns when the snoop has decoded a new $91.
+    void note_btcm_responses() {
+        const std::uint64_t n = bus_snoop.btcm_responses();
+        if (n != btcm_responses_seen) {
+            btcm_responses_seen = n;
+            btcm_response_ns    = now_ns();
+        }
+    }
 
     // BTCM per-wheel actuator state on the chassis bus: the front iso valves
     // (4147/4148), the front modulator motors' release leads and the rear
     // apply motors' commands (from their leads), and the front cylinder
-    // pressures (4153/4154).  When the chassis-bus value has ever been
-    // observed for a given wheel (chassis_*_ns != 0), the AbsPhaseFront /
-    // RearEmbCmd consumers prefer it over the main-harness equivalent.
-    // Liveness is still gated by the BTCM canonical-frame heartbeat (5050)
-    // because the chassis-bus signals are also on-change publications.
-    //
-    // 4153/4154 (cylinder pressure FL/FR, kPa) have no main-harness
-    // equivalent; they are exposed via GetFrontWheelCylinderPressuresKpa.
+    // pressures (4153/4154), each stamped when first seen (chassis_*_ns != 0).
+    // Liveness is btcm_response_ns above.
     bool          chassis_btcm_iso_close_fl    = false;
     bool          chassis_btcm_iso_close_fr    = false;
     bool          chassis_btcm_front_release_fl = false;
@@ -1670,11 +1618,6 @@ struct ExternalSimConnector::State {
     std::uint32_t barrier_fleet_n = 0;
     int barrier_timeout_ms = 30000;  // crash backstop; slow-but-live is waited for
 
-    // Liveness proxy for the BTCM GM-8192 TX bit-stream (GM8192_BTCM_TX): the
-    // last total-bit count we observed. When it advances, the BTCM is
-    // transmitting, so we stamp btcm_uart_frame_ns (the old kSigBtcmUartFrame
-    // 5050 heartbeat). 0 = never seen.
-    std::uint64_t btcm_tx_bits_last = 0;
 #endif
 };
 
@@ -1723,7 +1666,6 @@ void ExternalSimConnector::Stop() {
     m_state->bus_snoop.Detach();
     m_state->wire.reset();
     m_state->wire_attach_tried = false;
-    m_state->btcm_tx_bits_last = 0;
 #  endif
     m_state->status = m_opts.enabled ? Status::Connecting : Status::Disabled;
 #else
@@ -2512,62 +2454,27 @@ bool ExternalSimConnector::HasReceivedRunMode() const {
     return m_state->has_rsa_run_mode;
 }
 
+bool ExternalSimConnector::BtcmAlive(std::chrono::milliseconds freshness_window) const {
+    // freshness_window is a peer-side liveness tolerance in sim time; SimApp
+    // passes 3 s, the IPC's $91 timeout (IPC DTC 15, elec-274/276), the
+    // tightest of the four $91 absence timeouts. Past it the brake plant falls
+    // back to the manual's hydraulic-backup behaviour.
+    const auto& st = *m_state;
+    if (st.btcm_response_ns == 0) return false;
+    const std::uint64_t window_ns =
+        static_cast<std::uint64_t>(freshness_window.count()) * 1'000'000ULL;
+    // now_ns >= any stamp: SetSimTime holds the clock's high-water mark, so
+    // the unsigned subtraction cannot wrap.
+    return (st.now_ns() - st.btcm_response_ns) < window_ns;
+}
+
 ExternalSimConnector::AbsPhaseFront ExternalSimConnector::GetAbsPhaseFront(
     std::chrono::milliseconds freshness_window) const {
     AbsPhaseFront result{};
     const auto& st = *m_state;
+    const bool btcm_alive = BtcmAlive(freshness_window);
 
-    const std::uint64_t window_ns =
-        static_cast<std::uint64_t>(freshness_window.count()) * 1'000'000ULL;
-
-    const std::uint64_t now_ns = st.now_ns();
-
-    // Freshness model — the full rationale is inline below.
-    //
-    // Liveness comes from the BTCM's 5 Hz canonical-frame heartbeat
-    // (kSigBtcmUartFrame, signal 5050).  The BTCM supervisor
-    // broadcasts this frame every 200 ms regardless of ABS modulation
-    // state (its periodic canonical-frame publish, independent of the
-    // ABS algorithm).  That makes it the authoritative "BTCM is alive" signal,
-    // independent of whether the algorithm has changed phase recently.
-    //
-    // Iso/dump pin states are *commanded state* (on-change publish),
-    // not edge events.  We cache the latest values indefinitely while
-    // the BTCM is alive and use them as the authoritative phase
-    // decode.  No per-pin freshness check — only the per-pin
-    // "have-ever-seen" gate (ts != 0) so the chassis doesn't trust
-    // phase data before any has arrived.
-    //
-    // Source preference: BTCM publishes the same actuator state on
-    // two segments — chassis side (iso 4147/4148 + motor leads) and main harness
-    // (5010-5013).  We prefer chassis-bus values per-wheel: if any
-    // chassis-bus update has arrived for that wheel (either iso or
-    // dump timestamp != 0), the chassis source is authoritative.
-    // Otherwise, fall back to the main-harness source.  This lets
-    // the public chassis-bus path become primary as the producer
-    // rolls out, without breaking deployments that haven't migrated.
-    //
-    // The freshness_window parameter is the multi-second peer-side
-    // liveness tolerance (3 s per the EV1 electrical service manual
-    // IPC DTC 015, the tightest spec in the corpus).  After 3 s of
-    // no UART frame, the chassis declares BTCM dead and falls back
-    // to local hydraulic (the manual's hydraulic-backup behavior).
-    // Those 3 s are 3 s **of sim time** — the manual is describing a
-    // car, not a host.  See SetSimTime for why that distinction is a
-    // determinism property and not just pedantry.
-    const bool btcm_alive = [&]() -> bool {
-        if (st.btcm_uart_frame_ns == 0) return false;
-        // now_ns >= any stamp: SetSimTime holds the clock's high-water mark, so
-        // the unsigned subtraction below cannot wrap.
-        return (now_ns - st.btcm_uart_frame_ns) < window_ns;
-    }();
-
-    auto pin_ever_seen = [&](std::uint64_t ts_iso, std::uint64_t ts_dmp) -> bool {
-        return ts_iso != 0 && ts_dmp != 0;
-    };
-
-    auto decode_phase = [](bool iso, bool dmp,
-                           float motor = 0.0f) -> AbsPhaseFront::Phase {
+    auto decode_phase = [](bool iso, bool dmp, float motor) -> AbsPhaseFront::Phase {
         if (!iso && !dmp) return AbsPhaseFront::Phase::APPLY;
         // Sealed iso with the motor's restore leg driven: re-apply toward the
         // pedal (the plant's APPLY approaches the local brake from below).
@@ -2578,92 +2485,36 @@ ExternalSimConnector::AbsPhaseFront ExternalSimConnector::GetAbsPhaseFront(
         return AbsPhaseFront::Phase::APPLY;
     };
 
-    // Per-wheel source selection.  "ever-seen on chassis" wins; otherwise
-    // try main-harness; otherwise stale-APPLY.
-    const bool fl_chassis_seen =
-        (st.chassis_btcm_iso_close_fl_ns != 0) ||
-        (st.chassis_btcm_front_release_fl_ns != 0);
-    const bool fr_chassis_seen =
-        (st.chassis_btcm_iso_close_fr_ns != 0) ||
-        (st.chassis_btcm_front_release_fr_ns != 0);
+    const bool fl_seen = (st.chassis_btcm_iso_close_fl_ns != 0) ||
+                         (st.chassis_btcm_front_release_fl_ns != 0);
+    const bool fr_seen = (st.chassis_btcm_iso_close_fr_ns != 0) ||
+                         (st.chassis_btcm_front_release_fr_ns != 0);
 
-    const bool fl_main_seen =
-        pin_ever_seen(st.sol_fl_iso_ns, st.sol_fl_dmp_ns);
-    const bool fr_main_seen =
-        pin_ever_seen(st.sol_fr_iso_ns, st.sol_fr_dmp_ns);
-
-    result.fl_fresh = btcm_alive && (fl_chassis_seen || fl_main_seen);
-    result.fr_fresh = btcm_alive && (fr_chassis_seen || fr_main_seen);
-
-    auto decode_fl = [&]() -> AbsPhaseFront::Phase {
-        if (fl_chassis_seen) {
-            return decode_phase(st.chassis_btcm_iso_close_fl,
-                                st.chassis_btcm_front_release_fl,
-                                st.btcm_front_motor_fl);
-        }
-        if (fl_main_seen) {
-            return decode_phase(st.sol_fl_iso, st.sol_fl_dmp);
-        }
-        return AbsPhaseFront::Phase::APPLY;
-    };
-    auto decode_fr = [&]() -> AbsPhaseFront::Phase {
-        if (fr_chassis_seen) {
-            return decode_phase(st.chassis_btcm_iso_close_fr,
-                                st.chassis_btcm_front_release_fr,
-                                st.btcm_front_motor_fr);
-        }
-        if (fr_main_seen) {
-            return decode_phase(st.sol_fr_iso, st.sol_fr_dmp);
-        }
-        return AbsPhaseFront::Phase::APPLY;
-    };
-
-    result.fl = result.fl_fresh ? decode_fl() : AbsPhaseFront::Phase::APPLY;
-    result.fr = result.fr_fresh ? decode_fr() : AbsPhaseFront::Phase::APPLY;
-
+    result.fl_fresh = btcm_alive && fl_seen;
+    result.fr_fresh = btcm_alive && fr_seen;
+    result.fl = result.fl_fresh
+                    ? decode_phase(st.chassis_btcm_iso_close_fl,
+                                   st.chassis_btcm_front_release_fl, st.btcm_front_motor_fl)
+                    : AbsPhaseFront::Phase::APPLY;
+    result.fr = result.fr_fresh
+                    ? decode_phase(st.chassis_btcm_iso_close_fr,
+                                   st.chassis_btcm_front_release_fr, st.btcm_front_motor_fr)
+                    : AbsPhaseFront::Phase::APPLY;
     return result;
 }
 
 ExternalSimConnector::RearEmbCmd ExternalSimConnector::GetRearEmbCmd(
     std::chrono::milliseconds freshness_window) const {
+    // The motor leads are commanded state published on change (a sustained
+    // apply holds one value for hundreds of ms), so freshness is BTCM
+    // liveness plus "ever seen", as GetAbsPhaseFront.
     RearEmbCmd r{};
     const auto& st = *m_state;
-    const std::uint64_t window_ns =
-        static_cast<std::uint64_t>(freshness_window.count()) * 1'000'000ULL;
-    const std::uint64_t now_ns = st.now_ns();
-
-    // Heartbeat-based liveness — same pattern as GetAbsPhaseFront.
-    // kSigRearMotorLR/RR publish on-change only and a steady-state
-    // EMB command (sustained APPLY or RELEASE) holds the same float
-    // value for hundreds of ms, so the per-signal timestamp doesn't
-    // refresh.  The 5 Hz kSigBtcmUartFrame heartbeat is the
-    // authoritative "BTCM alive" signal; cached motor-cmd values
-    // stay valid as long as the producer is alive.  Same freshness
-    // model as GetAbsPhaseFront above.
-    //
-    // Source preference (per wheel): the motor leads on the wire win
-    // when ever-seen; otherwise main-harness value (5014/5015).  Same
-    // rationale as GetAbsPhaseFront — keep both paths live so the
-    // public chassis-bus subscription can become primary without
-    // breaking older producers.
-    const bool btcm_alive = [&]() -> bool {
-        if (st.btcm_uart_frame_ns == 0) return false;
-        // now_ns >= any stamp: SetSimTime holds the clock's high-water mark, so
-        // the unsigned subtraction below cannot wrap.
-        return (now_ns - st.btcm_uart_frame_ns) < window_ns;
-    }();
-
-    auto ever_seen = [&](std::uint64_t ts) -> bool { return ts != 0; };
-
-    const bool lr_chassis_seen = ever_seen(st.chassis_btcm_emb_motor_lr_ns);
-    const bool rr_chassis_seen = ever_seen(st.chassis_btcm_emb_motor_rr_ns);
-    const bool lr_main_seen    = ever_seen(st.rear_motor_lr_ns);
-    const bool rr_main_seen    = ever_seen(st.rear_motor_rr_ns);
-
-    r.lr = lr_chassis_seen ? st.chassis_btcm_emb_motor_lr : st.rear_motor_lr;
-    r.rr = rr_chassis_seen ? st.chassis_btcm_emb_motor_rr : st.rear_motor_rr;
-    r.lr_fresh = btcm_alive && (lr_chassis_seen || lr_main_seen);
-    r.rr_fresh = btcm_alive && (rr_chassis_seen || rr_main_seen);
+    const bool btcm_alive = BtcmAlive(freshness_window);
+    r.lr = st.chassis_btcm_emb_motor_lr;
+    r.rr = st.chassis_btcm_emb_motor_rr;
+    r.lr_fresh = btcm_alive && st.chassis_btcm_emb_motor_lr_ns != 0;
+    r.rr_fresh = btcm_alive && st.chassis_btcm_emb_motor_rr_ns != 0;
     return r;
 }
 
@@ -2676,16 +2527,9 @@ ExternalSimConnector::GetFrontWheelCylinderPressuresKpa(
         static_cast<std::uint64_t>(freshness_window.count()) * 1'000'000ULL;
     const std::uint64_t now_ns = st.now_ns();
 
-    // Liveness via the BTCM heartbeat — cylinder pressure (4153/4154)
-    // is published on-change with an epsilon gate just like the
-    // iso/dump signals, so per-signal staleness is not meaningful for
-    // a sustained-pressure regime.
-    const bool btcm_alive = [&]() -> bool {
-        if (st.btcm_uart_frame_ns == 0) return false;
-        // now_ns >= any stamp: SetSimTime holds the clock's high-water mark, so
-        // the unsigned subtraction below cannot wrap.
-        return (now_ns - st.btcm_uart_frame_ns) < window_ns;
-    }();
+    // Cylinder pressure (4153/4154) is published on change with an epsilon
+    // gate, so liveness is the BTCM's, as GetAbsPhaseFront.
+    const bool btcm_alive = BtcmAlive(freshness_window);
 
     p.fl_kpa   = st.chassis_btcm_cyl_press_fl_kpa;
     p.fr_kpa   = st.chassis_btcm_cyl_press_fr_kpa;
@@ -2709,26 +2553,6 @@ void ExternalSimConnector::DebugInjectDelta(std::uint32_t signal_id, bool value)
     } else if (signal_id == kSigWasherPumpCommand) {
         m_state->washer_pump_cmd     = value;
         m_state->has_washer_pump_cmd = true;
-    } else if (signal_id == kSigSolFL_ISO) {
-        m_state->sol_fl_iso    = value;
-        m_state->sol_fl_iso_ns = m_state->now_ns();
-    } else if (signal_id == kSigSolFL_DMP) {
-        m_state->sol_fl_dmp    = value;
-        m_state->sol_fl_dmp_ns = m_state->now_ns();
-    } else if (signal_id == kSigSolFR_ISO) {
-        m_state->sol_fr_iso    = value;
-        m_state->sol_fr_iso_ns = m_state->now_ns();
-    } else if (signal_id == kSigSolFR_DMP) {
-        m_state->sol_fr_dmp    = value;
-        m_state->sol_fr_dmp_ns = m_state->now_ns();
-    } else if (signal_id == kSigBtcmUartFrame) {
-        // Test helper: simulate a BTCM canonical-frame heartbeat arrival.
-        // The bool argument is ignored — the heartbeat is purely a
-        // "timestamp received" event — but the dispatch convention is
-        // bool-per-signal so we accept it.  In production this is set
-        // in DrainInbound when the heartbeat frame arrives.
-        (void)value;
-        m_state->btcm_uart_frame_ns = m_state->now_ns();
     } else if (signal_id == kSigChassisBtcmIsoCloseFL ||
                signal_id == kSigChassisBtcmIsoCloseFR) {
         // Chassis-bus mirror of the BTCM iso solenoid state.
@@ -2775,13 +2599,7 @@ void ExternalSimConnector::DebugInjectDelta(std::uint32_t signal_id, bool value)
 
 void ExternalSimConnector::DebugInjectFloat(std::uint32_t signal_id, float value) {
     const std::uint64_t now_ns = m_state->now_ns();
-    if (signal_id == kSigRearMotorLR) {
-        m_state->rear_motor_lr    = value;
-        m_state->rear_motor_lr_ns = now_ns;
-    } else if (signal_id == kSigRearMotorRR) {
-        m_state->rear_motor_rr    = value;
-        m_state->rear_motor_rr_ns = now_ns;
-    } else if (signal_id == kSigSteeringCmd) {
+    if (signal_id == kSigSteeringCmd) {
         m_state->steering_cmd     = value;
         m_state->has_steering_cmd = true;
         m_state->steering_cmd_ns  = now_ns;
@@ -2809,6 +2627,12 @@ void ExternalSimConnector::DebugInjectPimCoastDragNm(float drag_nm) {
 void ExternalSimConnector::DebugInjectBtcmMotorLeads(BrakeMotor motor, float drive,
                                                      float release) {
     m_state->apply_btcm_motor_leads(motor, drive, release);
+}
+
+void ExternalSimConnector::DebugInjectBusFrame(std::uint8_t id, const std::uint8_t* payload,
+                                               std::uint8_t n) {
+    m_state->bus_snoop.DecodeFrame(id, payload, n, m_state->sim_time_s);
+    m_state->note_btcm_responses();
 }
 
 void ExternalSimConnector::DebugInjectWiperSweepPositionPct(std::uint8_t pct) {
@@ -3402,28 +3226,12 @@ void ExternalSimConnector::Tick(double sim_time_s) {
             st.has_apm_12v_status_code = true;
         }
 
-        // BTCM liveness (was the kSigBtcmUartFrame 5050 heartbeat). The full
-        // canonical-frame payload reconstruction off GM8192_BTCM_TX (a kBitStream
-        // FIFO drained via read_bits_since + gm8192_rx_framer) is DEFERRED as too
-        // involved to do safely here — TODO(wire-truth Phase 4): reconstruct the
-        // BTCM frame off kWireGM8192_BTCM_TX through src/io/gm8192/gm8192_rx_framer
-        // when a frame consumer (IPC decode) needs the bytes. Until then we use a
-        // liveness PROXY: the total bit count advancing means the BTCM is
-        // transmitting (it broadcasts at 5 Hz), so we stamp btcm_uart_frame_ns.
-        // This keeps the ABS-phase / rear-EMB freshness gate (btcm_alive) live
-        // without decoding frame internals. @inferred 2026-06-17.
-        if (auto total = st.wire->btcm_tx_total_bits()) {
-            if (*total != st.btcm_tx_bits_last) {
-                st.btcm_tx_bits_last  = *total;
-                st.btcm_uart_frame_ns = st.now_ns();
-            }
-        }
-
         // GM-8192 frame snoop (Phase 1 IPC cluster): drain the PIM/BPM/BTCM/IPC
         // TX cells into the dashboard snapshot. The bit-streams self-pace, so
         // one step per tick replays every bit since the last.
         if (!st.bus_snoop.attached()) st.bus_snoop.Attach(st.wire->table());
         st.bus_snoop.Step(sim_time_s);
+        st.note_btcm_responses();
 
         // PIM cruise state (was kSigPimCruiseActive/SetpointMps 5360/5361) ->
         // PIM_CRUISE_ACTIVE + PIM_CRUISE_SETPOINT_MPS. The external sim declared these
@@ -3813,15 +3621,10 @@ void ExternalSimConnector::Tick(double sim_time_s) {
     //
     //    CONSUME: the inbound ECU cells this segment used to carry are now read
     //    from the WireTable in the §2c block above (RSA run-mode, AD contactor,
-    //    AD state, BTCM liveness). The solenoid (kSigSol* 5010-5013) and rear-EMB
-    //    (kSigRearMotor* 5014-5015) main-harness deltas were dropped as REDUNDANT:
-    //    BTCM publishes the SAME actuator state on the chassis cells
-    //    (CHASSIS_BTCM_ISO_CLOSE_* 4147/4148 and the BTCM_FRONT_MOD_* /
-    //    BTCM_REAR_EMB_* motor leads), GetAbsPhaseFront/GetRearEmbCmd PREFER the chassis source
-    //    per-wheel, and the chassis cells already arrive via apply_consumer_overlay
-    //    above. The st.sol_*/st.rear_motor_* fallback fields stay (the source-
-    //    preference logic still consults them) but are simply never written now;
-    //    the chassis path is authoritative.
+    //    AD state, BTCM liveness off the decoded $91). The BTCM's actuator
+    //    state is the chassis cells (CHASSIS_BTCM_ISO_CLOSE_* 4147/4148 and the
+    //    BTCM_FRONT_MOD_* / BTCM_REAR_EMB_* motor leads), which arrive via
+    //    apply_consumer_overlay above.
     //
     //    MIGRATED (the external sim declared the cells; gaps now closed):
     //      - PIM cruise active/setpoint (was 5360/5361 -> st.pim_cruise_*):

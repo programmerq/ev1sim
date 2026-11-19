@@ -823,16 +823,6 @@ bool WireTruthChassis::publish_ps_motor_case_temp_q8(std::uint16_t q8) {
     return write_uint16(ProducerWireId(electricsim::topology::kWireCHASSIS_PS_MOTOR_CASE_TEMP_Q8), q8);
 }
 
-std::optional<std::uint64_t> WireTruthChassis::btcm_tx_total_bits() const {
-    if (!attached()) return std::nullopt;
-    std::uint64_t total = 0;
-    if (!impl_->table->bit_stream_total(
-            electricsim::topology::kWireGM8192_BTCM_TX, &total)) {
-        return std::nullopt;  // undeclared / type mismatch
-    }
-    if (total == 0) return std::nullopt;  // nothing ever appended (BTCM silent)
-    return total;
-}
 
 electricsim::io::WireTable* WireTruthChassis::table() const {
     return impl_ ? impl_->table.get() : nullptr;
@@ -1274,9 +1264,6 @@ bool WireTruthChassis::publish_hv_isolation_fault(std::uint8_t, std::uint32_t) {
     return false;
 }
 bool WireTruthChassis::publish_ps_motor_case_temp_q8(std::uint16_t) { return false; }
-std::optional<std::uint64_t> WireTruthChassis::btcm_tx_total_bits() const {
-    return std::nullopt;
-}
 electricsim::io::WireTable* WireTruthChassis::table() const { return nullptr; }
 std::optional<bool> WireTruthChassis::pim_cruise_active() const {
     return std::nullopt;

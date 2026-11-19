@@ -53,42 +53,26 @@ Pure WireTable. ev1sim already opens the unified region via
 
 ## Consume migration map
 
-ev1sim's `main_transport` poll (`ExternalSimConnector.cpp` ~3276-3359) consumes:
+Each read the old `main_transport` poll carried, and where it comes from now:
 
-| ev1sim read | signal | wire path at electricsim head | status |
+| ev1sim read | was | wire path | status |
 |---|---|---|---|
-| RSA run-mode | 5711 | `RSA_RUN1_OUT` / `RSA_RUN2_OUT` (+ RHJB RUN1/RUN2 already read) | ✅ migratable (enum→bool remap) |
-| AD main contactor | 5224 | `APM_HV_CONTACTOR_CLOSED` | ✅ migratable |
-| AD state enum | `kSigAdStateEnum` | `AD_STATE_*` (confirm w/ electricsim) | ✅ likely |
-| BTCM canonical frame | 5050 | `GM8192_BTCM_TX` + `gm8192_rx_framer` | ✅ migratable (involved) |
-| Front ABS solenoids FL/FR ISO/DMP | `kSigSol*` | `CHASSIS_BTCM_ISO_CLOSE_*` / `DUMP_OPEN_*` (already read) | ✅ redundant w/ chassis |
-| Rear EMB motors LR/RR | `kSigRearMotor*` | `CHASSIS_BTCM_EMB_MOTOR_CMD_*` (already read) | ✅ redundant w/ chassis |
-| **PIM cruise active** | 5360 | — none — | ❌ GAP |
-| **PIM cruise setpoint** | 5361 | — none — | ❌ GAP |
-| **AD precharge relay** | 5225 | — none — | ❌ GAP |
+| RSA run-mode | 5711 | `RSA_RUN1_OUT` / `RSA_RUN2_OUT` (+ RHJB RUN1/RUN2) | ✅ done |
+| AD main contactor | 5224 | `APM_HV_CONTACTOR_CLOSED` | ✅ done |
+| AD state enum | `kSigAdStateEnum` | `AD_STATE_A/B/C` + `AD_POWER_SUPPLY` | ✅ done |
+| BTCM liveness and frame data | 5050 | `GM8192_BTCM_TX` → `gm8192_rx_framer` → `BusSnoop` $91 decode | ✅ done |
+| Front ABS solenoids FL/FR | 5010-5013 | `CHASSIS_BTCM_ISO_CLOSE_*` + `BTCM_FRONT_MOD_*` motor leads | ✅ done (chassis cells only) |
+| Rear EMB motors LR/RR | 5014/5015 | `BTCM_REAR_EMB_*` motor leads | ✅ done (chassis cells only) |
+| PIM cruise active / setpoint | 5360/5361 | `PIM_CRUISE_ACTIVE` / `PIM_CRUISE_SETPOINT_MPS` | ✅ done |
+| AD precharge relay | 5225 | `HV_ES_PRECHARGE_CONTACTOR` | ✅ done |
 
-Freshness: the main-bus consume keyed off frame `monotonic_time_ns` + windows
-(e.g. `kAbsFreshnessWindow`); the WireTable `written()` / generation contract
-replaces that.
+Freshness: each read is `written()`-gated. BTCM liveness is a valid $91 BTCM
+Data Response (framed, SumCheck good, N = 11) decoded within the window
+(`ExternalSimConnector::BtcmAlive`); the actuator cells are commanded state and
+stay authoritative while the BTCM is alive.
 
-## Gaps (blocked on electricsim — requested on PR #171)
-
-- **PIM cruise state** (5360/5361) — PIM publishes no cruise-state cell post-rip-out.
-- **AD precharge relay** (5225) + precharge sequence — no cell.
-
-Until those land, ev1sim's cruise readout + precharge-sequence logging stay dark.
-Consumers are `written()`-gated, so they degrade gracefully (like the aux-battery
-producer gap), not crash.
-
-## Sequencing
-
-ev1sim builds (stub fallback) against head regardless, so there's no hard
-deadline:
-1. **(this branch)** Rip out `SharedMemoryTransport`; migrate the ✅ reads; drop
-   the redundant frame-publish; fix the CMake stale-check. Connector compiles
-   against head as a real WireTable client again.
-2. **(electricsim)** declare the 3 gap cells (PR #171 ask).
-3. **(this branch)** wire the gap reads once the cells exist.
+Every row is migrated; the connector holds no `SharedMemoryTransport` and no
+legacy signal-id path for the BTCM.
 
 ## Preserved / out of scope
 

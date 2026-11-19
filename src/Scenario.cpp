@@ -1,5 +1,7 @@
 #include "Scenario.h"
 
+#include "BusSnoop.h"  // BtcmResponseField
+
 #include <algorithm>
 #include <cctype>
 #include <chrono>
@@ -395,15 +397,15 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
     // This MUST match the control path's window (SimApp::kAbsFreshnessWindow
     // = 3000 ms, the authoritative source of truth).  The two diverged once:
     // this stats-CSV observer read the same signals with a 200 ms window while
-    // the control path used 3000 ms.  Liveness comes from the BTCM's ~5 Hz
-    // canonical-frame heartbeat, and the observed inter-heartbeat gap can
-    // stretch past 200 ms, so the observer wrongly declared the BTCM dead and
+    // the control path used 3000 ms.  Liveness comes from the BTCM's 120 ms
+    // $91 Data Response, and the observed gap between frames can stretch
+    // past 200 ms, so the observer wrongly declared the BTCM dead and
     // emitted the -1 no-data sentinel for a phase that was actually live (and
     // that the control path, on 3000 ms, still saw).  Keep the two in lockstep.
     //
     // That gap is measured in sim time now — see
     // ExternalSimConnector::SetSimTime.  The previous version of this comment
-    // said the heartbeat is "paced in sim time"; it is not.  The producer paces
+    // said the frames are "paced in sim time"; it is not.  The producer paces
     // its bit-level output on its own host clock, which is the second finding
     // in DECISION_QUEUE.md.
     constexpr auto kAbsPhaseFreshness = std::chrono::milliseconds(3000);
@@ -735,6 +737,18 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
         // torque the BTCM is asking the propulsion side to produce.
         else if (f == "btcm_retard_request_duty_q8")
             m_csv << static_cast<int>(bus.GetBtcmRetardRequestDutyQ8());
+        // The BTCM's $91 Data Response decoded off its serial line,
+        // "btcm91_<field>" (BusSnoop.h BtcmResponseField); blank until a $91
+        // is decoded and again once it goes stale.
+        else if (f.rfind("btcm91_", 0) == 0) {
+            const std::string name = f.substr(7);
+            if (!BtcmResponseField(DashBrakeStatus{}, name)) {
+                WarnUnknownField(f);
+                m_csv << "";
+            } else if (const auto b = bus.GetDashSnapshot().brake) {
+                m_csv << *BtcmResponseField(*b, name);
+            }
+        }
         // PIM coast-down drag (CHASSIS_PIM_COAST_DRAG_NM), Nm at the motor
         // shaft; -1 until the PIM has written it.
         else if (f == "pim_coast_drag_nm")

@@ -134,20 +134,96 @@ TEST_CASE("BusSnoop: $90 bargraph counts the highest lit bar", "[bus_snoop]") {
     REQUIRE(snoop.Snapshot(0.0).power_bars == std::optional<std::uint8_t>(11u));
 }
 
-TEST_CASE("BusSnoop: $91 BTCM Data Response gives the brake status bits", "[bus_snoop]") {
+TEST_CASE("BusSnoop: $91 BTCM Data Response decodes every field", "[bus_snoop]") {
     BusSnoop snoop;
     // [2] Park Brake (b0) + Service Brake Telltale (b2) + ABS/TCS Active (b5)
-    std::uint8_t p[11] = {};
-    p[0] = 0x25u;
+    //     + Wheel Speed valid (b7)
+    // [3] Redundant Retard Request count 35 (coastdown band)
+    // [4..11] TAU LF 0x0102, RF 0x0304, LR 0xA0B0, RR 0xFFFF
+    // [12] Service Soon request (b0) + TIM vehicle accelerating (b3)
+    const std::uint8_t p[11] = {0xA5u, 35u, 0x01u, 0x02u, 0x03u, 0x04u,
+                                0xA0u, 0xB0u, 0xFFu, 0xFFu, 0x09u};
     REQUIRE(snoop.DecodeFrame(0x91u, p, 11u, 0.0));
+    REQUIRE(snoop.btcm_responses() == 1u);
 
     const auto b = snoop.Snapshot(0.0).brake;
     REQUIRE(b);
-    REQUIRE(b->park_brake);
-    REQUIRE_FALSE(b->service_brake);
-    REQUIRE(b->brake_tt);
-    REQUIRE_FALSE(b->antilock_tt);
-    REQUIRE(b->abs_tcs_active);
+    CHECK(b->park_brake);
+    CHECK_FALSE(b->service_brake);
+    CHECK(b->brake_tt);
+    CHECK_FALSE(b->antilock_tt);
+    CHECK_FALSE(b->redundant_regen_disable);
+    CHECK(b->abs_tcs_active);
+    CHECK_FALSE(b->retard_achieved_fault);
+    CHECK(b->wheel_speed_valid);
+    CHECK(b->retard_request_count == 35u);
+    CHECK(b->retard_band == ev1sim::DashRetardBand::kCoastdown);
+    CHECK_THAT(b->coastdown_reduction_pct, WithinAbs(50.0, 1e-6));
+    CHECK(b->wheel_tau[0] == 0x0102u);
+    CHECK(b->wheel_tau[1] == 0x0304u);
+    CHECK(b->wheel_tau[2] == 0xA0B0u);
+    CHECK(b->wheel_tau[3] == 0xFFFFu);
+    CHECK(b->service_soon_req);
+    CHECK_FALSE(b->front_power_assist);
+    CHECK_FALSE(b->tim_wheel_accel);
+    CHECK(b->tim_vehicle_accel);
+    CHECK_FALSE(b->tim_accel_limit);
+
+    // The other half of each flag byte.
+    const std::uint8_t q[11] = {0x5Au, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 0x16u};
+    REQUIRE(snoop.DecodeFrame(0x91u, q, 11u, 0.0));
+    const auto c = snoop.Snapshot(0.0).brake;
+    REQUIRE(c);
+    CHECK_FALSE(c->park_brake);
+    CHECK(c->service_brake);
+    CHECK_FALSE(c->brake_tt);
+    CHECK(c->antilock_tt);
+    CHECK(c->redundant_regen_disable);
+    CHECK_FALSE(c->abs_tcs_active);
+    CHECK(c->retard_achieved_fault);
+    CHECK_FALSE(c->wheel_speed_valid);
+    CHECK_FALSE(c->service_soon_req);
+    CHECK(c->front_power_assist);
+    CHECK(c->tim_wheel_accel);
+    CHECK_FALSE(c->tim_vehicle_accel);
+    CHECK(c->tim_accel_limit);
+    CHECK(snoop.btcm_responses() == 2u);
+}
+
+TEST_CASE("BusSnoop: $91 retard request reads its two count bands", "[bus_snoop]") {
+    ev1sim::DashBrakeStatus s;
+    using Band = ev1sim::DashRetardBand;
+
+    ev1sim::DecodeRetardRequest(25u, s);  // full coastdown drag reduction
+    CHECK(s.retard_band == Band::kCoastdown);
+    CHECK_THAT(s.coastdown_reduction_pct, WithinAbs(100.0, 1e-6));
+    ev1sim::DecodeRetardRequest(45u, s);  // no reduction
+    CHECK(s.retard_band == Band::kCoastdown);
+    CHECK_THAT(s.coastdown_reduction_pct, WithinAbs(0.0, 1e-6));
+
+    ev1sim::DecodeRetardRequest(46u, s);  // braking from 0 Nm
+    CHECK(s.retard_band == Band::kBraking);
+    CHECK_THAT(s.braking_retard_nm, WithinAbs(0.0, 1e-6));
+    CHECK_THAT(s.coastdown_reduction_pct, WithinAbs(0.0, 1e-6));
+    ev1sim::DecodeRetardRequest(230u, s);  // 184 counts x 10.875 = 2001 Nm
+    CHECK(s.retard_band == Band::kBraking);
+    CHECK_THAT(s.braking_retard_nm, WithinAbs(2001.0, 1e-3));
+
+    ev1sim::DecodeRetardRequest(24u, s);
+    CHECK(s.retard_band == Band::kOutOfRange);
+    CHECK_THAT(s.braking_retard_nm, WithinAbs(0.0, 1e-6));
+    ev1sim::DecodeRetardRequest(231u, s);
+    CHECK(s.retard_band == Band::kOutOfRange);
+    CHECK(s.retard_request_count == 231u);
+}
+
+TEST_CASE("BusSnoop: a $91 with the wrong length is not a BTCM response", "[bus_snoop]") {
+    BusSnoop snoop;
+    const std::uint8_t p[11] = {};
+    REQUIRE_FALSE(snoop.DecodeFrame(0x91u, p, 10u, 0.0));
+    CHECK(snoop.btcm_responses() == 0u);
+    CHECK(snoop.frames_rejected() == 1u);
+    CHECK_FALSE(snoop.Snapshot(0.0).brake);
 }
 
 TEST_CASE("BusSnoop: $21 DSCM Data Response gives the 22-bit season odometer", "[bus_snoop]") {

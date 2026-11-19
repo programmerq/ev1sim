@@ -105,7 +105,7 @@ private:
     /// @param local_front_brake  the local (driver-commanded) front brake ratio [0..1]
     void ApplyAbsFrontBrake(double time, double dt_s, double local_front_brake);
 
-    // Consume BTCM rear-motor commands (kSigRearMotorLR/RR), compute
+    // Consume BTCM rear-motor commands (the rear apply motors' leads), compute
     // self-energizing drum torque per wheel using the current wheel omega,
     // and apply the resulting brake ratio to Chrono's rear axle.  When
     // BTCM data is stale or missing, falls back to the local rear-brake
@@ -288,13 +288,11 @@ private:
     /// both run loops.
     void PublishRsaConsoleButtons(double dt_s);
 
-    // Freshness window for BTCM liveness signal (kSigBtcmUartFrame
-    // heartbeat).  See ExternalSimConnector::GetAbsPhaseFront for the
-    // architecture: liveness comes from the BTCM's 5 Hz
-    // canonical-frame heartbeat (200 ms cadence per the
-    // BTCM_UART_FRAME_BROADCAST_PERIOD_MS contract), and iso/dump
-    // pin states are persistent commanded state — they don't have
-    // their own freshness check.  The 3-second window matches the
+    // Freshness window for BTCM liveness.  See
+    // ExternalSimConnector::GetAbsPhaseFront for the architecture: liveness
+    // comes from the BTCM's $91 Data Response, decoded off its serial line
+    // (120 ms cadence), and iso/dump pin states are persistent commanded
+    // state — they don't have their own freshness check.  The 3-second window matches the
     // tightest peer-side BTCM-loss tolerance documented in the EV1
     // manual corpus (IPC DTC 015 "Loss of BTCM Eavesdrop", page 27
     // of the EV1 electrical service manual): a shorter window would
@@ -308,7 +306,7 @@ private:
     static constexpr std::chrono::milliseconds kAbsFreshnessWindow{3000};
 
     // Rear EMB drum brake state (BTCM rear-motor integration).
-    // The ApplyRearEmbBrake helper consumes kSigRearMotorLR/RR (5014/5015),
+    // The ApplyRearEmbBrake helper consumes the rear apply motors' commands,
     // converts the float command to a shoe force (holding it through an
     // anti-lock HOLD), computes torque via the
     // BrakeDrum self-energizing model, and applies per-wheel rear brake

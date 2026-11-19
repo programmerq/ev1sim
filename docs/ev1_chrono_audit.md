@@ -1108,8 +1108,8 @@ overshoot as a known plant limitation.
 ### Rear brake — self-energizing drum with electric actuator
 
 EV1 service manuals describe the rear brakes as drums driven by an
-electric motor at each wheel (kSigRearMotorLR/RR are already published
-by BTCM).  No hydraulic line, no shoe-return spring assist — the motor
+electric motor at each wheel (BTCM drives each motor's apply and release
+leads, `BTCM_REAR_EMB_{LR,RR}_{APPLY,RELEASE}`).  No hydraulic line, no shoe-return spring assist — the motor
 drives a leadscrew-like mechanism that pushes the shoes outward.
 
 Self-energizing drum behavior summary:
@@ -1135,12 +1135,12 @@ As wheel speed `|omega| → 0`:
 
 **Where it should live**:
 - `electricsim/ev1/btcm/`: model the **commanded shoe force** based on
-  motor current and travel.  Already publishing `kSigRearMotorLR/RR`;
+  motor current and travel.  Already driving the rear motor leads;
   needs a force-vs-current curve.  Real EV1 fuse ratings + steady-state
   motor current limits are the spec inputs (manual hints).
 - `ev1sim/src/`: model the **physics of the drum** (T_brake formula
   above) and apply per-wheel torque to Chrono.  Reads
-  `kSigRearMotorLR/RR` for force command, reads `wheel_omega_rl/rr`
+  the rear motor leads for force command, reads `wheel_omega_rl/rr`
   from physics for the self-energizing factor.  Mirrors the existing
   front-brake bus-mediated path (`ApplyAbsFrontBrake` / `ApplyFrontBrakePerWheel`).
 
