@@ -57,6 +57,15 @@ static constexpr WireId ReadOnlyWireId(electricsim::io::ConductorId id) {
     return static_cast<WireId>(id);
 }
 
+// EffectWireId — the numeric id of a `class: effect` cell, for the same
+// registry-driven read path. An effect (a lamp lit, a blower turning, a motor's
+// current) is written by its load only while the load holds power; ev1sim reads
+// the outcome. ev1sim's producer path never takes an effect id, so this
+// conversion feeds reads only.
+static constexpr WireId EffectWireId(electricsim::io::EffectId id) {
+    return static_cast<WireId>(id);
+}
+
 namespace ev1sim {
 
 // ---------------------------------------------------------------------------
@@ -528,7 +537,7 @@ static const std::unordered_map<std::uint32_t, ConsumerCell>& ConsumerRegistry()
         // the ON half of a flash. electricsim docs/3d_sim_contract.md 2.6.
         {4096U, {ReadOnlyWireId(kWireTURN_TICK_SOUNDER_DRIVE),          WireType::kBit}},
         // Motor current (float32)
-        {4072U, {kWireCHASSIS_MOTOR_CURRENT_A,          WireType::kFloat32}},
+        {4072U, {EffectWireId(kWireCHASSIS_MOTOR_CURRENT_A),          WireType::kFloat32}},
         // PIM commanded throttle (byte, PIM -> ev1sim). MISSING from the
         // original wire-truth consumer set: the ring used to deliver 4073 as a
         // 1-byte delta into DebugInjectU8, and the wire-truth migration ported the
@@ -546,8 +555,8 @@ static const std::unordered_map<std::uint32_t, ConsumerCell>& ConsumerRegistry()
         {4080U, {kWireCHASSIS_WIPER_MOTOR_COMMAND,      WireType::kByte}},
         {4081U, {kWireCHASSIS_WASHER_PUMP_COMMAND,      WireType::kBit}},
         // HVAC blower level + defrost grid (byte / bit)
-        {4082U, {kWireCHASSIS_HVAC_BLOWER_LEVEL,        WireType::kByte}},
-        {4083U, {kWireCHASSIS_DEFROST_GRID_ACTIVE,      WireType::kBit}},
+        {4082U, {EffectWireId(kWireCHASSIS_HVAC_BLOWER_LEVEL),        WireType::kByte}},
+        {4083U, {EffectWireId(kWireCHASSIS_DEFROST_GRID_ACTIVE),      WireType::kBit}},
         // RSA shift-blocked cue (bit)
         {4088U, {kWireCHASSIS_RSA_SHIFT_BLOCKED,        WireType::kBit}},
         // IPC seatbelt telltale (bit)
@@ -777,10 +786,10 @@ ev1sim::DashRsaConsole WireTruthChassis::rsa_console() const {
     c.security      = read_bit(ReadOnlyWireId(kWireCHASSIS_SECURITY_TELLTALE));
     c.shift_blocked = read_bit(kWireCHASSIS_RSA_SHIFT_BLOCKED);
     c.btsi_solenoid = rsa_btsi_energised();
-    c.led_park      = read_bit(kWireCHASSIS_RSA_SELECTOR_LED_PARK);
-    c.led_reverse   = read_bit(kWireCHASSIS_RSA_SELECTOR_LED_REVERSE);
-    c.led_neutral   = read_bit(kWireCHASSIS_RSA_SELECTOR_LED_NEUTRAL);
-    c.led_drive     = read_bit(kWireCHASSIS_RSA_SELECTOR_LED_DRIVE);
+    c.led_park      = read_bit(EffectWireId(kWireCHASSIS_RSA_SELECTOR_LED_PARK));
+    c.led_reverse   = read_bit(EffectWireId(kWireCHASSIS_RSA_SELECTOR_LED_REVERSE));
+    c.led_neutral   = read_bit(EffectWireId(kWireCHASSIS_RSA_SELECTOR_LED_NEUTRAL));
+    c.led_drive     = read_bit(EffectWireId(kWireCHASSIS_RSA_SELECTOR_LED_DRIVE));
     {
         electricsim::io::WireTable::Sample<std::uint16_t> dim;
         if (attached() && impl_->table->read_uint16_sample(kWireRSA_ES_DIM_LEVEL_DRV, &dim) &&

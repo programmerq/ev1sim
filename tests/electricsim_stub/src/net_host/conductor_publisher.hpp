@@ -23,6 +23,7 @@
 #include <cstdint>
 
 #include "../io/wire_table.hpp"
+#include "topology/topology_generated.h"
 
 namespace electricsim {
 namespace net_host {
@@ -38,11 +39,20 @@ class ConductorPublisher {
   // way to check that here, which is precisely why the capability is scoped to this
   // class instead of being a flag on a call: the check is "who is allowed to hold
   // the token", and the answer is one class in one file.
+  //
+  // A conductor published dark also zeroes every effect it grants
+  // (config/topology.yaml `granted_by:`), so a load's outcome stops on the tick the load
+  // loses power.
   bool publish(io::ConductorId id, bool energised) {
     const bool ok = table_->publish_conductor(id, energised, token_);
     if (ok) {
       ++published_;
       if (energised) ++energised_;
+      else {
+        for (const auto& g : ::electricsim::topology::kEffectGrants) {
+          if (g.conductor == id) table_->clear_effect(g.effect, token_);
+        }
+      }
     } else {
       ++refused_;
     }
