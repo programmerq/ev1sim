@@ -1539,6 +1539,9 @@ struct ExternalSimConnector::State {
     std::uint64_t chassis_btcm_front_release_fr_ns = 0;
     std::uint64_t chassis_btcm_emb_motor_lr_ns = 0;
     std::uint64_t chassis_btcm_emb_motor_rr_ns = 0;
+    // The rear park latch motors' drive (+1 latch, -1 unlatch, 0 undriven).
+    std::int8_t   chassis_btcm_park_latch_lr   = 0;
+    std::int8_t   chassis_btcm_park_latch_rr   = 0;
     std::uint64_t chassis_btcm_cyl_press_fl_ns = 0;
     std::uint64_t chassis_btcm_cyl_press_fr_ns = 0;
 
@@ -2515,6 +2518,10 @@ ExternalSimConnector::RearEmbCmd ExternalSimConnector::GetRearEmbCmd(
     r.rr = st.chassis_btcm_emb_motor_rr;
     r.lr_fresh = btcm_alive && st.chassis_btcm_emb_motor_lr_ns != 0;
     r.rr_fresh = btcm_alive && st.chassis_btcm_emb_motor_rr_ns != 0;
+    // The latch motors are read whether or not the BTCM is alive: a dark
+    // BTCM's latch leads read undriven, and the latch stays where it is.
+    r.lr_latch = st.chassis_btcm_park_latch_lr;
+    r.rr_latch = st.chassis_btcm_park_latch_rr;
     return r;
 }
 
@@ -2627,6 +2634,11 @@ void ExternalSimConnector::DebugInjectPimCoastDragNm(float drag_nm) {
 void ExternalSimConnector::DebugInjectBtcmMotorLeads(BrakeMotor motor, float drive,
                                                      float release) {
     m_state->apply_btcm_motor_leads(motor, drive, release);
+}
+
+void ExternalSimConnector::DebugInjectBtcmParkLatch(bool left, std::int8_t drive) {
+    (left ? m_state->chassis_btcm_park_latch_lr
+          : m_state->chassis_btcm_park_latch_rr) = drive;
 }
 
 void ExternalSimConnector::DebugInjectBusFrame(std::uint8_t id, const std::uint8_t* payload,
@@ -3266,6 +3278,10 @@ void ExternalSimConnector::Tick(double sim_time_s) {
                 if (auto leads = st.wire->btcm_motor_leads(wire_motor))
                     st.apply_btcm_motor_leads(motor, leads->drive, leads->release);
             }
+            if (auto d = st.wire->btcm_park_latch_drive(true))
+                st.chassis_btcm_park_latch_lr = *d;
+            if (auto d = st.wire->btcm_park_latch_drive(false))
+                st.chassis_btcm_park_latch_rr = *d;
         }
         // Window motor commands from the motor legs at the junction blocks.
         for (int side = 0; side < 2; ++side) {

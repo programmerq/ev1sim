@@ -10,7 +10,7 @@
 # an opaque identifier, recorded so a reader can tell WHICH upstream state
 # this copy reflects — without it the manifest says the copy is consistent
 # but not what it is consistent with.
-provenance e313c3594d30f6e074b99730fec43f67062f986e
+provenance c2a5f3846a3bdd7561adaa6257db9e2270013e1d
 count 19
 5a570102b2976acab79c691b2ea5ddda0fd3d57ce93b042207093f2cdb78461d  src/io/ev1_chassis_signals.hpp
 43f11cacc108aba17425ce315b20200755871045bcc92a98aecf19106fce498c  src/io/gm8192/gm8192_frame.c
@@ -22,7 +22,7 @@ d24d694d050610443cc3cecc989178bc6e8c5be472f724d700f01f5f528ae42e  src/io/topolog
 31f223e113e23c2b8bcafa44ceec21ef9df07c3f4b6bea2806e34a6b603a819f  src/io/topology/feed_query.hpp
 e9240d547fd263e4ecd4f8b9a9a98146fda939c8bcb80cf66a25d99cc79023b5  src/io/topology/power_grant.hpp
 f68e4031181b914cdb665797b5ffa296b9e5b4f2a2f50374e49b9a3679f790e6  src/io/topology/shm_test_helpers.hpp
-4974c9396c81177703ffd7a0c91feb16f54fd5ad7b3365e986a30acdf665eb55  src/io/topology/topology_generated.h
+65e387f3b66447aafaecff2d7154be0f4f85e10f31a2d20f054b6cfb1f9c7df1  src/io/topology/topology_generated.h
 1f1927b0c839c5903e22a50593d7e1a47ae440119e5ab62750374cb638587ad3  src/io/topology/wire_defaults.hpp
 b957dd474efdd69b0defaefd9a7303784bbcc2b6f31ff3390c95c8fecf7171b0  src/io/uart/uart_rx.cpp
 044f6ceb817a8673ce0e378f6d13691dba1661cf1d2c2aa3f22572e7ce43c2e6  src/io/uart/uart_rx.hpp

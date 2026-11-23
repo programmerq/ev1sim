@@ -49,6 +49,7 @@ public:
     void TurnSignalRight()   override;
     void HazardToggle()      override;
     void IpcTripResetPress() override;
+    void ParkBrakePress() override;
     void CruiseSet()         override;
     void CruiseResume()      override;
     void CruiseCancel()      override;
@@ -306,14 +307,14 @@ private:
     static constexpr std::chrono::milliseconds kAbsFreshnessWindow{3000};
 
     // Rear EMB drum brake state (BTCM rear-motor integration).
-    // The ApplyRearEmbBrake helper consumes the rear apply motors' commands,
-    // converts the float command to a shoe force (holding it through an
-    // anti-lock HOLD), computes torque via the
+    // The ApplyRearEmbBrake helper consumes the rear apply motors' commands
+    // and park latch drives, converts them to a shoe force (RearEmbClamp),
+    // computes torque via the
     // BrakeDrum self-energizing model, and applies per-wheel rear brake
     // ratio against the BrakeSimple max torque.
     bool m_rear_lr_was_fresh = false;
     bool m_rear_rr_was_fresh = false;
-    /// Per-corner clamp state: a HOLD (command 0) keeps the last force.
+    /// Per-corner clamp state: actuator travel and park latch.
     ev1sim::RearEmbClamp m_rear_clamp_rl;
     ev1sim::RearEmbClamp m_rear_clamp_rr;
     /// Rear brake "Maximum Torque" (N·m) — converts the physical drum torque

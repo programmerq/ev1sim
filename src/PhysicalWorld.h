@@ -417,6 +417,10 @@ public:
     }
     bool pushed() const { return m_button.pushed(); }
 
+    /// One press, independent of the requested level (a scenario's
+    /// park_brake_press).
+    void press() { m_button.queue_press(); }
+
 private:
     bool            m_seen      = false;
     bool            m_requested = false;   // latest driver request

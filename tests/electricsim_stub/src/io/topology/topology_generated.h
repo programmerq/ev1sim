@@ -27,15 +27,15 @@
 namespace electricsim::topology {
 
 inline constexpr std::uint32_t kFormatVersion = 2U;
-inline constexpr std::uint32_t kTopologyHash = 0x6B451999U;
-inline constexpr std::size_t kWireCount = 633;
+inline constexpr std::uint32_t kTopologyHash = 0x1061B825U;
+inline constexpr std::size_t kWireCount = 643;
 
 // Per-class cell counts. Emitted so a
 // receipt can print the classification without re-parsing YAML,
 // and so a test can assert against them. The legacy count is held
 // by a DECREASING ratchet in the generator that fails on !=.
-inline constexpr std::size_t kConductorCellCount = 248;
-inline constexpr std::size_t kElementStateCellCount = 183;
+inline constexpr std::size_t kConductorCellCount = 253;
+inline constexpr std::size_t kElementStateCellCount = 188;
 inline constexpr std::size_t kSemanticCellCount = 183;
 inline constexpr std::size_t kUnclassifiedLegacyCellCount = 9;
 inline constexpr std::size_t kEffectCellCount = 10;
@@ -440,6 +440,7 @@ inline constexpr ::electricsim::io::ElementStateId kWireHTCM_ES_VEHICLE_WAKE_DRI
 inline constexpr ::electricsim::io::ElementStateId kWireBPM_ES_VEHICLE_WAKE_DRIVE{1402U};
 inline constexpr ::electricsim::io::ConductorId kWireBPM_VEHICLE_WAKE_UP_IN{1403U};
 inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_CHARGE_COUPLER_MATED{1404U};
+inline constexpr ::electricsim::io::ElementStateId kWireCHARGER_ES_RECEPTACLE_WAKE_CONTACT{1837U};
 inline constexpr ::electricsim::io::ConductorId kWirePIM_COUPLER_PRESENT_IN{1405U};
 inline constexpr ::electricsim::io::ConductorId kWireBPM_CHARGE_PORT_TEMP_CIRCUIT_IN{1407U};
 inline constexpr ::electricsim::io::ConductorId kWireHTCM_VEHICLE_WAKE_UP_IN{1406U};
@@ -620,6 +621,7 @@ inline constexpr ::electricsim::io::EffectId kWireAPM_HV_INPUT_CURRENT_Q8{424U};
 inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_PARK_BRAKE_SWITCH{1300U};
 inline constexpr ::electricsim::io::ConductorId kWireBTCM_PARK_BRAKE_WAKE_2031{1301U};
 inline constexpr ::electricsim::io::ConductorId kWireBTCM_PARK_BRAKE_IDLE_1134{1302U};
+inline constexpr ::electricsim::io::ConductorId kWireBTCM_PARK_BRAKE_WAKE_2031_MV{1838U};
 inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_BRAKE_SWITCH{1307U};
 inline constexpr ::electricsim::io::ConductorId kWirePIM_BRAKE_SWITCH_IN{1308U};
 inline constexpr ::electricsim::io::ConductorId kWireBTCM_FRONT_MOD_LF_RESTORE{1309U};
@@ -640,6 +642,14 @@ inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REAR_EMB_RR_APPL
 inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REAR_EMB_RR_RELEASE{1324U};
 inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REAR_EMB_LR_DUTY{1327U};
 inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REAR_EMB_RR_DUTY{1328U};
+inline constexpr ::electricsim::io::ConductorId kWireBTCM_REAR_PARK_LR_LATCH{1839U};
+inline constexpr ::electricsim::io::ConductorId kWireBTCM_REAR_PARK_LR_UNLATCH{1840U};
+inline constexpr ::electricsim::io::ConductorId kWireBTCM_REAR_PARK_RR_LATCH{1841U};
+inline constexpr ::electricsim::io::ConductorId kWireBTCM_REAR_PARK_RR_UNLATCH{1842U};
+inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REAR_PARK_LR_LATCH{1843U};
+inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REAR_PARK_LR_UNLATCH{1844U};
+inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REAR_PARK_RR_LATCH{1845U};
+inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REAR_PARK_RR_UNLATCH{1846U};
 inline constexpr ::electricsim::io::ElementStateId kWireCHASSIS_ES_MASTER_CYL_PRESSURE{1329U};
 inline constexpr ::electricsim::io::ConductorId kWireBTCM_MC1_PRESSURE_IN{1330U};
 inline constexpr ::electricsim::io::ConductorId kWireBTCM_MC2_PRESSURE_IN{1331U};
@@ -1503,6 +1513,8 @@ inline constexpr auto kWireBPM_VEHICLE_WAKE_UP_IN_Default = false;
 inline constexpr InitPolicy kWireBPM_VEHICLE_WAKE_UP_IN_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireDRIVER_ES_CHARGE_COUPLER_MATED_Default = false;
 inline constexpr InitPolicy kWireDRIVER_ES_CHARGE_COUPLER_MATED_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireCHARGER_ES_RECEPTACLE_WAKE_CONTACT_Default = false;
+inline constexpr InitPolicy kWireCHARGER_ES_RECEPTACLE_WAKE_CONTACT_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWirePIM_COUPLER_PRESENT_IN_Default = false;
 inline constexpr InitPolicy kWirePIM_COUPLER_PRESENT_IN_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireBPM_CHARGE_PORT_TEMP_CIRCUIT_IN_Default = false;
@@ -1863,6 +1875,8 @@ inline constexpr auto kWireBTCM_PARK_BRAKE_WAKE_2031_Default = false;
 inline constexpr InitPolicy kWireBTCM_PARK_BRAKE_WAKE_2031_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireBTCM_PARK_BRAKE_IDLE_1134_Default = false;
 inline constexpr InitPolicy kWireBTCM_PARK_BRAKE_IDLE_1134_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireBTCM_PARK_BRAKE_WAKE_2031_MV_Default = 0x0U;
+inline constexpr InitPolicy kWireBTCM_PARK_BRAKE_WAKE_2031_MV_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireDRIVER_ES_BRAKE_SWITCH_Default = false;
 inline constexpr InitPolicy kWireDRIVER_ES_BRAKE_SWITCH_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWirePIM_BRAKE_SWITCH_IN_Default = false;
@@ -1903,6 +1917,22 @@ inline constexpr auto kWireBTCM_ES_REAR_EMB_LR_DUTY_Default = static_cast<std::u
 inline constexpr InitPolicy kWireBTCM_ES_REAR_EMB_LR_DUTY_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireBTCM_ES_REAR_EMB_RR_DUTY_Default = static_cast<std::uint16_t>(0x0U);
 inline constexpr InitPolicy kWireBTCM_ES_REAR_EMB_RR_DUTY_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireBTCM_REAR_PARK_LR_LATCH_Default = false;
+inline constexpr InitPolicy kWireBTCM_REAR_PARK_LR_LATCH_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireBTCM_REAR_PARK_LR_UNLATCH_Default = false;
+inline constexpr InitPolicy kWireBTCM_REAR_PARK_LR_UNLATCH_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireBTCM_REAR_PARK_RR_LATCH_Default = false;
+inline constexpr InitPolicy kWireBTCM_REAR_PARK_RR_LATCH_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireBTCM_REAR_PARK_RR_UNLATCH_Default = false;
+inline constexpr InitPolicy kWireBTCM_REAR_PARK_RR_UNLATCH_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireBTCM_ES_REAR_PARK_LR_LATCH_Default = false;
+inline constexpr InitPolicy kWireBTCM_ES_REAR_PARK_LR_LATCH_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireBTCM_ES_REAR_PARK_LR_UNLATCH_Default = false;
+inline constexpr InitPolicy kWireBTCM_ES_REAR_PARK_LR_UNLATCH_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireBTCM_ES_REAR_PARK_RR_LATCH_Default = false;
+inline constexpr InitPolicy kWireBTCM_ES_REAR_PARK_RR_LATCH_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireBTCM_ES_REAR_PARK_RR_UNLATCH_Default = false;
+inline constexpr InitPolicy kWireBTCM_ES_REAR_PARK_RR_UNLATCH_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireCHASSIS_ES_MASTER_CYL_PRESSURE_Default = static_cast<std::uint16_t>(0x0U);
 inline constexpr InitPolicy kWireCHASSIS_ES_MASTER_CYL_PRESSURE_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireBTCM_MC1_PRESSURE_IN_Default = static_cast<std::uint16_t>(0x0U);
@@ -2386,6 +2416,7 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBPM_ES_VEHICLE_WAKE_DRIVE), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBPM_VEHICLE_WAKE_UP_IN), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_CHARGE_COUPLER_MATED), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireCHARGER_ES_RECEPTACLE_WAKE_CONTACT), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWirePIM_COUPLER_PRESENT_IN), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBPM_CHARGE_PORT_TEMP_CIRCUIT_IN), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireHTCM_VEHICLE_WAKE_UP_IN), ::electricsim::io::WireType::kBit) && ok;
@@ -2566,6 +2597,7 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_PARK_BRAKE_SWITCH), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_PARK_BRAKE_WAKE_2031), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_PARK_BRAKE_IDLE_1134), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_PARK_BRAKE_WAKE_2031_MV), ::electricsim::io::WireType::kUint32) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_BRAKE_SWITCH), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWirePIM_BRAKE_SWITCH_IN), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_FRONT_MOD_LF_RESTORE), ::electricsim::io::WireType::kBit) && ok;
@@ -2586,6 +2618,14 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_RELEASE), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_LR_DUTY), ::electricsim::io::WireType::kUint16) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_DUTY), ::electricsim::io::WireType::kUint16) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_PARK_LR_LATCH), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_PARK_LR_UNLATCH), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_PARK_RR_LATCH), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_PARK_RR_UNLATCH), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_PARK_LR_LATCH), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_PARK_LR_UNLATCH), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_PARK_RR_LATCH), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_PARK_RR_UNLATCH), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireCHASSIS_ES_MASTER_CYL_PRESSURE), ::electricsim::io::WireType::kUint16) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_MC1_PRESSURE_IN), ::electricsim::io::WireType::kUint16) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_MC2_PRESSURE_IN), ::electricsim::io::WireType::kUint16) && ok;
@@ -3027,6 +3067,7 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case static_cast<::electricsim::io::WireId>(kWireBPM_ES_VEHICLE_WAKE_DRIVE): return "BPM_ES_VEHICLE_WAKE_DRIVE";
     case static_cast<::electricsim::io::WireId>(kWireBPM_VEHICLE_WAKE_UP_IN): return "BPM_VEHICLE_WAKE_UP_IN";
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_CHARGE_COUPLER_MATED): return "DRIVER_ES_CHARGE_COUPLER_MATED";
+    case static_cast<::electricsim::io::WireId>(kWireCHARGER_ES_RECEPTACLE_WAKE_CONTACT): return "CHARGER_ES_RECEPTACLE_WAKE_CONTACT";
     case static_cast<::electricsim::io::WireId>(kWirePIM_COUPLER_PRESENT_IN): return "PIM_COUPLER_PRESENT_IN";
     case static_cast<::electricsim::io::WireId>(kWireBPM_CHARGE_PORT_TEMP_CIRCUIT_IN): return "BPM_CHARGE_PORT_TEMP_CIRCUIT_IN";
     case static_cast<::electricsim::io::WireId>(kWireHTCM_VEHICLE_WAKE_UP_IN): return "HTCM_VEHICLE_WAKE_UP_IN";
@@ -3207,6 +3248,7 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_PARK_BRAKE_SWITCH): return "DRIVER_ES_PARK_BRAKE_SWITCH";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_PARK_BRAKE_WAKE_2031): return "BTCM_PARK_BRAKE_WAKE_2031";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_PARK_BRAKE_IDLE_1134): return "BTCM_PARK_BRAKE_IDLE_1134";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_PARK_BRAKE_WAKE_2031_MV): return "BTCM_PARK_BRAKE_WAKE_2031_MV";
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_BRAKE_SWITCH): return "DRIVER_ES_BRAKE_SWITCH";
     case static_cast<::electricsim::io::WireId>(kWirePIM_BRAKE_SWITCH_IN): return "PIM_BRAKE_SWITCH_IN";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_FRONT_MOD_LF_RESTORE): return "BTCM_FRONT_MOD_LF_RESTORE";
@@ -3227,6 +3269,14 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_RELEASE): return "BTCM_ES_REAR_EMB_RR_RELEASE";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_LR_DUTY): return "BTCM_ES_REAR_EMB_LR_DUTY";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_DUTY): return "BTCM_ES_REAR_EMB_RR_DUTY";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_PARK_LR_LATCH): return "BTCM_REAR_PARK_LR_LATCH";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_PARK_LR_UNLATCH): return "BTCM_REAR_PARK_LR_UNLATCH";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_PARK_RR_LATCH): return "BTCM_REAR_PARK_RR_LATCH";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_PARK_RR_UNLATCH): return "BTCM_REAR_PARK_RR_UNLATCH";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_PARK_LR_LATCH): return "BTCM_ES_REAR_PARK_LR_LATCH";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_PARK_LR_UNLATCH): return "BTCM_ES_REAR_PARK_LR_UNLATCH";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_PARK_RR_LATCH): return "BTCM_ES_REAR_PARK_RR_LATCH";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_PARK_RR_UNLATCH): return "BTCM_ES_REAR_PARK_RR_UNLATCH";
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_ES_MASTER_CYL_PRESSURE): return "CHASSIS_ES_MASTER_CYL_PRESSURE";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_MC1_PRESSURE_IN): return "BTCM_MC1_PRESSURE_IN";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_MC2_PRESSURE_IN): return "BTCM_MC2_PRESSURE_IN";
@@ -3667,6 +3717,7 @@ inline ::electricsim::io::WireId wire_id_for(::std::string_view name) noexcept {
   if (name == "BPM_ES_VEHICLE_WAKE_DRIVE") return static_cast<::electricsim::io::WireId>(kWireBPM_ES_VEHICLE_WAKE_DRIVE);
   if (name == "BPM_VEHICLE_WAKE_UP_IN") return static_cast<::electricsim::io::WireId>(kWireBPM_VEHICLE_WAKE_UP_IN);
   if (name == "DRIVER_ES_CHARGE_COUPLER_MATED") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_CHARGE_COUPLER_MATED);
+  if (name == "CHARGER_ES_RECEPTACLE_WAKE_CONTACT") return static_cast<::electricsim::io::WireId>(kWireCHARGER_ES_RECEPTACLE_WAKE_CONTACT);
   if (name == "PIM_COUPLER_PRESENT_IN") return static_cast<::electricsim::io::WireId>(kWirePIM_COUPLER_PRESENT_IN);
   if (name == "BPM_CHARGE_PORT_TEMP_CIRCUIT_IN") return static_cast<::electricsim::io::WireId>(kWireBPM_CHARGE_PORT_TEMP_CIRCUIT_IN);
   if (name == "HTCM_VEHICLE_WAKE_UP_IN") return static_cast<::electricsim::io::WireId>(kWireHTCM_VEHICLE_WAKE_UP_IN);
@@ -3847,6 +3898,7 @@ inline ::electricsim::io::WireId wire_id_for(::std::string_view name) noexcept {
   if (name == "DRIVER_ES_PARK_BRAKE_SWITCH") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_PARK_BRAKE_SWITCH);
   if (name == "BTCM_PARK_BRAKE_WAKE_2031") return static_cast<::electricsim::io::WireId>(kWireBTCM_PARK_BRAKE_WAKE_2031);
   if (name == "BTCM_PARK_BRAKE_IDLE_1134") return static_cast<::electricsim::io::WireId>(kWireBTCM_PARK_BRAKE_IDLE_1134);
+  if (name == "BTCM_PARK_BRAKE_WAKE_2031_MV") return static_cast<::electricsim::io::WireId>(kWireBTCM_PARK_BRAKE_WAKE_2031_MV);
   if (name == "DRIVER_ES_BRAKE_SWITCH") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_BRAKE_SWITCH);
   if (name == "PIM_BRAKE_SWITCH_IN") return static_cast<::electricsim::io::WireId>(kWirePIM_BRAKE_SWITCH_IN);
   if (name == "BTCM_FRONT_MOD_LF_RESTORE") return static_cast<::electricsim::io::WireId>(kWireBTCM_FRONT_MOD_LF_RESTORE);
@@ -3867,6 +3919,14 @@ inline ::electricsim::io::WireId wire_id_for(::std::string_view name) noexcept {
   if (name == "BTCM_ES_REAR_EMB_RR_RELEASE") return static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_RELEASE);
   if (name == "BTCM_ES_REAR_EMB_LR_DUTY") return static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_LR_DUTY);
   if (name == "BTCM_ES_REAR_EMB_RR_DUTY") return static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_DUTY);
+  if (name == "BTCM_REAR_PARK_LR_LATCH") return static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_PARK_LR_LATCH);
+  if (name == "BTCM_REAR_PARK_LR_UNLATCH") return static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_PARK_LR_UNLATCH);
+  if (name == "BTCM_REAR_PARK_RR_LATCH") return static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_PARK_RR_LATCH);
+  if (name == "BTCM_REAR_PARK_RR_UNLATCH") return static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_PARK_RR_UNLATCH);
+  if (name == "BTCM_ES_REAR_PARK_LR_LATCH") return static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_PARK_LR_LATCH);
+  if (name == "BTCM_ES_REAR_PARK_LR_UNLATCH") return static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_PARK_LR_UNLATCH);
+  if (name == "BTCM_ES_REAR_PARK_RR_LATCH") return static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_PARK_RR_LATCH);
+  if (name == "BTCM_ES_REAR_PARK_RR_UNLATCH") return static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_PARK_RR_UNLATCH);
   if (name == "CHASSIS_ES_MASTER_CYL_PRESSURE") return static_cast<::electricsim::io::WireId>(kWireCHASSIS_ES_MASTER_CYL_PRESSURE);
   if (name == "BTCM_MC1_PRESSURE_IN") return static_cast<::electricsim::io::WireId>(kWireBTCM_MC1_PRESSURE_IN);
   if (name == "BTCM_MC2_PRESSURE_IN") return static_cast<::electricsim::io::WireId>(kWireBTCM_MC2_PRESSURE_IN);
@@ -4312,6 +4372,7 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case static_cast<::electricsim::io::WireId>(kWireBPM_ES_VEHICLE_WAKE_DRIVE): return "bpm_ecu";
     case static_cast<::electricsim::io::WireId>(kWireBPM_VEHICLE_WAKE_UP_IN): return "";
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_CHARGE_COUPLER_MATED): return "none";
+    case static_cast<::electricsim::io::WireId>(kWireCHARGER_ES_RECEPTACLE_WAKE_CONTACT): return "charger";
     case static_cast<::electricsim::io::WireId>(kWirePIM_COUPLER_PRESENT_IN): return "";
     case static_cast<::electricsim::io::WireId>(kWireBPM_CHARGE_PORT_TEMP_CIRCUIT_IN): return "";
     case static_cast<::electricsim::io::WireId>(kWireHTCM_VEHICLE_WAKE_UP_IN): return "";
@@ -4492,6 +4553,7 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_PARK_BRAKE_SWITCH): return "none";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_PARK_BRAKE_WAKE_2031): return "";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_PARK_BRAKE_IDLE_1134): return "";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_PARK_BRAKE_WAKE_2031_MV): return "";
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_BRAKE_SWITCH): return "none";
     case static_cast<::electricsim::io::WireId>(kWirePIM_BRAKE_SWITCH_IN): return "";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_FRONT_MOD_LF_RESTORE): return "";
@@ -4512,6 +4574,14 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_RELEASE): return "btcm_ecu";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_LR_DUTY): return "btcm_ecu";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_DUTY): return "btcm_ecu";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_PARK_LR_LATCH): return "";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_PARK_LR_UNLATCH): return "";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_PARK_RR_LATCH): return "";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_PARK_RR_UNLATCH): return "";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_PARK_LR_LATCH): return "btcm_ecu";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_PARK_LR_UNLATCH): return "btcm_ecu";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_PARK_RR_LATCH): return "btcm_ecu";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_PARK_RR_UNLATCH): return "btcm_ecu";
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_ES_MASTER_CYL_PRESSURE): return "none";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_MC1_PRESSURE_IN): return "";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_MC2_PRESSURE_IN): return "";
@@ -4962,6 +5032,7 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBPM_ES_VEHICLE_WAKE_DRIVE), &gen) && gen == 0) { visitor(::std::string_view{"BPM_ES_VEHICLE_WAKE_DRIVE"}, static_cast<::electricsim::io::WireId>(kWireBPM_ES_VEHICLE_WAKE_DRIVE)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBPM_VEHICLE_WAKE_UP_IN), &gen) && gen == 0) { visitor(::std::string_view{"BPM_VEHICLE_WAKE_UP_IN"}, static_cast<::electricsim::io::WireId>(kWireBPM_VEHICLE_WAKE_UP_IN)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_CHARGE_COUPLER_MATED), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_CHARGE_COUPLER_MATED"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_CHARGE_COUPLER_MATED)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireCHARGER_ES_RECEPTACLE_WAKE_CONTACT), &gen) && gen == 0) { visitor(::std::string_view{"CHARGER_ES_RECEPTACLE_WAKE_CONTACT"}, static_cast<::electricsim::io::WireId>(kWireCHARGER_ES_RECEPTACLE_WAKE_CONTACT)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWirePIM_COUPLER_PRESENT_IN), &gen) && gen == 0) { visitor(::std::string_view{"PIM_COUPLER_PRESENT_IN"}, static_cast<::electricsim::io::WireId>(kWirePIM_COUPLER_PRESENT_IN)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBPM_CHARGE_PORT_TEMP_CIRCUIT_IN), &gen) && gen == 0) { visitor(::std::string_view{"BPM_CHARGE_PORT_TEMP_CIRCUIT_IN"}, static_cast<::electricsim::io::WireId>(kWireBPM_CHARGE_PORT_TEMP_CIRCUIT_IN)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireHTCM_VEHICLE_WAKE_UP_IN), &gen) && gen == 0) { visitor(::std::string_view{"HTCM_VEHICLE_WAKE_UP_IN"}, static_cast<::electricsim::io::WireId>(kWireHTCM_VEHICLE_WAKE_UP_IN)); ++count; }
@@ -5142,6 +5213,7 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_PARK_BRAKE_SWITCH), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_PARK_BRAKE_SWITCH"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_PARK_BRAKE_SWITCH)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_PARK_BRAKE_WAKE_2031), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_PARK_BRAKE_WAKE_2031"}, static_cast<::electricsim::io::WireId>(kWireBTCM_PARK_BRAKE_WAKE_2031)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_PARK_BRAKE_IDLE_1134), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_PARK_BRAKE_IDLE_1134"}, static_cast<::electricsim::io::WireId>(kWireBTCM_PARK_BRAKE_IDLE_1134)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_PARK_BRAKE_WAKE_2031_MV), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_PARK_BRAKE_WAKE_2031_MV"}, static_cast<::electricsim::io::WireId>(kWireBTCM_PARK_BRAKE_WAKE_2031_MV)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_BRAKE_SWITCH), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_BRAKE_SWITCH"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_BRAKE_SWITCH)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWirePIM_BRAKE_SWITCH_IN), &gen) && gen == 0) { visitor(::std::string_view{"PIM_BRAKE_SWITCH_IN"}, static_cast<::electricsim::io::WireId>(kWirePIM_BRAKE_SWITCH_IN)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_FRONT_MOD_LF_RESTORE), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_FRONT_MOD_LF_RESTORE"}, static_cast<::electricsim::io::WireId>(kWireBTCM_FRONT_MOD_LF_RESTORE)); ++count; }
@@ -5162,6 +5234,14 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_RELEASE), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_ES_REAR_EMB_RR_RELEASE"}, static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_RELEASE)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_LR_DUTY), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_ES_REAR_EMB_LR_DUTY"}, static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_LR_DUTY)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_DUTY), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_ES_REAR_EMB_RR_DUTY"}, static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_DUTY)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_PARK_LR_LATCH), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_REAR_PARK_LR_LATCH"}, static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_PARK_LR_LATCH)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_PARK_LR_UNLATCH), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_REAR_PARK_LR_UNLATCH"}, static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_PARK_LR_UNLATCH)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_PARK_RR_LATCH), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_REAR_PARK_RR_LATCH"}, static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_PARK_RR_LATCH)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_PARK_RR_UNLATCH), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_REAR_PARK_RR_UNLATCH"}, static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_PARK_RR_UNLATCH)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_PARK_LR_LATCH), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_ES_REAR_PARK_LR_LATCH"}, static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_PARK_LR_LATCH)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_PARK_LR_UNLATCH), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_ES_REAR_PARK_LR_UNLATCH"}, static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_PARK_LR_UNLATCH)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_PARK_RR_LATCH), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_ES_REAR_PARK_RR_LATCH"}, static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_PARK_RR_LATCH)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_PARK_RR_UNLATCH), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_ES_REAR_PARK_RR_UNLATCH"}, static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_PARK_RR_UNLATCH)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireCHASSIS_ES_MASTER_CYL_PRESSURE), &gen) && gen == 0) { visitor(::std::string_view{"CHASSIS_ES_MASTER_CYL_PRESSURE"}, static_cast<::electricsim::io::WireId>(kWireCHASSIS_ES_MASTER_CYL_PRESSURE)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_MC1_PRESSURE_IN), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_MC1_PRESSURE_IN"}, static_cast<::electricsim::io::WireId>(kWireBTCM_MC1_PRESSURE_IN)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_MC2_PRESSURE_IN), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_MC2_PRESSURE_IN"}, static_cast<::electricsim::io::WireId>(kWireBTCM_MC2_PRESSURE_IN)); ++count; }
@@ -5608,6 +5688,7 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case static_cast<::electricsim::io::WireId>(kWireBPM_ES_VEHICLE_WAKE_DRIVE): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireBPM_VEHICLE_WAKE_UP_IN): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_CHARGE_COUPLER_MATED): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireCHARGER_ES_RECEPTACLE_WAKE_CONTACT): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWirePIM_COUPLER_PRESENT_IN): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireBPM_CHARGE_PORT_TEMP_CIRCUIT_IN): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireHTCM_VEHICLE_WAKE_UP_IN): return ::electricsim::io::CellClass::kConductor;
@@ -5788,6 +5869,7 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_PARK_BRAKE_SWITCH): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireBTCM_PARK_BRAKE_WAKE_2031): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireBTCM_PARK_BRAKE_IDLE_1134): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_PARK_BRAKE_WAKE_2031_MV): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_BRAKE_SWITCH): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWirePIM_BRAKE_SWITCH_IN): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireBTCM_FRONT_MOD_LF_RESTORE): return ::electricsim::io::CellClass::kConductor;
@@ -5808,6 +5890,14 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_RELEASE): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_LR_DUTY): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_EMB_RR_DUTY): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_PARK_LR_LATCH): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_PARK_LR_UNLATCH): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_PARK_RR_LATCH): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_REAR_PARK_RR_UNLATCH): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_PARK_LR_LATCH): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_PARK_LR_UNLATCH): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_PARK_RR_LATCH): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_PARK_RR_UNLATCH): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireCHASSIS_ES_MASTER_CYL_PRESSURE): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireBTCM_MC1_PRESSURE_IN): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireBTCM_MC2_PRESSURE_IN): return ::electricsim::io::CellClass::kConductor;

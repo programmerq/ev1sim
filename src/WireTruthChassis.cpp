@@ -890,6 +890,17 @@ std::optional<WireTruthChassis::BtcmMotorLeads> WireTruthChassis::btcm_motor_lea
     return std::nullopt;
 }
 
+std::optional<std::int8_t> WireTruthChassis::btcm_park_latch_drive(bool left) const {
+    using namespace electricsim::topology;
+    const auto latch = read_bit(ReadOnlyWireId(left ? kWireBTCM_REAR_PARK_LR_LATCH
+                                                    : kWireBTCM_REAR_PARK_RR_LATCH));
+    const auto unlatch = read_bit(ReadOnlyWireId(left ? kWireBTCM_REAR_PARK_LR_UNLATCH
+                                                      : kWireBTCM_REAR_PARK_RR_UNLATCH));
+    if (!latch || !unlatch) return std::nullopt;
+    if (*latch == *unlatch) return std::int8_t{0};
+    return std::int8_t{static_cast<std::int8_t>(*latch ? 1 : -1)};
+}
+
 std::optional<std::uint16_t> WireTruthChassis::pim_retard_request_permille() const {
     return read_uint16(ReadOnlyWireId(electricsim::topology::kWirePIM_RETARD_REQUEST_IN));
 }
@@ -1288,6 +1299,9 @@ std::optional<float> WireTruthChassis::pim_coast_drag_nm() const {
 }
 std::optional<WireTruthChassis::BtcmMotorLeads> WireTruthChassis::btcm_motor_leads(
     BtcmBrakeMotor) const {
+    return std::nullopt;
+}
+std::optional<std::int8_t> WireTruthChassis::btcm_park_latch_drive(bool) const {
     return std::nullopt;
 }
 std::optional<std::uint16_t> WireTruthChassis::pim_retard_request_permille() const {

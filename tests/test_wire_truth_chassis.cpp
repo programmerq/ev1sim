@@ -1439,6 +1439,29 @@ TEST_CASE("WireTruthChassis: brake motor leads read as fractions of full drive",
     CHECK(lf->release == 1.0f);
 }
 
+TEST_CASE("WireTruthChassis: a park latch motor's drive comes from its two leads",
+          "[wire_truth]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("park_latch_leads");
+    auto fleet = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(fleet != nullptr);
+    auto wire = ev1sim::WireTruthChassis::Attach(seg);
+    REQUIRE(wire != nullptr);
+
+    CHECK_FALSE(wire->btcm_park_latch_drive(true).has_value());   // never solved
+    REQUIRE(publish_conductor(*fleet, topo::kWireBTCM_REAR_PARK_LR_LATCH, true));
+    REQUIRE(publish_conductor(*fleet, topo::kWireBTCM_REAR_PARK_LR_UNLATCH, false));
+    CHECK(wire->btcm_park_latch_drive(true) == std::optional<std::int8_t>(1));
+    REQUIRE(publish_conductor(*fleet, topo::kWireBTCM_REAR_PARK_LR_LATCH, false));
+    CHECK(wire->btcm_park_latch_drive(true) == std::optional<std::int8_t>(0));
+    REQUIRE(publish_conductor(*fleet, topo::kWireBTCM_REAR_PARK_LR_UNLATCH, true));
+    CHECK(wire->btcm_park_latch_drive(true) == std::optional<std::int8_t>(-1));
+
+    REQUIRE(publish_conductor(*fleet, topo::kWireBTCM_REAR_PARK_RR_LATCH, true));
+    REQUIRE(publish_conductor(*fleet, topo::kWireBTCM_REAR_PARK_RR_UNLATCH, false));
+    CHECK(wire->btcm_park_latch_drive(false) == std::optional<std::int8_t>(1));
+}
+
 TEST_CASE("WireTruthChassis: a window motor's command comes from its two legs",
           "[wire_truth]") {
     namespace topo = electricsim::topology;

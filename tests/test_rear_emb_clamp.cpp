@@ -1,11 +1,11 @@
 // Tests for RearEmbClamp: the clamp force one EMB rear brake holds under the
-// BTCM's signed motor command (+1 apply, -1 release, 0 hold).
+// BTCM's signed apply motor command (+1 apply, -1 release, 0 undriven) and its
+// park latch motor (+1 latch, -1 unlatch, 0 undriven).
 //
-// Two things matter. HOLD: an anti-lock HOLD on the rear axle is the BTCM
-// latching the actuator where it is, so a 0 must keep the force, not drop it.
-// And travel: the command drives a motor, so with a step size the force
-// builds through clearance take-up and a compliant rise, and falls back the
-// same way, instead of jumping to the commanded level.
+// The mechanism under test (RearEmbClamp.h): a driven apply motor holds the
+// clamp its current supports; the shoe return spring backdrives an undriven
+// motor until the shoes leave the drum; only the park latch holds a clamp with
+// no current, and it holds through a dead BTCM.
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -21,65 +21,88 @@ namespace {
 
 constexpr double kStep = 0.002;  // the sim's default 2 ms physics step
 
-// Drive `cmd` for `seconds` at kStep; return the force after the last step.
+// Drive `cmd` and `latch` for `seconds` at kStep; return the force after the
+// last step.
 double drive(RearEmbClamp& c, float cmd, double seconds,
-             const BrakeDrum::Params& p, bool fresh = true) {
+             const BrakeDrum::Params& p, bool fresh = true, int latch = 0) {
     const int n = static_cast<int>(seconds / kStep + 0.5);
     double f = c.ForceN();
-    for (int i = 0; i < n; ++i) f = c.Update(cmd, fresh, p, kStep);
+    for (int i = 0; i < n; ++i) f = c.Update(cmd, latch, fresh, p, kStep);
     return f;
 }
 
 }  // namespace
 
 // ---------------------------------------------------------------------------
-// Settled map (no step size): the actuator settles within each call.
+// Settled map (no step size): every move completes within the call.
 // ---------------------------------------------------------------------------
 
-TEST_CASE("RearEmbClamp: HOLD keeps the clamp force an APPLY built",
+TEST_CASE("RearEmbClamp: an undriven apply motor lets the clamp go",
           "[RearEmbClamp]") {
+    // US5366281 rehome Mode 1: the return spring backdrives the motor.
     BrakeDrum::Params p;
     RearEmbClamp c;
-    CHECK_THAT(c.Update(+1.0f, true, p), WithinAbs(p.max_shoe_force_n, 1e-9));
-    for (int i = 0; i < 100; ++i) {
-        CHECK_THAT(c.Update(0.0f, true, p), WithinAbs(p.max_shoe_force_n, 1e-9));
-    }
+    CHECK_THAT(c.Update(+1.0f, 0, true, p), WithinAbs(p.max_shoe_force_n, 1e-9));
+    CHECK(c.Update(0.0f, 0, true, p) == 0.0);
+    // ...to the running clearance, not to home: inside it nothing pushes.
+    CHECK_FALSE(c.InContact());
+    CHECK_FALSE(c.AtHome());
+    CHECK_THAT(c.TravelS(), WithinAbs(c.TravelParams().clearance_s, 1e-12));
 }
 
-TEST_CASE("RearEmbClamp: RELEASE drops the force and HOLD then keeps it off",
+TEST_CASE("RearEmbClamp: a part command holds a part clamp", "[RearEmbClamp]") {
+    // Current-controlled apply (US5366281 Fig 10): the clamp follows the
+    // effort, so a hold needs current and a lower current holds less.
+    BrakeDrum::Params p;
+    RearEmbClamp c;
+    CHECK_THAT(c.Update(0.6f, 0, true, p), WithinAbs(0.6 * p.max_shoe_force_n, 1e-3));
+    for (int i = 0; i < 10; ++i) {
+        CHECK_THAT(c.Update(0.6f, 0, true, p), WithinAbs(0.6 * p.max_shoe_force_n, 1e-3));
+    }
+    CHECK_THAT(c.Update(0.25f, 0, true, p), WithinAbs(0.25 * p.max_shoe_force_n, 1e-3));
+}
+
+TEST_CASE("RearEmbClamp: RELEASE drives the actuator home", "[RearEmbClamp]") {
+    BrakeDrum::Params p;
+    RearEmbClamp c;
+    c.Update(+1.0f, 0, true, p);
+    CHECK(c.Update(-1.0f, 0, true, p) == 0.0);
+    CHECK(c.AtHome());
+    CHECK(c.Update(0.0f, 0, true, p) == 0.0);
+    CHECK(c.AtHome());  // the spring does not push a home actuator anywhere
+}
+
+TEST_CASE("RearEmbClamp: a stale BTCM lets an unlatched clamp go",
           "[RearEmbClamp]") {
+    // No hydraulic backup on the EV1 rear, and a dead BTCM drives nothing.
     BrakeDrum::Params p;
     RearEmbClamp c;
-    c.Update(+1.0f, true, p);
-    CHECK(c.Update(-1.0f, true, p) == 0.0);
-    CHECK(c.AtHome());
-    CHECK(c.Update(0.0f, true, p) == 0.0);
+    c.Update(+1.0f, 0, true, p);
+    CHECK(c.Update(+1.0f, 0, false, p) == 0.0);
 }
 
-TEST_CASE("RearEmbClamp: an anti-lock APPLY/HOLD/DUMP cycle", "[RearEmbClamp]") {
+TEST_CASE("RearEmbClamp: a set park latch holds the clamp with no power",
+          "[RearEmbClamp][Latch]") {
+    // US5366281 Fig 18a/18b: the latch is its own motor, and a set latch
+    // stays set undriven, so the park brake holds through total power loss.
     BrakeDrum::Params p;
     RearEmbClamp c;
-    const float cmds[]    = {+1.0f, 0.0f, 0.0f, -1.0f, 0.0f, +1.0f, 0.0f};
-    const double expect[] = {1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0};
-    for (int i = 0; i < 7; ++i) {
-        CHECK_THAT(c.Update(cmds[i], true, p),
-                   WithinAbs(expect[i] * p.max_shoe_force_n, 1e-9));
-    }
-}
-
-TEST_CASE("RearEmbClamp: a stale BTCM holds nothing", "[RearEmbClamp]") {
-    // No hydraulic backup on the EV1 rear: a module that is not commanding the
-    // motors is not holding a latch either.
-    BrakeDrum::Params p;
-    RearEmbClamp c;
-    c.Update(+1.0f, true, p);
-    CHECK(c.Update(0.0f, false, p) == 0.0);
-    CHECK(c.AtHome());
-    CHECK(c.Update(0.0f, true, p) == 0.0);  // and a HOLD after it holds zero
+    c.Update(+1.0f, 0, true, p);
+    c.Update(+1.0f, +1, true, p);
+    CHECK(c.Latched());
+    CHECK_THAT(c.Update(0.0f, 0, true, p), WithinAbs(p.max_shoe_force_n, 1e-9));
+    CHECK_THAT(c.Update(0.0f, 0, false, p), WithinAbs(p.max_shoe_force_n, 1e-9));
+    // A release drive against the latch moves nothing.
+    CHECK_THAT(c.Update(-1.0f, 0, true, p), WithinAbs(p.max_shoe_force_n, 1e-9));
+    CHECK(c.Latched());
+    // Clearing the latch lets the spring take the clamp off.
+    c.Update(0.0f, -1, true, p);
+    CHECK_FALSE(c.Latched());
+    CHECK(c.Update(0.0f, 0, true, p) == 0.0);
 }
 
 // ---------------------------------------------------------------------------
-// Shoe-position integration (with a step size).
+// With a step size.
 // ---------------------------------------------------------------------------
 
 TEST_CASE("RearEmbClamp: APPLY takes up the clearance before any force",
@@ -87,45 +110,11 @@ TEST_CASE("RearEmbClamp: APPLY takes up the clearance before any force",
     BrakeDrum::Params p;
     RearEmbClamp c;
     const auto& t = c.TravelParams();
-
-    // Just short of contact: the motor has been running, the shoes have moved,
-    // and there is still no force on the drum.
     CHECK(drive(c, +1.0f, t.clearance_s - 2 * kStep, p) == 0.0);
     CHECK(c.TravelS() > 0.0);
     CHECK_FALSE(c.InContact());
-
-    // A few steps further the shoes are on the drum and force has begun.
     CHECK(drive(c, +1.0f, 4 * kStep, p) > 0.0);
     CHECK(c.InContact());
-}
-
-TEST_CASE("RearEmbClamp: force rises with travel past contact to the stall",
-          "[RearEmbClamp][Travel]") {
-    BrakeDrum::Params p;
-    RearEmbClamp c;
-    const auto& t = c.TravelParams();
-
-    drive(c, +1.0f, t.clearance_s, p);
-    double prev = c.ForceN();
-    // 40 % of the way up the rise: 40 % of the maximum force (linear
-    // compliance).
-    const double partial = drive(c, +1.0f, 0.4 * t.rise_s, p);
-    CHECK_THAT(partial, WithinAbs(0.4 * p.max_shoe_force_n, 1e-6 * p.max_shoe_force_n));
-    CHECK(partial > prev);
-    prev = partial;
-
-    // Every further APPLY step adds force until the motor stalls at the max.
-    for (int i = 0; i < 200; ++i) {
-        const double f = c.Update(+1.0f, true, p, kStep);
-        CHECK(f >= prev);
-        prev = f;
-    }
-    CHECK_THAT(prev, WithinAbs(p.max_shoe_force_n, 1e-9));
-    // A stalled motor goes no further however long it is driven.
-    const double travel_at_stall = c.TravelS();
-    drive(c, +1.0f, 1.0, p);
-    CHECK(c.TravelS() == travel_at_stall);
-    CHECK_THAT(c.ForceN(), WithinAbs(p.max_shoe_force_n, 1e-9));
 }
 
 TEST_CASE("RearEmbClamp: full apply from home takes clearance plus rise",
@@ -134,85 +123,66 @@ TEST_CASE("RearEmbClamp: full apply from home takes clearance plus rise",
     RearEmbClamp c;
     const auto& t = c.TravelParams();
     const double total = t.clearance_s + t.rise_s;
-
     CHECK(drive(c, +1.0f, total - 4 * kStep, p) < p.max_shoe_force_n);
     CHECK_THAT(drive(c, +1.0f, 4 * kStep, p), WithinAbs(p.max_shoe_force_n, 1e-6));
+    // A stalled motor goes no further however long it is driven.
+    const double travel_at_stall = c.TravelS();
+    drive(c, +1.0f, 1.0, p);
+    CHECK(c.TravelS() == travel_at_stall);
 }
 
-TEST_CASE("RearEmbClamp: RELEASE backs the force off and stops at home",
+TEST_CASE("RearEmbClamp: a part command rises at its speed to its clamp",
           "[RearEmbClamp][Travel]") {
     BrakeDrum::Params p;
     RearEmbClamp c;
     const auto& t = c.TravelParams();
-    drive(c, +1.0f, 1.0, p);  // stalled at max
-
-    // Reversing for 40 % of the rise takes 40 % of the force off.
-    CHECK_THAT(drive(c, -1.0f, 0.4 * t.rise_s, p),
-               WithinAbs(0.6 * p.max_shoe_force_n, 1e-6 * p.max_shoe_force_n));
-    // The rest of the rise brings it to zero; the shoes are off the drum
-    // before the actuator is home.
-    CHECK(drive(c, -1.0f, 0.6 * t.rise_s + 2 * kStep, p) == 0.0);
-    CHECK_FALSE(c.InContact());
-    CHECK_FALSE(c.AtHome());
-    // Driving on in RELEASE reaches the home stop and stays there.
-    drive(c, -1.0f, 1.0, p);
-    CHECK(c.AtHome());
-    CHECK(c.TravelS() == 0.0);
-}
-
-TEST_CASE("RearEmbClamp: HOLD mid-rise keeps a partial force",
-          "[RearEmbClamp][Travel]") {
-    BrakeDrum::Params p;
-    RearEmbClamp c;
-    const auto& t = c.TravelParams();
-    drive(c, +1.0f, t.clearance_s + t.rise_s / 4.0, p);
-    const double held = c.ForceN();
-    CHECK(held > 0.0);
-    CHECK(held < p.max_shoe_force_n);
-    CHECK(drive(c, 0.0f, 0.5, p) == held);
-}
-
-TEST_CASE("RearEmbClamp: an anti-lock cycle modulates without stepping",
-          "[RearEmbClamp][Travel]") {
-    // A short DUMP pulse takes some force off, not all of it: the release
-    // rate is the motor's, so the force moves by the travel the pulse buys.
-    BrakeDrum::Params p;
-    RearEmbClamp c;
-    const auto& t = c.TravelParams();
-    drive(c, +1.0f, 1.0, p);                              // APPLY to stall
-    const double dumped = drive(c, -1.0f, 0.020, p);      // 20 ms DUMP
-    const double per_s = p.max_shoe_force_n / t.rise_s;
-    CHECK_THAT(dumped, WithinAbs(p.max_shoe_force_n - 0.020 * per_s, 1e-6));
-    CHECK(drive(c, 0.0f, 0.100, p) == dumped);            // HOLD
-    const double reapplied = drive(c, +1.0f, 0.010, p);   // 10 ms APPLY
-    CHECK_THAT(reapplied, WithinAbs(dumped + 0.010 * per_s, 1e-6));
-}
-
-TEST_CASE("RearEmbClamp: a fractional command scales the motor speed",
-          "[RearEmbClamp][Travel]") {
-    BrakeDrum::Params p;
-    RearEmbClamp c;
-    const auto& t = c.TravelParams();
-    drive(c, 0.5f, 2.0 * t.clearance_s, p);
     // Half speed for twice the clearance time: only just at contact.
-    CHECK_THAT(c.ForceN(), WithinAbs(0.0, 1e-6 * p.max_shoe_force_n));
-    CHECK_THAT(c.TravelS(), WithinAbs(t.clearance_s, 1e-9));
-    // An out-of-range command saturates at full speed.
-    RearEmbClamp d;
-    drive(d, 3.0f, t.clearance_s, p);
-    CHECK_THAT(d.TravelS(), WithinAbs(t.clearance_s, 1e-9));
+    CHECK_THAT(drive(c, 0.5f, 2.0 * t.clearance_s, p), WithinAbs(0.0, 1e-6));
+    // Then on to half the maximum, and no further.
+    drive(c, 0.5f, 2.0, p);
+    CHECK_THAT(c.ForceN(), WithinAbs(0.5 * p.max_shoe_force_n, 1e-6));
 }
 
-TEST_CASE("RearEmbClamp: a stale BTCM mid-apply sends the actuator home",
+TEST_CASE("RearEmbClamp: the spring takes the clamp off over its travel",
           "[RearEmbClamp][Travel]") {
     BrakeDrum::Params p;
     RearEmbClamp c;
     const auto& t = c.TravelParams();
     drive(c, +1.0f, 1.0, p);
-    CHECK(c.Update(+1.0f, false, p, kStep) == 0.0);
-    CHECK(c.AtHome());
-    // When the BTCM comes back the clearance has to be taken up again.
-    CHECK(drive(c, +1.0f, t.clearance_s - 2 * kStep, p) == 0.0);
+    // Undriven for 40 % of the spring's time: 40 % of the force gone.
+    const double part = drive(c, 0.0f, 0.4 * t.rise_s / t.spring_speed, p);
+    CHECK_THAT(part, WithinAbs(0.6 * p.max_shoe_force_n, 1e-6 * p.max_shoe_force_n));
+    // Then all of it, stopping at the clearance.
+    CHECK(drive(c, 0.0f, 1.0, p) == 0.0);
+    CHECK_THAT(c.TravelS(), WithinAbs(t.clearance_s, 1e-9));
+}
+
+TEST_CASE("RearEmbClamp: an anti-lock DUMP then HOLD keeps the dumped clamp",
+          "[RearEmbClamp][Travel]") {
+    // The BTCM's anti-lock HOLD keeps the apply lead driven at its walked-down
+    // level, so the clamp it holds is the one the dump left.
+    BrakeDrum::Params p;
+    RearEmbClamp c;
+    drive(c, 0.8f, 1.0, p);
+    const double dumped = drive(c, -1.0f, 0.020, p);
+    CHECK(dumped < 0.8 * p.max_shoe_force_n);
+    const float hold = static_cast<float>(dumped / p.max_shoe_force_n);
+    CHECK_THAT(drive(c, hold, 0.100, p), WithinAbs(dumped, 1e-6 * p.max_shoe_force_n));
+}
+
+TEST_CASE("RearEmbClamp: a latch drive shorter than its stroke changes nothing",
+          "[RearEmbClamp][Latch]") {
+    BrakeDrum::Params p;
+    RearEmbClamp c;
+    const auto& t = c.TravelParams();
+    drive(c, +1.0f, 1.0, p);
+    drive(c, +1.0f, t.latch_stroke_s / 2.0, p, true, +1);
+    CHECK_FALSE(c.Latched());
+    drive(c, +1.0f, t.latch_stroke_s, p, true, +1);
+    CHECK(c.Latched());
+    drive(c, 0.0f, t.latch_stroke_s / 2.0, p, true, -1);
+    CHECK(c.Latched());
+    CHECK_THAT(drive(c, 0.0f, 1.0, p), WithinAbs(p.max_shoe_force_n, 1e-9));
 }
 
 TEST_CASE("RearEmbClamp: travel times are configurable", "[RearEmbClamp][Travel]") {
@@ -221,6 +191,6 @@ TEST_CASE("RearEmbClamp: travel times are configurable", "[RearEmbClamp][Travel]
     tr.clearance_s = 0.0;
     tr.rise_s = 0.100;
     RearEmbClamp c(tr);
-    CHECK(c.Update(+1.0f, true, p, kStep) > 0.0);  // no clearance: force at once
+    CHECK(c.Update(+1.0f, 0, true, p, kStep) > 0.0);  // no clearance: force at once
     CHECK_THAT(drive(c, +1.0f, 0.100, p), WithinAbs(p.max_shoe_force_n, 1e-9));
 }

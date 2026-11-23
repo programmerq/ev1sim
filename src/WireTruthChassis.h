@@ -326,6 +326,13 @@ public:
     };
     std::optional<BtcmMotorLeads> btcm_motor_leads(BtcmBrakeMotor motor) const;
 
+    // The BTCM's rear park latch motors, one per rear corner, each driven
+    // through a latch lead and an unlatch lead (BTCM_REAR_PARK_{LR,RR}_
+    // {LATCH,UNLATCH}, bit conductors the solver publishes): +1 while the
+    // latch lead drives, -1 while the unlatch lead drives, 0 undriven. nullopt
+    // until the solver has written both leads of that motor.
+    std::optional<std::int8_t> btcm_park_latch_drive(bool left) const;
+
     // The retard-request line at the PIM (PIM_RETARD_REQUEST_IN): the BTCM's
     // request duty in permille while the line is live, 0 while dark. nullopt
     // until the solver writes it.
