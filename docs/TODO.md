@@ -33,27 +33,6 @@ work.  When you finish an item, delete it from here.
   retracted "0.09 m², a quarter of spec" one that never was (it was
   0.088 ± 0.145 m²).
 
-## Bus-mediated physics
-
-- [ ] **Regen ↔ friction blending (S15 — documented gap, do NOT fabricate).**
-  Friction braking is regen-agnostic and regen (PIM's motor-current readout,
-  chassis 4072 `kSigChassisMotorCurrentA`, derived/published by electricsim's
-  PIM — see `src/ExternalSimConnector.cpp:244-252`) is a display-only ammeter
-  readout that never feeds wheel torque,
-  so the **regen-cutout fail-safe is untestable in-sim** (no regen torque
-  to cut, no blend to hand off to friction).  Documented fully in
-  [docs/ev1_chrono_audit.md](ev1_chrono_audit.md) §15.  (The earlier
-  `src/MotorCurrent.h` limitation block was removed when PIM took over
-  pack-current derivation — commit `4d49a55`.)  Blocked on
-  EV1 regen-torque-vs-speed + blend-handover data the manuals don't
-  publish — modelling it would mean inventing constants.  When traceable
-  structure (or a justified structure-only `@design` model) lands: add a
-  signed `propulsion_torque` channel to `DriverCommand` (regen = negative
-  torque, per ARCHITECTURE.md "Future per-axle brake control"), sum
-  regen + friction to the driver demand in a BTCM-side blend controller,
-  backfill friction on regen cutout — then the fail-safe becomes a real
-  closed-loop test.
-
 ## Future: physical sim rig
 
 - [ ] Adapt the user's physical driving sim rig with a lookalike RSA, IPC
