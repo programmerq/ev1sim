@@ -1,7 +1,7 @@
 # IPC + RSA in-app display surfaces — ev1sim HUD rework plan
 
 **Status:** Planned (backlog). Drafted 2026-06-21.
-**Tracking:** `docs/TODO.md` → "IPC + RSA display rework (planned)".
+**Tracking:** all four phases done; the item has left `docs/TODO.md`.
 
 ## Why
 
