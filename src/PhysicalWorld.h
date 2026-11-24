@@ -396,34 +396,26 @@ private:
 };
 
 /// Park-brake push button: one momentary contact (DRIVER_ES_PARK_BRAKE_SWITCH)
-/// the BTCM reads, each push toggling apply/release.  The driver's request is
-/// a level (DriverCommand::parking_brake); every change of it becomes one
-/// TimedPushButton press.
+/// the BTCM reads, each push toggling apply/release.  The driver only presses
+/// it; whether a press applies or releases is the BTCM's call, so ev1sim keeps
+/// no applied/released state of its own.  Every press (Space,
+/// DriverCommand::park_brake_press, the park_brake_press input action, a
+/// scenario's park_brake_press) is one TimedPushButton push.
 class ParkBrakeButton {
 public:
     static constexpr double kPushS = TimedPushButton::kPushS;
     static constexpr double kGapS  = TimedPushButton::kGapS;
 
-    /// Call once per tick with the requested level and the sim time.
-    void update(bool requested, double sim_time_s) {
-        if (!m_seen) {
-            m_seen = true;
-            m_requested = requested;   // the car starts where the driver does
-        } else if (requested != m_requested) {
-            m_requested = requested;
-            m_button.queue_press();
-        }
-        m_button.update(sim_time_s);
-    }
-    bool pushed() const { return m_button.pushed(); }
-
-    /// One press, independent of the requested level (a scenario's
-    /// park_brake_press).
+    /// Queue one press.  Presses closer together than a push plus its gap
+    /// queue up, each held kPushS with a kGapS release between.
     void press() { m_button.queue_press(); }
 
+    /// Call once per tick with the sim time.
+    void update(double sim_time_s) { m_button.update(sim_time_s); }
+
+    bool pushed() const { return m_button.pushed(); }
+
 private:
-    bool            m_seen      = false;
-    bool            m_requested = false;   // latest driver request
     TimedPushButton m_button;
 };
 

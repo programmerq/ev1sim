@@ -22,7 +22,7 @@ TEST_CASE("Keyboard default output is all zeros", "[Keyboard]") {
     CHECK_THAT(cmd.throttle,    WithinAbs(0.0, 1e-9));
     CHECK_THAT(cmd.front_brake, WithinAbs(0.0, 1e-9));
     CHECK_THAT(cmd.steering,    WithinAbs(0.0, 1e-9));
-    CHECK(cmd.parking_brake  == false);
+    CHECK(cmd.park_brake_press == false);
     CHECK(cmd.reset_vehicle  == false);
 }
 
@@ -92,24 +92,26 @@ TEST_CASE("Brake ramps with S and sets both front and rear", "[Keyboard]") {
 }
 
 // -----------------------------------------------------------------------
-TEST_CASE("Parking brake toggles on Space press", "[Keyboard]") {
+TEST_CASE("Space is one park brake button press per key-down", "[Keyboard]") {
     auto ctrl = MakeController();
 
-    // Press space.
+    // Press space: one press on the key-down frame.
     ctrl.SetKeyPressed(irr::KEY_SPACE, true);
     auto cmd = ctrl.Update(0.016);
-    CHECK(cmd.parking_brake == true);
+    CHECK(cmd.park_brake_press == true);
 
-    // Still held — no re-toggle.
+    // Still held: no second press (the keyboard holds no applied state).
     cmd = ctrl.Update(0.016);
-    CHECK(cmd.parking_brake == true);
+    CHECK(cmd.park_brake_press == false);
 
-    // Release then press again — toggles off.
+    // Release: nothing.  Press again: one more press, the same as the first;
+    // apply or release is the BTCM's call, not the keyboard's.
     ctrl.SetKeyPressed(irr::KEY_SPACE, false);
-    ctrl.Update(0.016);
+    cmd = ctrl.Update(0.016);
+    CHECK(cmd.park_brake_press == false);
     ctrl.SetKeyPressed(irr::KEY_SPACE, true);
     cmd = ctrl.Update(0.016);
-    CHECK(cmd.parking_brake == false);
+    CHECK(cmd.park_brake_press == true);
 }
 
 // -----------------------------------------------------------------------

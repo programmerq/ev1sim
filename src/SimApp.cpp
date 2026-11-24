@@ -1700,6 +1700,8 @@ int SimApp::RunWithVisualization() {
         // Handle one-shot actions.
         if (cmd.reset_vehicle)
             m_world->ResetVehicle();
+        if (cmd.park_brake_press)
+            ParkBrakePress();
         if (m_keyboard->ConsumeCameraCycle())
             m_camera->CycleMode();
         if (m_keyboard->ConsumePauseToggle()) {
@@ -2039,7 +2041,7 @@ int SimApp::RunWithVisualization() {
             }
             m_physical->door_handles().clear_oneshots();   // SimApp's UI callbacks consumed them
             // 3D-sim contract buttons + key position (6942-6946, 6966).
-            PushExtContractDriverInputs(cmd, t);
+            PushExtContractDriverInputs(t);
         }
         // Ambient temp + humidity (chassis bus 4090-4091).
         PublishAmbient(t);
@@ -2265,7 +2267,7 @@ int SimApp::RunWithVisualization() {
                 drawL(L"KEYBOARD CONTROLS              [? to toggle]", hdr);
                 drawL(L"-----------------------------------------------", dim_col);
                 drawL(L"WASD/Arrows  drive (throttle, brake, steering)", norm);
-                drawL(L"Space        parking brake",                       norm);
+                drawL(L"Space        park brake button (press toggles)",  norm);
                 drawL(L"K            key cycle: OFF -> RUN -> ACC -> OFF", norm);
                 drawL(L"H            headlamp: OFF -> PARK -> ON -> HI",  norm);
                 drawL(L"U            flash-to-pass (held)",                norm);
@@ -2639,7 +2641,7 @@ int SimApp::RunHeadless() {
             }
             m_physical->door_handles().clear_oneshots();   // SimApp's UI callbacks consumed them
             // 3D-sim contract buttons + key position (6942-6946, 6966).
-            PushExtContractDriverInputs(cmd, t);
+            PushExtContractDriverInputs(t);
         }
         // Ambient temp + humidity (chassis bus 4090-4091).
         PublishAmbient(t);
@@ -2758,7 +2760,7 @@ int SimApp::RunHeadless() {
 // always constructs PhysicalWorld), but defensive null-checks make these
 // safe in tests that mock SimApp.
 // ---------------------------------------------------------------------------
-void SimApp::PushExtContractDriverInputs(const DriverCommand& cmd, double sim_time_s) {
+void SimApp::PushExtContractDriverInputs(double sim_time_s) {
     if (!m_external_sim) return;
     // (Horn 6940/6941 removed — the driver horn is a single contact (circuit
     //  28), published as the chassis horn cavity 4046 alongside the turn/hazard
@@ -2774,11 +2776,12 @@ void SimApp::PushExtContractDriverInputs(const DriverCommand& cmd, double sim_ti
     }
     // Telltale test (6945) — no UI source yet; stub at false.
     m_external_sim->SetDriverTelltaleTestRequest(false);
-    // Park brake (6946): each change of DriverCommand.parking_brake is one
-    // held push of the park-brake button (ParkBrakeButton).
+    // Park brake (6946): play the momentary park-brake button's queued
+    // presses (ParkBrakeButton; Space, a bound button or a scenario each
+    // queue one).  The BTCM decides apply or release.
     if (m_physical) {
         auto& pb = m_physical->park_brake_button();
-        pb.update(cmd.parking_brake, sim_time_s);
+        pb.update(sim_time_s);
         m_external_sim->SetDriverParkBrakeSwitch(pb.pushed());
         auto& reset = m_physical->ipc_trip_reset();
         reset.update(sim_time_s);
@@ -2986,11 +2989,11 @@ void SimApp::DispatchAction(ev1sim::InputAction action) {
             std::cout << (m_paused ? "[SimApp] PAUSED" : "[SimApp] RESUMED") << std::endl;
             break;
         case A::SnapshotToggle:  m_show_snapshot = !m_show_snapshot;   break;
+        case A::ParkBrakePress:  ParkBrakePress();    break;
         // Horn is a held/level input folded into DriverCommand, not dispatched.
         // The remaining actions have no button hook yet (need DriverCommand-level
         // or window-state plumbing) — log + ignore so a stray binding is visible.
         case A::Horn:
-        case A::ParkingBrakeToggle:
         case A::UiModeToggle:
         case A::HelpToggle:
         case A::Quit:

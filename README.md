@@ -354,7 +354,7 @@ deferred:
 | S | Brake (ramps up while held) |
 | A | Steer left (ramps, self-centers on release) |
 | D | Steer right (ramps, self-centers on release) |
-| Space | Toggle parking brake |
+| Space | Press the park brake button (each press applies or releases; the BTCM decides) |
 | R | Reset vehicle to spawn position |
 | C | Cycle camera mode |
 | Tab | Open the floating control panel (mouse) |
@@ -430,7 +430,7 @@ cd build
 ctest --output-on-failure
 ```
 
-Tests cover: config JSON parsing, CLI overrides, default values, keyboard ramping logic, parking brake toggle, one-shot reset/camera-cycle behavior.
+Tests cover: config JSON parsing, CLI overrides, default values, keyboard ramping logic, park brake button presses, one-shot reset/camera-cycle behavior.
 
 ## Project Structure
 

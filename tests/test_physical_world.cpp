@@ -2061,43 +2061,58 @@ TEST_CASE("Lock knobs on the body diagram follow the door-lock motors' stroke",
 
 
 // ---------------------------------------------------------------------------
-// ParkBrakeButton: each change of the requested level is one held push.
+// ParkBrakeButton: each press is one held push of the momentary button.
 // ---------------------------------------------------------------------------
-TEST_CASE("ParkBrakeButton: a change of request is one push held for kPushS", "[physical][park_brake]") {
+TEST_CASE("ParkBrakeButton: one press is one push held for kPushS", "[physical][park_brake]") {
     ParkBrakeButton b;
-    b.update(false, 0.0);
-    CHECK_FALSE(b.pushed());
-    b.update(true, 1.0);
+    b.update(0.0);
+    CHECK_FALSE(b.pushed());        // never pressed: contact open
+    b.press();
+    b.update(1.0);
     CHECK(b.pushed());
-    b.update(true, 1.0 + ParkBrakeButton::kPushS * 0.5);
+    b.update(1.0 + ParkBrakeButton::kPushS * 0.5);
     CHECK(b.pushed());
-    b.update(true, 1.0 + ParkBrakeButton::kPushS);
+    b.update(1.0 + ParkBrakeButton::kPushS);
     CHECK_FALSE(b.pushed());
-    b.update(true, 5.0);
+    b.update(5.0);
     CHECK_FALSE(b.pushed());
 }
 
-TEST_CASE("ParkBrakeButton: the starting level is not a push", "[physical][park_brake]") {
+TEST_CASE("ParkBrakeButton: a second press is a push too, not a release of the first",
+          "[physical][park_brake]") {
+    // The button keeps no applied/released state: press two looks exactly like
+    // press one on the contact, and the BTCM toggles on each.
+    const double p = ParkBrakeButton::kPushS;
     ParkBrakeButton b;
-    b.update(true, 0.0);
+    b.press();
+    b.update(1.0);
+    CHECK(b.pushed());
+    b.update(1.0 + p);
+    CHECK_FALSE(b.pushed());
+    b.press();
+    b.update(3.0);
+    CHECK(b.pushed());
+    b.update(3.0 + p);
     CHECK_FALSE(b.pushed());
 }
 
-TEST_CASE("ParkBrakeButton: changes faster than a press each become a push, with a release between",
+TEST_CASE("ParkBrakeButton: presses faster than a push each become a push, with a release between",
           "[physical][park_brake]") {
     const double p = ParkBrakeButton::kPushS, g = ParkBrakeButton::kGapS;
     ParkBrakeButton b;
-    b.update(false, 0.0);
-    b.update(true, 1.0);            // push 1 starts
-    b.update(false, 1.0 + p * 0.5); // second change while push 1 is held
+    b.update(0.0);
+    b.press();
+    b.update(1.0);                  // push 1 starts
+    b.press();                      // second press while push 1 is held
+    b.update(1.0 + p * 0.5);
     CHECK(b.pushed());              // push 1 still held; push 2 waits its turn
-    b.update(false, 1.0 + p);       // push 1 ends, gap starts
+    b.update(1.0 + p);              // push 1 ends, gap starts
     CHECK_FALSE(b.pushed());
-    b.update(false, 1.0 + p + g * 0.5);
+    b.update(1.0 + p + g * 0.5);
     CHECK_FALSE(b.pushed());
-    b.update(false, 1.0 + p + g);   // push 2
+    b.update(1.0 + p + g);          // push 2
     CHECK(b.pushed());
-    b.update(false, 1.0 + 2 * p + g);
+    b.update(1.0 + 2 * p + g);
     CHECK_FALSE(b.pushed());
 }
 
