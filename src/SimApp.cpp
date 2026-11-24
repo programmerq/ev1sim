@@ -1275,9 +1275,9 @@ void SimApp::ApplyRearEmbBrake(double time, double /*local_rear_brake*/) {
     // BTCM-failure model: real EV1 rear brakes are PURELY electromechanical.
     // There's no hydraulic backup line from the master cylinder, unlike the
     // front calipers.  When the BTCM is not commanding the rear motors —
-    // either powered down or signals stale — the rear shoes free-roll and
-    // contribute zero brake force.  This is the safety design we model
-    // here, even though it's an unexpected operating state.  The unused
+    // either powered down or signals stale — the return springs pull the
+    // shoes off the drums and they contribute zero brake force, unless the
+    // park latch is set, which holds its clamp with no power.  The unused
     // `local_rear_brake` arg is intentional; we never fall back to it.
 
     const auto cmd = m_external_sim->GetRearEmbCmd(kAbsFreshnessWindow);
@@ -1297,15 +1297,19 @@ void SimApp::ApplyRearEmbBrake(double time, double /*local_rear_brake*/) {
         m_rear_rr_was_fresh = cmd.rr_fresh;
     }
 
-    // The [-1, +1] motor command drives each corner's clamp: +1 applies,
-    // -1 releases, and 0 is the BTCM's anti-lock HOLD, which KEEPS the clamp
-    // force (RearEmbClamp.h has the reasoning). A stale command is zero
-    // force: the rear has no hydraulic fallback path. Each call advances the
-    // actuator by one physics step, so the force builds over its travel time.
+    // The [-1, +1] apply motor command and the park latch motor drive each
+    // corner's clamp: a driven apply motor holds the clamp its current
+    // supports, an undriven one is backdrived by the return spring until the
+    // shoes leave the drum, and a set park latch holds the clamp with no
+    // current (RearEmbClamp.h has the reasoning). A stale BTCM drives
+    // nothing: an unlatched rear lets go, a latched one stays set. Each call
+    // advances the actuator by one physics step.
     const ev1sim::BrakeDrum::Params drum;
     const double dt = m_config.simulation.step_size_s;
-    const double force_rl = m_rear_clamp_rl.Update(cmd.lr, cmd.lr_fresh, drum, dt);
-    const double force_rr = m_rear_clamp_rr.Update(cmd.rr, cmd.rr_fresh, drum, dt);
+    const double force_rl =
+        m_rear_clamp_rl.Update(cmd.lr, cmd.lr_latch, cmd.lr_fresh, drum, dt);
+    const double force_rr =
+        m_rear_clamp_rr.Update(cmd.rr, cmd.rr_latch, cmd.rr_fresh, drum, dt);
 
     // Wheel angular velocity needed for the self-energizing factor.
     // VehicleState.wheel_omega is indexed FL, FR, RL, RR.
@@ -2841,6 +2845,9 @@ void SimApp::HazardToggle() {
 }
 void SimApp::IpcTripResetPress() {
     if (m_physical) m_physical->ipc_trip_reset().queue_press();
+}
+void SimApp::ParkBrakePress() {
+    if (m_physical) m_physical->park_brake_button().press();
 }
 void SimApp::CruiseSet() {
     if (m_physical) m_physical->cruise_stalk().press_set();

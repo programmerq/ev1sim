@@ -412,7 +412,7 @@ public:
 
     /// Rear EMB motor commands from BTCM: the rear apply motors' apply and
     /// release leads (BTCM_REAR_EMB_{LR,RR}_{APPLY,RELEASE}), apply minus
-    /// release. Float in [-1, +1]: +1=apply, 0=idle, -1=release.
+    /// release. Float in [-1, +1]: +1=apply, 0=undriven, -1=release.
     /// fresh = true when the BTCM is alive (a valid $91 within
     /// freshness_window, as GetAbsPhaseFront) and the wheel's leads were seen.
     struct RearEmbCmd {
@@ -420,6 +420,10 @@ public:
         float rr        = 0.0f;
         bool  lr_fresh  = false;
         bool  rr_fresh  = false;
+        /// Park latch motor drive per corner (BTCM_REAR_PARK_*): +1 latch
+        /// lead, -1 unlatch lead, 0 undriven.
+        std::int8_t lr_latch = 0;
+        std::int8_t rr_latch = 0;
     };
     RearEmbCmd GetRearEmbCmd(
         std::chrono::milliseconds freshness_window) const;
@@ -861,6 +865,9 @@ public:
     /// motor), as Tick reads them off the wire.  Used by unit tests; not part
     /// of the runtime path.
     void DebugInjectBtcmMotorLeads(BrakeMotor motor, float drive, float release);
+    /// Test hook: set a rear park latch motor's drive (+1 latch, -1 unlatch,
+    /// 0 undriven), as the solver's BTCM_REAR_PARK_* leads would.
+    void DebugInjectBtcmParkLatch(bool left, std::int8_t drive);
 
     /// Feed one already-framed GM-8192 frame (ID + payload, SumCheck verified)
     /// through the same BusSnoop decode Tick uses, at the current sim time. A

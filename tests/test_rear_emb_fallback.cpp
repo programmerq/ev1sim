@@ -5,7 +5,7 @@
 // ratio. This file drives the rear through the models SimApp actually runs per
 // corner (RearEmbClamp -> BrakeDrum -> torque/kRearBrakeMaxTorqueNm) and kills
 // the BTCM part-way through the stop, so what is checked is the transition:
-// the rear clamp letting go the step the commands go stale, and the front
+// the rear clamp letting go once the commands go stale, and the front
 // carrying on with the driver's pedal.
 //
 // What the car does when the BTCM is not driving the brakes:
@@ -17,7 +17,8 @@
 //     (@source:manual brakes-222). SimApp::ApplyAbsFrontBrake models this by
 //     leaving the driver's symmetric front pressure in effect when stale.
 //   - Rear: purely electromechanical, no hydraulic backup (@source:manual
-//     brakes-312), so a stale BTCM is zero rear force (RearEmbClamp).
+//     brakes-312), so once a stale BTCM stops driving the apply motors the
+//     shoe return springs take the rear force to zero (RearEmbClamp).
 //   - One rear corner can fail on its own: "the BTCM will disable front ABS
 //     and left rear brake apply. The front brakes, the right rear brake system
 //     and regen will function normally" (@source:manual brakes-254 DTC 147).
@@ -108,8 +109,8 @@ Stop run_stop(double v0_mps, double pedal, const Faults& f) {
         const double front_force =
             2.0 * front.front_pressure * kFrontMaxTorqueNm / kTireRadiusM;
 
-        const double lr_shoe = lr.Update(cmd, lr_live, drum, kStep);
-        const double rr_shoe = rr.Update(cmd, rr_live, drum, kStep);
+        const double lr_shoe = lr.Update(cmd, 0, lr_live, drum, kStep);
+        const double rr_shoe = rr.Update(cmd, 0, rr_live, drum, kStep);
         const double rear_force = (rear_ratio(lr_shoe, omega) +
                                    rear_ratio(rr_shoe, omega)) *
                                   ev1sim::kRearBrakeMaxTorqueNm / kTireRadiusM;
@@ -142,7 +143,13 @@ constexpr double kPedal = 0.5;
 constexpr double kV0    = 25.0;   // m/s
 constexpr double kDeath = 1.0;    // s into the stop
 
-TEST_CASE("RearEmbFallback: the rear lets go the step the BTCM dies",
+// How long the return spring takes to pull a fully applied rear off the drum.
+double let_go_s() {
+    const RearEmbClamp::Travel tr;
+    return tr.rise_s / tr.spring_speed + 2 * kStep;
+}
+
+TEST_CASE("RearEmbFallback: the rear lets go once the BTCM dies",
           "[RearEmbFallback][BTCMLoss]") {
     Faults f;
     f.lr_stale_at_s = kDeath;
@@ -153,14 +160,16 @@ TEST_CASE("RearEmbFallback: the rear lets go the step the BTCM dies",
     const Sample& after  = at(s, kDeath);
     CHECK(before.rear_lr_shoe_n > 0.0);
     CHECK(before.rear_rr_shoe_n > 0.0);
-    CHECK(after.rear_lr_shoe_n == 0.0);
-    CHECK(after.rear_rr_shoe_n == 0.0);
-    CHECK(after.rear_force_n == 0.0);
-    // And it stays off for the rest of the stop.
+    // The spring starts taking the force off the step the motors go undriven.
+    CHECK(after.rear_lr_shoe_n < before.rear_lr_shoe_n);
+    CHECK(after.rear_rr_shoe_n < before.rear_rr_shoe_n);
+    // It never rises again, and is gone once the spring has done its work.
+    double prev = before.rear_force_n;
     for (const Sample& x : s.trace) {
-        if (x.t_s >= kDeath) {
-            CHECK(x.rear_force_n == 0.0);
-        }
+        if (x.t_s < kDeath) continue;
+        CHECK(x.rear_force_n <= prev);
+        prev = x.rear_force_n;
+        if (x.t_s >= kDeath + let_go_s()) CHECK(x.rear_force_n == 0.0);
     }
 }
 
@@ -175,7 +184,7 @@ TEST_CASE("RearEmbFallback: front base braking persists on BTCM death",
     // The front force is the driver's pedal either side of the death: the
     // BTCM going away changes nothing at the front.
     const Sample& before = at(dead, kDeath - kStep);
-    const Sample& after  = at(dead, kDeath);
+    const Sample& after  = at(dead, kDeath + let_go_s());
     CHECK_THAT(after.front_force_n, WithinRel(before.front_force_n, 1e-3));
     CHECK(after.front_force_n > 0.0);
 
@@ -205,17 +214,18 @@ TEST_CASE("RearEmbFallback: one rear corner failing leaves the other braking",
     Faults f;
     f.lr_stale_at_s = kDeath;  // left rear only (DTC 147-style)
     const Stop s = run_stop(kV0, kPedal, f);
-    const Sample& after = at(s, kDeath + 0.1);
+    const Sample& after = at(s, kDeath + let_go_s());
     CHECK(after.rear_lr_shoe_n == 0.0);
     CHECK(after.rear_rr_shoe_n > 0.0);
     CHECK(after.front_force_n > 0.0);
     CHECK(s.stopped);
 }
 
-TEST_CASE("RearEmbFallback: a recovered BTCM re-applies from home",
+TEST_CASE("RearEmbFallback: a recovered BTCM re-applies from the clearance",
           "[RearEmbFallback][BTCMLoss]") {
-    // The actuator went home when the BTCM died, so on recovery the motor has
-    // to take up the clearance again before the left rear brakes.
+    // When the BTCM died the return spring backdrove the actuator until the
+    // shoes left the drum, and no further, so on recovery force builds at once
+    // and reaches the maximum after the rise.
     constexpr double kBack = kDeath + 0.5;
     Faults f;
     f.lr_stale_at_s = kDeath;
@@ -223,11 +233,10 @@ TEST_CASE("RearEmbFallback: a recovered BTCM re-applies from home",
     const Stop s = run_stop(kV0, kPedal, f);
     const RearEmbClamp::Travel tr;
 
-    CHECK(at(s, kBack).rear_lr_shoe_n == 0.0);
-    CHECK(at(s, kBack + tr.clearance_s - 2 * kStep).rear_lr_shoe_n == 0.0);
-    CHECK(at(s, kBack + tr.clearance_s + 2 * kStep).rear_lr_shoe_n > 0.0);
-    // ...and builds back to the full force after the rise.
+    CHECK(at(s, kBack - 2 * kStep).rear_lr_shoe_n == 0.0);
+    CHECK(at(s, kBack + 4 * kStep).rear_lr_shoe_n > 0.0);
     const BrakeDrum::Params drum;
-    CHECK_THAT(at(s, kBack + tr.clearance_s + tr.rise_s + 2 * kStep).rear_lr_shoe_n,
+    CHECK(at(s, kBack + tr.rise_s - 4 * kStep).rear_lr_shoe_n < drum.max_shoe_force_n);
+    CHECK_THAT(at(s, kBack + tr.rise_s + 2 * kStep).rear_lr_shoe_n,
                WithinRel(drum.max_shoe_force_n, 1e-9));
 }

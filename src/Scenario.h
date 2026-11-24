@@ -56,11 +56,10 @@ class PhysicalWorld;
 //       would hide whether that OR works.
 //   set_horn:      value != 0 closes the driver horn contact (circuit 28) and
 //       holds it until a set_horn 0; the LHJB decides which tones sound.
-//   set_parking_brake:  value != 0 sets the driver's park-brake control and
-//       holds it until a set_parking_brake 0.  The control is a level whose
-//       rising edge SimApp publishes as the one-tick SET press (6946) and
-//       whose falling edge is the RELEASE press (6947); what the rear brakes
-//       then do is the BTCM's answer.
+//   park_brake_press:  press the momentary park brake button once (held
+//       about 200 ms, ParkBrakeButton).  The button has no position: each
+//       press asks the BTCM to apply or release, and what the rear brakes then
+//       do is the BTCM's answer.
 //   set_charge_coupler:  value != 0 mates the charge paddle in the
 //       receptacle and holds it there until a set_charge_coupler 0 pulls it.
 //       The paddle is all this sets: whether the car then charges is the
@@ -148,6 +147,7 @@ public:
     virtual void TurnSignalRight()    = 0;
     virtual void HazardToggle()       = 0;
     virtual void IpcTripResetPress()  = 0;
+    virtual void ParkBrakePress()     = 0;
     virtual void CruiseSet()          = 0;
     virtual void CruiseResume()       = 0;
     virtual void CruiseCancel()       = 0;
@@ -319,9 +319,6 @@ private:
     // Horn contact, held like the pedals: set_horn value != 0 closes the
     // single driver horn contact (circuit 28) until the next set_horn 0.
     std::optional<bool>        m_held_horn;
-    // Park-brake control, held like the horn: set_parking_brake value != 0
-    // sets it until the next set_parking_brake 0.
-    std::optional<bool>        m_held_parking_brake;
 
     ScenarioStats              m_stats;
     std::ofstream              m_csv;

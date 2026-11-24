@@ -42,6 +42,7 @@ struct CountingHooks : public ev1sim::ScenarioHooks {
     int prnd_up = 0, prnd_down = 0;
     int turn_left = 0, turn_right = 0, hazard = 0;
     int ipc_trip_reset = 0;
+    int park_brake_press = 0;
     int cruise_set = 0, cruise_resume = 0, cruise_cancel = 0;
     int cruise_speed_up = 0, cruise_speed_down = 0;
     int door_lock_all = 0, door_unlock_all = 0;
@@ -64,6 +65,7 @@ struct CountingHooks : public ev1sim::ScenarioHooks {
     void TurnSignalRight()   override { ++turn_right; }
     void HazardToggle()      override { ++hazard; }
     void IpcTripResetPress() override { ++ipc_trip_reset; }
+    void ParkBrakePress()    override { ++park_brake_press; }
     void CruiseSet()         override { ++cruise_set; }
     void CruiseResume()      override { ++cruise_resume; }
     void CruiseCancel()      override { ++cruise_cancel; }
@@ -218,27 +220,25 @@ TEST_CASE("Scenario: drive-cycle body actions reach their hooks",
     CHECK(cmd2.horn_low == true);
 }
 
-TEST_CASE("Scenario: set_parking_brake holds the park-brake control",
+TEST_CASE("Scenario: park_brake_press presses the button once per event",
           "[Scenario]") {
     using ev1sim::Scenario;
     Scenario s;
     s.set_events({
-        {0.10, "set_parking_brake", 1.0},
-        {0.50, "set_parking_brake", 0.0},
+        {0.10, "park_brake_press", 0.0},
+        {0.50, "park_brake_press", 0.0},
     });
     CountingHooks hooks;
     DriverCommand cmd{};
     s.Tick(0.05, VehicleState{}, hooks, cmd);
-    CHECK(cmd.parking_brake == false);
+    CHECK(hooks.park_brake_press == 0);
     s.Tick(0.20, VehicleState{}, hooks, cmd);
-    CHECK(cmd.parking_brake == true);
-    // Held on a fresh command with no further event, like the pedals.
-    DriverCommand cmd2{};
-    s.Tick(0.30, VehicleState{}, hooks, cmd2);
-    CHECK(cmd2.parking_brake == true);
-    DriverCommand cmd3{};
-    s.Tick(0.60, VehicleState{}, hooks, cmd3);
-    CHECK(cmd3.parking_brake == false);
+    CHECK(hooks.park_brake_press == 1);
+    // No held level: later ticks press nothing more until the next event.
+    s.Tick(0.30, VehicleState{}, hooks, cmd);
+    CHECK(hooks.park_brake_press == 1);
+    s.Tick(0.60, VehicleState{}, hooks, cmd);
+    CHECK(hooks.park_brake_press == 2);
 }
 
 TEST_CASE("Scenario: unknown action logs warning, doesn't crash",
