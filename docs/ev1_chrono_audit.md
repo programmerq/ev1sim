@@ -1219,9 +1219,11 @@ they're not lost when we pivot back to integration work.
   caliper and the modulator motor holds it at the pedal pressure less the
   regen's share, so ev1sim sees ordinary HOLD and DUMP phases on the front
   channel outside anti-lock (`ApplyAbsFrontBrake`). The rear electric brakes
-  follow the pedal. Under anti-lock the request ramps down and regen stays
-  off until the pedal is released. Sources and the estimated numbers:
-  electricsim `ev1/btcm/btcm_front_regen_blend.h`.
-- **Regen-cutout fail-safe.** When regen drops out the front calipers return
-  toward the pedal pressure, so the property is a closed-loop test in
-  electricsim's vehicle acceptance suite (`btcm_regen_blend_stop`).
+  follow the pedal. Under anti-lock, and at a hard pedal where the master
+  pressure reading nears its sensor ceiling, the request ramps down and the
+  friction alone carries the stop. Sources, thresholds and the estimated
+  numbers: electricsim `ev1/btcm/btcm_front_regen_blend.h`.
+- **Consistent braking across the cutout.** When regen drops out the front
+  calipers return toward the pedal pressure. Whether the deceleration holds
+  steady is a closed-loop property, checked by electricsim's vehicle
+  acceptance case `btcm_regen_blend_stop`.
