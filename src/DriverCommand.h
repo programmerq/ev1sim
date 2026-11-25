@@ -8,7 +8,9 @@ struct DriverCommand {
     double front_brake = 0.0;   // 0..1  (first pass: keyboard sets both identically)
     double rear_brake  = 0.0;   // 0..1
     double steering    = 0.0;   // -1..1  (positive = left turn, Chrono convention)
-    bool   parking_brake  = false;
+    // One-shot: one press of the momentary park brake button this frame.  The
+    // car (the BTCM) holds apply/release; the driver only presses.
+    bool   park_brake_press = false;
     bool   reset_vehicle  = false;
 
     // Horn tones — controlled by BCM or directly by keyboard.

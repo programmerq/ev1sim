@@ -54,7 +54,7 @@ produce one of these is a valid driver:
 | `front_brake`     | 0..1      | Service brake, front axle               |
 | `rear_brake`      | 0..1      | Service brake, rear axle                |
 | `steering`        | -1..1     | Positive = left turn (Chrono convention)|
-| `parking_brake`   | bool      |                                         |
+| `park_brake_press`| bool      | One-shot: one press of the momentary park brake button (the BTCM holds apply/release) |
 | `reset_vehicle`   | bool      | One-shot: respawn at spawn point        |
 | `horn_low`        | bool      | 400 Hz tone request                     |
 | `horn_high`       | bool      | 500 Hz tone request                     |

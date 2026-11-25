@@ -54,7 +54,7 @@ enum class InputAction {
 
     // Vehicle.
     ResetVehicle,
-    ParkingBrakeToggle,
+    ParkBrakePress,
 
     // Sim / debug (no real-car equivalent).
     CameraCycle,
@@ -100,7 +100,7 @@ inline constexpr ActionName kInputActionNames[] = {
     {InputAction::KeyOnCycle,         "key_on_cycle"},
     {InputAction::IpcTripReset,       "ipc_trip_reset"},
     {InputAction::ResetVehicle,       "reset_vehicle"},
-    {InputAction::ParkingBrakeToggle, "parking_brake_toggle"},
+    {InputAction::ParkBrakePress,     "park_brake_press"},
     {InputAction::CameraCycle,        "camera_cycle"},
     {InputAction::PauseToggle,        "pause_toggle"},
     {InputAction::SnapshotToggle,     "snapshot_toggle"},

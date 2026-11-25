@@ -14,7 +14,7 @@ TEST_CASE("DriverCommand default-initialises to safe values", "[DriverCommand]")
     CHECK(cmd.front_brake == 0.0);
     CHECK(cmd.rear_brake  == 0.0);
     CHECK(cmd.steering    == 0.0);
-    CHECK(cmd.parking_brake  == false);
+    CHECK(cmd.park_brake_press == false);
     CHECK(cmd.reset_vehicle  == false);
     CHECK(cmd.horn_low   == false);
     CHECK(cmd.horn_high  == false);
@@ -26,13 +26,13 @@ TEST_CASE("DriverCommand fields are independently assignable", "[DriverCommand]"
     cmd.front_brake = 0.5;
     cmd.rear_brake  = 0.3;
     cmd.steering    = -0.4;
-    cmd.parking_brake = true;
+    cmd.park_brake_press = true;
 
     CHECK(cmd.throttle    == 0.75);
     CHECK(cmd.front_brake == 0.5);
     CHECK(cmd.rear_brake  == 0.3);
     CHECK(cmd.steering    == -0.4);
-    CHECK(cmd.parking_brake == true);
+    CHECK(cmd.park_brake_press == true);
     CHECK(cmd.reset_vehicle == false);  // untouched
 }
 

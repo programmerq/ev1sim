@@ -104,8 +104,8 @@ public:
     bool ConsumeWiperWash();
 
     // True once after Z was tapped — toggle the physical-world snapshot overlay.
-    // Lock toggles (per-door) will land via the floating-UI panel per docs/TODO.md;
-    // the [ / ] door bindings nearby are ajar-only (open/close), not lock state.
+    // (Per-door lock toggles live on the floating-UI panel; the [ / ] door
+    // bindings nearby are ajar-only (open/close), not lock state.)
     bool ConsumeSnapshotToggle();
 
     // True once after J was tapped — step to the next readout page
@@ -127,7 +127,6 @@ private:
     double m_throttle = 0.0;
     double m_brake    = 0.0;
     double m_steering = 0.0;
-    bool   m_parking_brake = false;
 
     // Edge-detect helpers
     bool m_space_prev = false;

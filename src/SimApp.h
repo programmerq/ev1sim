@@ -271,12 +271,11 @@ private:
 
     /// Push 3D-sim integration contract driver-side inputs to the
     /// external sim connector (6942-6946, 6966).  Pulls headlight switch
-    /// + dim from CombinationSwitch; horn and park-brake state from the
-    /// passed DriverCommand; telltale test + key position are stubbed
-    /// (no ev1sim UI source).  The park brake goes through
-    /// PhysicalWorld::park_brake_button() at sim_time_s.  Safe to call when
-    /// m_external_sim is null.
-    void PushExtContractDriverInputs(const struct DriverCommand& cmd, double sim_time_s);
+    /// + dim from CombinationSwitch; telltale test + key position are stubbed
+    /// (no ev1sim UI source).  The park brake plays
+    /// PhysicalWorld::park_brake_button()'s queued presses at sim_time_s.
+    /// Safe to call when m_external_sim is null.
+    void PushExtContractDriverInputs(double sim_time_s);
 
     /// Publish ambient temperature + humidity (chassis bus 4090-4091) for this
     /// sim instant.  One implementation for both run loops.

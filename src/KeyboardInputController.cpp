@@ -51,10 +51,9 @@ DriverCommand KeyboardInputController::Update(double dt) {
             m_steering = std::min(0.0, m_steering + m_rates.steer_return_rate * dt);
     }
 
-    // --- Parking brake (Space toggle) ---
+    // --- Park brake button (Space one-shot: one press per key-down) ---
     bool space_now = m_keys[irr::KEY_SPACE];
-    if (space_now && !m_space_prev)
-        m_parking_brake = !m_parking_brake;
+    bool park_brake_press = space_now && !m_space_prev;
     m_space_prev = space_now;
 
     // --- Reset vehicle (R one-shot) ---
@@ -211,7 +210,7 @@ DriverCommand KeyboardInputController::Update(double dt) {
     cmd.front_brake   = m_brake;
     cmd.rear_brake    = m_brake;
     cmd.steering      = m_steering;
-    cmd.parking_brake = m_parking_brake;
+    cmd.park_brake_press = park_brake_press;
     cmd.reset_vehicle = do_reset;
 
     // Horn — direct key state, no ramping.

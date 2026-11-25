@@ -3,137 +3,7 @@
 Catch-all for physical-world / render / sim follow-ups deferred from focused
 work.  When you finish an item, delete it from here.
 
-## IPC + RSA display rework (planned)
-
-Rework ev1sim's HUD to surface the IPC instrument cluster + RSA center console
-as in-app displays (2D panels first, 3D later), fed by **decoding the GM-8192
-`*_TX` frame cells off the wire** (Palm-EV1-dashboard style) rather than
-per-value chassis cells. Display-only first; interactivity later. Full plan +
-ratified decisions: [`docs/ipc_rsa_display_plan.md`](ipc_rsa_display_plan.md).
-
-- [x] **Phase 1 — IPC cluster, 2D, snoop-fed (display-only)**: `BusSnoop`
-  (`src/BusSnoop.{h,cpp}`) decodes $41 / $40 / $20 / $90 / $91 / $21 off the PIM,
-  BPM, BTCM and IPC `*_TX` cells into a freshness-gated `DashSnapshot`;
-  `ExternalSimConnector::GetDashSnapshot()` adds the IPC lamp cells (4130-4145);
-  `SimApp` draws `InstrumentClusterPanel` bottom-centre when the external sim
-  is on. Decode, label, null-driver draw and `[e2e]` tests.
-- [x] **Phase 2 — RSA console, 2D (display-only)**: `RsaConsolePanel`
-  (`src/RsaConsolePanel.{h,cpp}`) draws the console indicators the external sim
-  drives (OFF/ACC + RUN mode LEDs, P R N D, VALID CODE / keypad lamp, security,
-  shift lock, BTSI solenoid, backlight) from the RSA output cells via
-  `WireTruthChassis::rsa_console()`, with the external sim's wire-mode panel
-  derivations. The catalog's `stub` HVAC/fan/clock/trip LEDs are left out.
-  Drawn right of the cluster when the external sim is on.
-- [x] **Phase 3 — 3D in-scene** cluster + console (same snapshot feed):
-  `DashScreens3D` (`src/DashScreens3D.{h,cpp}`) draws the two 2D panels into
-  render-target textures on quads fixed to the chassis frame (cluster at the
-  dash top below the windshield, console low between the seats; positions
-  read off the chassis visual mesh, no interior dimensions in hand). The new
-  **Cabin** camera mode looks at both from the driver's seat.
-- [x] **Phase 4 — interactivity**: the console panel's controls are
-  clickable in UI mode (Tab), on the 2D panel and on the 3D console screen in
-  the Cabin view (`src/RsaConsoleInput.{h,cpp}`). OFF/ACC, RUN and LOCK go
-  through the keypad driver's mode-switch bits, P/R/N/D through the selector's
-  pins, the five keys through the keypad driver (held 0.5 s or more = long
-  press), and COAST DOWN toggles the driver's coast-down switch, lit from the
-  PCM's $41 Coast Down LED request. Every click reuses a producer ev1sim
-  already had (the keyboard's, or the coast-down cell's scenario hook), so
-  ev1sim gains no new writer on any cell and the
-  arbitration with electricsim's web RSA panel is unchanged.
-
-## Physical-world components (next batches)
-
-The `PhysicalWorld` pattern landed with `CombinationSwitch` as the first
-instance.  Each item below is a new component that joins it — keyboard or
-future-UI input on one side, chassis-segment signal publishing on the other.
-
-- [x] **Live weather for the ambient almanac.**  `scripts/fetch_weather.py`
-  fits a real day's hourly temperature and humidity (Open-Meteo) to the
-  almanac's daily cycle and writes a weather file; a config names it under
-  `environment.weather` (see `Config::Environment::Weather`).  The sim reads it
-  at startup only and stays on sim time (`AmbientTempSensor::hour_of_day`);
-  without a file, or when the script cannot reach the service, the almanac
-  keeps its defaults.
-- [x] **Trip-reset button reaches the car.**  The I key, the Trip Reset UI
-  button and Scenario's `ipc_trip_reset` hook each close the RSA's RESET button
-  (`DRIVER_ES_RSA_TRIP_RESET`) for one timed push (`TimedPushButton`).  (The
-  door handles are mechanical rods to the latch with no switch; opening a door
-  reaches the car through the jamb switches ev1sim already writes.)
-
-## ABS scenarios
-
-- [x] **The three uniform-surface stops brake on the barrier tick.**
-  Done 2026-08-12.  `abs_high_mu_stop`, `abs_hard_brake` and
-  `abs_brake_and_steer` scheduled `set_brake` at 7.0 / 7.0 / 6.0 s, all behind
-  a `wait_for_speed` barrier releasing at 15.028 / 15.028 / 12.053 s, so full
-  brake landed on the exact tick the throttle dropped to zero.  Brakes moved to
-  18.0 / 18.0 / 15.0 s — a 2.97 / 2.97 / 2.96 s settle — with brake values, mu
-  values, the 0.30 s brake-to-steer offset and the hold durations (18 / 18 / 19
-  s) all unchanged; `max_time_s` extended to keep the same 5 s tail after brake
-  release.  `scripts/scenario_runway_report.py` now covers all seven ABS
-  scenarios rather than the four transition ones, and
-  `config/abs_hard_brake.json` was added because `abs_hard_brake` had no config
-  wrapper at all — which is part of why nobody had measured it.
-
-- [x] **The settle table's barrier-release times are frozen measurements that
-  nothing re-derives.**  Done 2026-08-12.  The table moved out of
-  `tests/test_scenario.cpp` into `config/scenarios/measured_settle.json` — one
-  copy, read by the `[Runway]` cases, by the coverage guard, and by
-  `scripts/scenario_runway_report.py`, which now **re-derives**
-  `measured_release_s` and `measured_crossing_s` from a headless run and exits
-  non-zero when a derived value sits more than 0.05 s from the recorded one.
-  `--update` re-records what it measured, so a legitimate plant move is a
-  command rather than a hand-edit; `--selftest` drives the comparison across
-  its own tolerance (0.025 / 0.045 / 0.100 s against 0.050) and is registered
-  as the `runway_table_selftest` ctest, which runs no simulation.
-  Two things found while doing it.  The report **could not be run the way its
-  own docstring documented**: `scripts/scenario_runway_report.py` with no
-  scenario names exited 2 without simulating anything, because `argparse`
-  checks a `nargs="*"` list default against `choices` as a single value.  And
-  the table conflated two different reasons for a `-1` crossing — "no boundary
-  exists" (the three uniform stops) and "the crossing is inside the brake event
-  by design" (`abs_mu_jump`) — which the JSON now distinguishes, so the
-  re-derivation can check the crossings that are entry conditions and skip the
-  one that is the subject of its test.
-  The real re-derivation is seven headless scenario runs, so it is opt-in
-  locally — `make test-runway-table`, or `ctest -L slow` when configured
-  `-DEV1SIM_SLOW_TESTS=ON`.  Timing, measured both places: **3 min 02 s** on a
-  GitHub runner with a warm cache, ~18 min on the developer machine it was
-  first timed on.
-  **In CI it is its own `settle-table` job on the CRON lane**, not the PR path
-  (`if: schedule || workflow_dispatch`, `needs: chrono-smoke` for the warm
-  Chrono cache).  Adding it to a lane that gates every PR is the wrong
-  direction, and sharing a job with a cold Chrono build could exceed a ceiling
-  and turn a correctness check into a flaky one; nobody waits on the cron.  Its
-  own job also means a red names what broke rather than reddening the smoke
-  job.  A failure surfaces as a red scheduled run carrying an `::error::`
-  annotation that names the fix, a job-summary block, and GitHub's default mail
-  for a failed scheduled workflow; `runway.log` is kept as an artifact for 30
-  days.  The script prints a completion marker and the step refuses to pass
-  without it, so a run killed by the timeout cannot leave a log that reads like
-  a clean one — which is not hypothetical: the first dispatch crashed on a
-  relative `--binary` path and the step correctly reported that nothing had
-  been checked rather than a verdict.  `workflow_dispatch` exists so a red cron
-  can be re-checked without waiting three days for the next.
-
-- [x] **The coast map exceeds the manual's stated regeneration bound above
-  ~8400 RPM.**  Done 2026-08-12, and the framing above was wrong in the way
-  that mattered.  It is not a category error that the bound is electrical and
-  the map "mechanical drag": @source:manual propulsion p57, "COAST DOWN
-  FUNCTION" says the zero-pedal negative torque IS commanded regenerative
-  braking ("The coast down feature uses a calibrated amount of regenerative
-  braking... The PCM controls coast down by providing a negative torque current
-  as a function of drive motor shaft speed/direction sensor rate"), so the
-  printed limit on p60/p209 applies to it directly and the curve was in
-  straight violation — 5.5× the ceiling at its worst, not merely implausible.
-  Curve re-cut as constant power above an 8350 RPM knee; no breakpoint at or
-  below 8000 RPM changed value.  That is **not** the same as leaving the
-  2026-04-30 calibration alone — coastdown spans 3586–10 758 RPM, so 34 % of
-  its fitted range moved and the fit's CdA shifted 8×.  Details, the conditions
-  the map still does not represent, and the coastdown effect are in
-  `docs/ev1_chrono_audit.md` §3.1 and §11.1.
-
-## Door / lock state
+## Tire model
 
 - [ ] **Slip-dynamics drag calibration (deferred).**  CdA still 6.5× spec
   in coastdown after the geometry fix.  The remaining excess lives in
@@ -162,78 +32,9 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   which is what makes "CdA is 1.7× spec" a claim worth acting on and the
   retracted "0.09 m², a quarter of spec" one that never was (it was
   0.088 ± 0.145 m²).
-- [x] **SHM transport "intermittent float corruption" — root-caused.**
-  Was NOT a transport bug.  Controllers' bus-drain loops did not
-  filter `FrameType::SignalDefine` frames, which carry an ASCII
-  signal-name payload sharing the same `signal_id` as the data
-  frames they describe.  Reading the first 4 bytes of
-  `"vehicle.brake.master_cylinder_pressure_kpa..."` as a float
-  produced 1.756e25 every time — looked like corruption, was actually
-  a missing typecheck.  Fix landed in BTCM/PIM/IPC/APM/RSA/RHJB/LHJB
-  controller drains: skip non-`DeltaBatch` frames before typed
-  decode (matches the existing ev1sim + scan_tool + BPM + scripted
-  pattern).  Defensive single-creator SHM init also landed
-  (`O_CREAT|O_EXCL` + wait-for-magic) so the multi-creator init race
-  can't corrupt the mutex/cond state, even though it wasn't the
-  actual bug here.
-- [x] **BTCM ABS algorithm engages — confirmed working.**  After the
-  SignalDefine filter fix, the BTCM AVR firmware's ABS state machine
-  cycles through HOLD/DUMP phases ~720 times during the
-  `abs_hard_brake.json` brake event.  The
-  `scripts/run_abs_compare.sh + compare_abs_runs.py` output now
-  shows clear differences between BTCM-on and BTCM-off:
-  **Provenance flag (2026-08-12):** this entry credits
-  `run_abs_compare.sh` with running `abs_hard_brake`, but until this date
-  that script's whitelist rejected `hard_brake` and `config/abs_hard_brake.json`
-  did not exist — so whatever produced these numbers, it was not the invocation
-  named here.  The stopping distances below (19.16 / 19.29 m) are also an order
-  of magnitude off this branch's measured ~102 m for the same scenario, which
-  says they came from a different scenario, a different plant, or both.  Left
-  as the historical record rather than rewritten; do not treat these figures as
-  current.
-    - BTCM-on rear EMB peak slip ≈ 0.66 vs free-rolling 0.43 (rear
-      brakes engage and contribute to deceleration)
-    - Stopping distance BTCM-on 19.16 m vs BTCM-off 19.29 m
-      (marginal on dry asphalt — expected; ABS shines on low-mu)
-    - Front time-locked drops slightly with ABS but not dramatically
-      because dry asphalt's high friction limit barely benefits from
-      modulation.
-## Outputs ev1sim could render
-- [x] Wiper sweep: `WiperBlades3D` (`src/WiperBlades3D.{h,cpp}`) draws both
-  wipers as arm and blade bars on the windshield (the chassis mesh has no wiper
-  parts), swung to the blade position the RHJB's wiper-motor plant publishes
-  (`CHASSIS_WIPER_SWEEP_POSITION`), so the park return after OFF shows too; the
-  HUD's WIPER bar follows the same position. Parked blade-tip heights from the
-  body manual (p. 126); pivots, lengths and sweep angle are `@design`.
-- [x] Door lock visual: the body diagram (bottom right) has a lock knob inside
-  each door and the trunk, sliding with the door-lock motor's stroke (amber
-  mid-stroke, red latched locked); the audio click still plays at end of
-  travel.
-- [x] Trunk lid opens in 3D: `TrunkLid3D` (`src/TrunkLid3D.{h,cpp}`) swings
-  the lid about its front-edge hinge while the trunk is open (T key or the UI
-  panel). The lid is its own mesh, `ev1_trunk_lid.obj`, split out of the
-  chassis visual mesh by `ev1model/split_trunk_lid.py`; open angle and travel
-  time are `@design`.
-- [x] Interior lamps: `InteriorLamps3D` (`src/InteriorLamps3D.{h,cpp}`) lights
-  the four-bar lamp and the mirror map lamp in the cabin from their circuits at
-  the RHJB, dimmed by its interior-lamp module's level; the lights diagram shows
-  both. Mounts are read off the visual mesh (`@inferred`).
-- [x] Climate loads: the floating UI panel and the scenario CSV show whether the
-  compressor, heated windshield, both rear defog grids and radiator fan are
-  actually energised (`src/ClimateLoads.h`), beside the HTCM's requests.
-- [x] Charger report: the floating UI and the scenario CSV show what the
-  off-board charger reports while the paddle is in (state, current, voltage,
-  mains, temperatures, faults), from its `CHASSIS_CHARGER_*` cells
-  (`src/ChargerStatus.h`).
-- [x] Climate readout: J shows the climate controller's sensor readings and
-  outputs and the APM's compressor and windshield-heat drives
-  (`src/ClimateReadout.h`); scenario CSV `climate_*` columns.
-- [x] Drive and power readout: J's second page shows the BTCM's wheel speeds
-  and lamp states, the AD's high-voltage readings, the APM's status and two
-  other modules' observability cells (`src/DriveReadout.h`); scenario CSV
-  `drive_*` columns.
 
 ## Bus-mediated physics
+
 - [ ] **Regen ↔ friction blending (S15 — documented gap, do NOT fabricate).**
   Friction braking is regen-agnostic and regen (PIM's motor-current readout,
   chassis 4072 `kSigChassisMotorCurrentA`, derived/published by electricsim's
@@ -254,32 +55,14 @@ future-UI input on one side, chassis-segment signal publishing on the other.
   closed-loop test.
 
 ## Future: physical sim rig
+
 - [ ] Adapt the user's physical driving sim rig with a lookalike RSA, IPC
   display and chime/horn sound effects.  Real switches already reach the sim:
   a USB button box's buttons bind to momentary actions or to maintained
   switches (seat belts, charge coupler, A/C, defrost, windows, HVAC fan and
-  mode rotaries) through `input.rig` (`src/RigSwitches.h`).  Still open: the
+  mode rotaries) through `input.rig` (`src/RigSwitches.h`), and a button bound
+  to `park_brake_press` is one push of the park brake button.  Still open: the
   lookalike RSA and IPC hardware, and switches that must reach the bus as
   contact states rather than PhysicalWorld inputs.
 
 ## Vendored stub hygiene
-
-- [x] **Vendored electricsim stub carried upstream-internal references — scrubbed
-  upstream, re-vendored here.**  `tests/electricsim_stub/src/io/wire_table.hpp`
-  and `tests/electricsim_stub/src/net_host/conductor_publisher.hpp` picked up
-  upstream review-finding identifiers and source paths when PR #48 re-vendored
-  the stub set.  Both files are intentionally byte-identical to their upstream
-  originals, and the stub's integrity check treats any local edit as drift, so
-  the references could not be scrubbed in this repo — the fix landed upstream in
-  electricsim first (tracked there as
-  `BL-2026-08-09-vendored-stub-leaks-private-refs-to-ev1sim`), and this repo
-  re-vendored both files from that commit.
-
-  **The identifiers are gone.  The source paths stay, deliberately.**  Upstream
-  ruled that a path naming a real source file is not a private reference — it
-  points at a file, where a finding id points at a document a reader outside that
-  repo cannot open — and that the same rule had already been applied when these
-  files were scrubbed the first time.  So `src/net/net_types.hpp` and
-  `config/nets/<module>.yaml` remain in `wire_table.hpp`, and the third path this
-  entry implied was in these two files, `src/io/topology/feed_query.hpp`, turns
-  out to sit in `tests/electricsim_stub/src/io/ev1_chassis_signals.hpp` instead.
