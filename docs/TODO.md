@@ -8,8 +8,9 @@ work.  When you finish an item, delete it from here.
 - [ ] **Slip-dynamics drag calibration (deferred).**  Coastdown CdA is
   **1.7× spec**: 0.621 ± 0.181 m² against the printed 0.19 × 1.89 = 0.36 m²
   (chassis p. 62), with F_rr about 2.3× the rolling-resistance estimate
-  (`docs/ev1_chrono_audit.md` §11.1).  That fit was taken before the car was
-  set to its printed 1350 kg and the tyre to its printed load index; re-measure
+  (`docs/ev1_chrono_audit.md` §11.1).  That fit predates the driveshaft inertia
+  at 0.03 kg·m² (0.5 sat in every deceleration it used), the printed 1350 kg
+  and the printed tyre load index; re-measure
   with `./build/ev1sim --config config/coastdown.json` and
   `scripts/fit_coastdown.py`.  The excess lives in TMeasy's internal slip-curve
   shape; the exposed `Initial Slopes dFx/dsx` knob doesn't usefully reduce it
