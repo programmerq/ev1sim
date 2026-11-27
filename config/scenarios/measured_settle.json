@@ -60,7 +60,7 @@
       "scenario": "config/scenarios/abs_hard_brake.json",
       "boundary": null,
       "surface": "dry asphalt",
-      "measured_release_s": 15.028,
+      "measured_release_s": 10.744,
       "min_settle_s": 2.0,
       "measured_crossing_s": null,
       "min_on_surface_s": null
