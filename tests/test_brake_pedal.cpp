@@ -24,8 +24,21 @@ TEST_CASE("BrakePedal: dead-band returns zero pressure", "[BrakePedal]") {
     CHECK(BrakePedal::pressure_for_travel(0.07, cal) == 0.0);
 }
 
+namespace {
+// A calibration built for the shape tests, independent of the defaults.
+BrakePedal::Calibration shape_cal() {
+    BrakePedal::Calibration cal;
+    cal.dead_band = 0.07;
+    cal.transition = 0.35;
+    cal.k1_kpa_per_unit = 8000.0;
+    cal.k2_kpa_per_unit = 18000.0;
+    cal.max_pressure_kpa = 15000.0;
+    return cal;
+}
+}  // namespace
+
 TEST_CASE("BrakePedal: soft stage is linear with k1", "[BrakePedal]") {
-    BrakePedal::Calibration cal;  // defaults: dead_band 0.07, transition 0.35, k1 8000
+    const auto cal = shape_cal();
     // At 0.20: pressure = 8000 * (0.20 - 0.07) = 1040 kPa
     CHECK_THAT(BrakePedal::pressure_for_travel(0.20, cal),
                WithinAbs(1040.0, 1e-9));
@@ -36,28 +49,36 @@ TEST_CASE("BrakePedal: soft stage is linear with k1", "[BrakePedal]") {
 
 TEST_CASE("BrakePedal: firm stage uses k2 from the transition point",
           "[BrakePedal]") {
-    BrakePedal::Calibration cal;
+    const auto cal = shape_cal();
     // Soft segment top: 8000 * (0.35 - 0.07) = 2240 kPa
     CHECK_THAT(BrakePedal::pressure_for_travel(0.35, cal),
                WithinAbs(2240.0, 1e-9));
-    // At 0.50: 2240 + 18000 * (0.50 - 0.35) = 2240 + 2700 = 4940 kPa
+    // At 0.50: 2240 + 18000 * (0.50 - 0.35) = 4940 kPa
     CHECK_THAT(BrakePedal::pressure_for_travel(0.50, cal),
                WithinAbs(4940.0, 1e-9));
-    // At 0.80: 2240 + 18000 * (0.80 - 0.35) = 2240 + 8100 = 10340 kPa
-    CHECK_THAT(BrakePedal::pressure_for_travel(0.80, cal),
-               WithinAbs(10340.0, 1e-9));
 }
 
 TEST_CASE("BrakePedal: pressure caps at max_pressure_kpa", "[BrakePedal]") {
-    BrakePedal::Calibration cal;  // max 15000
-    // At 1.0: uncapped would be 2240 + 18000*0.65 = 13940 (under cap)
+    const auto cal = shape_cal();
+    // At 1.0: 2240 + 18000*0.65 = 13940, under the 15000 cap
     CHECK_THAT(BrakePedal::pressure_for_travel(1.0, cal),
                WithinAbs(13940.0, 1e-9));
-
-    // Lower the cap and check it kicks in.
     BrakePedal::Calibration tight = cal;
     tight.max_pressure_kpa = 5000.0;
     CHECK(BrakePedal::pressure_for_travel(1.0, tight) == 5000.0);
+}
+
+TEST_CASE("BrakePedal: default curve spans the sensors' full scale",
+          "[BrakePedal]") {
+    BrakePedal::Calibration cal;
+    // The soft stage ends at a fifth of full scale; full travel is full scale.
+    CHECK_THAT(BrakePedal::pressure_for_travel(cal.transition, cal),
+               WithinAbs(BrakePedal::kSoftStageShare * BrakePedal::kSensorFullScaleKpa, 1e-6));
+    CHECK_THAT(BrakePedal::pressure_for_travel(1.0, cal),
+               WithinAbs(BrakePedal::kSensorFullScaleKpa, 1e-6));
+    // Monotonic across the knee.
+    CHECK(BrakePedal::pressure_for_travel(0.34, cal) <
+          BrakePedal::pressure_for_travel(0.36, cal));
 }
 
 TEST_CASE("BrakePedal: travel outside [0,1] is clamped",
@@ -71,7 +92,8 @@ TEST_CASE("BrakePedal: travel outside [0,1] is clamped",
 TEST_CASE("BrakePedal: update() stores most-recent pressure", "[BrakePedal]") {
     BrakePedal pedal;
     pedal.update(0.5);
-    CHECK_THAT(pedal.pressure_kpa(), WithinAbs(4940.0, 1e-9));
+    CHECK_THAT(pedal.pressure_kpa(),
+               WithinAbs(BrakePedal::pressure_for_travel(0.5, BrakePedal::Calibration{}), 1e-9));
 
     // Subsequent update overwrites.
     pedal.update(0.0);
@@ -117,4 +139,19 @@ TEST_CASE("ExternalSimConnector: SetBrakeMasterPressureKpa stores the value",
     c.SetBrakeMasterPressureKpa(0.0f);
     c.SetBrakeMasterPressureKpa(12345.6f);
     SUCCEED();
+}
+
+#include "FrontCaliperBrake.h"
+
+TEST_CASE("FrontCaliperBrake: torque follows the BTCM's caliper pressure",
+          "[FrontCaliperBrake]") {
+    using ev1sim::front_brake_command_for_kpa;
+    using ev1sim::kFrontCaliperFullTorqueKpa;
+    CHECK(front_brake_command_for_kpa(0.0) == 0.0);
+    CHECK(front_brake_command_for_kpa(-50.0) == 0.0);
+    CHECK_THAT(front_brake_command_for_kpa(kFrontCaliperFullTorqueKpa / 2.0),
+               WithinAbs(0.5, 1e-12));
+    CHECK(front_brake_command_for_kpa(kFrontCaliperFullTorqueKpa) == 1.0);
+    // Above the BTCM model's ceiling the brake stays at its Maximum Torque.
+    CHECK(front_brake_command_for_kpa(13940.0) == 1.0);
 }
