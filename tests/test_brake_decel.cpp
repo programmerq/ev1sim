@@ -41,7 +41,7 @@ namespace {
 
 // EV1 plant constants — kept in sync with the committed data the real run
 // loads (data/vehicle/ev1/**, docs/ev1_chrono_audit.md §2/§5/§6).
-constexpr double kCurbMassKg     = 1281.0;   // Gen-2 NiMH curb (audit §2)
+constexpr double kCurbMassKg     = 1350.0;   // curb weight, chassis manual p. 62
 constexpr double kTireRadiusM    = 0.2915;   // P175/65R14 unloaded radius (audit §5)
 constexpr double kTireMu         = 0.8;      // dry-asphalt friction (audit §5)
 constexpr double kGravity        = 9.80665;
@@ -139,7 +139,7 @@ TEST_CASE("BrakeDecel: full-pedal stop from 30 m/s lands in a physical envelope"
 TEST_CASE("BrakeDecel: partial pedal is graded and below the friction ceiling",
           "[BrakeDecel][Integrated]") {
     // 30% command: 0.30 × 3266 ≈ 980 N·m total → 980/0.2915 ≈ 3361 N →
-    // 3361/1281 ≈ 2.62 m/s² ≈ 0.27g, well under the 0.8g ceiling.  This is the
+    // 3361/1350 ≈ 2.49 m/s² ≈ 0.25g, well under the 0.8g ceiling.  This is the
     // "usable middle range" the Round-4 budget was set to preserve (audit §6).
     const StopResult r = integrate_stop(30.0, 0.30, 0.30, /*actuator_lag=*/true);
 
@@ -192,7 +192,7 @@ TEST_CASE("BrakeDecel: BTCM death zeroes the rear but front braking is retained"
     CHECK(btcm_dead.distance_m > 0.0);
 
     // 2. Front-only decel is meaningful: 2×1120 = 2240 N·m → 2240/0.2915 ≈
-    //    7684 N → /1281 ≈ 6.0 m/s² ≈ 0.61g.  Below the 0.8g friction ceiling,
+    //    7684 N → /1350 ≈ 5.7 m/s² ≈ 0.58g.  Below the 0.8g friction ceiling,
     //    so the lost rear is genuinely visible (not masked by saturation).
     const double front_only_decel = brake_force_n(front_pedal, 0.0) / kCurbMassKg;
     CHECK(front_only_decel < kTireMu * kGravity);

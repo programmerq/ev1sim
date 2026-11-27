@@ -1,26 +1,20 @@
 # EV1 Chrono vehicle audit
 
 Cross-reference of every parameter in `data/vehicle/ev1/**/*.json` against
-known GM EV1 specifications.  Targets **Generation 2 NiMH (1999)** as the
-canonical config — it's the more polished production variant most folks
-remember, and the lighter mass + extended range numbers are what the
-public datasheets cite.
+the EV1 service manuals.  The model is the **Generation 1 (1997) lead-acid
+car**, the one the manuals in `ev1-manual-redux` describe; nothing here is
+taken from the later Gen 2 car.
 
 Symbol legend in the tables:
-- ✅ matches real EV1 closely
+- ✅ matches the manual
 - ⚠️  approximation — close enough for now, refine with new data
 - ❌ wrong — should be fixed
 - 🔧 fixed in the audit batch (commit log has the change)
 
-Sources for the real-EV1 numbers in this document:
-- **EV1 service manuals, transcribed in the `ev1-manual-redux` repo** — the
-  primary source, and the one section 7 should have used from the start.  Cite
-  the printed page (e.g. "chassis p. 62"), not "known specifications."
-- GM EV1 product brochure (1999), reproduced widely (e.g. ev1.org archives)
-- Wikipedia GM EV1 article (cross-checked figures)
-- "Who Killed the Electric Car?" (Paine 2006) — production / range numbers
-- General automotive engineering knowledge for the
-  derivative-but-undocumented values
+Sources: the **EV1 service manuals, transcribed in the `ev1-manual-redux`
+repo**, cited by printed page (e.g. "chassis p. 62").  A value no manual prints
+is an estimate and says so (⚠️ or `@inferred`); brochures, encyclopaedia
+articles and the sims themselves are not sources.
 
 The audit was occasioned by the cruise-control demo run — steady-state
 cruise hold dropped to ~11.6 m/s when commanding 13.15 m/s.  That bug is
@@ -29,57 +23,49 @@ off cruise gain tuning until these fixes land.
 
 ## 1. Vehicle dimensions
 
-| Parameter | Current | Real EV1 | Status |
+All printed values in this table are chassis manual p. 62, "Exterior
+Dimensions"; body repair manual p. 94, "EV1 Specifications", prints the same.
+
+| Parameter | Current | EV1 manual | Status |
 |---|---|---|---|
-| Wheelbase | 2.512 m | 2.514 m (99.2 in) | ✅ within 2 mm |
+| Wheelbase | 2.512 m | 2512 mm (98.9 in) | ✅ |
 | Front axle x | +1.346 m (suspension loc) | n/a (derived) | ✅ |
 | Rear axle x  | −1.166 m (suspension loc) | n/a (derived) | ✅ |
-| Min turning radius | 10.8 m | 11.0 m (curb-to-curb) | ⚠️  close |
-| Max steering angle | 13.5° (vehicle); 10° (pinion) | ~13° (matches 11 m TR) | ✅ |
-| Length / width / height | n/a (visual mesh) | 4310 / 1765 / 1281 mm | n/a |
-| Drag coefficient | n/a (Chrono uses tire/rolling losses, no aero) | 0.19 | ❌ no aero model |
-| Frontal area | n/a | 1.89 m² | ❌ no aero model |
-
-**Note on aero**: Chrono's WheeledVehicle doesn't model body aero by default.
-The EV1's signature 0.19 Cd should manifest as a `chrono::ChAerodynamicLoad`
-or similar applied to the chassis body — currently absent.  Without it,
-high-speed deceleration is artificially low.
+| Min turning radius | 10.8 m | not printed | ⚠️ estimate |
+| Max steering angle | 13.5° (vehicle); 10° (pinion) | not printed | ⚠️ estimate, see §8 |
+| Length / width / height | n/a (visual mesh) | 4309 / 1766 / 1281 mm | n/a |
+| Drag coefficient | 0.19 (`src/Aerodynamics.h`) | 0.19 | ✅ |
+| Frontal area | 1.89 m² (`src/Aerodynamics.h`) | 1.89 m² | ✅ |
 
 ## 2. Mass and inertia
 
-| Parameter | Current | Real EV1 (NiMH) | Status |
+| Parameter | Current | EV1 manual | Status |
 |---|---|---|---|
-| Chassis mass | 1167 kg | target curb 1281, less ~114 kg of wheel, tyre, suspension and steering bodies | 🔧 1217→1199→1167 |
-| Curb weight (computed) | ~1299 kg | 1281 kg (NiMH) | ⚠️ off by 18 kg |
-| Centroidal Frame x | +0.1241 m | unknown — likely +0.1 to +0.15 (slight front bias from motor) | ⚠️ moved with the rear axle mass, see below |
-| Centroidal Frame z | 0.4955 m | likely 0.40-0.45 m (T-pack batteries low in floor) | ⚠️ slightly high |
-| Ixx (roll) | 130 kg·m² | rg≈0.33 m → plausible | ⚠️ |
-| Iyy (pitch) | 600 kg·m² | rg≈0.70 m → plausible | ⚠️ |
-| Izz (yaw)  | 680 kg·m² | rg≈0.75 m → plausible | ⚠️ |
+| Curb weight (whole car) | 1349.6 kg | **1350 kg (2970 lb)**, chassis p. 62, body p. 94 | ✅ |
+| Chassis body mass | 1236 kg | curb less the 113.6 kg of bodies below | ✅ derived |
+| Battery pack mass | inside the chassis body | 533 kg, body p. 94 | n/a (not a separate body) |
+| Front axle share | 52.6 % | not printed | ⚠️ the ev1 repo suspension baseline's `front_axle_load_fraction` (a weighed 1997 car) |
+| Centroidal Frame x | +0.193 m | not printed | ⚠️ set to give that axle share |
+| Centroidal Frame z | 0.4955 m | not printed | ⚠️ estimate; the pack sits low in the floor tunnel |
+| Ixx / Iyy / Izz | 138 / 635 / 720 kg·m² | not printed | ⚠️ radii of gyration 0.33 / 0.72 / 0.76 m |
 
-**Curb-weight breakdown (Chrono adds these to chassis)**:
+**Curb-weight breakdown (Chrono adds these to the chassis body)**, all
+estimated:
 - 4× wheel × 8.0 kg = 32 kg
 - 4× tire × 7.5 kg = 30 kg
 - 2× front suspension (spindle 1.0 + upright 1.2 + UCA 0.9 + LCA 1.4) = 9.0 kg
 - Rear five-link axle (axle tube 35.0 + 2 spindles 1.0 + 2 lower links 1.0 +
-  track bar 2.0) = 41.0 kg, all estimated; see `EV1_RearFiveLink.json`
+  track bar 2.0) = 41.0 kg; see `EV1_RearFiveLink.json`
 - Steering link = 1.6 kg
-- Total non-chassis = ~114 kg
-- Target chassis = 1281 − 114 = **1167 kg** for Gen 2 NiMH
+- Total = 113.6 kg, so the chassis body is 1350 − 113.6 = **1236 kg**
 
-The rear axle replaced a 9.0 kg wishbone stand-in, so 32 kg moved from the
-chassis body to the axle.  The chassis COM moved from (0.09, 0, 0.49) to
-(0.1241, 0, 0.4955), the point that keeps the whole car's mass centre where
-it was; the curb weight and axle split the rest of the model was tuned on are
-unchanged.  Inertia left as it was.
-
-For PbA Gen 1 (1351 kg curb), chassis would be 1269 kg — choose NiMH as
-the canonical config since the demo scenarios are tuned around the more
-modern variant.
+The front spring's free length and damper follow from the chassis body's front
+load; `tests/test_suspension_geometry.cpp` recomputes both springs from this
+file's mass and COM.
 
 ## 3. Powertrain — motor
 
-| Parameter | Current | Real EV1 (Gen 2 AC induction) | Status |
+| Parameter | Current | EV1 manual (AC induction) | Status |
 |---|---|---|---|
 | Peak torque | **141 N·m at 7000 RPM**, held flat below it | **141 N·m at 7000 RPM** (prop p250) | ✅ the rating is sourced; the flat plateau below it is ⚠️ @inferred |
 | Peak power | **103.4 kW at 7000 RPM** | **103 kW (138 Hp) at 7000 RPM** (prop p250) | ✅ sourced — the map's value is the stated torque × the stated speed |
@@ -454,14 +440,14 @@ What's also still missing:
 
 ## 4. Drivetrain
 
-| Parameter | Current | Real EV1 | Status |
+| Parameter | Current | EV1 manual | Status |
 |---|---|---|---|
 | Transmission type | single forward gear, ratio 1.0 | single-speed reduction | ✅ |
 | Final drive (Conical Gear) | 0.1 → **10.0:1 reduction** | **10.95:1 reduction** (@source:manual propulsion p250) | 🔧 0.1 → 0.0913 |
 | Driveline | FWD (`ShaftsDriveline2WD`) | FWD | ✅ |
 | Driveshaft inertia | 0.03 kg·m² | no manual figure — @inferred 0.013–0.035 kg·m² | 🔧 0.5 → 0.03 |
 | Differential box inertia | 0.6 kg·m² | unknown — typical | ⚠️  |
-| Differential lock limit | 100 N·m | open differential, no LSD on EV1 | ✅ (open at this limit) |
+| Differential lock limit | 100 N·m | a differential is printed (prop p. 248); no limited-slip is | ⚠️ treated as open (the lock is never engaged) |
 
 The 10.0 vs 10.95 final drive change is small (~9% off) and shifts the
 operating RPM at a given speed slightly.  At 13 m/s with current ratio:
@@ -502,20 +488,21 @@ claimed as resolved by this entry.
 
 ## 5. Tires
 
-| Parameter | Current | Real EV1 (P175/65R14) | Status |
-|---|---|---|---|
-| Unloaded radius | 0.2915 m | 0.292 m (computed from spec) | ✅ |
-| Width | 0.175 m | 0.175 m (175 mm) | ✅ |
-| Rim radius | 0.1778 m | 0.1778 m (14"/2) | ✅ |
-| Mass | 7.5 kg | typical | ✅ |
-| Coefficient of friction | 0.8 | typical dry asphalt | ✅ |
-| Rolling resistance | 0.008 | EV1 spec'd 0.006-0.008 (Michelin Proxima LRR) | ✅ |
-| Load index | 82 (475 kg/tire) | 95 (Q-rated) | ⚠️  probably under-spec'd |
-| Tire model | TMeasy + first-order longitudinal tire dynamics (§5.2) | n/a | ✅ standard choice |
+Printed: P175/65R14 84S on a 14×4.5 aluminium wheel (body p. 93, RPO QEL and
+PY7); 175/65R14 at 345 kPa (50 psi) (chassis p. 62).
 
-Tires are the best-modeled part of the vehicle.  The wide margin on
-bearing capacity (4750 N vs ~3140 N actual peak load per tire) is
-conservative; not worth touching.
+| Parameter | Current | EV1 manual | Status |
+|---|---|---|---|
+| Unloaded radius | 0.2915 m | 0.2916 m (175 × 0.65 + 14 in / 2) | ✅ |
+| Width | 0.175 m | 175 mm | ✅ |
+| Rim radius | 0.1778 m | 14 in / 2 | ✅ |
+| Load index | 84 (500 kg, 4905 N) | 84 | ✅ |
+| Slip, vertical and aligning parameters | Chrono's `GuessPassCar70Par` at load index 84 | not printed | ⚠️ generic passenger-car values |
+| Inflation pressure | not modelled (pressure term 1) | 345 kPa | ⚠️ no reference pressure is printed to scale from |
+| Mass | 7.5 kg | not printed | ⚠️ estimate |
+| Coefficient of friction | 0.8 | not printed | ⚠️ typical dry asphalt |
+| Rolling resistance | 0.008 | not printed | ⚠️ low-rolling-resistance estimate |
+| Tire model | TMeasy + first-order longitudinal tire dynamics (§5.2) | n/a | ✅ standard choice |
 
 ### 5.1 Standstill wheel-spin limit cycle → integration step (2026-07-08)
 
@@ -582,24 +569,14 @@ within 0.0004 of its 100 ms mean.  `tests/test_launch_slip.cpp`
 
 ## 6. Brakes
 
-| Parameter | Current | Real EV1 | Status |
+| Parameter | Current | EV1 manual | Status |
 |---|---|---|---|
-| Per-wheel max torque | 1800 N·m | ~700-800 N·m front, ~400-500 rear | 🔧 1800 → 800 |
-| Front brake type | "BrakeSimple" | ventilated disc (256 mm) | ⚠️ ok abstraction |
-| Rear brake type | "BrakeSimple" (same as front) | drum (200 mm) — much weaker | ⚠️ |
+| Front brake | `BrakeSimple`, 1120 N·m per wheel | disc, 245 mm diameter, 11.0 mm new thickness, 45.03 mm caliper bore (brakes p. 28-29) | ⚠️ torque not printed |
+| Rear brake | `BrakeSimple`, 513 N·m per wheel, driven by the EMB drum model | electric drum, 225.0 mm inside diameter (brakes p. 28) | ⚠️ torque from the drum model, not printed |
 
-**Math behind the fix**: 1800 N·m × 4 wheels = 7200 N·m total.  At 0.2915 m
-tire radius that's 24,700 N braking force = 1.97g of deceleration —
-which exceeds the tire's friction-limited deceleration (~0.8g on dry
-asphalt).  In practice the wheels lock and ABS modulates, so the
-visible deceleration is friction-limited regardless.  But the
-unrealistically high commanded torque means even a 30% brake pedal
-saturates wheel friction — there's no usable middle range.
-
-Setting per-wheel torque to 800 N·m gives 3200 N·m total ≈ 11,000 N
-≈ 0.88g, which still saturates friction at full brake but leaves a
-realistic gradient at partial pedal.  Future improvement: split front
-800 / rear 500 to match the EV1's disc/drum bias.
+Full pedal gives 3266 N·m total, ≈ 11,200 N at the tyre, ≈ 0.85 g on the
+1350 kg car: friction-limited at full brake, with a usable gradient at partial
+pedal.  `docs/vehicle-dynamics.md` has the bias reasoning.
 
 ## 7. Suspension geometry
 
@@ -706,39 +683,32 @@ nominals and all four match.  They are now pinned to the printed values.
 
 ## 8. Steering
 
-| Parameter | Current | Real EV1 | Status |
+| Parameter | Current | EV1 manual | Status |
 |---|---|---|---|
-| Template | RackPinion | rack-and-pinion w/ electric assist | ✅ |
+| Template | RackPinion | rack-and-pinion with electrohydraulic assist (chassis p. 63) | ✅ |
+| Steering ratio | not modelled: the driver input is a normalised [−1, 1] road-wheel command | 16.38:1 (chassis p. 63) | n/a until a steering-wheel angle input exists |
 | Pinion radius | 0.3 m | n/a (Chrono effective parameter) | ⚠️ |
-| Max pinion angle | 10° | n/a | ⚠️ |
-| Steering link length | 0.46 m | unknown | ⚠️ |
-| Rack-to-wheel ratio (effective) | 1.35:1 | unknown | ⚠️ |
+| Max pinion angle | 10° | not printed | ⚠️ |
+| Steering link length | 0.46 m | not printed | ⚠️ |
 
 `EV1_Vehicle.json` declares a 13.5° maximum steering angle (≈ 11 m turning
-radius on the 2.512 m wheelbase), but that key is metadata for drivers and path
-followers, not kinematics.  The rack's 0.3 m × 10° travel through the
+radius on the 2.512 m wheelbase, both estimates: no manual prints a turning
+circle), but that key is metadata for drivers and path followers, not
+kinematics.  The rack's 0.3 m × 10° travel through the
 suspension's steering arms gives more at full lock: in a standalone Chrono
 9.0.1 run the road wheels reach about 24° inside / 20.5° outside on the
-baseline front geometry (the sedan template gave 24.6° / 23.2°).  The
-published 9.9 m turning diameter needs about 30° outside, so the rack travel
-is the number to revisit, not the geometry.  Internal pinion parameters
+baseline front geometry.  With no printed turning circle, the rack travel
+stays an estimate.  Internal pinion parameters
 are tuning surface, not physical specs.  Leave alone.
 
 ## 9. Aerodynamics
 
-**Not modeled.**  See dimensions table.  Adding aero would need a custom
-`ChAerodynamicLoad` or chassis-level drag force computation
-(`F_drag = 0.5 ρ v² Cd A`).
+`src/EV1Vehicle.cpp` applies `F_drag = 0.5 ρ v² Cd A` at the chassis COM
+through Chrono's `SetAerodynamicDrag`, with Cd 0.19 and A 1.89 m², both printed
+on chassis p. 62 and body p. 94 (`src/Aerodynamics.h`; `docs/vehicle-dynamics.md`).
 
-At 13 m/s (cruise speed in the demo):
-- Drag force = 0.5 × 1.225 × 169 × 0.19 × 1.89 = **37 N**
-- That's 481 W of drag power at 13 m/s
-- For comparison, rolling resistance ≈ 100 N at 13 m/s ≈ 1.3 kW
-
-So drag is a **smaller** loss than rolling resistance at urban speeds.
-This explains why the cruise-control demo's steady-state error doesn't
-trace back to missing aero — the dominant losses are tire-side, which
-TMeasy already models.
+At 13 m/s that is 37 N (481 W), against ≈ 106 N of rolling resistance at the
+estimated Crr 0.008 on 1350 kg, so tyre losses dominate at urban speeds.
 
 ## 10. What's missing (open questions)
 
@@ -746,9 +716,9 @@ These probably explain the cruise-hold steady-state error:
 
 1. **Drivetrain efficiency / friction not parameterized.**  The
    `ShaftsDriveline2WD` template applies inertia but the only resistive
-   load comes from tire ground forces.  In reality the gearbox + differential
-   bleed several kW.  EV1 manuals cite ~92% drivetrain efficiency; that
-   missing 8% is currently unaccounted.
+   load comes from tire ground forces.  The propulsion manual prints the
+   motor's efficiency only, 90 % at 48 km/h and 91 % at 89 and 105 km/h
+   (prop p. 250); no page prints a gear or differential loss.
 2. **Spring/damper rates are estimates.**  Each axle's spring and damper
    rates are the ev1 suspension baseline's estimates for its ride target,
    in `EV1_FrontDoubleWishbone.json` and `EV1_RearFiveLink.json`; none is
@@ -782,8 +752,8 @@ data points after throttle release at t=13.55 s, v=30 m/s:
 
 Fitting `F = m × decel = F_rr + 0.5·ρ·v²·CdA` to the (30, 20) m/s anchors:
 
-- **Sim F_rr ≈ 198 N** (real EV1 ≈ 100 N) — **~2× too high**
-- **Sim CdA ≈ 0.756 m²** (real EV1 = 0.19 × 1.89 ≈ 0.36 m²) — **~2× too high**
+- **Sim F_rr ≈ 198 N** (estimate ≈ 100 N) — **~2× too high**
+- **Sim CdA ≈ 0.756 m²** (printed 0.19 × 1.89 ≈ 0.36 m²) — **~2× too high**
 
 So the simulator's total decel force is roughly 2× what published EV1
 specs predict — both the static rolling component and the velocity-squared
