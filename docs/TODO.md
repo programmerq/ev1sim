@@ -33,6 +33,20 @@ work.  When you finish an item, delete it from here.
   retracted "0.09 m², a quarter of spec" one that never was (it was
   0.088 ± 0.145 m²).
 
+## Brakes
+
+- [ ] **Front calipers keep a pressure model separate from the BTCM's.**
+  `SimApp.cpp` (the ABS phase block that ends in `ApplyFrontBrakePerWheel`)
+  runs its own fill and dump time constants off the BTCM's valve commands and
+  ignores the per-wheel cylinder pressure the BTCM publishes (4153/4154). So a
+  front isolation valve that sticks against its command, a drifting pressure
+  sensor, or the master-cylinder fallback through a valve that is stuck closed
+  cannot change how the car stops. Coupling the brake to the BTCM's pressure
+  stopped every anti-lock case from cycling, so the two models need
+  reconciling first: electricsim `BL-2026-11-27-front-caliper-two-models`
+  (electricsim #939) and `BL-2026-11-26-brake-front-hydraulic-plant`
+  (electricsim #938).
+
 ## Future: physical sim rig
 
 - [ ] Adapt the user's physical driving sim rig with a lookalike RSA, IPC
