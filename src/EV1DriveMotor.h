@@ -16,8 +16,9 @@ namespace ev1sim {
 /// negative torque current".  So the zero-pedal torque is the PIM's coast-down
 /// drag, which it publishes on CHASSIS_PIM_COAST_DRAG_NM.  While
 /// SetCoastTorque() holds a value it replaces the map's "Map Zero Throttle";
-/// otherwise the map stands in for the PIM (a run with no electronics, or
-/// before the PIM publishes):
+/// otherwise the map stands in for the PIM's coast down (a run with no
+/// electronics, or before the PIM publishes, with the coast-down button on;
+/// ev1sim::CoastDragWithoutPim):
 ///
 ///     torque = Z * (1 - throttle) + F(speed) * throttle
 ///     Z      = the coast torque while the PIM owns it, else the coast map

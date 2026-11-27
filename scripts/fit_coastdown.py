@@ -334,8 +334,8 @@ class Fit:
         0.097 +/- 0.089 is a ratio of 1.09, no more a measurement of an aero
         term than 0.086 +/- 0.144 is.  The COEFFICIENTS are far steadier than
         the verdict — over the whole coast CdA holds 0.610-0.621 (new map) and
-        0.908-0.914 (old) across those same widths, so what section 11.1
-        publishes does not turn on this constant even though the verdict does.
+        0.908-0.914 (old) across those same widths, so the published
+        coefficients do not turn on this constant even though the verdict does.
         """
         if self.cd_a_sigma is None:
             return None
