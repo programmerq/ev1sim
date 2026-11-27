@@ -6,13 +6,15 @@ work.  When you finish an item, delete it from here.
 ## Tire model
 
 - [ ] **Slip-dynamics drag calibration (deferred).**  Coastdown CdA is
-  **1.7× spec**: 0.621 ± 0.181 m² against the printed 0.19 × 1.89 = 0.36 m²
-  (chassis p. 62), with F_rr about 2.3× the rolling-resistance estimate
-  (`docs/ev1_chrono_audit.md` §11.1).  That fit predates the driveshaft inertia
-  at 0.03 kg·m² (0.5 sat in every deceleration it used), the printed 1350 kg
-  and the printed tyre load index; re-measure
-  with `./build/ev1sim --config config/coastdown.json` and
-  `scripts/fit_coastdown.py`.  The excess lives in TMeasy's internal slip-curve
+  **2.7× spec**: 0.99 ± 0.28 m² against the printed 0.19 × 1.89 = 0.36 m²
+  (chassis p. 62), with F_rr 278 ± 71 N, 2.6× the rolling-resistance
+  estimate, over 10.0-29.6 m/s on the 1350 kg car (`./build/ev1sim --config
+  config/coastdown.json`, then `scripts/fit_coastdown.py`).  The 1281 kg car
+  fits the same within the spread (0.98 m² at its own mass), so the mass and
+  tyre values do not move it.  The 0.621 m² (1.7×) in
+  `docs/ev1_chrono_audit.md` §11.1 is an older plant's fit and no longer
+  reproduces.
+  The excess lives in TMeasy's internal slip-curve
   shape; the exposed `Initial Slopes dFx/dsx` knob doesn't usefully reduce it
   (lowering trades F_rr for CdA, raising past 2× hits numerical instability).
   Defer until we have measured EV1 slip-curve data or migrate to a Pacejka
