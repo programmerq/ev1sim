@@ -101,7 +101,9 @@ private:
     /// calls ApplyFrontBrakePerWheel().
     /// Also emits one INFO line per wheel on freshness transitions.
     /// @param time       current sim time (seconds), forwarded to Chrono brake API
-    void ApplyAbsFrontBrake(double time);
+    /// @param local_front_brake  this frame's post-override pedal travel (0..1),
+    ///                   the master pressure a stale corner brakes on
+    void ApplyAbsFrontBrake(double time, double local_front_brake);
 
     // Consume BTCM rear-motor commands (the rear apply motors' leads), compute
     // self-energizing drum torque per wheel using the current wheel omega,

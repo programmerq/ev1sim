@@ -1122,7 +1122,7 @@ void SimApp::SetupVisualization() {
 }
 
 // ---------------------------------------------------------------------------
-void SimApp::ApplyAbsFrontBrake(double time) {
+void SimApp::ApplyAbsFrontBrake(double time, double local_front_brake) {
     const auto cyl =
         m_external_sim->GetFrontWheelCylinderPressuresKpa(kAbsFreshnessWindow);
 
@@ -1149,9 +1149,13 @@ void SimApp::ApplyAbsFrontBrake(double time) {
     // BTCM's wheel-hydraulics model publishes for it, the same pressure its
     // firmware senses.  A corner the BTCM has not yet published takes the
     // master pressure.  Torque follows pressure either way
-    // (FrontCaliperBrake.h).
-    const double master =
-        ev1sim::front_brake_command_for_kpa(m_physical->brake_pedal().pressure_kpa());
+    // (FrontCaliperBrake.h).  The master pressure is this frame's: it comes
+    // from the post-override pedal travel the substeps run on (so the KEY OFF
+    // hold reaches the fronts too), not from the pedal component, which
+    // updates after the substeps.
+    const double master = ev1sim::front_brake_command_for_kpa(
+        ev1sim::BrakePedal::pressure_for_travel(
+            local_front_brake, m_physical->brake_pedal().calibration()));
     const double fl = cyl.fl_fresh ? ev1sim::front_brake_command_for_kpa(cyl.fl_kpa)
                                    : master;
     const double fr = cyl.fr_fresh ? ev1sim::front_brake_command_for_kpa(cyl.fr_kpa)
@@ -1779,7 +1783,7 @@ int SimApp::RunWithVisualization() {
                 // Per-wheel BTCM ABS modulation (front axle).
                 // Must follow Synchronize() (which calls ApplyBrakes internally)
                 // so we can override the symmetric front pressure when BTCM is live.
-                ApplyAbsFrontBrake(t);
+                ApplyAbsFrontBrake(t, cmd.front_brake);
                 // Per-wheel BTCM rear EMB integration.  Mirror pattern;
                 // converts motor cmd → shoe force → drum torque per wheel
                 // and applies to axle 1 via VehicleWorld::ApplyRearBrakePerWheel.
@@ -2427,7 +2431,7 @@ int SimApp::RunHeadless() {
             // Per-wheel BTCM ABS modulation (front axle).
             // Must follow Synchronize() so we override the symmetric front
             // pressure when BTCM is live.
-            ApplyAbsFrontBrake(t);
+            ApplyAbsFrontBrake(t, cmd.front_brake);
             // Per-wheel BTCM rear EMB integration.
             ApplyRearEmbBrake(t, cmd.rear_brake);
             m_world->Advance(step);

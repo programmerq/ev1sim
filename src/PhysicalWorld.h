@@ -126,10 +126,10 @@ public:
         double dead_band  = 0.07;   ///< travel below this → 0 pressure
         double transition = 0.35;   ///< travel above this → use k2 slope
         /// soft stage: a fifth of full scale over dead_band..transition
-        double k1_kpa_per_unit = kSoftStageShare * kSensorFullScaleKpa / (0.35 - 0.07);
+        double k1_kpa_per_unit = kSoftStageShare * kSensorFullScaleKpa / (transition - dead_band);
         /// firm stage: the rest of full scale over transition..1
         double k2_kpa_per_unit =
-            (1.0 - kSoftStageShare) * kSensorFullScaleKpa / (1.0 - 0.35);
+            (1.0 - kSoftStageShare) * kSensorFullScaleKpa / (1.0 - transition);
         double max_pressure_kpa = kSensorFullScaleKpa; ///< cap (saturation)
     };
 

@@ -732,8 +732,6 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
             m_csv << static_cast<int>(bus.GetDoorLockCmd(0));
         else if (f == "door_lock_cmd_passenger")
             m_csv << static_cast<int>(bus.GetDoorLockCmd(1));
-        // BTCM retard-request PWM duty (4191), Q8 percent 0..25600 — regen
-        // torque the BTCM is asking the propulsion side to produce.
         // BTCM published front caliper pressures (4153/4154), kPa: what the
         // front corners brake on (FrontCaliperBrake.h). Blank while stale.
         else if (f == "btcm_cyl_pressure_fl_kpa" || f == "btcm_cyl_pressure_fr_kpa") {
@@ -741,6 +739,8 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
             const bool fl = (f == "btcm_cyl_pressure_fl_kpa");
             if (fl ? c.fl_fresh : c.fr_fresh) m_csv << (fl ? c.fl_kpa : c.fr_kpa);
         }
+        // BTCM retard-request PWM duty (4191), Q8 percent 0..25600 — regen
+        // torque the BTCM is asking the propulsion side to produce.
         else if (f == "btcm_retard_request_duty_q8")
             m_csv << static_cast<int>(bus.GetBtcmRetardRequestDutyQ8());
         // The BTCM's $91 Data Response decoded off its serial line,
