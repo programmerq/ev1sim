@@ -100,8 +100,13 @@ private:
 ///
 /// No fluid compressibility, volume tracking or temperature effects.
 ///
-/// The calibration values are @inferred: the manual prints spring forces and
-/// travel but no pressure-versus-travel figure or pedal ratio.
+/// Pressure follows pedal force, so the two stages keep the springs' force
+/// ratio: the soft stage ends at 10 lb of the 50 lb full apply, a fifth of
+/// full pressure (brakes-310).  Full travel reaches the upstream sensors'
+/// 0-3448 kPa full scale (brakes-310), which the front brake's torque is
+/// scaled to (FrontCaliperBrake.h).
+/// @inferred: the dead band, the transition travel and full scale at full
+///   travel; the manual prints no pressure-versus-travel figure or pedal ratio.
 ///
 /// Published on the chassis bus as kSigChassisBrakeMasterPressureKpa (4074)
 /// every tick on change.  BTCM consumes it as the primary brake-effort
@@ -109,12 +114,23 @@ private:
 /// ABS pump-prime threshold.
 class BrakePedal {
 public:
+    /// Full scale of the two master-cylinder pressure sensors the BTCM reads,
+    /// and the pressure at full pedal travel.
+    /// @design electricsim config/topology.yaml CHASSIS_ES_MASTER_CYL_PRESSURE
+    static constexpr double kSensorFullScaleKpa = 3448.0;
+    /// The soft spring stage's share of full pressure: 10 lb of 50 lb.
+    /// @source:manual brakes-310
+    static constexpr double kSoftStageShare = 10.0 / 50.0;
+
     struct Calibration {
         double dead_band  = 0.07;   ///< travel below this → 0 pressure
         double transition = 0.35;   ///< travel above this → use k2 slope
-        double k1_kpa_per_unit = 8000.0;   ///< soft initial takeup stage
-        double k2_kpa_per_unit = 18000.0;  ///< firm fluid-pressure stage
-        double max_pressure_kpa = 15000.0; ///< cap (saturation)
+        /// soft stage: a fifth of full scale over dead_band..transition
+        double k1_kpa_per_unit = kSoftStageShare * kSensorFullScaleKpa / (transition - dead_band);
+        /// firm stage: the rest of full scale over transition..1
+        double k2_kpa_per_unit =
+            (1.0 - kSoftStageShare) * kSensorFullScaleKpa / (1.0 - transition);
+        double max_pressure_kpa = kSensorFullScaleKpa; ///< cap (saturation)
     };
 
     BrakePedal() = default;
@@ -127,10 +143,6 @@ public:
 
     /// Most-recently-computed master cylinder pressure (kPa).
     double pressure_kpa() const { return m_pressure_kpa; }
-
-    /// Full scale of the two master-cylinder pressure sensors the BTCM reads.
-    /// @design electricsim config/topology.yaml CHASSIS_ES_MASTER_CYL_PRESSURE
-    static constexpr double kSensorFullScaleKpa = 3448.0;
 
     /// A pressure as those sensors read it: permille of full scale, rounded,
     /// clamped to 0..1000 (they saturate above full scale).

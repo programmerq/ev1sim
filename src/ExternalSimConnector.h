@@ -433,9 +433,8 @@ public:
     /// post-modulator pressure measured downstream of the iso/dump
     /// solenoid pair — distinct from the master-cylinder pressure
     /// (kSigChassisBrakeMasterPressureKpa = 4074) that ev1sim itself
-    /// publishes upstream.  Use it for instrumentation/HUD or for a
-    /// future pressure-driven brake plant; the existing brake plant
-    /// gates torque on AbsPhaseFront and does not need this directly.
+    /// publishes upstream.  While fresh, each front caliper brakes on it
+    /// (SimApp::ApplyAbsFrontBrake, FrontCaliperBrake.h).
     /// fresh = true when the BTCM is alive per the freshness_window.
     struct FrontWheelCylinderPressures {
         float fl_kpa  = 0.0f;

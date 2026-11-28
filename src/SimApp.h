@@ -95,16 +95,15 @@ private:
     int  RunWithVisualization();
     int  RunHeadless();
 
-    /// Apply BTCM ABS per-wheel front brake modulation for the current tick.
-    /// Reads the current AbsPhaseFront from m_external_sim, computes modulated
-    /// per-wheel values, and (if fresh) calls ApplyFrontBrakePerWheel().
+    /// Apply the BTCM's per-wheel front caliper pressure for the current tick.
+    /// Reads the cylinder pressures the BTCM publishes (4153/4154), turns
+    /// each into a brake command (FrontCaliperBrake.h) and, while fresh,
+    /// calls ApplyFrontBrakePerWheel().
     /// Also emits one INFO line per wheel on freshness transitions.
     /// @param time       current sim time (seconds), forwarded to Chrono brake API
-    /// @param dt_s       physics step size in seconds — used by the
-    ///                   finite-rate hydraulic model to integrate
-    ///                   APPLY/HOLD/DUMP pressure changes.
-    /// @param local_front_brake  the local (driver-commanded) front brake ratio [0..1]
-    void ApplyAbsFrontBrake(double time, double dt_s, double local_front_brake);
+    /// @param local_front_brake  this frame's post-override pedal travel (0..1),
+    ///                   the master pressure a stale corner brakes on
+    void ApplyAbsFrontBrake(double time, double local_front_brake);
 
     // Consume BTCM rear-motor commands (the rear apply motors' leads), compute
     // self-energizing drum torque per wheel using the current wheel omega,
@@ -258,12 +257,6 @@ private:
     // a rolling start coasts instead until the RSA first reports RUN; after
     // that the gate behaves as it always has.
     bool m_rolling_start_coast = false;
-
-    // Per-wheel front brake modulation state (BTCM ABS integration).
-    // Holds the previous modulated brake torque ratio for each front wheel;
-    // used to implement HOLD phase (freeze-previous) semantics.
-    double m_abs_fl_prev = 0.0;  ///< previous FL modulated brake (0..1)
-    double m_abs_fr_prev = 0.0;  ///< previous FR modulated brake (0..1)
 
     // Freshness-fallback logging state — emit one INFO line on transition.
     bool m_abs_fl_was_fresh = false;  ///< was FL fresh on the previous tick?

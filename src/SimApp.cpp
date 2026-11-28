@@ -1,5 +1,6 @@
 #include "SimApp.h"
 #include "BrakeDrum.h"
+#include "FrontCaliperBrake.h"
 #include "EV1Vehicle.h"
 #include "MacOSPlatform.h"
 
@@ -1121,99 +1122,44 @@ void SimApp::SetupVisualization() {
 }
 
 // ---------------------------------------------------------------------------
-void SimApp::ApplyAbsFrontBrake(double time, double dt_s,
-                                double local_front_brake) {
-    using Phase = ExternalSimConnector::AbsPhaseFront::Phase;
-
-    const auto abs_phase = m_external_sim->GetAbsPhaseFront(kAbsFreshnessWindow);
+void SimApp::ApplyAbsFrontBrake(double time, double local_front_brake) {
+    const auto cyl =
+        m_external_sim->GetFrontWheelCylinderPressuresKpa(kAbsFreshnessWindow);
 
     // Log freshness transitions (one line per wheel).
-    if (abs_phase.fl_fresh != m_abs_fl_was_fresh) {
-        if (abs_phase.fl_fresh)
+    if (cyl.fl_fresh != m_abs_fl_was_fresh) {
+        if (cyl.fl_fresh)
             std::cout << "[SimApp] front-brake from BTCM (live) wheel=FL\n";
         else
             std::cout << "[SimApp] front-brake fallback (BTCM stale) wheel=FL\n";
-        m_abs_fl_was_fresh = abs_phase.fl_fresh;
+        m_abs_fl_was_fresh = cyl.fl_fresh;
     }
-    if (abs_phase.fr_fresh != m_abs_fr_was_fresh) {
-        if (abs_phase.fr_fresh)
+    if (cyl.fr_fresh != m_abs_fr_was_fresh) {
+        if (cyl.fr_fresh)
             std::cout << "[SimApp] front-brake from BTCM (live) wheel=FR\n";
         else
             std::cout << "[SimApp] front-brake fallback (BTCM stale) wheel=FR\n";
-        m_abs_fr_was_fresh = abs_phase.fr_fresh;
+        m_abs_fr_was_fresh = cyl.fr_fresh;
     }
 
-    // BTCM-off / stale path: the EV1's front brake hydraulic line bypasses
-    // the BTCM modulator when the controller is unpowered — the iso/dump
-    // solenoids are normally-open / normally-closed so without current the
-    // master cylinder pressure flows directly to the front calipers.  We
-    // model that here by leaving the symmetric front_pressure from
-    // CommandDriver::ApplyBrakes() (set inside VehicleWorld::Synchronize)
-    // in effect.  Nothing to do.
-    if (!abs_phase.fl_fresh && !abs_phase.fr_fresh) {
-        // Keep prev values in sync with local so HOLD doesn't freeze at stale values.
-        m_abs_fl_prev = local_front_brake;
-        m_abs_fr_prev = local_front_brake;
-        return;
-    }
-
-    // Finite-rate hydraulic model.  Real ABS valves are flow-limited: a
-    // single dump pulse takes ~30 ms to bleed pressure to a third, not
-    // an instantaneous step to zero.  Modeling APPLY as exponential
-    // rise toward MC pressure and DUMP as exponential decay toward 0
-    // matches the published service-bay numbers and avoids the
-    // pathological behavior of the old step-function model (which
-    // dropped pressure to 0.2 × MC every dump tick — effectively
-    // "open-circuit" braking through the ABS unit during long DUMP
-    // sequences).
-    //
-    // Time constants are first-pass estimates — refined in future
-    // tuning passes once we have GM EV1 hardware reference data.
-    //
-    // **2026-05-18 tuning attempt — mu_jump (~50% FL/FR time-locked).**
-    // The prior tau_dump = 60 ms over-estimated the dump-valve bleed
-    // time, leaving plant pressure too high during the asphalt→ice
-    // transition: the wheel went negative-rotating before the
-    // pressure could fall, so the ABS algorithm couldn't see spin-up
-    // and the slip ratio pinned at 1.  Lowered tau_dump from 60 ms to
-    // 30 ms — close to the manual's "1/3 of pressure in 30 ms" claim
-    // (analytically tau = 30 ms / ln(3) ≈ 27.3 ms).  30 ms is a clean
-    // round number close to the analytic target.
-    //
-    // **Validated 2026-05-21 — keep 30 ms.**  Full 6-scenario BTCM-on/off
-    // sweep (external ECU controllers rebuilt) vs the prior
-    // baseline: mu_jump FL/FR time-locked dropped ~50% → 36%/32% (the goal);
-    // diagonal_mu also improved (5% locked); high_mu 149.4 m, split_mu
-    // 73.4 m, brake_and_steer 60.8 m all within ~1% of baseline with heading
-    // preserved; no scenario regressed.  The earlier "0 phase transitions"
-    // scare was a stale-controller artifact, not the plant.  Regression gate
-    // for this knob now lives in scripts/abs_regression.sh + abs_baseline.txt
-    // (`make test-integration`); see the external sim's BTCM deferred-behaviour notes (§8).
-    const double tau_apply = 0.005;  // s, caliper-fill time constant
-    const double tau_dump  = 0.030;  // s, dump-valve release time constant
-                                     // (was 0.060; validated 2026-05-21)
-    const double alpha_apply =
-        dt_s >= tau_apply ? 1.0 : (1.0 - std::exp(-dt_s / tau_apply));
-    const double alpha_dump  =
-        dt_s >= tau_dump  ? 1.0 : (1.0 - std::exp(-dt_s / tau_dump));
-
-    // APPLY also covers the BTCM's modulator motor restoring a sealed caliper
-    // (iso sealed, restore leg driven; GetAbsPhaseFront's decode table): the
-    // same approach toward the local brake, which caps it at the pedal level.
-    auto modulate = [&](Phase phase, double prev, double local) -> double {
-        switch (phase) {
-            case Phase::APPLY: return prev + alpha_apply * (local - prev);
-            case Phase::HOLD:  return prev;
-            case Phase::DUMP:  return prev * (1.0 - alpha_dump);
-        }
-        return local;  // unreachable
-    };
-
-    const double fl = modulate(abs_phase.fl, m_abs_fl_prev, local_front_brake);
-    const double fr = modulate(abs_phase.fr, m_abs_fr_prev, local_front_brake);
-
-    m_abs_fl_prev = fl;
-    m_abs_fr_prev = fr;
+    // BTCM-off / stale path: the iso solenoids are normally open, so without
+    // current the master cylinder feeds the front calipers directly
+    // (brakes-308, brakes-311), and each caliper brakes on the pedal's
+    // master pressure.  BTCM live: each caliper brakes on the pressure the
+    // BTCM's wheel-hydraulics model publishes for it, the same pressure its
+    // firmware senses.  A corner the BTCM has not yet published takes the
+    // master pressure.  Torque follows pressure either way
+    // (FrontCaliperBrake.h).  The master pressure is this frame's: it comes
+    // from the post-override pedal travel the substeps run on (so the KEY OFF
+    // hold reaches the fronts too), not from the pedal component, which
+    // updates after the substeps.
+    const double master = ev1sim::front_brake_command_for_kpa(
+        ev1sim::BrakePedal::pressure_for_travel(
+            local_front_brake, m_physical->brake_pedal().calibration()));
+    const double fl = cyl.fl_fresh ? ev1sim::front_brake_command_for_kpa(cyl.fl_kpa)
+                                   : master;
+    const double fr = cyl.fr_fresh ? ev1sim::front_brake_command_for_kpa(cyl.fr_kpa)
+                                   : master;
 
     // Apply per-wheel front brakes via Chrono API, overriding the symmetric
     // front_pressure CommandDriver::ApplyBrakes() already set in Synchronize().
@@ -1840,7 +1786,7 @@ int SimApp::RunWithVisualization() {
                 // Per-wheel BTCM ABS modulation (front axle).
                 // Must follow Synchronize() (which calls ApplyBrakes internally)
                 // so we can override the symmetric front pressure when BTCM is live.
-                ApplyAbsFrontBrake(t, step, cmd.front_brake);
+                ApplyAbsFrontBrake(t, cmd.front_brake);
                 // Per-wheel BTCM rear EMB integration.  Mirror pattern;
                 // converts motor cmd → shoe force → drum torque per wheel
                 // and applies to axle 1 via VehicleWorld::ApplyRearBrakePerWheel.
@@ -2488,7 +2434,7 @@ int SimApp::RunHeadless() {
             // Per-wheel BTCM ABS modulation (front axle).
             // Must follow Synchronize() so we override the symmetric front
             // pressure when BTCM is live.
-            ApplyAbsFrontBrake(t, step, cmd.front_brake);
+            ApplyAbsFrontBrake(t, cmd.front_brake);
             // Per-wheel BTCM rear EMB integration.
             ApplyRearEmbBrake(t, cmd.rear_brake);
             m_world->Advance(step);
