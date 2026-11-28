@@ -146,7 +146,7 @@
     "//free_length":            "Derived: installed length (damper top to yoke bolt) plus the static spring force over the rate. Static force = the chassis body's share of the front axle load per side (EV1_Chassis.json mass and COM, EV1_Vehicle.json axle positions) over this geometry's motion ratio at the tyre; the test recomputes it.",
     "Location Chassis":         [-0.0230, 0.4380, 0.3901],
     "Location Arm":             [-0.0130, 0.6371, -0.2068],
-    "Free Length":              0.7302,
+    "Free Length":              0.7418,
     "Spring Coefficient":       37826.0
   },
 
@@ -155,7 +155,7 @@
     "//":                       "Derived for a 0.30 ride damping ratio at the wheel: 2 x 0.30 x sqrt(wheel rate x sprung corner mass), over the motion ratio squared. Not printed.",
     "Location Chassis":         [-0.0230, 0.4380, 0.3901],
     "Location Arm":             [-0.0130, 0.6371, -0.2068],
-    "Damping Coefficient":      2620.0
+    "Damping Coefficient":      2770.0
   },
 
   "Axle":

@@ -37,14 +37,10 @@
 
     {"//": "Coast to settle dynamics, then SLAM the brake to 100 %.  Hard",
      "//1": "enough that without ABS modulation the wheels lock up.",
-     "//2": "This comment used to say \"brief coast to settle\" above a 7.00 s",
-     "//3": "brake, and there was no coast at all: wait_for_speed is a barrier",
-     "//4": "that does not advance the event index (src/Scenario.cpp), so a",
-     "//5": "brake scheduled behind it fires on the RELEASE tick — measured",
-     "//6": "15.028 s (2026-08-12, scripts/scenario_runway_report.py), the same",
-     "//7": "tick the throttle dropped to zero.  18.00 s makes the settle real:",
-     "//8": "2.97 s of coast.  Brake value (1.0) and hold duration (18.0 s)",
-     "//9": "are UNCHANGED; only the schedule moved."},
+     "//2": "wait_for_speed is a barrier that does not advance the event index",
+     "//3": "(src/Scenario.cpp), so the coast runs from the barrier's release,",
+     "//4": "recorded in config/scenarios/measured_settle.json, to this 18.00 s",
+     "//5": "brake; the [Runway] cases hold it to that table's min_settle_s."},
     {"at_time_s": 18.00, "action": "set_brake",   "value": 1.0},
 
     {"//": "Hold full brake until vehicle stops or scenario ends."},

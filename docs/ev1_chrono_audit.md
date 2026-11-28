@@ -1,26 +1,20 @@
 # EV1 Chrono vehicle audit
 
 Cross-reference of every parameter in `data/vehicle/ev1/**/*.json` against
-known GM EV1 specifications.  Targets **Generation 2 NiMH (1999)** as the
-canonical config — it's the more polished production variant most folks
-remember, and the lighter mass + extended range numbers are what the
-public datasheets cite.
+the EV1 service manuals.  The model is the **Generation 1 (1997) lead-acid
+car**, the one the manuals in `ev1-manual-redux` describe; nothing here is
+taken from the later Gen 2 car.
 
 Symbol legend in the tables:
-- ✅ matches real EV1 closely
+- ✅ matches the manual
 - ⚠️  approximation — close enough for now, refine with new data
 - ❌ wrong — should be fixed
 - 🔧 fixed in the audit batch (commit log has the change)
 
-Sources for the real-EV1 numbers in this document:
-- **EV1 service manuals, transcribed in the `ev1-manual-redux` repo** — the
-  primary source, and the one section 7 should have used from the start.  Cite
-  the printed page (e.g. "chassis p. 62"), not "known specifications."
-- GM EV1 product brochure (1999), reproduced widely (e.g. ev1.org archives)
-- Wikipedia GM EV1 article (cross-checked figures)
-- "Who Killed the Electric Car?" (Paine 2006) — production / range numbers
-- General automotive engineering knowledge for the
-  derivative-but-undocumented values
+Sources: the **EV1 service manuals, transcribed in the `ev1-manual-redux`
+repo**, cited by printed page (e.g. "chassis p. 62").  A value no manual prints
+is an estimate and says so (⚠️ or `@inferred`); brochures, encyclopaedia
+articles and the sims themselves are not sources.
 
 The audit was occasioned by the cruise-control demo run — steady-state
 cruise hold dropped to ~11.6 m/s when commanding 13.15 m/s.  That bug is
@@ -29,57 +23,49 @@ off cruise gain tuning until these fixes land.
 
 ## 1. Vehicle dimensions
 
-| Parameter | Current | Real EV1 | Status |
+All printed values in this table are chassis manual p. 62, "Exterior
+Dimensions"; body repair manual p. 94, "EV1 Specifications", prints the same.
+
+| Parameter | Current | EV1 manual | Status |
 |---|---|---|---|
-| Wheelbase | 2.512 m | 2.514 m (99.2 in) | ✅ within 2 mm |
+| Wheelbase | 2.512 m | 2512 mm (98.9 in) | ✅ |
 | Front axle x | +1.346 m (suspension loc) | n/a (derived) | ✅ |
 | Rear axle x  | −1.166 m (suspension loc) | n/a (derived) | ✅ |
-| Min turning radius | 10.8 m | 11.0 m (curb-to-curb) | ⚠️  close |
-| Max steering angle | 13.5° (vehicle); 10° (pinion) | ~13° (matches 11 m TR) | ✅ |
-| Length / width / height | n/a (visual mesh) | 4310 / 1765 / 1281 mm | n/a |
-| Drag coefficient | n/a (Chrono uses tire/rolling losses, no aero) | 0.19 | ❌ no aero model |
-| Frontal area | n/a | 1.89 m² | ❌ no aero model |
-
-**Note on aero**: Chrono's WheeledVehicle doesn't model body aero by default.
-The EV1's signature 0.19 Cd should manifest as a `chrono::ChAerodynamicLoad`
-or similar applied to the chassis body — currently absent.  Without it,
-high-speed deceleration is artificially low.
+| Min turning radius | 10.8 m | not printed | ⚠️ estimate |
+| Max steering angle | 13.5° (vehicle); 10° (pinion) | not printed | ⚠️ estimate, see §8 |
+| Length / width / height | n/a (visual mesh) | 4309 / 1766 / 1281 mm | n/a |
+| Drag coefficient | 0.19 (`src/Aerodynamics.h`) | 0.19 | ✅ |
+| Frontal area | 1.89 m² (`src/Aerodynamics.h`) | 1.89 m² | ✅ |
 
 ## 2. Mass and inertia
 
-| Parameter | Current | Real EV1 (NiMH) | Status |
+| Parameter | Current | EV1 manual | Status |
 |---|---|---|---|
-| Chassis mass | 1167 kg | target curb 1281, less ~114 kg of wheel, tyre, suspension and steering bodies | 🔧 1217→1199→1167 |
-| Curb weight (computed) | ~1299 kg | 1281 kg (NiMH) | ⚠️ off by 18 kg |
-| Centroidal Frame x | +0.1241 m | unknown — likely +0.1 to +0.15 (slight front bias from motor) | ⚠️ moved with the rear axle mass, see below |
-| Centroidal Frame z | 0.4955 m | likely 0.40-0.45 m (T-pack batteries low in floor) | ⚠️ slightly high |
-| Ixx (roll) | 130 kg·m² | rg≈0.33 m → plausible | ⚠️ |
-| Iyy (pitch) | 600 kg·m² | rg≈0.70 m → plausible | ⚠️ |
-| Izz (yaw)  | 680 kg·m² | rg≈0.75 m → plausible | ⚠️ |
+| Curb weight (whole car) | 1349.6 kg | **1350 kg (2970 lb)**, chassis p. 62, body p. 94 | ✅ |
+| Chassis body mass | 1236 kg | curb less the 113.6 kg of bodies below | ✅ derived |
+| Battery pack mass | inside the chassis body | 533 kg, body p. 94 | n/a (not a separate body) |
+| Front axle share | 52.6 % | not printed | ⚠️ the ev1 repo suspension baseline's `front_axle_load_fraction` (a weighed 1997 car) |
+| Centroidal Frame x | +0.193 m | not printed | ⚠️ set to give that axle share |
+| Centroidal Frame z | 0.4955 m | not printed | ⚠️ estimate; the pack sits low in the floor tunnel |
+| Ixx / Iyy / Izz | 138 / 635 / 720 kg·m² | not printed | ⚠️ radii of gyration 0.33 / 0.72 / 0.76 m |
 
-**Curb-weight breakdown (Chrono adds these to chassis)**:
+**Curb-weight breakdown (Chrono adds these to the chassis body)**, all
+estimated:
 - 4× wheel × 8.0 kg = 32 kg
 - 4× tire × 7.5 kg = 30 kg
 - 2× front suspension (spindle 1.0 + upright 1.2 + UCA 0.9 + LCA 1.4) = 9.0 kg
 - Rear five-link axle (axle tube 35.0 + 2 spindles 1.0 + 2 lower links 1.0 +
-  track bar 2.0) = 41.0 kg, all estimated; see `EV1_RearFiveLink.json`
+  track bar 2.0) = 41.0 kg; see `EV1_RearFiveLink.json`
 - Steering link = 1.6 kg
-- Total non-chassis = ~114 kg
-- Target chassis = 1281 − 114 = **1167 kg** for Gen 2 NiMH
+- Total = 113.6 kg, so the chassis body is 1350 − 113.6 = **1236 kg**
 
-The rear axle replaced a 9.0 kg wishbone stand-in, so 32 kg moved from the
-chassis body to the axle.  The chassis COM moved from (0.09, 0, 0.49) to
-(0.1241, 0, 0.4955), the point that keeps the whole car's mass centre where
-it was; the curb weight and axle split the rest of the model was tuned on are
-unchanged.  Inertia left as it was.
-
-For PbA Gen 1 (1351 kg curb), chassis would be 1269 kg — choose NiMH as
-the canonical config since the demo scenarios are tuned around the more
-modern variant.
+The front spring's free length and damper follow from the chassis body's front
+load; `tests/test_suspension_geometry.cpp` recomputes both springs from this
+file's mass and COM.
 
 ## 3. Powertrain — motor
 
-| Parameter | Current | Real EV1 (Gen 2 AC induction) | Status |
+| Parameter | Current | EV1 manual (AC induction) | Status |
 |---|---|---|---|
 | Peak torque | **141 N·m at 7000 RPM**, held flat below it | **141 N·m at 7000 RPM** (prop p250) | ✅ the rating is sourced; the flat plateau below it is ⚠️ @inferred |
 | Peak power | **103.4 kW at 7000 RPM** | **103 kW (138 Hp) at 7000 RPM** (prop p250) | ✅ sourced — the map's value is the stated torque × the stated speed |
@@ -157,11 +143,8 @@ Two things that do **not** move, measured rather than assumed:
   coast** (0.010 % at 27.8 m/s), which is the 0.8 mm/s difference in speed at
   the instant the barrier released, propagated.  Only the time to *reach*
   release speed moves, by the same ~0.36 s.
-  **Superseded 2026-08-12 as to the coast map:** §3.1 did edit it, above
-  8350 RPM, and the clause that used to close this bullet — "the drag
-  calibration in section 11 is unaffected" — no longer holds.  §11.1 has the
-  measured effect (CdA 0.880 → 0.571 m²).  Everything above remains true of the
-  p250 corner-point change this section is about.
+  §3.1 edits the coast map separately, above 8350 RPM; §11 has the coastdown
+  as it measures now.
 * **The drive ceiling.**  `wheelspin_ceiling_probe` on dry asphalt, 60 s of full
   throttle: terminal speed **43.423 → 43.428 m/s (97.13 → 97.14 mph)**.  Up
   there the envelope is on the shared 15 500 → 16 000 RPM ramp to zero, so where
@@ -380,8 +363,7 @@ print, so the cap here binds the sum.
 
 Note which way that errs.  Because the cap binds the sum, the model gives the
 car *less* coast drag than a real one carrying both regen and mechanical
-losses; §11.1 measures exactly that — total drag force fell and the car coasts
-further.  So this is conservative about **regen**, not about drag, and it is
+losses.  So this is conservative about **regen**, not about drag, and it is
 the reason the correction makes the sim coast further rather than less far.
 
 It is a ceiling, not a continuous rating: no duty cycle, no time limit and no
@@ -394,7 +376,7 @@ everything the pages condition the limit on:
 
 | condition | page | modelled? |
 |---|---|---|
-| Coast down is a driver-selectable button; default with RSA data lost is "Coast down request = No Coast Down" | p204, DTC 028 | no — the map is the coast-down-**enabled** case |
+| Coast down is a driver-selectable button; default with RSA data lost is "Coast down request = No Coast Down" | p204, DTC 028 | yes — the map applies only with the coast-down button on (§11) |
 | Regen amount is a function of PSOC; inhibited outright at PSOC 100 % | p209 | no — no pack model, so this is the **maximum**-regen case, which is what the ceiling bounds |
 | Regen disabled below ~10 km/h (6 mph) | p209 | not as a cutoff; the −5 N·m breakpoint happens to sit at 6.2 mph |
 | Shaft-to-pack efficiency η | — | not stated anywhere; see above |
@@ -407,9 +389,8 @@ crossed the ceiling at 8349 RPM (52.1 mph) and then ran away; above a knee at
 An earlier draft of this section, and of the JSON header, said that left "the
 whole region the 2026-04-30 coastdown calibration fitted" untouched.  **That is
 false.**  Coastdown runs 30 → 10 m/s, i.e. **3586–10 758 RPM**, so 34 % of its
-fitted span sits above the knee and moved.  §11.1 measures the consequence —
-the fit's CdA moves 8× — instead of asserting there wasn't one.  What is true
-is the narrower claim: no *breakpoint* at or below 8000 RPM changed value.
+fitted span sits above the knee and moved.  What is true is the narrower
+claim: no *breakpoint* at or below 8000 RPM changed value.
 
 | RPM | mph | old N·m | old kW | new N·m | new kW |
 |---|---|---|---|---|---|
@@ -454,14 +435,14 @@ What's also still missing:
 
 ## 4. Drivetrain
 
-| Parameter | Current | Real EV1 | Status |
+| Parameter | Current | EV1 manual | Status |
 |---|---|---|---|
 | Transmission type | single forward gear, ratio 1.0 | single-speed reduction | ✅ |
 | Final drive (Conical Gear) | 0.1 → **10.0:1 reduction** | **10.95:1 reduction** (@source:manual propulsion p250) | 🔧 0.1 → 0.0913 |
 | Driveline | FWD (`ShaftsDriveline2WD`) | FWD | ✅ |
 | Driveshaft inertia | 0.03 kg·m² | no manual figure — @inferred 0.013–0.035 kg·m² | 🔧 0.5 → 0.03 |
 | Differential box inertia | 0.6 kg·m² | unknown — typical | ⚠️  |
-| Differential lock limit | 100 N·m | open differential, no LSD on EV1 | ✅ (open at this limit) |
+| Differential lock limit | 100 N·m | a differential is printed (prop p. 248); no limited-slip is | ⚠️ treated as open (the lock is never engaged) |
 
 The 10.0 vs 10.95 final drive change is small (~9% off) and shifts the
 operating RPM at a given speed slightly.  At 13 m/s with current ratio:
@@ -494,28 +475,25 @@ torque alone dominates and the driveline's contribution would be negligible)
 `Differential Box` (wheel-side, downstream of the reduction) is unaffected by
 this and untouched: its inertia is not multiplied by `N_final²`, so at 0.6
 kg·m² it reflects to only ~7 kg of effective mass, and is not implicated in
-the phantom-mass finding.  Re-running the coastdown fit (§11) after this
-change was not done here — suspicion #2 there (driveline inertia as an
-effective numerical damper) may now be smaller, but confirming that is a
-separate exercise on top of the fit-tooling work already in flight and is not
-claimed as resolved by this entry.
+the phantom-mass finding.  §11 has the coastdown fit on this driveline.
 
 ## 5. Tires
 
-| Parameter | Current | Real EV1 (P175/65R14) | Status |
-|---|---|---|---|
-| Unloaded radius | 0.2915 m | 0.292 m (computed from spec) | ✅ |
-| Width | 0.175 m | 0.175 m (175 mm) | ✅ |
-| Rim radius | 0.1778 m | 0.1778 m (14"/2) | ✅ |
-| Mass | 7.5 kg | typical | ✅ |
-| Coefficient of friction | 0.8 | typical dry asphalt | ✅ |
-| Rolling resistance | 0.008 | EV1 spec'd 0.006-0.008 (Michelin Proxima LRR) | ✅ |
-| Load index | 82 (475 kg/tire) | 95 (Q-rated) | ⚠️  probably under-spec'd |
-| Tire model | TMeasy + first-order longitudinal tire dynamics (§5.2) | n/a | ✅ standard choice |
+Printed: P175/65R14 84S on a 14×4.5 aluminium wheel (body p. 93, RPO QEL and
+PY7); 175/65R14 at 345 kPa (50 psi) (chassis p. 62).
 
-Tires are the best-modeled part of the vehicle.  The wide margin on
-bearing capacity (4750 N vs ~3140 N actual peak load per tire) is
-conservative; not worth touching.
+| Parameter | Current | EV1 manual | Status |
+|---|---|---|---|
+| Unloaded radius | 0.2915 m | 0.2916 m (175 × 0.65 + 14 in / 2) | ✅ |
+| Width | 0.175 m | 175 mm | ✅ |
+| Rim radius | 0.1778 m | 14 in / 2 | ✅ |
+| Load index | 84 (500 kg, 4905 N) | 84 | ✅ |
+| Slip, vertical and aligning parameters | Chrono's `GuessPassCar70Par` at load index 84 | not printed | ⚠️ generic passenger-car values |
+| Inflation pressure | not modelled (pressure term 1) | 345 kPa | ⚠️ no reference pressure is printed to scale from |
+| Mass | 7.5 kg | not printed | ⚠️ estimate |
+| Coefficient of friction | 0.8 | not printed | ⚠️ typical dry asphalt |
+| Rolling resistance | 0.008 | not printed | ⚠️ low-rolling-resistance estimate |
+| Tire model | TMeasy + first-order longitudinal tire dynamics (§5.2) | n/a | ✅ standard choice |
 
 ### 5.1 Standstill wheel-spin limit cycle → integration step (2026-07-08)
 
@@ -582,24 +560,14 @@ within 0.0004 of its 100 ms mean.  `tests/test_launch_slip.cpp`
 
 ## 6. Brakes
 
-| Parameter | Current | Real EV1 | Status |
+| Parameter | Current | EV1 manual | Status |
 |---|---|---|---|
-| Per-wheel max torque | 1800 N·m | ~700-800 N·m front, ~400-500 rear | 🔧 1800 → 800 |
-| Front brake type | "BrakeSimple" | ventilated disc (256 mm) | ⚠️ ok abstraction |
-| Rear brake type | "BrakeSimple" (same as front) | drum (200 mm) — much weaker | ⚠️ |
+| Front brake | `BrakeSimple`, 1120 N·m per wheel | disc, 245 mm diameter, 11.0 mm new thickness, 45.03 mm caliper bore (brakes p. 28-29) | ⚠️ torque not printed |
+| Rear brake | `BrakeSimple`, 513 N·m per wheel, driven by the EMB drum model | electric drum, 225.0 mm inside diameter (brakes p. 28) | ⚠️ torque from the drum model, not printed |
 
-**Math behind the fix**: 1800 N·m × 4 wheels = 7200 N·m total.  At 0.2915 m
-tire radius that's 24,700 N braking force = 1.97g of deceleration —
-which exceeds the tire's friction-limited deceleration (~0.8g on dry
-asphalt).  In practice the wheels lock and ABS modulates, so the
-visible deceleration is friction-limited regardless.  But the
-unrealistically high commanded torque means even a 30% brake pedal
-saturates wheel friction — there's no usable middle range.
-
-Setting per-wheel torque to 800 N·m gives 3200 N·m total ≈ 11,000 N
-≈ 0.88g, which still saturates friction at full brake but leaves a
-realistic gradient at partial pedal.  Future improvement: split front
-800 / rear 500 to match the EV1's disc/drum bias.
+Full pedal gives 3266 N·m total, ≈ 11,200 N at the tyre, ≈ 0.85 g on the
+1350 kg car: friction-limited at full brake, with a usable gradient at partial
+pedal.  `docs/vehicle-dynamics.md` has the bias reasoning.
 
 ## 7. Suspension geometry
 
@@ -706,39 +674,32 @@ nominals and all four match.  They are now pinned to the printed values.
 
 ## 8. Steering
 
-| Parameter | Current | Real EV1 | Status |
+| Parameter | Current | EV1 manual | Status |
 |---|---|---|---|
-| Template | RackPinion | rack-and-pinion w/ electric assist | ✅ |
+| Template | RackPinion | rack-and-pinion with electrohydraulic assist (chassis p. 63) | ✅ |
+| Steering ratio | not modelled: the driver input is a normalised [−1, 1] road-wheel command | 16.38:1 (chassis p. 63) | n/a until a steering-wheel angle input exists |
 | Pinion radius | 0.3 m | n/a (Chrono effective parameter) | ⚠️ |
-| Max pinion angle | 10° | n/a | ⚠️ |
-| Steering link length | 0.46 m | unknown | ⚠️ |
-| Rack-to-wheel ratio (effective) | 1.35:1 | unknown | ⚠️ |
+| Max pinion angle | 10° | not printed | ⚠️ |
+| Steering link length | 0.46 m | not printed | ⚠️ |
 
 `EV1_Vehicle.json` declares a 13.5° maximum steering angle (≈ 11 m turning
-radius on the 2.512 m wheelbase), but that key is metadata for drivers and path
-followers, not kinematics.  The rack's 0.3 m × 10° travel through the
+radius on the 2.512 m wheelbase, both estimates: no manual prints a turning
+circle), but that key is metadata for drivers and path followers, not
+kinematics.  The rack's 0.3 m × 10° travel through the
 suspension's steering arms gives more at full lock: in a standalone Chrono
 9.0.1 run the road wheels reach about 24° inside / 20.5° outside on the
-baseline front geometry (the sedan template gave 24.6° / 23.2°).  The
-published 9.9 m turning diameter needs about 30° outside, so the rack travel
-is the number to revisit, not the geometry.  Internal pinion parameters
+baseline front geometry.  With no printed turning circle, the rack travel
+stays an estimate.  Internal pinion parameters
 are tuning surface, not physical specs.  Leave alone.
 
 ## 9. Aerodynamics
 
-**Not modeled.**  See dimensions table.  Adding aero would need a custom
-`ChAerodynamicLoad` or chassis-level drag force computation
-(`F_drag = 0.5 ρ v² Cd A`).
+`src/EV1Vehicle.cpp` applies `F_drag = 0.5 ρ v² Cd A` at the chassis COM
+through Chrono's `SetAerodynamicDrag`, with Cd 0.19 and A 1.89 m², both printed
+on chassis p. 62 and body p. 94 (`src/Aerodynamics.h`; `docs/vehicle-dynamics.md`).
 
-At 13 m/s (cruise speed in the demo):
-- Drag force = 0.5 × 1.225 × 169 × 0.19 × 1.89 = **37 N**
-- That's 481 W of drag power at 13 m/s
-- For comparison, rolling resistance ≈ 100 N at 13 m/s ≈ 1.3 kW
-
-So drag is a **smaller** loss than rolling resistance at urban speeds.
-This explains why the cruise-control demo's steady-state error doesn't
-trace back to missing aero — the dominant losses are tire-side, which
-TMeasy already models.
+At 13 m/s that is 37 N (481 W), against ≈ 106 N of rolling resistance at the
+estimated Crr 0.008 on 1350 kg, so tyre losses dominate at urban speeds.
 
 ## 10. What's missing (open questions)
 
@@ -746,9 +707,9 @@ These probably explain the cruise-hold steady-state error:
 
 1. **Drivetrain efficiency / friction not parameterized.**  The
    `ShaftsDriveline2WD` template applies inertia but the only resistive
-   load comes from tire ground forces.  In reality the gearbox + differential
-   bleed several kW.  EV1 manuals cite ~92% drivetrain efficiency; that
-   missing 8% is currently unaccounted.
+   load comes from tire ground forces.  The propulsion manual prints the
+   motor's efficiency only, 90 % at 48 km/h and 91 % at 89 and 105 km/h
+   (prop p. 250); no page prints a gear or differential loss.
 2. **Spring/damper rates are estimates.**  Each axle's spring and damper
    rates are the ev1 suspension baseline's estimates for its ride target,
    in `EV1_FrontDoubleWishbone.json` and `EV1_RearFiveLink.json`; none is
@@ -765,301 +726,32 @@ drivetrain-loss torque, calibrated to a coastdown test from real EV1
 data — but this requires real coastdown numbers, which we don't have.
 Track this as a future TODO.
 
-## 11. Empirical evidence — coastdown shows 2× excess dissipation
+## 11. Coastdown against the printed drag
 
-After applying the audit fixes (final drive 10.95, mass 1199, track widths),
-the `coastdown` scenario (`config/scenarios/coastdown.json`) produced these
-data points after throttle release at t=13.55 s, v=30 m/s:
+With the pedal released in D and coast down off, the car "will coast freely
+like an automatic transmission in neutral" (propulsion manual p. 57); coast
+down is the selected feature that adds a calibrated regen drag.  A run with no
+PIM therefore gives the motor no zero-pedal torque unless the coast-down button
+is on, when the coast map (§3.1) stands in for the PIM's drag
+(`ev1sim::CoastDragWithoutPim`, `src/EV1Vehicle.h`).
 
-| t (s) | v (m/s) | decel (m/s²) avg over Δt |
+`config/coastdown.json` (local mode, button off) launches to 30 m/s and coasts.
+On the 1350 kg car, fitted with `scripts/fit_coastdown.py` over 17.2–29.8 m/s:
+
+| | sim | source |
 |---|---|---|
-| 13.6 | 30.05 |  — |
-| 15.2 | 29.23 | 0.48 |
-| 20.4 | 27.19 | 0.40 |
-| 25.5 | 24.88 | 0.33 |
-| 30.6 | 23.86 | 0.30 |
-| 43.4 | 19.98 | 0.30 |
+| CdA | 0.335 ± 0.001 m² | 0.19 × 1.89 = 0.36 m², chassis p. 62, body p. 94 |
+| F_rr | 107.7 ± 0.3 N | ~106 N, estimate (tyre `//crr`) |
 
-Fitting `F = m × decel = F_rr + 0.5·ρ·v²·CdA` to the (30, 20) m/s anchors:
+The same run with the coast-down button on fits CdA 0.99 ± 0.28 m² and F_rr
+278 ± 71 N: the coast map's regen, which a two-term `F_rr + CdA·v²` fit splits
+between both terms.  That is the coast-down feature, not drag.
 
-- **Sim F_rr ≈ 198 N** (real EV1 ≈ 100 N) — **~2× too high**
-- **Sim CdA ≈ 0.756 m²** (real EV1 = 0.19 × 1.89 ≈ 0.36 m²) — **~2× too high**
-
-So the simulator's total decel force is roughly 2× what published EV1
-specs predict — both the static rolling component and the velocity-squared
-component.  Likely culprits, in order of suspicion:
-
-1. **TMeasy tire model internal slip dissipation.**  The `Rolling Resistance
-   Coefficient: 0.008` only covers static rolling drag; TMeasy also
-   dissipates power through longitudinal-slip deformation that scales
-   non-linearly with speed.  Tuning the slip-curve parameters (not exposed
-   in the current JSON) could halve the v² term.
-2. **Driveline shaft inertia acting as effective damper** in the
-   `ChShaftsDriveline2WD` solver.  The 0.5 + 0.6 kg·m² shaft inertias
-   combined with stiff joints may produce numerical viscosity.  **Update
-   2026-08-13:** `Driveshaft` is now 0.03, not 0.5 — see §4 — so this
-   suspicion's premise has changed.  Not re-run here; if this is picked up
-   again, redo the fit against the new value before trusting the old 198 N /
-   0.756 m² figures as a baseline for it.
-3. **Powertrain coast torque firing during coastdown** — the engine
-   `Map Zero Throttle` fires at zero throttle.  As written this said the map
-   was "-5 to -25 N·m", that coastdown covered "rpm range 4000-7000", and that
-   the load there was "-10 to -15 N·m".  All three were wrong: coastdown spans
-   3586-10 758 RPM and the map reached -16.9 N·m over it.  §11.1 has the
-   corrected figures and the result of actually running the experiment below;
-   the shipped map is now -5 to -12.5 N·m.
-
-**Concrete next experiment when we want to chase this down**: drop the
-zero-throttle map to ~half its current values, re-run coastdown, and
-see if F_rr drops to ~150 N.  Anything still excess after that is in
-the tire model or the solver.
-
-**For now**: don't chase tire/driveline tuning.  The 2× factor is a
-known plant-fidelity limitation captured here.  Cruise-control gain
-tuning should still wait until F_rr is closer to spec — otherwise we'd
-be tuning around the wrong plant.  See [docs/TODO.md](TODO.md) for the
-follow-up task.
-
-### 11.1 That experiment has now been run (2026-08-12)
-
-Suspicion 3 above is the one §3.1 acted on, and two of its numbers were wrong
-in the direction that made it look small.  Coastdown runs from 30 m/s down, so
-it spans **3586–10 758 RPM**, not "4000-7000"; the old map's load over that
-span reached −16.9 N·m, not "−10 to −15".
-
-The coastdown was re-run either side of the §3.1 correction — same binary, same
-scenario, only `Map Zero Throttle` differing, and differing only above 8350 RPM
-(52.1 mph).  Both runs are identical until throttle release, as they must be:
-the launch is at full throttle, where Chrono's blend `T_zero·(1−throttle) +
-T_full·throttle` multiplies the coast map out entirely.  Measured speed at
-release differs by **0.003 mph**.
-
-**Read the earlier version of this section with suspicion.** It reported
-F_rr 250.5 → 438.1 N and CdA 0.747 → 0.090 m², and concluded the residual drag
-had become "speed-independent" and therefore "not aero-shaped".  Those figures
-came from `scripts/fit_coastdown.py`, which capped its window at 30 s after
-release (`MAX_DURATION_AFTER_RELEASE_S`).  The corrected car coasts further, so
-the cap truncated the two runs at different speeds — 18.26 m/s (40.8 mph)
-against 19.24 m/s (43.0 mph) — and the low-speed bins were being compared over
-different windows.  The 8× CdA collapse was substantially that artefact.
-
-The retraction is reproducible, and was re-run on 2026-08-12 before the tool
-was changed: the pre-change `fit_coastdown.py`, on the two CSVs from
-`config/coastdown.json`, prints F_rr 251.0 → 438.2 N and CdA 0.748 →
-0.091 m².  That is the artefact, to three figures, from a committed run
-condition — so the fix below is aimed at a defect that has been watched
-happening rather than at a description of one.
-
-#### The numbers below are the ones the shipped tool produces (2026-08-12, second pass)
-
-An earlier version of this table read F_rr 193.4 → 239.6 N and CdA 0.880 →
-0.571 m².  **No tool in this repo produces those numbers**, then or now:
-`fit_coastdown.py` still had its 30 s cap when they were written, so it cannot
-have made them, and the uncapped tool makes the numbers below instead.  A
-figure in an audit that the repo cannot reproduce is the defect this section
-exists to fix, one level up.
-
-What the difference is *not* is the plant.  The mean-deceleration table further
-down needs no fit at all, and it reproduces the committed one to four decimals,
-so the CSVs behind both sets of figures are the same data.  What it looks like
-is the estimator: an **unweighted** least-squares fit on the same speed bins
-gives 195.2 → 246.2 N and 0.891 → 0.574 m², within a few percent of the retired
-figures, where the shipped fit weights each bin by its sample count
-(inverse-variance for a bin mean).  Term by term against the retired numbers:
-F_rr +0.93 % (old) and **+2.75 %** (new), CdA +1.25 % and +0.53 % — so three of
-the four are inside 1.3 % and one is not, and "within about 1 %" (an earlier
-wording here) was wrong about F_rr new.  That is an inference from a match, not
-a recovered script — the fit that made them was never committed, which is the
-whole problem.
-
-Both runs come from `config/coastdown.json` — also new on 2026-08-12, because
-until then no config wrapper existed and the run condition behind every number
-in §11 and §11.1 was unrecorded.
-
-**Why "unrecorded" and not just "undocumented".** The invocation these sections
-*did* document (`--headless --start-propulsion-enabled --scenario …`, no
-`--config`) runs one of two different experiments depending on the working
-directory, and says nothing about which:
-
-| run from | what loads | result |
-|---|---|---|
-| a directory where `config/default.json` resolves | the **milford** level | car leaves the level mid-launch; peak **370.78 m/s** (829 mph), 562 samples above 60 m/s, 254 above 200 m/s |
-| anywhere else | `[Config] Cannot open config/default.json — using built-in defaults` → **rigid_plane** | a perfectly ordinary coastdown, peak **30.15 m/s** |
-
-The second is the dangerous one. A fallback that produces garbage gets noticed;
-one that produces *plausible* results does not, and the only signal separating
-them is a single line on stderr that any `> log` redirect hides. That is the
-best available explanation for how these figures went four months without
-anyone being able to say what they were measured on.  `src/main.cpp` now makes
-a **named** `--config` that cannot be opened fatal (exit 2) rather than
-substituting defaults, pinned by the `named_config_is_fatal` test; the implicit
-default still falls back, which is documented behaviour.
-
-Reproduce the numbers in this section with:
-
-```sh
-./build/ev1sim --config config/coastdown.json
-mv scenario_coastdown.csv new.csv
-# put the pre-3.1 coast map back, re-run, and restore it afterwards:
-git show 792d062^:data/vehicle/ev1/powertrain/EV1_EngineSimpleMap.json \
-    > data/vehicle/ev1/powertrain/EV1_EngineSimpleMap.json
-./build/ev1sim --config config/coastdown.json
-mv scenario_coastdown.csv old.csv
-git checkout data/vehicle/ev1/powertrain/EV1_EngineSimpleMap.json
-
-scripts/fit_coastdown.py old.csv new.csv                 # whole coast
-scripts/fit_coastdown.py --v-max 23.28 old.csv new.csv   # the sub-knee control
-```
-
-| fit window | | old coast map | new coast map |
-|---|---|---|---|
-| whole coast (10.01–29.78 m/s) | F_rr | 188.9 ± 17.6 N (1.89× spec) | 231.7 ± 48.2 N (2.32× spec) |
-| whole coast | CdA | 0.914 ± 0.069 m² (2.54× spec) | **0.621 ± 0.181 m² (1.72× spec)** |
-| below the knee only (v ≤ 23.28 m/s) | F_rr | 165.8 ± 8.8 N | 166.1 ± 9.2 N |
-| below the knee only | CdA | 1.075 ± 0.051 m² | 1.072 ± 0.053 m² |
-
-The ± is the scatter of the speed bins about the fitted line (n−2 degrees of
-freedom) — model error, not sampling error, since each bin averages hundreds of
-samples.  It is what says whether a two-parameter law describes the window at
-all, and it is the number the retracted claim never carried: the CdA that was
-reported as 0.090 m², "a quarter of spec", is **0.088 ± 0.145 m² over the
-window it was fitted on**.  Consistent with no aero term at all, which is not a
-measurement of one.  `fit_coastdown.py` now says so and exits non-zero.
-
-**That verdict depends on a constant, and the constant is `BIN_WIDTH_MPS`.**
-There is no window-*width* term in it — the test is `|CdA| > σ` — but the bin
-width sets how many bins a window is cut into, hence the degrees of freedom
-behind σ.  Over the 19.31–29.78 m/s window that produced the 0.088:
-
-| bin width | bins | dof | CdA | σ | verdict |
-|---|---|---|---|---|---|
-| 2.0 m/s | 6 | 4 | 0.097 | 0.089 | IDENTIFIED |
-| 2.5 m/s | 5 | 3 | 0.097 | 0.098 | not identified |
-| 4.0 m/s | 4 | 2 | 0.086 | 0.099 | not identified |
-| **5.0 m/s (shipped)** | 3 | 1 | 0.086 | 0.144 | **not identified** |
-| 6.0 m/s | 2 | 0 | 0.092 | — | no dof |
-
-Recorded rather than tuned away, because a verdict resting on an undeclared
-constant is the same defect as a fit resting on an undeclared window.  Three
-things about it.  The shipped 5.0 gave the **widest** σ of the widths tried —
-the cautious end, the one that reaches "not identified" soonest — though that
-is observed on these fits, not proved in general.  The substantive reading
-survives the flip: 0.097 ± 0.089 is a ratio of 1.09, no more a measurement of
-an aero term than 0.086 ± 0.144 is.  And **the published coefficients in the
-table above are far steadier than the verdict** — over the whole coast CdA
-holds 0.610–0.621 m² (new map) and 0.908–0.914 m² (old) across those same bin
-widths, so the headline does not turn on this constant even though the verdict
-does.  The tool prints the bin width and the dof beside every number, so the
-knob is visible wherever a number is quoted from.
-
-**The bottom two rows are the control, and they are the reason to believe the
-top two.**  Below the knee the two maps are byte-identical, and the fit agrees
-to 0.3 N and 0.003 m² — well inside the ± above. Mean deceleration per band,
-computed off the raw CSVs with no window cap, says the same thing more
-directly:
-
-| band | old | new |
-|---|---|---|
-| 25–30 m/s (56–67 mph) | 0.4610 m/s² | **0.3724 m/s²** |
-| 20–25 m/s (45–56 mph) | 0.3788 m/s² | 0.3713 m/s² |
-| 15–20 m/s (34–45 mph) | 0.2880 m/s² | 0.2881 m/s² |
-| 10–15 m/s (22–34 mph) | 0.2076 m/s² | 0.2076 m/s² |
-
-The two bands below the knee are identical to four decimals; 20–25 straddles it
-and moves 2 %; 25–30 sits wholly above it and moves 19 %.  That is exactly the
-footprint the §3.1 edit should have, and nothing else moved.  This table needs
-no fit at all, which is why it is the check on the one above.
-
-**What this does and does not say.**  The old coast curve's torque rose with
-speed, and a two-parameter `F_rr + CdA·v²` fit has nowhere to put a rising
-term but CdA — so it was inflating the apparent aero coefficient, and removing
-it cuts CdA by 32 % (2.54× → 1.72× spec).  §11's headline was therefore
-*partly* an artefact of an unsourced curve.  It was not wholly one: CdA is
-still 1.7× spec and F_rr is still 2.3×, deceleration still rises with speed
-across the range (0.208 → 0.288 → 0.372 m/s²), and the excess is still there.
-An earlier draft of this section claimed the residual was "not aero-shaped" and
-pointed the drag work away from the aero term; that was wrong, and it was wrong
-because it rested on the window-truncated fit.
-
-Coasting from 30.07 m/s (67.3 mph), the corrected car holds more speed while
-above the knee, converging again below 52 mph where the maps agree:
-
-| s after release | old mph | new mph | Δ mph |
-|---|---|---|---|
-| 0 | 67.3 | 67.3 | +0.00 |
-| 5 | 62.2 | 63.6 | +1.39 |
-| 10 | 57.2 | 59.5 | +2.24 |
-| 15 | 52.6 | 55.3 | **+2.64** |
-| 20 | 48.4 | 51.0 | +2.62 |
-| 30 | 40.9 | 43.0 | +2.19 |
-| 50 | 29.6 | 31.1 | +1.44 |
-| 70 | 20.6 | 22.0 | +1.38 |
-
-Re-fitting the drag calibration is still open and is still the item in
-`docs/TODO.md` — but it should be fitted against a coast map bounded by the
-print, over the speed range both runs reach rather than a fixed slice of time,
-and with the sub-knee control above as the check that the fit is measuring the
-plant rather than the window.  `fit_coastdown.py` now enforces the first two of
-those: it takes both CSVs at once, states the window it fitted, and refuses
-when there isn't a shared one.
-
-
-## 12. Calibration attempt — what didn't work
-
-After the audit fixes landed, an explicit calibration attempt
-(2026-04-30) tried to bring F_rr and CdA closer to spec.  Tooling:
-[scripts/fit_coastdown.py](../scripts/fit_coastdown.py) does
-weighted-OLS on bin centroids to recover F_rr and CdA from a coastdown
-CSV.  Tested values:
-
-| config                                        | F_rr (N) | CdA (m²) |
-|---|---|---|
-| baseline (engine -5..-25, Crr=0.008)          | 301      | 1.21     |
-| engine zeroed (engine 0, Crr=0.008)           | -126*    | 2.01     |
-| engine halved (engine -2.5..-12.5, Crr=0.008) | 220      | 1.98     |
-| Crr lowered (engine -5..-25, Crr=0.005)       | 185      | 1.75     |
-| Crr near-zero (engine -5..-25, Crr=0.001)     | unstable | unstable |
-
-\* negative F_rr is a fit artifact — pure-v² shape doesn't decompose
-cleanly.  The "F_avg" at v≈22 m/s is actually a better single-number
-summary than the F_rr/CdA decomposition.
-
-| config                                        | F_avg @ 22 m/s | F_avg @ 27 m/s |
-|---|---|---|
-| baseline                                      | 667 N          | 845 N          |
-| engine zeroed                                 | 528 N (-21%)   | 780 N (-8%)    |
-| engine halved                                 | 815 N (+22%)   | 1180 N (+40%)  |
-| Crr lowered                                   | 723 N          | ~1000 N        |
-
-Engine-zero gave the cleanest reduction (~10-20%).  But "engine halved"
-gave WORSE total drag than baseline — the trajectory diverged because
-small dynamics changes accumulate over a 30 s coastdown.
-
-**Conclusion**: the simple knobs exposed in the JSON (engine coast map,
-tire Crr) can each shave 10-20 % off total drag, but cannot get within
-2× of spec.  The remaining ~70-80 % of excess dissipation lives in
-TMeasy's internal slip dynamics — `Vehicle Type: "Passenger"` preset
-sets longitudinal/lateral slip stiffness defaults that aren't exposed
-in the JSON.
-
-**Reverted to baseline config.**  Calibration deferred until either:
-(a) Chrono exposes more TMeasy parameters via JSON, (b) we switch to
-a different tire model with explicit dissipation knobs (e.g.
-Pacejka-style with rolling-resistance map), or (c) we accept the 3×
-factor as a known plant limitation and tune the controller around it.
-
-**What the tooling enables for future work**:
-- `./build/ev1sim --config config/coastdown.json` is the standardized
-  validation run — one command, committed terrain, no external sim.
-- `scripts/fit_coastdown.py scenario_coastdown.csv` reports F_rr and CdA with
-  the speed window it fitted and a spread on each.  Comparing a before and an
-  after means passing **both** CSVs in one invocation, not eyeballing two runs.
-- Both should converge toward 100 N and 0.36 m² as the plant model improves.
-
-The table above is from 2026-04-30 and predates all of that: its numbers were
-measured on an unrecorded terrain with the old time-capped fit, so treat them
-as the shape of the result (which knob moves which way) and not as figures to
-compare against anything measured since.
+`fit_coastdown.py` fits two CSVs over the speed range they share when comparing
+a before and an after, reports the bin scatter (±) beside each term, and
+refuses a window that cannot separate F_rr from CdA.  `--v-max` limits the fit
+to a sub-range; a fit that moves when only the window moves is measuring the
+window.
 
 ## 13. TMeasy full-parameterization migration (2026-04-30)
 

@@ -15,8 +15,9 @@ regression guard that runs in the normal unit-test suite:
 
 ## Brake bias — front disc / rear drum
 
-The real EV1 runs **front vented discs + rear drums**, each axle with its own
-`BrakeSimple` file:
+The EV1 runs a **245 mm front disc and a 225 mm (inside diameter) rear drum**
+(brakes manual, printed page 28), each axle with its own `BrakeSimple` file.
+The torques are estimates; no manual page prints one:
 
 | File | Wheel | Pair | Share |
 |------|------:|-----:|------:|
@@ -26,8 +27,9 @@ The real EV1 runs **front vented discs + rear drums**, each axle with its own
 
 ### Why front-biased
 
-The EV1's static weight is ~**50/50** (CG at chassis x≈0.09 m, almost mid-
-wheelbase of 2.512 m — the T-shaped battery pack sits low and central).  But a
+The car's static weight is ~**53/47** front/rear on the 2512 mm wheelbase (an
+estimate: see `EV1_Chassis.json`; the T-shaped battery pack sits low and
+central).  A
 ~0.8 g stop transfers load **forward**, so the front axle carries far more than
 half the braking load at the limit.  A front bias near 70/30 matches that
 dynamic load distribution, keeps the rears away from premature lock-up, and
@@ -60,8 +62,8 @@ for the constants and the drag law `F = 0.5·ρ·Cd·A·v²`:
 
 | Constant | Value | Note |
 |----------|------:|------|
-| Cd | 0.19 | GM-published |
-| Frontal area A | 1.89 m² | ~20.3 sq ft (approximate) |
+| Cd | 0.19 | chassis manual p. 62, body repair manual p. 94 |
+| Frontal area A | 1.89 m² | chassis manual p. 62, body repair manual p. 94 |
 | Air density ρ | 1.225 kg/m³ | ISA sea level, 15 °C |
 | ⇒ CdA | 0.359 m² | |
 

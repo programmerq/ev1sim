@@ -31,11 +31,12 @@ namespace ev1sim {
 /// inside this class while it is still incomplete).
 class Aerodynamics {
 public:
-    /// GM-published EV1 drag coefficient.
+    /// EV1 drag coefficient: chassis manual, printed page 62 ("Exterior
+    /// Dimensions"), and body repair manual, printed page 94.
     static constexpr double kEV1DragCoefficient = 0.19;
 
-    /// EV1 reference frontal area (m^2), ~20.3 sq ft.  Not quoted to high
-    /// precision in the literature; refine if a measured figure surfaces.
+    /// EV1 frontal area (m^2): chassis manual, printed page 62, and body
+    /// repair manual, printed page 94 ("1.89 sq. m.").
     static constexpr double kEV1FrontalAreaM2 = 1.89;
 
     /// ISA sea-level air density (kg/m^3) at 15 °C / 101.325 kPa.

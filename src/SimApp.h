@@ -121,8 +121,8 @@ private:
 
     // Hand the drive motor's zero-pedal torque to the PIM's coast-down drag
     // (CHASSIS_PIM_COAST_DRAG_NM) while the PIM is driving the car — electronics
-    // mode with its throttle command fresh — and back to the coast map
-    // otherwise.  Call after ApplyElectronicsThrottle.
+    // mode with its throttle command fresh — and otherwise to
+    // ev1sim::CoastDragWithoutPim.  Call after ApplyElectronicsThrottle.
     void ApplyElectronicsCoastDrag();
 
     // Symmetric to ApplyElectronicsThrottle: override cmd.steering from the

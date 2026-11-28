@@ -1304,10 +1304,13 @@ void SimApp::ApplyElectronicsCoastDrag() {
         m_throttle_bus_was_fresh) {
         if (const auto nm = m_external_sim->GetPimCoastDragNm()) drag = *nm;
     }
-    if (drag.has_value() != m_coast_drag_from_pim) {
-        std::cout << (drag ? "[SimApp] coast torque from PIM (coast-down drag)\n"
-                           : "[SimApp] coast torque from the motor map\n");
-        m_coast_drag_from_pim = drag.has_value();
+    const bool from_pim = drag.has_value();
+    if (!from_pim)
+        drag = ev1sim::CoastDragWithoutPim(m_physical->coast_down_button().on());
+    if (from_pim != m_coast_drag_from_pim) {
+        std::cout << (from_pim ? "[SimApp] coast torque from PIM (coast-down drag)\n"
+                               : "[SimApp] coast torque without the PIM (coast-down button)\n");
+        m_coast_drag_from_pim = from_pim;
     }
     ev1sim::SetCoastDrag(m_world->GetVehicle(), drag);
 }

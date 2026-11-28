@@ -59,6 +59,15 @@ inline constexpr double kCoastDragDeadbandRadS = 1.0;
 void SetCoastDrag(chrono::vehicle::ChWheeledVehicle& vehicle,
                   std::optional<double> drag_nm);
 
+/// The zero-pedal drag when no PIM owns it: the coast map (nullopt) with the
+/// coast-down button on, else none (0 Nm).  @source:manual propulsion p57: with
+/// the pedal released in D the car "will coast freely like an automatic
+/// transmission in neutral"; coast down is the selected feature.
+inline std::optional<double> CoastDragWithoutPim(bool coast_down_on) {
+    if (coast_down_on) return std::nullopt;
+    return 0.0;
+}
+
 /// Motor shaft speed in rad/s, signed: positive turning the car forward,
 /// negative turning it backward, whichever way the torque points.  The
 /// magnitude is the transmission's output-motorshaft speed (unclamped, unlike
