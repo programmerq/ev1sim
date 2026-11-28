@@ -1959,3 +1959,103 @@ TEST_CASE("Scenario: charge_coupler_present stats field reads the paddle",
     f.close();
     std::filesystem::remove(tmp_csv);
 }
+
+namespace {
+// Closes the braking driver's loop on a toy car whose deceleration is
+// `gain` m/s^2 per unit of pedal travel, ticked at the 60 Hz the scenario
+// sees.  Returns the pedal travel after `seconds`.
+double SettledDecelHoldTravel(double gain, double target, double seconds) {
+    ev1sim::Scenario s;
+    s.set_events({{0.0, "decel_hold", target, 0.0}});
+    CountingHooks hooks;
+    VehicleState st{};
+    st.speed_mps = 25.0;
+    DriverCommand cmd{};
+    for (int i = 0; i <= static_cast<int>(seconds * 60.0); ++i) {
+        cmd = DriverCommand{};
+        s.Tick(i / 60.0, st, hooks, cmd);
+        st.accel_long = -gain * cmd.front_brake;
+    }
+    return cmd.front_brake;
+}
+}  // namespace
+
+TEST_CASE("Scenario: decel_hold settles where the car needs the pedal, and a "
+          "weaker car needs more travel", "[Scenario][DecelHold]") {
+    const double healthy = SettledDecelHoldTravel(9.0, 3.0, 8.0);
+    const double weak    = SettledDecelHoldTravel(4.5, 3.0, 8.0);
+    CHECK(healthy == Catch::Approx(3.0 / 9.0).margin(0.01));
+    CHECK(weak    == Catch::Approx(3.0 / 4.5).margin(0.01));
+    // A car that cannot reach the target gets the whole pedal, no more.
+    CHECK(SettledDecelHoldTravel(2.0, 3.0, 8.0) == Catch::Approx(1.0));
+}
+
+TEST_CASE("Scenario: decel_hold drives both pedal fields, logs its target, and "
+          "yields to set_brake and decel_release", "[Scenario][DecelHold]") {
+    using ev1sim::Scenario;
+    Scenario s;
+    s.set_events({
+        {1.0, "decel_hold",    3.0, 0.0},
+        {3.0, "set_brake",     0.2, 0.0},
+        {4.0, "decel_hold",    3.0, 0.0},
+        {5.0, "decel_release", 0.0, 0.0},
+    });
+    CountingHooks hooks;
+    VehicleState st{};
+    st.speed_mps = 20.0;
+    DriverCommand cmd{};
+
+    s.Tick(0.5, st, hooks, cmd);
+    CHECK_FALSE(s.decel_hold_engaged());
+    CHECK(s.decel_target_mps2() == 0.0);
+
+    // Coasting (no deceleration) while asked for 3 m/s^2: the foot goes down
+    // on every tick, and both pedal fields carry it.
+    s.Tick(1.0, st, hooks, cmd);
+    double prev = cmd.front_brake;
+    for (double t = 1.1; t < 1.5; t += 0.1) {
+        cmd = DriverCommand{};
+        s.Tick(t, st, hooks, cmd);
+        CHECK(cmd.front_brake > prev);
+        CHECK(cmd.rear_brake == cmd.front_brake);
+        prev = cmd.front_brake;
+    }
+    CHECK(s.decel_hold_engaged());
+    CHECK(s.decel_target_mps2() == 3.0);
+
+    // Over-braking (6 m/s^2 against 3): the foot comes back up.
+    st.accel_long = -6.0;
+    cmd = DriverCommand{};
+    s.Tick(1.6, st, hooks, cmd);
+    const double before = cmd.front_brake;
+    cmd = DriverCommand{};
+    s.Tick(1.8, st, hooks, cmd);
+    CHECK(cmd.front_brake < before);
+
+    // Stopped: the pedal stays where it is, however the reading goes.
+    st.speed_mps = 0.1;
+    st.accel_long = 0.0;
+    cmd = DriverCommand{};
+    s.Tick(2.0, st, hooks, cmd);
+    const double held = cmd.front_brake;
+    cmd = DriverCommand{};
+    s.Tick(2.5, st, hooks, cmd);
+    CHECK(cmd.front_brake == held);
+
+    // set_brake takes the pedal back and disengages the driver.
+    cmd = DriverCommand{};
+    s.Tick(3.0, st, hooks, cmd);
+    CHECK_FALSE(s.decel_hold_engaged());
+    CHECK(cmd.front_brake == 0.2);
+
+    // decel_release lifts the pedal.
+    st.speed_mps = 20.0;
+    cmd = DriverCommand{};
+    s.Tick(4.5, st, hooks, cmd);
+    CHECK(s.decel_hold_engaged());
+    cmd = DriverCommand{};
+    s.Tick(5.0, st, hooks, cmd);
+    CHECK_FALSE(s.decel_hold_engaged());
+    CHECK(cmd.front_brake == 0.0);
+    CHECK(cmd.rear_brake == 0.0);
+}

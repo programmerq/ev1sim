@@ -139,6 +139,7 @@ void Scenario::Tick(double sim_time, const VehicleState& state,
             m_held_throttle = e.value;
         } else if (e.action == "set_brake") {
             m_held_brake = e.value;
+            m_decel_target.reset();
         } else if (e.action == "set_steering") {
             m_held_steering = e.value;
         } else if (e.action == "assert_speed_within") {
@@ -210,6 +211,16 @@ void Scenario::Tick(double sim_time, const VehicleState& state,
             // takes over (R13-H counts rotation), not wheel position.
             m_lane_base = m_lane_out;
             m_lane_prev.reset();
+        } else if (e.action == "decel_hold") {
+            m_decel_target = std::max(0.0, e.value);
+            m_decel_integ  = 0.0;
+            m_decel_out    = 0.0;
+            m_decel_out_t.reset();
+        } else if (e.action == "decel_release") {
+            m_decel_target.reset();
+            m_decel_out  = 0.0;
+            m_decel_out_t.reset();
+            m_held_brake = 0.0;
         } else if (e.action == "lane_release") {
             m_lane_hold_y.reset();
             m_lane_profile = 0;
@@ -227,6 +238,7 @@ void Scenario::Tick(double sim_time, const VehicleState& state,
     if (m_held_brake)    cmd.front_brake = cmd.rear_brake = *m_held_brake;
     if (m_held_steering) cmd.steering    = *m_held_steering;
     if (m_lane_hold_y)   cmd.steering    = LaneHoldSteering(state, sim_time);
+    if (m_decel_target)  cmd.front_brake = cmd.rear_brake = DecelHoldPedal(state, sim_time);
     // One physical horn contact (circuit 28); SimApp ORs low||high into
     // HornButton::set_held, so driving both mirrors a closed contact.
     if (m_held_horn)     cmd.horn_low    = cmd.horn_high = *m_held_horn;
@@ -340,6 +352,44 @@ double Scenario::LaneHoldSteering(const VehicleState& state, double sim_time) {
     return out;
 }
 
+// Braking-driver law: a PI loop on the measured deceleration, through a foot
+// lag, clamped to the pedal's travel.
+//
+//   e     = target - (-accel_long)              deceleration still missing
+//   integ = clamp(integ + kI * e * dt, 0, 1)    the foot's held position
+//   want  = clamp(integ + kP * e, 0, 1)
+//   pedal = pedal + (want - pedal) * dt / (kFootLagS + dt)
+//
+// The integral term is what makes the TRAVEL meaningful: at steady state the
+// error is zero and the pedal sits wherever this car needs it for this
+// deceleration, whatever braking is left behind the pedal.  Below
+// kDecelHoldStopMps the pedal is frozen (a stopped car reads accel_long 0 and
+// the loop would otherwise floor the pedal for no reason).
+//
+// @design 2026-11-28 claude — gains sized on the ev1sim pedal curve (full
+// travel is 3448 kPa at the fronts with the rears at full clamp; roughly
+// 8-10 m/s^2 per unit of travel on dry asphalt with every brake working):
+//   kP         0.05 per m/s^2   a 3 m/s^2 shortfall asks for 0.15 travel now
+//   kI         0.6  per m/s^2/s a 3 m/s^2 shortfall adds 0.18 travel per
+//                               0.1 s; loop crossover ~0.5-1 rad/s on the
+//                               healthy car, slower on a weakened one
+//   kFootLagS  0.2 s            the same 0.1-0.3 s attentive-driver delay as
+//                               the lane hold's hand lag (McRuer's crossover
+//                               model), @inferred, not measured on a person
+double Scenario::DecelHoldPedal(const VehicleState& state, double sim_time) {
+    constexpr double kP = 0.05;
+    constexpr double kI = 0.6;
+    constexpr double kFootLagS = 0.2;
+    const double dt = m_decel_out_t ? std::max(0.0, sim_time - *m_decel_out_t) : 0.0;
+    m_decel_out_t = sim_time;
+    if (state.speed_mps < kDecelHoldStopMps && m_decel_out > 0.0) return m_decel_out;
+    const double e = *m_decel_target + state.accel_long;
+    m_decel_integ = std::clamp(m_decel_integ + kI * e * dt, 0.0, 1.0);
+    const double want = std::clamp(m_decel_integ + kP * e, 0.0, 1.0);
+    m_decel_out += (want - m_decel_out) * dt / (kFootLagS + dt);
+    return m_decel_out;
+}
+
 void Scenario::OpenStats() {
     if (m_csv_opened || m_stats.output_csv.empty()) return;
     m_csv.open(m_stats.output_csv, std::ios::out | std::ios::trunc);
@@ -434,6 +484,7 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
         else if (f == "applied_front_brake")  m_csv << applied_cmd.front_brake;
         else if (f == "applied_rear_brake")   m_csv << applied_cmd.rear_brake;
         else if (f == "applied_steering")     m_csv << applied_cmd.steering;
+        else if (f == "decel_target_mps2")    m_csv << decel_target_mps2();
         else if (f == "front_brake_pressure") m_csv << state.front_brake_pressure;
         else if (f == "rear_brake_position")  m_csv << state.rear_brake_position;
         else if (f == "throttle_cmd_q8")      m_csv << static_cast<int>(bus_throttle.q8);
