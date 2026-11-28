@@ -27,16 +27,16 @@
 namespace electricsim::topology {
 
 inline constexpr std::uint32_t kFormatVersion = 2U;
-inline constexpr std::uint32_t kTopologyHash = 0x1061B825U;
-inline constexpr std::size_t kWireCount = 643;
+inline constexpr std::uint32_t kTopologyHash = 0x84FA453FU;
+inline constexpr std::size_t kWireCount = 650;
 
 // Per-class cell counts. Emitted so a
 // receipt can print the classification without re-parsing YAML,
 // and so a test can assert against them. The legacy count is held
 // by a DECREASING ratchet in the generator that fails on !=.
-inline constexpr std::size_t kConductorCellCount = 253;
-inline constexpr std::size_t kElementStateCellCount = 188;
-inline constexpr std::size_t kSemanticCellCount = 183;
+inline constexpr std::size_t kConductorCellCount = 255;
+inline constexpr std::size_t kElementStateCellCount = 189;
+inline constexpr std::size_t kSemanticCellCount = 187;
 inline constexpr std::size_t kUnclassifiedLegacyCellCount = 9;
 inline constexpr std::size_t kEffectCellCount = 10;
 
@@ -577,6 +577,10 @@ inline constexpr ::electricsim::io::ConductorId kWireRSA_PARK_LAMPS_INPUT_301E{1
 inline constexpr ::electricsim::io::ConductorId kWireIPC_DIM_LEVEL_INPUT_230{1124U};
 inline constexpr ::electricsim::io::ConductorId kWireIPC_SEATBELT_INPUT_238{1119U};
 inline constexpr ::electricsim::io::ElementStateId kWireDRIVER_ES_SDM_CONNECTOR_UNPLUGGED{1126U};
+inline constexpr ::electricsim::io::WireId kWireSDM_VELOCITY_EXCEED_COUNT = 1704U;
+inline constexpr ::electricsim::io::WireId kWireSDM_ARMING_SENSOR_CLOSED = 1705U;
+inline constexpr ::electricsim::io::WireId kWireSDM_DRIVER_SQUIB_FIRE = 1706U;
+inline constexpr ::electricsim::io::WireId kWireSDM_PASSENGER_SQUIB_FIRE = 1707U;
 inline constexpr ::electricsim::io::ConductorId kWireIPC_AIRBAG_IND_INPUT_358{1120U};
 inline constexpr ::electricsim::io::ConductorId kWireSDM_AIR_BAG_TT_OUTPUT_358E{1647U};
 inline constexpr ::electricsim::io::ElementStateId kWireIPC_ES_ANTILOCK_TT_DRV{390U};
@@ -598,6 +602,9 @@ inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_FRONT_BRAKE_ENAB
 inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REAR_BRAKE_ENABLE{406U};
 inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_FRONT_ISO_FL{407U};
 inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_FRONT_ISO_FR{408U};
+inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_FRONT_EMB{1847U};
+inline constexpr ::electricsim::io::ConductorId kWireBTCM_FRONT_EMB_ENERGIZED{1848U};
+inline constexpr ::electricsim::io::ConductorId kWireBTCM_FRONT_EMB_LO_GROUNDED{1849U};
 inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_REGEN_DISABLE{413U};
 inline constexpr ::electricsim::io::ElementStateId kWireBTCM_ES_RETARD_REQUEST_DUTY{1303U};
 inline constexpr ::electricsim::io::ConductorId kWirePIM_RETARD_REQUEST_IN{1304U};
@@ -1787,6 +1794,14 @@ inline constexpr auto kWireIPC_SEATBELT_INPUT_238_Default = false;
 inline constexpr InitPolicy kWireIPC_SEATBELT_INPUT_238_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireDRIVER_ES_SDM_CONNECTOR_UNPLUGGED_Default = false;
 inline constexpr InitPolicy kWireDRIVER_ES_SDM_CONNECTOR_UNPLUGGED_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireSDM_VELOCITY_EXCEED_COUNT_Default = 0x0U;
+inline constexpr InitPolicy kWireSDM_VELOCITY_EXCEED_COUNT_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireSDM_ARMING_SENSOR_CLOSED_Default = false;
+inline constexpr InitPolicy kWireSDM_ARMING_SENSOR_CLOSED_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireSDM_DRIVER_SQUIB_FIRE_Default = false;
+inline constexpr InitPolicy kWireSDM_DRIVER_SQUIB_FIRE_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireSDM_PASSENGER_SQUIB_FIRE_Default = false;
+inline constexpr InitPolicy kWireSDM_PASSENGER_SQUIB_FIRE_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireIPC_AIRBAG_IND_INPUT_358_Default = false;
 inline constexpr InitPolicy kWireIPC_AIRBAG_IND_INPUT_358_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireSDM_AIR_BAG_TT_OUTPUT_358E_Default = false;
@@ -1829,6 +1844,12 @@ inline constexpr auto kWireBTCM_ES_FRONT_ISO_FL_Default = false;
 inline constexpr InitPolicy kWireBTCM_ES_FRONT_ISO_FL_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireBTCM_ES_FRONT_ISO_FR_Default = false;
 inline constexpr InitPolicy kWireBTCM_ES_FRONT_ISO_FR_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireBTCM_ES_FRONT_EMB_Default = false;
+inline constexpr InitPolicy kWireBTCM_ES_FRONT_EMB_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireBTCM_FRONT_EMB_ENERGIZED_Default = false;
+inline constexpr InitPolicy kWireBTCM_FRONT_EMB_ENERGIZED_InitPolicy = InitPolicy::kHold;
+inline constexpr auto kWireBTCM_FRONT_EMB_LO_GROUNDED_Default = false;
+inline constexpr InitPolicy kWireBTCM_FRONT_EMB_LO_GROUNDED_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireBTCM_ES_REGEN_DISABLE_Default = false;
 inline constexpr InitPolicy kWireBTCM_ES_REGEN_DISABLE_InitPolicy = InitPolicy::kHold;
 inline constexpr auto kWireBTCM_ES_RETARD_REQUEST_DUTY_Default = static_cast<std::uint16_t>(0x0U);
@@ -2553,6 +2574,10 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireIPC_DIM_LEVEL_INPUT_230), ::electricsim::io::WireType::kUint16) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireIPC_SEATBELT_INPUT_238), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_SDM_CONNECTOR_UNPLUGGED), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireSDM_VELOCITY_EXCEED_COUNT, ::electricsim::io::WireType::kUint32) && ok;
+  ok = table.declare(kWireSDM_ARMING_SENSOR_CLOSED, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireSDM_DRIVER_SQUIB_FIRE, ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(kWireSDM_PASSENGER_SQUIB_FIRE, ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireIPC_AIRBAG_IND_INPUT_358), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireSDM_AIR_BAG_TT_OUTPUT_358E), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireIPC_ES_ANTILOCK_TT_DRV), ::electricsim::io::WireType::kBit) && ok;
@@ -2574,6 +2599,9 @@ inline bool declare_all(::electricsim::io::WireTable& table) {
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_BRAKE_ENABLE), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_FRONT_ISO_FL), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_FRONT_ISO_FR), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_FRONT_EMB), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_FRONT_EMB_ENERGIZED), ::electricsim::io::WireType::kBit) && ok;
+  ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_FRONT_EMB_LO_GROUNDED), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REGEN_DISABLE), ::electricsim::io::WireType::kBit) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_RETARD_REQUEST_DUTY), ::electricsim::io::WireType::kUint16) && ok;
   ok = table.declare(static_cast<::electricsim::io::WireId>(kWirePIM_RETARD_REQUEST_IN), ::electricsim::io::WireType::kUint16) && ok;
@@ -3204,6 +3232,10 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case static_cast<::electricsim::io::WireId>(kWireIPC_DIM_LEVEL_INPUT_230): return "IPC_DIM_LEVEL_INPUT_230";
     case static_cast<::electricsim::io::WireId>(kWireIPC_SEATBELT_INPUT_238): return "IPC_SEATBELT_INPUT_238";
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_SDM_CONNECTOR_UNPLUGGED): return "DRIVER_ES_SDM_CONNECTOR_UNPLUGGED";
+    case kWireSDM_VELOCITY_EXCEED_COUNT: return "SDM_VELOCITY_EXCEED_COUNT";
+    case kWireSDM_ARMING_SENSOR_CLOSED: return "SDM_ARMING_SENSOR_CLOSED";
+    case kWireSDM_DRIVER_SQUIB_FIRE: return "SDM_DRIVER_SQUIB_FIRE";
+    case kWireSDM_PASSENGER_SQUIB_FIRE: return "SDM_PASSENGER_SQUIB_FIRE";
     case static_cast<::electricsim::io::WireId>(kWireIPC_AIRBAG_IND_INPUT_358): return "IPC_AIRBAG_IND_INPUT_358";
     case static_cast<::electricsim::io::WireId>(kWireSDM_AIR_BAG_TT_OUTPUT_358E): return "SDM_AIR_BAG_TT_OUTPUT_358E";
     case static_cast<::electricsim::io::WireId>(kWireIPC_ES_ANTILOCK_TT_DRV): return "IPC_ES_ANTILOCK_TT_DRV";
@@ -3225,6 +3257,9 @@ inline ::std::string_view wire_name_for(::electricsim::io::WireId id) noexcept {
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_BRAKE_ENABLE): return "BTCM_ES_REAR_BRAKE_ENABLE";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_FRONT_ISO_FL): return "BTCM_ES_FRONT_ISO_FL";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_FRONT_ISO_FR): return "BTCM_ES_FRONT_ISO_FR";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_FRONT_EMB): return "BTCM_ES_FRONT_EMB";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FRONT_EMB_ENERGIZED): return "BTCM_FRONT_EMB_ENERGIZED";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FRONT_EMB_LO_GROUNDED): return "BTCM_FRONT_EMB_LO_GROUNDED";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REGEN_DISABLE): return "BTCM_ES_REGEN_DISABLE";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_RETARD_REQUEST_DUTY): return "BTCM_ES_RETARD_REQUEST_DUTY";
     case static_cast<::electricsim::io::WireId>(kWirePIM_RETARD_REQUEST_IN): return "PIM_RETARD_REQUEST_IN";
@@ -3854,6 +3889,10 @@ inline ::electricsim::io::WireId wire_id_for(::std::string_view name) noexcept {
   if (name == "IPC_DIM_LEVEL_INPUT_230") return static_cast<::electricsim::io::WireId>(kWireIPC_DIM_LEVEL_INPUT_230);
   if (name == "IPC_SEATBELT_INPUT_238") return static_cast<::electricsim::io::WireId>(kWireIPC_SEATBELT_INPUT_238);
   if (name == "DRIVER_ES_SDM_CONNECTOR_UNPLUGGED") return static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_SDM_CONNECTOR_UNPLUGGED);
+  if (name == "SDM_VELOCITY_EXCEED_COUNT") return kWireSDM_VELOCITY_EXCEED_COUNT;
+  if (name == "SDM_ARMING_SENSOR_CLOSED") return kWireSDM_ARMING_SENSOR_CLOSED;
+  if (name == "SDM_DRIVER_SQUIB_FIRE") return kWireSDM_DRIVER_SQUIB_FIRE;
+  if (name == "SDM_PASSENGER_SQUIB_FIRE") return kWireSDM_PASSENGER_SQUIB_FIRE;
   if (name == "IPC_AIRBAG_IND_INPUT_358") return static_cast<::electricsim::io::WireId>(kWireIPC_AIRBAG_IND_INPUT_358);
   if (name == "SDM_AIR_BAG_TT_OUTPUT_358E") return static_cast<::electricsim::io::WireId>(kWireSDM_AIR_BAG_TT_OUTPUT_358E);
   if (name == "IPC_ES_ANTILOCK_TT_DRV") return static_cast<::electricsim::io::WireId>(kWireIPC_ES_ANTILOCK_TT_DRV);
@@ -3875,6 +3914,9 @@ inline ::electricsim::io::WireId wire_id_for(::std::string_view name) noexcept {
   if (name == "BTCM_ES_REAR_BRAKE_ENABLE") return static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_BRAKE_ENABLE);
   if (name == "BTCM_ES_FRONT_ISO_FL") return static_cast<::electricsim::io::WireId>(kWireBTCM_ES_FRONT_ISO_FL);
   if (name == "BTCM_ES_FRONT_ISO_FR") return static_cast<::electricsim::io::WireId>(kWireBTCM_ES_FRONT_ISO_FR);
+  if (name == "BTCM_ES_FRONT_EMB") return static_cast<::electricsim::io::WireId>(kWireBTCM_ES_FRONT_EMB);
+  if (name == "BTCM_FRONT_EMB_ENERGIZED") return static_cast<::electricsim::io::WireId>(kWireBTCM_FRONT_EMB_ENERGIZED);
+  if (name == "BTCM_FRONT_EMB_LO_GROUNDED") return static_cast<::electricsim::io::WireId>(kWireBTCM_FRONT_EMB_LO_GROUNDED);
   if (name == "BTCM_ES_REGEN_DISABLE") return static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REGEN_DISABLE);
   if (name == "BTCM_ES_RETARD_REQUEST_DUTY") return static_cast<::electricsim::io::WireId>(kWireBTCM_ES_RETARD_REQUEST_DUTY);
   if (name == "PIM_RETARD_REQUEST_IN") return static_cast<::electricsim::io::WireId>(kWirePIM_RETARD_REQUEST_IN);
@@ -4509,6 +4551,10 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case static_cast<::electricsim::io::WireId>(kWireIPC_DIM_LEVEL_INPUT_230): return "";
     case static_cast<::electricsim::io::WireId>(kWireIPC_SEATBELT_INPUT_238): return "";
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_SDM_CONNECTOR_UNPLUGGED): return "none";
+    case kWireSDM_VELOCITY_EXCEED_COUNT: return "";
+    case kWireSDM_ARMING_SENSOR_CLOSED: return "";
+    case kWireSDM_DRIVER_SQUIB_FIRE: return "";
+    case kWireSDM_PASSENGER_SQUIB_FIRE: return "";
     case static_cast<::electricsim::io::WireId>(kWireIPC_AIRBAG_IND_INPUT_358): return "";
     case static_cast<::electricsim::io::WireId>(kWireSDM_AIR_BAG_TT_OUTPUT_358E): return "";
     case static_cast<::electricsim::io::WireId>(kWireIPC_ES_ANTILOCK_TT_DRV): return "ipc_ecu";
@@ -4530,6 +4576,9 @@ inline ::std::string_view wire_driver_for(::electricsim::io::WireId id) noexcept
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_BRAKE_ENABLE): return "btcm_ecu";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_FRONT_ISO_FL): return "btcm_ecu";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_FRONT_ISO_FR): return "btcm_ecu";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_FRONT_EMB): return "btcm_ecu";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FRONT_EMB_ENERGIZED): return "";
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FRONT_EMB_LO_GROUNDED): return "";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REGEN_DISABLE): return "btcm_ecu";
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_RETARD_REQUEST_DUTY): return "btcm_ecu";
     case static_cast<::electricsim::io::WireId>(kWirePIM_RETARD_REQUEST_IN): return "";
@@ -5169,6 +5218,10 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireIPC_DIM_LEVEL_INPUT_230), &gen) && gen == 0) { visitor(::std::string_view{"IPC_DIM_LEVEL_INPUT_230"}, static_cast<::electricsim::io::WireId>(kWireIPC_DIM_LEVEL_INPUT_230)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireIPC_SEATBELT_INPUT_238), &gen) && gen == 0) { visitor(::std::string_view{"IPC_SEATBELT_INPUT_238"}, static_cast<::electricsim::io::WireId>(kWireIPC_SEATBELT_INPUT_238)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_SDM_CONNECTOR_UNPLUGGED), &gen) && gen == 0) { visitor(::std::string_view{"DRIVER_ES_SDM_CONNECTOR_UNPLUGGED"}, static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_SDM_CONNECTOR_UNPLUGGED)); ++count; }
+  if (table.write_gen(kWireSDM_VELOCITY_EXCEED_COUNT, &gen) && gen == 0) { visitor(::std::string_view{"SDM_VELOCITY_EXCEED_COUNT"}, kWireSDM_VELOCITY_EXCEED_COUNT); ++count; }
+  if (table.write_gen(kWireSDM_ARMING_SENSOR_CLOSED, &gen) && gen == 0) { visitor(::std::string_view{"SDM_ARMING_SENSOR_CLOSED"}, kWireSDM_ARMING_SENSOR_CLOSED); ++count; }
+  if (table.write_gen(kWireSDM_DRIVER_SQUIB_FIRE, &gen) && gen == 0) { visitor(::std::string_view{"SDM_DRIVER_SQUIB_FIRE"}, kWireSDM_DRIVER_SQUIB_FIRE); ++count; }
+  if (table.write_gen(kWireSDM_PASSENGER_SQUIB_FIRE, &gen) && gen == 0) { visitor(::std::string_view{"SDM_PASSENGER_SQUIB_FIRE"}, kWireSDM_PASSENGER_SQUIB_FIRE); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireIPC_AIRBAG_IND_INPUT_358), &gen) && gen == 0) { visitor(::std::string_view{"IPC_AIRBAG_IND_INPUT_358"}, static_cast<::electricsim::io::WireId>(kWireIPC_AIRBAG_IND_INPUT_358)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireSDM_AIR_BAG_TT_OUTPUT_358E), &gen) && gen == 0) { visitor(::std::string_view{"SDM_AIR_BAG_TT_OUTPUT_358E"}, static_cast<::electricsim::io::WireId>(kWireSDM_AIR_BAG_TT_OUTPUT_358E)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireIPC_ES_ANTILOCK_TT_DRV), &gen) && gen == 0) { visitor(::std::string_view{"IPC_ES_ANTILOCK_TT_DRV"}, static_cast<::electricsim::io::WireId>(kWireIPC_ES_ANTILOCK_TT_DRV)); ++count; }
@@ -5190,6 +5243,9 @@ inline ::std::size_t for_each_unwritten(
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_BRAKE_ENABLE), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_ES_REAR_BRAKE_ENABLE"}, static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_BRAKE_ENABLE)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_FRONT_ISO_FL), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_ES_FRONT_ISO_FL"}, static_cast<::electricsim::io::WireId>(kWireBTCM_ES_FRONT_ISO_FL)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_FRONT_ISO_FR), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_ES_FRONT_ISO_FR"}, static_cast<::electricsim::io::WireId>(kWireBTCM_ES_FRONT_ISO_FR)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_FRONT_EMB), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_ES_FRONT_EMB"}, static_cast<::electricsim::io::WireId>(kWireBTCM_ES_FRONT_EMB)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_FRONT_EMB_ENERGIZED), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_FRONT_EMB_ENERGIZED"}, static_cast<::electricsim::io::WireId>(kWireBTCM_FRONT_EMB_ENERGIZED)); ++count; }
+  if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_FRONT_EMB_LO_GROUNDED), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_FRONT_EMB_LO_GROUNDED"}, static_cast<::electricsim::io::WireId>(kWireBTCM_FRONT_EMB_LO_GROUNDED)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REGEN_DISABLE), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_ES_REGEN_DISABLE"}, static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REGEN_DISABLE)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWireBTCM_ES_RETARD_REQUEST_DUTY), &gen) && gen == 0) { visitor(::std::string_view{"BTCM_ES_RETARD_REQUEST_DUTY"}, static_cast<::electricsim::io::WireId>(kWireBTCM_ES_RETARD_REQUEST_DUTY)); ++count; }
   if (table.write_gen(static_cast<::electricsim::io::WireId>(kWirePIM_RETARD_REQUEST_IN), &gen) && gen == 0) { visitor(::std::string_view{"PIM_RETARD_REQUEST_IN"}, static_cast<::electricsim::io::WireId>(kWirePIM_RETARD_REQUEST_IN)); ++count; }
@@ -5825,6 +5881,10 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case static_cast<::electricsim::io::WireId>(kWireIPC_DIM_LEVEL_INPUT_230): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireIPC_SEATBELT_INPUT_238): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireDRIVER_ES_SDM_CONNECTOR_UNPLUGGED): return ::electricsim::io::CellClass::kElementState;
+    case kWireSDM_VELOCITY_EXCEED_COUNT: return ::electricsim::io::CellClass::kSemantic;
+    case kWireSDM_ARMING_SENSOR_CLOSED: return ::electricsim::io::CellClass::kSemantic;
+    case kWireSDM_DRIVER_SQUIB_FIRE: return ::electricsim::io::CellClass::kSemantic;
+    case kWireSDM_PASSENGER_SQUIB_FIRE: return ::electricsim::io::CellClass::kSemantic;
     case static_cast<::electricsim::io::WireId>(kWireIPC_AIRBAG_IND_INPUT_358): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireSDM_AIR_BAG_TT_OUTPUT_358E): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireIPC_ES_ANTILOCK_TT_DRV): return ::electricsim::io::CellClass::kElementState;
@@ -5846,6 +5906,9 @@ inline ::electricsim::io::CellClass cell_class_for(::electricsim::io::WireId id)
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REAR_BRAKE_ENABLE): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_FRONT_ISO_FL): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_FRONT_ISO_FR): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_FRONT_EMB): return ::electricsim::io::CellClass::kElementState;
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FRONT_EMB_ENERGIZED): return ::electricsim::io::CellClass::kConductor;
+    case static_cast<::electricsim::io::WireId>(kWireBTCM_FRONT_EMB_LO_GROUNDED): return ::electricsim::io::CellClass::kConductor;
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_REGEN_DISABLE): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWireBTCM_ES_RETARD_REQUEST_DUTY): return ::electricsim::io::CellClass::kElementState;
     case static_cast<::electricsim::io::WireId>(kWirePIM_RETARD_REQUEST_IN): return ::electricsim::io::CellClass::kConductor;

@@ -197,6 +197,13 @@ public:
     /// BPM_INTERNAL_MEMORY_FAULT once set.
     void SetBpmMemoryFault(std::uint8_t mask);
 
+    /// A crash pulse at the SDM (scenario actions "sdm_velocity_exceed" and
+    /// "sdm_arming_sensor"): adds to the running exceed total on
+    /// SDM_VELOCITY_EXCEED_COUNT, and sets SDM_ARMING_SENSOR_CLOSED. Both are
+    /// written every tick once either is set; until then both stay unwritten.
+    void AddSdmVelocityExceeds(std::uint32_t count);
+    void SetSdmArmingSensor(bool closed);
+
     /// The shifter's coast-down button position (scenario action
     /// "coast_down_switch"; 1 = coast down). Published on DRIVER_ES_COAST_DOWN_SWITCH
     /// every tick once set, for the RSA to report as $31 Coast Down Request.
@@ -712,6 +719,12 @@ public:
     /// Published by PIM each tick on change.
     /// bool: true = cruise ACTIVE (engaged), false = STANDBY or OFF.
     /// Returns false if never received.
+    /// The SDM's fire commands (SDM_DRIVER/PASSENGER_SQUIB_FIRE): false
+    /// until first received.
+    bool GetSdmDriverSquibFire() const;
+    bool GetSdmPassengerSquibFire() const;
+    bool HasReceivedSdmSquibFire() const;
+
     bool GetPimCruiseActive() const;
     bool HasReceivedPimCruiseActive() const;
 

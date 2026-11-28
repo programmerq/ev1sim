@@ -64,6 +64,8 @@ public:
     void FailThrottleInput(bool fail) override;
     void HvIsolationFault(int lead, double leak_kohm) override;
     void BpmMemoryFault(std::uint8_t mask) override;
+    void SdmVelocityExceed(std::uint32_t count) override;
+    void SdmArmingSensor(bool closed) override;
     void CoastDownSwitch(bool on) override;
     void SetChargeCoupler(bool mated) override;
 

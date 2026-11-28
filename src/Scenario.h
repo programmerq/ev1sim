@@ -193,6 +193,14 @@ public:
     // BPM_INTERNAL_MEMORY_FAULT carries (0x01 RAM, 0x02 ROM, 0x04 EEPROM,
     // 0x08 EEPROM checksum; 0 = none). Held until the next action.
     virtual void BpmMemoryFault(std::uint8_t mask) = 0;
+    // A crash pulse at the SDM (scenario actions "sdm_velocity_exceed" and
+    // "sdm_arming_sensor"). The SDM's sensing device and arming sensor are
+    // inside the module, and the sim models them at their outputs (sir-94):
+    // `count` more times the velocity-change signal exceeded its stored
+    // value, and whether the arming sensor is closed (held until the next
+    // action).
+    virtual void SdmVelocityExceed(std::uint32_t count) = 0;
+    virtual void SdmArmingSensor(bool closed) = 0;
     // The shifter's coast-down button position (scenario action
     // "coast_down_switch"), held until the next action. The RSA reports it to
     // the PIM, which then commands coast-down drag (propulsion p57).
