@@ -2929,6 +2929,17 @@ void SimApp::HvIsolationFault(int lead, double leak_kohm) {
               << " " << kohm << " kOhm to chassis\n";
 }
 
+void SimApp::SdmVelocityExceed(std::uint32_t count) {
+    if (m_external_sim) m_external_sim->AddSdmVelocityExceeds(count);
+    std::cout << "[Scenario] sdm_velocity_exceed -> +" << count << "\n";
+}
+
+void SimApp::SdmArmingSensor(bool closed) {
+    if (m_external_sim) m_external_sim->SetSdmArmingSensor(closed);
+    std::cout << "[Scenario] sdm_arming_sensor -> "
+              << (closed ? "closed" : "open") << "\n";
+}
+
 void SimApp::BpmMemoryFault(std::uint8_t mask) {
     if (m_external_sim) m_external_sim->SetBpmMemoryFault(mask);
     std::cout << "[Scenario] bpm_memory_fault -> mask 0x" << std::hex

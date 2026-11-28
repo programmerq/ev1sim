@@ -53,6 +53,8 @@ struct CountingHooks : public ev1sim::ScenarioHooks {
     int fail_throttle = 0, restore_throttle = 0;
     int hv_iso_calls = 0, hv_iso_lead = -1;
     int bpm_fault_calls = 0, bpm_fault_mask = -1;
+    std::uint32_t sdm_exceeds = 0;
+    int sdm_exceed_calls = 0, sdm_arming_closed = 0, sdm_arming_open = 0;
     int coast_down_on = 0, coast_down_off = 0;
     int coupler_mated = 0, coupler_pulled = 0;
     double hv_iso_kohm = -1.0;
@@ -93,6 +95,13 @@ struct CountingHooks : public ev1sim::ScenarioHooks {
     void BpmMemoryFault(std::uint8_t mask) override {
         ++bpm_fault_calls;
         bpm_fault_mask = mask;
+    }
+    void SdmVelocityExceed(std::uint32_t count) override {
+        ++sdm_exceed_calls;
+        sdm_exceeds += count;
+    }
+    void SdmArmingSensor(bool closed) override {
+        if (closed) ++sdm_arming_closed; else ++sdm_arming_open;
     }
     void CoastDownSwitch(bool on) override {
         if (on) ++coast_down_on; else ++coast_down_off;
@@ -1635,6 +1644,33 @@ TEST_CASE("Scenario: bpm_memory_fault dispatches the failed-memory mask",
     s.Tick(2.10, VehicleState{}, hooks, cmd);
     CHECK(hooks.bpm_fault_calls == 2);
     CHECK(hooks.bpm_fault_mask == 0);
+}
+
+TEST_CASE("Scenario: sdm_velocity_exceed and sdm_arming_sensor dispatch the crash pulse",
+          "[Scenario]") {
+    using ev1sim::Scenario;
+
+    Scenario s;
+    s.set_events({
+        {1.00, "sdm_velocity_exceed", 0.0, 0.0},   // no count: one exceedance
+        {1.00, "sdm_velocity_exceed", 2.0, 0.0},
+        {2.00, "sdm_arming_sensor",   1.0, 0.0},
+        {2.05, "sdm_arming_sensor",   0.0, 0.0},
+    });
+
+    CountingHooks hooks;
+    DriverCommand cmd{};
+
+    s.Tick(0.50, VehicleState{}, hooks, cmd);
+    CHECK(hooks.sdm_exceed_calls == 0);
+    s.Tick(1.10, VehicleState{}, hooks, cmd);
+    CHECK(hooks.sdm_exceed_calls == 2);
+    CHECK(hooks.sdm_exceeds == 3u);
+    s.Tick(2.01, VehicleState{}, hooks, cmd);
+    CHECK(hooks.sdm_arming_closed == 1);
+    CHECK(hooks.sdm_arming_open == 0);
+    s.Tick(2.10, VehicleState{}, hooks, cmd);
+    CHECK(hooks.sdm_arming_open == 1);
 }
 
 TEST_CASE("Scenario: coast_down_switch sets and clears the shifter button",

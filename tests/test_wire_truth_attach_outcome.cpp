@@ -583,6 +583,62 @@ TEST_CASE("Master-cylinder pressure and BPM memory fault publish through Tick",
     CHECK(permille() == 1000u);
 }
 
+// The crash pulse reaches the SDM's cells, and the SDM's fire commands reach
+// the connector, through Tick.
+TEST_CASE("SDM crash pulse out and squib fire commands back through Tick",
+          "[wire_truth][attach_outcome]") {
+    namespace topo = electricsim::topology;
+    const std::string seg = unique_segment("sdmcrash");
+    auto table = create_fleet_table(seg, topo::kTopologyHash);
+    REQUIRE(table != nullptr);
+
+    ScopedWiresName guard(seg.c_str());
+    ExternalSimConnector::Options opts;
+    opts.enabled = true;
+    ExternalSimConnector c(opts);
+
+    auto total_written = [&]() {
+        electricsim::io::WireTable::Sample<std::uint32_t> s{};
+        REQUIRE(table->read_uint32_sample(topo::kWireSDM_VELOCITY_EXCEED_COUNT, &s));
+        return s.written();
+    };
+    auto total = [&]() {
+        electricsim::io::WireTable::Sample<std::uint32_t> s{};
+        REQUIRE(table->read_uint32_sample(topo::kWireSDM_VELOCITY_EXCEED_COUNT, &s));
+        REQUIRE(s.written());
+        return s.value;
+    };
+    auto arming = [&]() {
+        electricsim::io::WireTable::Sample<bool> s{};
+        REQUIRE(table->read_bit_sample(topo::kWireSDM_ARMING_SENSOR_CLOSED, &s));
+        REQUIRE(s.written());
+        return s.value;
+    };
+
+    c.Tick(0.0);
+    REQUIRE(c.IsConnected());
+    CHECK_FALSE(total_written());
+    CHECK_FALSE(c.HasReceivedSdmSquibFire());
+
+    c.AddSdmVelocityExceeds(1u);
+    c.Tick(0.1);
+    CHECK(total() == 1u);
+    CHECK_FALSE(arming());
+
+    c.AddSdmVelocityExceeds(2u);
+    c.SetSdmArmingSensor(true);
+    c.Tick(0.2);
+    CHECK(total() == 3u);
+    CHECK(arming());
+
+    REQUIRE(table->write_bit(topo::kWireSDM_DRIVER_SQUIB_FIRE, true));
+    REQUIRE(table->write_bit(topo::kWireSDM_PASSENGER_SQUIB_FIRE, true));
+    c.Tick(0.3);
+    REQUIRE(c.HasReceivedSdmSquibFire());
+    CHECK(c.GetSdmDriverSquibFire());
+    CHECK(c.GetSdmPassengerSquibFire());
+}
+
 // The APM's 12 V status lines reach GetApm12vStatusCode through Tick.
 TEST_CASE("APM 12 V status code reaches the connector through Tick",
           "[wire_truth][attach_outcome]") {

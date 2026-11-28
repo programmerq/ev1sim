@@ -203,6 +203,13 @@ void Scenario::Tick(double sim_time, const VehicleState& state,
             // value = the failed-memory bitmask (Scenario.h BpmMemoryFault).
             hooks.BpmMemoryFault(static_cast<std::uint8_t>(
                 std::clamp(e.value, 0.0, 255.0)));
+        } else if (e.action == "sdm_velocity_exceed") {
+            // value = how many exceedances in this event (at least 1).
+            hooks.SdmVelocityExceed(static_cast<std::uint32_t>(
+                std::clamp(e.value, 1.0, 255.0)));
+        } else if (e.action == "sdm_arming_sensor") {
+            // value != 0 closes the SDM's arming sensor, 0 opens it.
+            hooks.SdmArmingSensor(e.value != 0.0);
         } else if (e.action == "lane_hold") {
             m_lane_hold_y = e.value;
             m_lane_profile = (e.value2 == 1.0) ? 1 : 0;
@@ -504,6 +511,12 @@ void Scenario::MaybeSampleStats(double sim_time, const VehicleState& state,
         // indication the SIR acceptance scenarios assert on.
         else if (f == "ipc_air_bag_telltale")
             m_csv << (bus.GetIpcAirBagTelltale() ? 1 : 0);
+        // The SDM's fire commands on the two inflator loops
+        // (SDM_DRIVER/PASSENGER_SQUIB_FIRE). 0 until first received.
+        else if (f == "sdm_driver_squib_fire")
+            m_csv << (bus.GetSdmDriverSquibFire() ? 1 : 0);
+        else if (f == "sdm_passenger_squib_fire")
+            m_csv << (bus.GetSdmPassengerSquibFire() ? 1 : 0);
         // CHECK MESSAGES (4141) is the IPC's aggregate comm-loss telltale —
         // the one that lights when a peer's UART stream dies (e.g. IPC
         // DTC 15 on BTCM eavesdrop loss), so it's the loss-of-module

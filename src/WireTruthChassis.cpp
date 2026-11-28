@@ -823,6 +823,24 @@ bool WireTruthChassis::publish_hv_isolation_fault(std::uint8_t lead,
     const bool b = write_uint32(ProducerWireId(electricsim::topology::kWireHV_ISOLATION_FAULT_KOHM), kohm);
     return a && b;
 }
+bool WireTruthChassis::publish_sdm_crash_pulse(std::uint32_t exceed_total,
+                                               bool arming_closed) {
+    if (!attached()) return false;
+    const bool a = write_uint32(
+        ProducerWireId(electricsim::topology::kWireSDM_VELOCITY_EXCEED_COUNT), exceed_total);
+    const bool b = write_bit(
+        ProducerWireId(electricsim::topology::kWireSDM_ARMING_SENSOR_CLOSED), arming_closed);
+    return a && b;
+}
+
+std::optional<bool> WireTruthChassis::sdm_driver_squib_fire() const {
+    return read_bit(electricsim::topology::kWireSDM_DRIVER_SQUIB_FIRE);
+}
+
+std::optional<bool> WireTruthChassis::sdm_passenger_squib_fire() const {
+    return read_bit(electricsim::topology::kWireSDM_PASSENGER_SQUIB_FIRE);
+}
+
 bool WireTruthChassis::publish_bpm_memory_fault(std::uint8_t mask) {
     if (!attached()) return false;
     return write_byte(ProducerWireId(electricsim::topology::kWireBPM_INTERNAL_MEMORY_FAULT), mask);
@@ -1280,6 +1298,9 @@ std::optional<std::uint8_t> WireTruthChassis::apm_12v_status_code() const {
     return std::nullopt;
 }
 bool WireTruthChassis::publish_bpm_memory_fault(std::uint8_t) { return false; }
+bool WireTruthChassis::publish_sdm_crash_pulse(std::uint32_t, bool) { return false; }
+std::optional<bool> WireTruthChassis::sdm_driver_squib_fire() const { return std::nullopt; }
+std::optional<bool> WireTruthChassis::sdm_passenger_squib_fire() const { return std::nullopt; }
 bool WireTruthChassis::publish_hv_isolation_fault(std::uint8_t, std::uint32_t) {
     return false;
 }

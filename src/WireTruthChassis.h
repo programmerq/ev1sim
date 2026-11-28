@@ -285,6 +285,12 @@ public:
     bool publish_hv_isolation_fault(std::uint8_t lead, std::uint32_t kohm);
     // The BPM's failed internal memories (BPM_INTERNAL_MEMORY_FAULT bitmask).
     bool publish_bpm_memory_fault(std::uint8_t mask);
+    // A crash pulse at the SDM: the running velocity-change exceed total
+    // (SDM_VELOCITY_EXCEED_COUNT) and the arming sensor (SDM_ARMING_SENSOR_CLOSED).
+    bool publish_sdm_crash_pulse(std::uint32_t exceed_total, bool arming_closed);
+    // The SDM's fire commands (SDM_DRIVER/PASSENGER_SQUIB_FIRE).
+    std::optional<bool> sdm_driver_squib_fire() const;
+    std::optional<bool> sdm_passenger_squib_fire() const;
 
     // The steering pump motor's case temperature, uint16 Q8 °C
     // (CHASSIS_PS_MOTOR_CASE_TEMP_Q8, read by the PSCM's 150 °C switch). ev1sim

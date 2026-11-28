@@ -1361,6 +1361,15 @@ struct ExternalSimConnector::State {
     // Injected BPM memory failure (scenario action bpm_memory_fault).
     bool          bpm_memory_fault_armed          = false;
     std::uint8_t  bpm_memory_fault_mask           = 0u;
+    // Injected SDM crash pulse (scenario actions sdm_velocity_exceed /
+    // sdm_arming_sensor).
+    bool          sdm_crash_armed                 = false;
+    std::uint32_t sdm_exceed_total                = 0u;
+    bool          sdm_arming_closed               = false;
+    // The SDM's fire commands, read back every tick.
+    bool          sdm_driver_squib_fire           = false;
+    bool          sdm_passenger_squib_fire        = false;
+    bool          has_sdm_squib_fire              = false;
     // Shifter coast-down button (scenario action coast_down_switch).
     bool          coast_down_switch_armed         = false;
     bool          coast_down_switch_on            = false;
@@ -2043,6 +2052,16 @@ bool ExternalSimConnector::HasReceivedIpcCheckTirePressTelltale() const {
     return m_state->has_ipc_check_tire_press_telltale;
 }
 
+bool ExternalSimConnector::GetSdmDriverSquibFire() const {
+    return m_state->sdm_driver_squib_fire;
+}
+bool ExternalSimConnector::GetSdmPassengerSquibFire() const {
+    return m_state->sdm_passenger_squib_fire;
+}
+bool ExternalSimConnector::HasReceivedSdmSquibFire() const {
+    return m_state->has_sdm_squib_fire;
+}
+
 bool ExternalSimConnector::GetPimCruiseActive() const {
     return m_state->pim_cruise_active;
 }
@@ -2246,6 +2265,16 @@ void ExternalSimConnector::SetHvIsolationFault(std::uint8_t lead,
     m_state->hv_iso_fault_armed = true;
     m_state->hv_iso_fault_lead  = lead;
     m_state->hv_iso_fault_kohm  = leak_kohm;
+}
+
+void ExternalSimConnector::AddSdmVelocityExceeds(std::uint32_t count) {
+    m_state->sdm_crash_armed  = true;
+    m_state->sdm_exceed_total += count;
+}
+
+void ExternalSimConnector::SetSdmArmingSensor(bool closed) {
+    m_state->sdm_crash_armed   = true;
+    m_state->sdm_arming_closed = closed;
 }
 
 void ExternalSimConnector::SetBpmMemoryFault(std::uint8_t mask) {
@@ -3248,6 +3277,15 @@ void ExternalSimConnector::Tick(double sim_time_s) {
         // PIM cruise state (was kSigPimCruiseActive/SetpointMps 5360/5361) ->
         // PIM_CRUISE_ACTIVE + PIM_CRUISE_SETPOINT_MPS. The external sim declared these
         // cells (gap now closed); nullopt until PIM writes them.
+        // The SDM's fire commands; nullopt until the SDM writes them.
+        {
+            const auto drv = st.wire->sdm_driver_squib_fire();
+            const auto pas = st.wire->sdm_passenger_squib_fire();
+            if (drv) st.sdm_driver_squib_fire = *drv;
+            if (pas) st.sdm_passenger_squib_fire = *pas;
+            if (drv || pas) st.has_sdm_squib_fire = true;
+        }
+
         if (auto active = st.wire->pim_cruise_active()) {
             st.pim_cruise_active     = *active;
             st.has_pim_cruise_active = true;
@@ -3542,6 +3580,12 @@ void ExternalSimConnector::Tick(double sim_time_s) {
     }
     // Injected BPM memory failure: unwritten (no fault) until a scenario sets
     // it, then level-held every tick.
+    // Injected SDM crash pulse: unwritten until a scenario sets it, then the
+    // running total and the arming level are written every tick.
+    if (st.sdm_crash_armed && st.wire) {
+        st.wire->publish_sdm_crash_pulse(st.sdm_exceed_total,
+                                         st.sdm_arming_closed);
+    }
     if (st.bpm_memory_fault_armed && st.wire) {
         st.wire->publish_bpm_memory_fault(st.bpm_memory_fault_mask);
     }
