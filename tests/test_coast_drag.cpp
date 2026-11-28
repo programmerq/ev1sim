@@ -110,3 +110,15 @@ TEST_CASE("Coast drag: a car at rest is not driven backward", "[plant][coast]") 
     // 12 Nm through the 10.95:1 reduction would roll the car back metres.
     CHECK(ev1->GetPos().x() - x0 > -0.05);
 }
+
+TEST_CASE("Coast drag: with no PIM, the coast map applies only with coast down on",
+          "[plant][coast]") {
+    CHECK_FALSE(ev1sim::CoastDragWithoutPim(true).has_value());
+    REQUIRE(ev1sim::CoastDragWithoutPim(false).has_value());
+    CHECK(*ev1sim::CoastDragWithoutPim(false) == 0.0);
+
+    const CoastRun button_off = Coast(ev1sim::CoastDragWithoutPim(false));
+    const CoastRun button_on  = Coast(ev1sim::CoastDragWithoutPim(true));
+    CHECK(std::abs(button_off.motor_torque_nm) < 1e-9);
+    CHECK(button_on.speed_loss_mps > button_off.speed_loss_mps);
+}

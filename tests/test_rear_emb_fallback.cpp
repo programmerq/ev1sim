@@ -45,7 +45,7 @@ using ev1sim::RearEmbClamp;
 namespace {
 
 // Same plant constants as test_brake_decel.cpp (docs/ev1_chrono_audit.md).
-constexpr double kCurbMassKg       = 1281.0;
+constexpr double kCurbMassKg       = 1350.0;  // chassis manual p. 62
 constexpr double kTireRadiusM      = 0.2915;
 constexpr double kTireMu           = 0.8;
 constexpr double kGravity          = 9.80665;

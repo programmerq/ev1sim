@@ -1,12 +1,14 @@
 {
-  "Name":                       "EV1 Front Brake (vented disc)",
+  "Name":                       "EV1 Front Brake (disc)",
   "Type":                       "Brake",
   "Template":                   "BrakeSimple",
 
-  "//":                         "Round 4 brake bias — front vented disc carries ~70% of total braking.",
+  "//":                         "Front disc: 245 mm rotor, 11.0 mm new thickness, 45.03 mm caliper bore",
+  "//0":                        "  (brakes manual, printed pages 28 and 29).  It carries ~70% of total braking.",
+  "//t":                        "@inferred 1120 N·m: no manual page prints a brake torque.",
   "//1":                        "Paired with EV1_BrakeSimple_Rear.json's 513 N·m (the rear EMB drum's peak);",
   "//2":                        "  4-wheel total 3266 N·m.",
-  "//3":                        "Static weight is ~50/50, but a 0.8g stop transfers load forward, so a",
+  "//3":                        "Static weight is ~53/47 front/rear (EV1_Chassis.json), and a 0.8g stop transfers load forward, so a",
   "//4":                        "  70/30 front bias matches the dynamic axle loads and the disc's thermal",
   "//5":                        "  headroom.  Front pair 2×1120 = 2240 N·m (69%); rear pair 2×513 = 1026 (31%).",
   "Maximum Torque":             1120

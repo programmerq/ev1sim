@@ -67,12 +67,12 @@ import tempfile
 from pathlib import Path
 
 # Plant constants (sync with data/vehicle/ev1/chassis/EV1_Chassis.json + spec).
-MASS_KG = 1281.0       # Gen 2 NiMH curb weight (chassis 1167 + ~114 wheel, tyre, suspension, steering bodies)
+MASS_KG = 1350.0       # curb weight, EV1 chassis manual p. 62 (chassis 1236 + 113.6 wheel, tyre, suspension, steering bodies)
 RHO_AIR = 1.225        # kg/m^3 at sea level
 
-# EV1 published spec for comparison.
-SPEC_F_RR_N = 100.0    # rolling resistance at curb weight: m*g*Crr ~= 100 N
-SPEC_CD_A   = 0.36     # 0.19 Cd * 1.89 m^2 frontal area
+# EV1 reference values for comparison.
+SPEC_F_RR_N = 106.0    # @inferred: m*g*Crr at the tyre file's estimated Crr 0.008; no manual prints one
+SPEC_CD_A   = 0.36     # 0.19 Cd * 1.89 m^2 frontal area, both printed on chassis manual p. 62
 
 MPS_TO_MPH = 2.2369362920544
 
@@ -334,8 +334,8 @@ class Fit:
         0.097 +/- 0.089 is a ratio of 1.09, no more a measurement of an aero
         term than 0.086 +/- 0.144 is.  The COEFFICIENTS are far steadier than
         the verdict — over the whole coast CdA holds 0.610-0.621 (new map) and
-        0.908-0.914 (old) across those same widths, so what section 11.1
-        publishes does not turn on this constant even though the verdict does.
+        0.908-0.914 (old) across those same widths, so the published
+        coefficients do not turn on this constant even though the verdict does.
         """
         if self.cd_a_sigma is None:
             return None
@@ -374,16 +374,16 @@ def print_fit(fit: Fit, indent: str = "  ") -> None:
           f"({fit.n_bins} bins of {BIN_WIDTH_MPS:.1f} m/s, {fit.dof} dof)")
     if f_sig is None:
         print(f"{indent}F_rr     = {fit.f_rr:7.1f} N          "
-              f"(real EV1 spec ~{SPEC_F_RR_N:.0f} N, ratio {fit.f_rr / SPEC_F_RR_N:.2f}x)")
+              f"(estimate ~{SPEC_F_RR_N:.0f} N, ratio {fit.f_rr / SPEC_F_RR_N:.2f}x)")
         print(f"{indent}CdA      = {fit.cd_a:7.3f} m^2        "
-              f"(real EV1 spec ~{SPEC_CD_A:.2f} m^2, ratio {fit.cd_a / SPEC_CD_A:.2f}x)")
+              f"(printed EV1 ~{SPEC_CD_A:.2f} m^2, ratio {fit.cd_a / SPEC_CD_A:.2f}x)")
         print(f"{indent}NO SPREAD: {fit.n_bins} bins fit 2 parameters exactly, so nothing "
               f"here has been\n{indent}           checked against anything. Widen the window.")
         return
     print(f"{indent}F_rr     = {fit.f_rr:7.1f} +/- {f_sig:5.1f} N    "
-          f"(real EV1 spec ~{SPEC_F_RR_N:.0f} N, ratio {fit.f_rr / SPEC_F_RR_N:.2f}x)")
+          f"(estimate ~{SPEC_F_RR_N:.0f} N, ratio {fit.f_rr / SPEC_F_RR_N:.2f}x)")
     print(f"{indent}CdA      = {fit.cd_a:7.3f} +/- {c_sig:5.3f} m^2  "
-          f"(real EV1 spec ~{SPEC_CD_A:.2f} m^2, ratio {fit.cd_a / SPEC_CD_A:.2f}x)")
+          f"(printed EV1 ~{SPEC_CD_A:.2f} m^2, ratio {fit.cd_a / SPEC_CD_A:.2f}x)")
     if not fit.identified:
         print(f"{indent}*** CdA IS NOT IDENTIFIED over this window: "
               f"|{fit.cd_a:.3f}| <= {c_sig:.3f}.")
