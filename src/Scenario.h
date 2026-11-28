@@ -92,6 +92,21 @@ class PhysicalWorld;
 //       at 0 until a later set_steering).  Schedule it on the brake tick
 //       so the stop itself is open-loop: what the car does under the
 //       brake is then the brake system's answer, not the driver's.
+//   decel_hold:  engage the scenario's braking driver: every tick until
+//       decel_release or a set_brake, the brake pedal is computed to hold a
+//       steady deceleration of value m/s^2 (positive), from accel_long in the
+//       VehicleState of the previous scenario tick.  A person asked for a
+//       firm stop presses until the car slows the way they want, so the
+//       pedal TRAVEL it took is the measured answer: after a fault that
+//       leaves less braking behind the pedal, the same deceleration needs
+//       more travel (brakes manual p310: "In the event of a failure resulting
+//       in front braking system apply only, the brake pedal travel will
+//       increase").  Overrides a held set_brake while engaged; below
+//       kDecelHoldStopMps the pedal is held where it is, because a car at
+//       rest has no deceleration left to steer by.  See
+//       Scenario::DecelHoldPedal for the law and its gains.
+//   decel_release:  disengage decel_hold and lift the pedal (brake held at
+//       0 until a later set_brake).
 //   flash_to_pass: value != 0 holds the combination-switch flash-to-pass lever
 //       until a flash_to_pass 0.
 //
@@ -272,6 +287,10 @@ public:
     const std::vector<ScenarioEvent>& events() const { return m_events; }
 
     bool lane_hold_engaged() const { return m_lane_hold_y.has_value(); }
+    bool decel_hold_engaged() const { return m_decel_target.has_value(); }
+    // The decel_hold target (m/s^2), 0 while disengaged: the stats column
+    // decel_target_mps2.
+    double decel_target_mps2() const { return m_decel_target.value_or(0.0); }
 
     // Test-only setters.
     void set_events(std::vector<ScenarioEvent> e) { m_events = std::move(e); }
@@ -316,6 +335,19 @@ private:
     // the definition for the law and the gain provenance.  Updates
     // m_lane_prev and the hand-lag state.
     double LaneHoldSteering(const VehicleState& state, double sim_time);
+    // Below this speed decel_hold holds the pedal still (see DecelHoldPedal).
+    static constexpr double    kDecelHoldStopMps = 0.5;
+    // decel_hold target deceleration (m/s^2, positive); disengaged when empty.
+    std::optional<double>      m_decel_target;
+    // The braking driver's state: its integral term and its last pedal
+    // output with the sim time it was written (the foot lag filters from
+    // there).
+    double                     m_decel_integ = 0.0;
+    double                     m_decel_out = 0.0;
+    std::optional<double>      m_decel_out_t;
+    // Brake pedal travel in [0, 1] that the braking driver applies for the
+    // current state; see the definition for the law and the gains.
+    double DecelHoldPedal(const VehicleState& state, double sim_time);
     // Horn contact, held like the pedals: set_horn value != 0 closes the
     // single driver horn contact (circuit 28) until the next set_horn 0.
     std::optional<bool>        m_held_horn;
